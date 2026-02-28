@@ -132,11 +132,25 @@ Sicurre uses a **dual-track architecture** — identical to how MongoDB, Grafana
 
 **Evaluation:** E1 (Professional Report + Oral Defence)
 
-**Project Context:** Build a complete data pipeline to collect French phishing emails from multiple sources (CERT-FR, PhishTank, Signal-Spam, synthetic LLM generation), clean/aggregate them, store in a RGPD-compliant PostgreSQL database, and expose via REST API. This pipeline directly feeds the CamemBERTv2 fine-tuning workflow and is your strongest Bloc 1 argument — **you are building a dataset that does not exist publicly**.
+**Project Context:** Build a complete data pipeline to collect French phishing emails from multiple sources (CERT-FR, PhishTank, BigQuery public datasets, synthetic LLM generation, local CSV files), clean/aggregate them, store in a RGPD-compliant PostgreSQL database, and expose via REST API. This pipeline directly feeds the CamemBERTv2 fine-tuning workflow and is your strongest Bloc 1 argument — **you are building a dataset that does not exist publicly**.
 
 ---
 
 ## C1: Automate Data Extraction from Multiple Sources
+
+### C1 Source Type Coverage (Certification Requirement)
+
+The certification requires extraction from **at least 5 source types**. Here is our mapping:
+
+| # | Required Source Type | Sicurre Implementation | Task |
+|---|---------------------|----------------------|------|
+| 1 | **Service web (API REST)** | PhishTank API (JSON) | Task 1.1 |
+| 2 | **Scraping** | CERT-FR CTI reports (BeautifulSoup + pdfplumber) | Task 1.2 |
+| 3 | **Fichier de données** | Local CSV files (Kinoux French Spam/Ham, Kaggle Multilingual, synthetic outputs) | Task 1.4 |
+| 4 | **Base de données** | PostgreSQL (Neon) / SQLite — read-back extraction queries | Task 1.5 + Task 2.1 |
+| 5 | **Système big data** | Google BigQuery — query HF phishing datasets (200K+ rows) + Common Crawl index | Task 1.7 |
+
+> ✅ All 5 mandatory source types are covered. BigQuery (Task 1.7) satisfies the "système big data" requirement.
 
 ### Task 1.1: Scrape PhishTank API for French Phishing URLs
 ✅ **What to do:**
@@ -258,6 +272,58 @@ Sicurre uses a **dual-track architecture** — identical to how MongoDB, Grafana
 
 ---
 
+### Task 1.7: Extract Phishing Data from Google BigQuery (Système Big Data)
+✅ **What to do:**
+- Set up Google Cloud project with BigQuery (free tier: 1 TB queries/month, 10 GB storage)
+- Load the HuggingFace `cybersectony/PhishingEmailDetectionv2.0` dataset (200K records) into a BigQuery table
+- Write SQL queries to extract and filter English phishing emails (label=1), deduplicate, and sample the most diverse 5,000 records
+- Export results as CSV for downstream cultural adaptation (English → French via LLM)
+- Optionally query the Common Crawl index (available as BigQuery public dataset) to find French-language pages on known phishing domains from PhishTank
+- Document query costs, execution times, and row counts
+
+📋 **Deliverable:** `scripts/bigquery_extractor.py` + `sql/bigquery_queries.sql` + output CSV
+
+🔧 **Tools:** `google-cloud-bigquery`, `pandas`, Google Cloud Console
+
+⏱️ **Timeline:** 3-5 days
+
+✔️ **Acceptance Criteria:**
+- BigQuery dataset created and queryable
+- SQL queries documented with `EXPLAIN` output and cost estimates
+- 5,000+ English phishing emails extracted for cultural adaptation pipeline
+- Demonstrates "système big data" competency (C1 requirement)
+- Connection credentials via `.env` / GCP service account (not hardcoded)
+
+> 💡 **Defence talking point:** *"BigQuery serves two purposes: it satisfies the 'système big data' extraction requirement, and it gives us access to 200K+ phishing samples at scale — which we then culturally adapt to French using LLM-based translation. This is how we overcome the absence of a public French phishing corpus."*
+
+---
+
+### Task 1.8: Culturally Adapt English Phishing Emails to French
+✅ **What to do:**
+- Take the 5,000 English phishing emails extracted from BigQuery (Task 1.7)
+- Select the 2,000 most diverse samples (cluster by topic, pick representatives)
+- Use Mistral Large or GPT-4 with a cultural adaptation prompt (not naive translation):
+  - Replace cultural references (IRS → DGFiP, USPS → La Poste, Bank of America → Crédit Agricole)
+  - Use formal French register ("vous")
+  - Adapt urgency patterns to French administrative style
+- Validate output with `langdetect` (confirm French) and manual spot-check (10% sample)
+- Label as `phishing`, source as `adapted_en_fr`
+- Save to CSV: `adapted_french_phishing.csv`
+
+📋 **Deliverable:** `scripts/cultural_adapter.py` + output CSV
+
+🔧 **Tools:** OpenAI API or Mistral API, `pandas`, `langdetect`
+
+⏱️ **Timeline:** 3-5 days
+
+✔️ **Acceptance Criteria:**
+- 2,000+ culturally adapted French phishing emails generated
+- No literal translations — cultural references are adapted to French entities
+- Language detection confirms >98% French output
+- Source tracked as `adapted_en_fr` (distinct from `synthetic`)
+
+---
+
 ## C2: Develop SQL Queries for Data Extraction
 
 ### Task 2.1: Write SQL Extraction Queries
@@ -297,10 +363,16 @@ Sicurre uses a **dual-track architecture** — identical to how MongoDB, Grafana
 
 ### Task 3.1: Aggregate Multi-Source Data
 ✅ **What to do:**
-- Merge PhishTank, CERT-FR, synthetic, and legitimate CSV files into single dataset
+- Merge **all** sources into single dataset:
+  - PhishTank French URLs + scraped page content (Task 1.1)
+  - CERT-FR CTI extracted indicators (Task 1.2)
+  - Synthetic French phishing (Task 1.3)
+  - Legitimate French emails from CSV files (Task 1.4)
+  - BigQuery-extracted English phishing, culturally adapted to French (Tasks 1.7 + 1.8)
+  - Kinoux French Spam/Ham 2K dataset (Task 1.4)
 - Standardize schema: `(text, label, source, language, timestamp)`
 - Deduplicate using hash of first 300 chars (catches near-duplicates)
-- Target: 6,000+ total samples (3,000 phishing + 3,000 legitimate), balanced
+- Target: **10,000+ total samples** (5,000 phishing + 5,000 legitimate), balanced
 
 📋 **Deliverable:** `scripts/data_aggregator.py` + `french_phishing_dataset.csv`
 
@@ -309,9 +381,10 @@ Sicurre uses a **dual-track architecture** — identical to how MongoDB, Grafana
 ⏱️ **Timeline:** 3-5 days
 
 ✔️ **Acceptance Criteria:**
-- All sources merged
+- All 6+ sources merged (document provenance per row)
 - Duplicates removed (document count)
 - Class balance documented (50/50 phishing/legitimate)
+- Source distribution chart included in report
 
 ---
 
@@ -947,7 +1020,9 @@ Compare on: accuracy on French phishing, pricing, French language support, laten
 - [ ] RGPD documentation + registre des traitements
 - [ ] Merise diagrams (MCD, MLD, MPD)
 - [ ] REST API live (public URL with `/docs` OpenAPI page)
-- [ ] French phishing dataset: 6,000+ samples published
+- [ ] French phishing dataset: **10,000+ samples** from 6+ sources (5 source types)
+- [ ] BigQuery extraction documented (système big data requirement)
+- [ ] Source type coverage table proving all 5 mandatory types are covered
 - [ ] Oral defence slides
 
 ## For E2 (Bloc 2 — Veille & Benchmark)
