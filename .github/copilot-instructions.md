@@ -143,4 +143,11 @@ The authoritative API spec is `docs/api/openapi.yaml`. When adding endpoints:
 | NFRs (latency, security, privacy) | `docs/architecture/non-functional-requirements.md` |
 | All architectural decisions | `docs/adr/` |
 | OpenAPI spec | `docs/api/openapi.yaml` |
+| Brand identity (colors, fonts, motion, French copy) | `docs/brand/brand-identity.md` |
 | Doc visibility policy | `docs/README.md` |
+
+## Skills
+
+| Skill | Trigger | File |
+|-------|---------|------|
+| Frontend Agent | Any UI / React / Streamlit / component work | `.vscode/skills/frontend-agent/SKILL.md` |

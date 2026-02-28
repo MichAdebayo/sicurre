@@ -38,6 +38,8 @@ uv run uvicorn src.sicurre_api.main:app --reload
 
 **Canonical DB schema:** `docs/architecture/data-design.md`  
 **Canonical API spec:** `docs/api/openapi.yaml`  
+**Brand identity (colors, fonts, motion, French copy):** `docs/brand/brand-identity.md`  
+**Frontend skill:** `.vscode/skills/frontend-agent/SKILL.md`  
 **All ADRs:** `docs/adr/`
 
 ---
