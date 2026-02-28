@@ -29,5 +29,6 @@ flowchart LR
   ING -->|HTTP call| CLS
   CLS -->|Verdict + signals| ING
   ING -->|Trash message| GM
-  ING -->|Write audit log| DB
+  ING -->|POST audit log| API
+  API -->|Store| DB
 ```
