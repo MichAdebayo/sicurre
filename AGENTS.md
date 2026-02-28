@@ -103,6 +103,46 @@ uv run uvicorn src.sicurre_api.main:app --reload
 
 ---
 
+## Code Quality — OOP & Clean Code
+
+Apply these principles to **all** production code. No exceptions.
+
+### SOLID Principles
+- **Single Responsibility (SRP):** One class/module = one reason to change. A scraper class does not also clean data. A classifier does not also write to the database.
+- **Open/Closed (OCP):** Extend via new classes or strategy patterns, not by modifying existing working code. Example: new data sources implement a `BaseExtractor` interface — don't add `if source == "new_thing"` branches.
+- **Liskov Substitution (LSP):** Subclasses must be drop-in replacements for their parent. If `CERTFRExtractor` extends `BaseExtractor`, it must honour the same contract.
+- **Interface Segregation (ISP):** Keep interfaces small and focused. Don't force a class to implement methods it doesn't need.
+- **Dependency Inversion (DIP):** Depend on abstractions (protocols/ABCs), not concrete implementations. Inject dependencies — don't instantiate them inside business logic.
+
+### Clean Code Rules
+- **Modular structure:** Each script/module does ONE thing. `scripts/phishtank_scraper.py` scrapes. `scripts/data_cleaner.py` cleans. `scripts/data_aggregator.py` aggregates. No god-files.
+- **Meaningful names:** `extract_french_phishing_urls()` — not `do_stuff()` or `process()`. Variable names describe content: `raw_emails`, `cleaned_df`, `phishing_samples`.
+- **Small functions:** Max ~20 lines per function. If a function needs a comment to explain *what* it does, it's too long — extract a well-named helper.
+- **No magic numbers/strings:** Use constants or enums. `CONFIDENCE_THRESHOLD = 0.85` — not `if score > 0.85`.
+- **DRY (Don't Repeat Yourself):** Shared logic lives in `src/common/` or `src/utils/`. Two scripts doing the same CSV normalization = refactor into one reusable function.
+- **Type hints everywhere:** Every function signature, every return type. Use `Protocol` for duck-typing interfaces.
+- **Docstrings on public APIs:** Google-style docstrings on all public classes and functions. Internal helpers get a one-liner if non-obvious.
+- **Error handling:** Catch specific exceptions, never bare `except:`. Log context. Re-raise or return typed errors — don't swallow silently.
+- **No side effects in constructors:** `__init__` sets state. It does not make HTTP calls, read files, or connect to databases. Use factory methods or explicit `.connect()` / `.load()` calls.
+
+### Project Structure Convention
+```
+src/
+├── common/          # Shared utilities, base classes, constants
+├── extractors/      # One module per data source (SRP)
+│   ├── base.py      # BaseExtractor protocol/ABC
+│   ├── phishtank.py
+│   ├── certfr.py
+│   ├── bigquery.py
+│   └── synthetic.py
+├── cleaning/        # Data cleaning & normalization
+├── storage/         # DB access layer (repository pattern)
+├── api/             # FastAPI routes
+└── ml/              # Model training, inference, evaluation
+```
+
+---
+
 ## Hard Rules
 
 ### Database
