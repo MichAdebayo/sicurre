@@ -45,3 +45,11 @@ Patterns captured after corrections. Review at the start of each session.
 
 **Mistake:** `bloc-by-bloc-tasks-v2.md` (the full Simplon task plan) was placed in `docs/research/`. Research is reference material; execution plans are work artifacts.  
 **Rule:** Active task plans live in `tasks/TASK_PLAN.md`. Reference material (competitive analysis, data sources, tech surveys) lives in `docs/research/`.
+
+---
+
+## L-007 — Gmail watch renewal must use Cloud Scheduler, not in-process background task
+
+**Decision:** `users.watch` expires after 7 days. Renewal runs every 6 days via Cloud Scheduler → `POST /internal/renew-watches` on `sicurre-api`.  
+**Rule:** Never implement watch renewal as an APScheduler or threading background task inside the API. Cloud Run scales to zero — in-process schedulers die silently. Multiple instances also cause duplicate `users.watch` calls (race condition).  
+**IAM:** The `/internal/renew-watches` endpoint is restricted to the Cloud Scheduler service account via `roles/run.invoker`. No shared API key.

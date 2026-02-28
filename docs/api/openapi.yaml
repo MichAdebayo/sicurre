@@ -217,6 +217,30 @@ paths:
         "401":
           description: Not authenticated
 
+  /internal/renew-watches:
+    post:
+      summary: Renew Gmail users.watch subscriptions for all active users
+      tags: [internal]
+      description: >
+        Called exclusively by a Cloud Scheduler job every 6 days (Gmail watch
+        expiry is 7 days). Protected via GCP IAM — only the Cloud Scheduler
+        service account with `roles/run.invoker` may call this endpoint.
+        Rate-limited to 1 request/minute. Never expose this endpoint publicly
+        or call it from client-side code.
+      security:
+        - InternalServiceAuth: []
+      responses:
+        "200":
+          description: Renewal completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RenewWatchesResponse"
+        "401":
+          description: Missing or invalid IAM credentials
+        "429":
+          description: Rate limit exceeded
+
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -227,6 +251,12 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+    InternalServiceAuth:
+      type: http
+      scheme: bearer
+      description: >
+        GCP IAM identity token issued to the Cloud Scheduler service account.
+        Verified by Cloud Run using `roles/run.invoker`. Not a user JWT.
 
   schemas:
     ClassifyRequest:
@@ -346,3 +376,19 @@ components:
         total_restored: { type: integer }
         false_positive_rate: { type: number }
         period_days: { type: integer }
+
+    RenewWatchesResponse:
+      type: object
+      properties:
+        renewed:
+          type: integer
+          description: Number of users whose watch was successfully renewed
+          example: 42
+        failed:
+          type: integer
+          description: Number of users whose renewal failed (logged server-side)
+          example: 0
+        skipped:
+          type: integer
+          description: Users whose watch is not due for renewal yet
+          example: 7
