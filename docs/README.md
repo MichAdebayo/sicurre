@@ -10,6 +10,8 @@ This repository uses a split documentation model:
 - `docs/architecture/` except `threat-model.md` and `privacy-rgpd.md`
 - `docs/adr/` except internal ADRs `0001`, `0006`, and `0007`
 - `docs/api/`
+- `docs/brand/`
+- `docs/research/`
 - `docs/README.md`
 
 ## Private (local-only, ignored)
