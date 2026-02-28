@@ -56,6 +56,22 @@ Thumbs.db
 
 *.db
 
+# Data files (CSVs, JSONs, model weights — too large / PII-sensitive for git)
+data/raw/**/*.csv
+data/raw/**/*.json
+data/raw/**/*.pdf
+data/processed/**/*.csv
+data/processed/**/*.json
+data/final/**/*.csv
+data/final/**/*.json
+data/models/**/*.onnx
+data/models/**/*.bin
+data/models/**/*.pt
+data/models/**/*.safetensors
+# Keep folder structure and READMEs
+!data/README.md
+!data/**/.gitkeep
+
 # Private-by-default documentation (internal only)
 docs/ops/
 docs/architecture/threat-model.md
