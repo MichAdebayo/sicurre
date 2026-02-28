@@ -16,3 +16,20 @@ build-backend = "hatchling.build"
 
 [tool.uv]
 package = false
+
+[dependency-groups]
+dev = [
+    "beautifulsoup4>=4.14.3",
+    "datasets>=4.6.1",
+    "db-dtypes>=1.5.0",
+    "google-cloud-bigquery>=3.40.1",
+    "httpx>=0.28.1",
+    "ipykernel>=7.2.0",
+    "langdetect>=1.0.9",
+    "matplotlib>=3.10.8",
+    "pandas>=2.3.3",
+    "pdfplumber>=0.11.9",
+    "requests>=2.32.5",
+    "scikit-learn>=1.8.0",
+    "seaborn>=0.13.2",
+]
