@@ -1,0 +1,69 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.hypothesis/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Coverage reports
+.coverage
+.coverage.*
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment and secrets
+.env
+.env.*
+*.local
+.python-version
+
+# Logs and runtime files
+*.log
+*.pid
+*.seed
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE/editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# UV lock and cache
+.uv/
+
+
+*.db
+
+# Private-by-default documentation (internal only)
+docs/ops/
+docs/architecture/threat-model.md
+docs/architecture/privacy-rgpd.md
+docs/adr/0001-post-delivery-gmail.md
+docs/adr/0006-scope-selection-gmail.md
+docs/adr/0007-idempotency-pubsub-history.md
+
+docs/simplon/
+
+research/

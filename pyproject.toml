@@ -1,0 +1,18 @@
+[project]
+name = "sicurre"
+version = "0.1.0"
+description = "Documentation and architecture workspace for Sicurre"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pypdf>=6.7.4",
+    "pypdf2>=3.0.1",
+    "virtualenv>=21.1.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+package = false

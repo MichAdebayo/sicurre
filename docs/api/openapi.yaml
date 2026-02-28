@@ -1,0 +1,394 @@
+openapi: 3.0.3
+info:
+  title: Sicurre API
+  version: 0.1.0
+  description: >
+    Sicurre API for phishing classification and inbox remediation (post-delivery).
+servers:
+  - url: https://api.sicurre.example.com
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+
+  /v1/classify:
+    post:
+      summary: Classify an email (phishing vs legitimate)
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClassifyRequest"
+      responses:
+        "200":
+          description: Classification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClassifyResponse"
+        "400":
+          description: Bad request
+        "401":
+          description: Unauthorized
+
+  /v1/remediate/gmail/trash:
+    post:
+      summary: Move a Gmail message to Trash (requires OAuth token stored per user)
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrashRequest"
+      responses:
+        "200":
+          description: Trash action completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrashResponse"
+        "400":
+          description: Bad request
+        "401":
+          description: Unauthorized
+
+  /v1/threat-log:
+    get:
+      summary: List threat log entries for the authenticated user
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50, maximum: 200 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+        - in: query
+          name: verdict
+          schema: { type: string, enum: [phishing, legitimate] }
+      responses:
+        "200":
+          description: List entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ThreatLogEntry"
+                  total:
+                    type: integer
+
+  /v1/threat-log/{id}/restore:
+    post:
+      summary: Restore a previously trashed Gmail message
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Message restored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: restored }
+                  message_id: { type: string }
+        "404":
+          description: Threat log entry not found
+        "409":
+          description: Message already restored or not trashed
+
+  /v1/feedback:
+    post:
+      summary: Submit feedback on a classification verdict
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackRequest"
+      responses:
+        "201":
+          description: Feedback recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackResponse"
+        "400":
+          description: Bad request
+        "409":
+          description: Feedback already submitted for this threat log entry
+
+  /v1/users/me:
+    get:
+      summary: Get current user profile and settings
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Unauthorized
+
+  /v1/stats:
+    get:
+      summary: Get summary statistics for the authenticated user
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: days
+          schema: { type: integer, default: 30, minimum: 1, maximum: 365 }
+      responses:
+        "200":
+          description: User stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserStats"
+
+  /auth/login/google:
+    get:
+      summary: Initiate Google OAuth login (redirects to Google consent screen)
+      description: >
+        Begins the OAuth 2.0 flow requesting `gmail.modify` scope.
+        Handled by Better Auth. Redirects the user to Google's consent page.
+      responses:
+        "302":
+          description: Redirect to Google OAuth consent
+
+  /auth/callback/google:
+    get:
+      summary: Google OAuth callback (handled by Better Auth)
+      description: >
+        Receives the authorization code from Google, exchanges it for tokens,
+        encrypts the refresh token, stores it, and creates a session.
+      parameters:
+        - in: query
+          name: code
+          required: true
+          schema: { type: string }
+        - in: query
+          name: state
+          schema: { type: string }
+      responses:
+        "302":
+          description: Redirect to dashboard after successful login
+        "400":
+          description: Invalid OAuth callback
+
+  /auth/logout:
+    post:
+      summary: End the current session
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Session ended
+        "401":
+          description: Not authenticated
+
+  /internal/renew-watches:
+    post:
+      summary: Renew Gmail users.watch subscriptions for all active users
+      tags: [internal]
+      description: >
+        Called exclusively by a Cloud Scheduler job every 6 days (Gmail watch
+        expiry is 7 days). Protected via GCP IAM — only the Cloud Scheduler
+        service account with `roles/run.invoker` may call this endpoint.
+        Rate-limited to 1 request/minute. Never expose this endpoint publicly
+        or call it from client-side code.
+      security:
+        - InternalServiceAuth: []
+      responses:
+        "200":
+          description: Renewal completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RenewWatchesResponse"
+        "401":
+          description: Missing or invalid IAM credentials
+        "429":
+          description: Rate limit exceeded
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    InternalServiceAuth:
+      type: http
+      scheme: bearer
+      description: >
+        GCP IAM identity token issued to the Cloud Scheduler service account.
+        Verified by Cloud Run using `roles/run.invoker`. Not a user JWT.
+
+  schemas:
+    ClassifyRequest:
+      type: object
+      required: [subject, body, sender]
+      properties:
+        subject:
+          type: string
+          example: "URGENT : Mise à jour URSSAF requise"
+        body:
+          type: string
+          example: "Bonjour, veuillez confirmer vos informations sous 24h..."
+        sender:
+          type: string
+          example: "urssaf-support@secure-notice.example"
+        received_at:
+          type: string
+          format: date-time
+        message_id:
+          type: string
+          description: Provider message id (Gmail message id)
+        language:
+          type: string
+          example: "fr"
+
+    ClassifyResponse:
+      type: object
+      required: [label, confidence, signals, model_version]
+      properties:
+        label:
+          type: string
+          enum: [phishing, legitimate]
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          example: 0.97
+        signals:
+          type: array
+          items:
+            type: string
+          example: ["French admin impersonation", "Suspicious URL", "DMARC fail"]
+        model_version:
+          type: string
+          example: "sicurre/camembertv2-phishing-fr@v0.1.0"
+
+    TrashRequest:
+      type: object
+      required: [user_id, message_id]
+      properties:
+        user_id: { type: string }
+        message_id: { type: string }
+        reason:
+          type: string
+          example: "phishing verdict confidence>=0.85"
+
+    TrashResponse:
+      type: object
+      properties:
+        status: { type: string, example: trashed }
+        message_id: { type: string }
+
+    ThreatLogEntry:
+      type: object
+      properties:
+        id: { type: string }
+        message_id: { type: string }
+        received_at: { type: string, format: date-time }
+        verdict: { type: string, enum: [phishing, legitimate] }
+        confidence: { type: number }
+        signals:
+          type: array
+          items: { type: string }
+        model_version: { type: string }
+        action_taken: { type: string, example: "trashed" }
+        action_at: { type: string, format: date-time }
+
+    FeedbackRequest:
+      type: object
+      required: [threat_log_id, feedback_label]
+      properties:
+        threat_log_id:
+          type: string
+          description: ID of the threat log entry
+        feedback_label:
+          type: string
+          enum: [true_positive, false_positive, false_negative, true_negative]
+        comment:
+          type: string
+          description: Optional free-text explanation
+
+    FeedbackResponse:
+      type: object
+      properties:
+        id: { type: string }
+        threat_log_id: { type: string }
+        feedback_label: { type: string }
+        created_at: { type: string, format: date-time }
+
+    UserProfile:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: string }
+        display_name: { type: string }
+        plan: { type: string, enum: [free, pro, business] }
+        watch_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+
+    UserStats:
+      type: object
+      properties:
+        total_scanned: { type: integer }
+        total_phishing: { type: integer }
+        total_legitimate: { type: integer }
+        total_trashed: { type: integer }
+        total_restored: { type: integer }
+        false_positive_rate: { type: number }
+        period_days: { type: integer }
+
+    RenewWatchesResponse:
+      type: object
+      properties:
+        renewed:
+          type: integer
+          description: Number of users whose watch was successfully renewed
+          example: 42
+        failed:
+          type: integer
+          description: Number of users whose renewal failed (logged server-side)
+          example: 0
+        skipped:
+          type: integer
+          description: Users whose watch is not due for renewal yet
+          example: 7
