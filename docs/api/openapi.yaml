@@ -75,6 +75,12 @@ paths:
         - in: query
           name: limit
           schema: { type: integer, default: 50, maximum: 200 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+        - in: query
+          name: verdict
+          schema: { type: string, enum: [phishing, legitimate] }
       responses:
         "200":
           description: List entries
@@ -87,6 +93,129 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/ThreatLogEntry"
+                  total:
+                    type: integer
+
+  /v1/threat-log/{id}/restore:
+    post:
+      summary: Restore a previously trashed Gmail message
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Message restored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: restored }
+                  message_id: { type: string }
+        "404":
+          description: Threat log entry not found
+        "409":
+          description: Message already restored or not trashed
+
+  /v1/feedback:
+    post:
+      summary: Submit feedback on a classification verdict
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackRequest"
+      responses:
+        "201":
+          description: Feedback recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackResponse"
+        "400":
+          description: Bad request
+        "409":
+          description: Feedback already submitted for this threat log entry
+
+  /v1/users/me:
+    get:
+      summary: Get current user profile and settings
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Unauthorized
+
+  /v1/stats:
+    get:
+      summary: Get summary statistics for the authenticated user
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: days
+          schema: { type: integer, default: 30, minimum: 1, maximum: 365 }
+      responses:
+        "200":
+          description: User stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserStats"
+
+  /auth/login/google:
+    get:
+      summary: Initiate Google OAuth login (redirects to Google consent screen)
+      description: >
+        Begins the OAuth 2.0 flow requesting `gmail.modify` scope.
+        Handled by Better Auth. Redirects the user to Google's consent page.
+      responses:
+        "302":
+          description: Redirect to Google OAuth consent
+
+  /auth/callback/google:
+    get:
+      summary: Google OAuth callback (handled by Better Auth)
+      description: >
+        Receives the authorization code from Google, exchanges it for tokens,
+        encrypts the refresh token, stores it, and creates a session.
+      parameters:
+        - in: query
+          name: code
+          required: true
+          schema: { type: string }
+        - in: query
+          name: state
+          schema: { type: string }
+      responses:
+        "302":
+          description: Redirect to dashboard after successful login
+        "400":
+          description: Invalid OAuth callback
+
+  /auth/logout:
+    post:
+      summary: End the current session
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Session ended
+        "401":
+          description: Not authenticated
 
 components:
   securitySchemes:
@@ -171,5 +300,49 @@ components:
         signals:
           type: array
           items: { type: string }
+        model_version: { type: string }
         action_taken: { type: string, example: "trashed" }
         action_at: { type: string, format: date-time }
+
+    FeedbackRequest:
+      type: object
+      required: [threat_log_id, feedback_label]
+      properties:
+        threat_log_id:
+          type: string
+          description: ID of the threat log entry
+        feedback_label:
+          type: string
+          enum: [true_positive, false_positive, false_negative, true_negative]
+        comment:
+          type: string
+          description: Optional free-text explanation
+
+    FeedbackResponse:
+      type: object
+      properties:
+        id: { type: string }
+        threat_log_id: { type: string }
+        feedback_label: { type: string }
+        created_at: { type: string, format: date-time }
+
+    UserProfile:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: string }
+        display_name: { type: string }
+        plan: { type: string, enum: [free, pro, business] }
+        watch_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+
+    UserStats:
+      type: object
+      properties:
+        total_scanned: { type: integer }
+        total_phishing: { type: integer }
+        total_legitimate: { type: integer }
+        total_trashed: { type: integer }
+        total_restored: { type: integer }
+        false_positive_rate: { type: number }
+        period_days: { type: integer }
