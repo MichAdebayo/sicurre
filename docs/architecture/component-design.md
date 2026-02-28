@@ -16,7 +16,7 @@
 
 ### 2) Sicurre API (FastAPI on Cloud Run)
 - Role: auth, user settings, audit log access, public API surface
-- Integrates with Supabase Postgres
+- Integrates with Neon PostgreSQL (prod) / SQLite (dev)
 
 ### 3) Gmail Listener (Cloud Run service/function)
 - Role: receive Pub/Sub push, resolve message changes, call classifier, trigger remediation
@@ -26,8 +26,10 @@
 - Role: classification + signal extraction
 - Loads fine-tuned French model + hybrid signals (DMARC/URL heuristics)
 
-### 5) Postgres (Supabase)
+### 5) Postgres (Neon — prod) / SQLite (dev)
 - Role: user records, encrypted tokens, audit log, model version tagging
+- Neon serverless PostgreSQL for production (autoscaling, branching for staging)
+- SQLite for local development and CI (zero-config, fast)
 
 ## Key interfaces
 - Pub/Sub push → Gmail Listener: HTTP endpoint secured by verification token/JWT
