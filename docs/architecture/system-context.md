@@ -8,7 +8,7 @@ flowchart LR
     API[Sicurre API]
     ING[Cloud Run<br/>gmail-listener]
     CLS[Cloud Run<br/>phishing-api]
-    DB[(Postgres<br/>Supabase)]
+    DB[(Postgres<br/>Neon)]
   end
 
   subgraph EXT[External Systems]
