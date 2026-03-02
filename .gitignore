@@ -79,7 +79,11 @@ docs/architecture/privacy-rgpd.md
 docs/adr/0001-post-delivery-gmail.md
 docs/adr/0006-scope-selection-gmail.md
 docs/adr/0007-idempotency-pubsub-history.md
-
+docs/raw_sources/
 docs/simplon/
 
+tasks/
+
 research/
+# Added by ggshield
+.cache_ggshield
