@@ -22,12 +22,17 @@ data/
 │   │                                   #   Kinoux FR Spam/Ham 2K, Kaggle Multilingual, etc.
 │   │
 │   └── db/                             # C1: Base de données
-│       └── crowdsourced/               #   User-forwarded phishing emails (anonymized)
+│       ├── adapted_fr_phishing.csv     #   EN→FR cultural adaptation (notebook 10)
+│       ├── synthetic_fr_emails.csv     #   Synthetic French generation (notebook 11)
+│       └── sicurre_dev.db              #   SQLite dev DB seeded from above (notebook 09)
 │
 ├── processed/                          # Cleaned, normalized, single-source outputs
-│   ├── synthetic/                      #   LLM-generated French phishing emails
-│   ├── adapted/                        #   English→French culturally adapted emails
-│   └── legitimate/                     #   Legitimate French emails (ham)
+│   ├── adapted/                        #   EN→FR adapted phishing (2,145 cleaned, NB12)
+│   │   └── adapted_clean_2145_<date>.csv
+│   ├── synthetic/                      #   Synthetic FR phishing (1,747 cleaned, NB12)
+│   │   └── synthetic_clean_1747_<date>.csv
+│   └── legitimate/                     #   All legitimate emails (7,461 cleaned, NB12)
+│       └── legitimate_clean_7461_<date>.csv
 │
 ├── final/                              # Aggregated, balanced, RGPD-compliant, ready for training
 │   ├── train/                          #   70% split
@@ -43,12 +48,20 @@ data/
 ```
 notebooks/
 ├── bigdata/                            # Mirrors data/raw/bigdata/
-│   ├── 03_bigquery_extraction.ipynb
-│   └── 04_common_crawl_extraction.ipynb
+│   ├── 03_bigquery_extraction.ipynb    #   BigQuery: HF phishing dataset → 4,597 EN emails
+│   └── 04_common_crawl_extraction.ipynb #  CC Index: FR bank/gov pages (28 usable)
 ├── api/                                # Mirrors data/raw/api/
+│   └── 05_phishtank_extraction.ipynb   #   PhishTank JSON feed → FR phishing URLs
 ├── scraping/                           # Mirrors data/raw/scraping/
+│   └── 06_certfr_extraction.ipynb      #   CERT-FR CTI + IOC pages → FR threat intel
 ├── csv/                                # Mirrors data/raw/csv/
+│   └── 08_csv_sources.ipynb            #   HF + Kaggle CSV/Parquet → normalized ham/spam
 ├── db/                                 # Mirrors data/raw/db/
+│   ├── 09_db_extraction.ipynb          #   SQLite dev DB → seed from adapted+synthetic → SQL queries
+│   ├── 10_en_fr_cultural_adaptation.ipynb #  EN→FR pattern-based adaptation (Task 1.8)
+│   └── 11_synthetic_fr_phishing.ipynb  #   Synthetic French phishing+legit generation (Task 1.3)
+├── processing/                         # Data cleaning & normalization
+│   └── 12_data_cleaning_normalization.ipynb # Raw→processed pipeline (PII anon, dedup, routing)
 └── ml/                                 # Model training & evaluation
     └── 07_camembertv2_finetuning.ipynb
 ```
