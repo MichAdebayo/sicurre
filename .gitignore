@@ -71,6 +71,7 @@ data/models/**/*.safetensors
 # Keep folder structure and READMEs
 !data/README.md
 !data/**/.gitkeep
+data/raw/
 
 # Private-by-default documentation (internal only)
 docs/ops/
