@@ -22,7 +22,7 @@ paths:
 
   /v1/classify:
     post:
-      summary: Classify an email (phishing vs legitimate)
+      summary: Classify an email (phishing, spam, or legitimate)
       security:
         - ApiKeyAuth: []
       requestBody:
@@ -80,7 +80,7 @@ paths:
           schema: { type: integer, default: 0 }
         - in: query
           name: verdict
-          schema: { type: string, enum: [phishing, legitimate] }
+          schema: { type: string, enum: [phishing, spam, legitimate] }
       responses:
         "200":
           description: List entries
@@ -288,7 +288,7 @@ components:
       properties:
         label:
           type: string
-          enum: [phishing, legitimate]
+          enum: [phishing, spam, legitimate]
         confidence:
           type: number
           minimum: 0
@@ -301,7 +301,7 @@ components:
           example: ["French admin impersonation", "Suspicious URL", "DMARC fail"]
         model_version:
           type: string
-          example: "sicurre/camembertv2-phishing-fr@v0.1.0"
+          example: "sicurre/camembertav2-phishing-fr@v0.1.0"
 
     TrashRequest:
       type: object
@@ -325,7 +325,7 @@ components:
         id: { type: string }
         message_id: { type: string }
         received_at: { type: string, format: date-time }
-        verdict: { type: string, enum: [phishing, legitimate] }
+        verdict: { type: string, enum: [phishing, spam, legitimate] }
         confidence: { type: number }
         signals:
           type: array
@@ -371,6 +371,7 @@ components:
       properties:
         total_scanned: { type: integer }
         total_phishing: { type: integer }
+        total_spam: { type: integer }
         total_legitimate: { type: integer }
         total_trashed: { type: integer }
         total_restored: { type: integer }
