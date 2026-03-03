@@ -23,8 +23,8 @@
 - Must be idempotent due to at-least-once delivery
 
 ### 4) Phishing API / Classifier (FastAPI on Cloud Run)
-- Role: classification + signal extraction
-- Loads fine-tuned French model + hybrid signals (DMARC/URL heuristics)
+- Role: 3-class classification (phishing / spam / legitimate) + signal extraction
+- Loads fine-tuned CamemBERTav2 (DeBERTaV3) + hybrid signals (DMARC/URL heuristics)
 
 ### 5) Postgres (Neon — prod) / SQLite (dev)
 - Role: user records, encrypted tokens, audit log, model version tagging
