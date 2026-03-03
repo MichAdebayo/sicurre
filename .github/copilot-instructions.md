@@ -1,6 +1,6 @@
 # Copilot Instructions — Sicurre
 
-Sicurre is a **French-native, real-time phishing detection and inbox remediation system** for Gmail (later M365). It targets French auto-entrepreneurs and TPEs. A fine-tuned CamemBERTv2 model classifies emails; confirmed phishing is automatically moved to Trash via the Gmail API within 2 seconds of delivery.
+Sicurre is a **French-native, real-time phishing detection and inbox remediation system** for Gmail (later M365). It targets French auto-entrepreneurs and TPEs. A fine-tuned CamemBERTav2 (DeBERTaV3-based) model classifies emails into three classes — **phishing**, **spam**, and **legitimate**; confirmed phishing is automatically moved to Trash via the Gmail API within 2 seconds of delivery.
 
 Read `docs/architecture/component-design.md` and `docs/architecture/data-design.md` before making changes to the API or database layer.
 
@@ -12,7 +12,7 @@ Read `docs/architecture/component-design.md` and `docs/architecture/data-design.
 |-------|--------|----------|
 | Language | Python 3.11+ | — |
 | API framework | FastAPI + Pydantic v2 | ADR-0003 |
-| Inference runtime | ONNX Runtime (INT8 quantized CamemBERTv2) | ADR-0002 |
+| Inference runtime | ONNX Runtime (INT8 quantized CamemBERTav2) | ADR-0002 |
 | Database (prod) | Neon PostgreSQL via SQLAlchemy / SQLModel | ADR-0004 |
 | Database (dev/CI) | SQLite (same ORM models, dialect abstraction) | ADR-0004 |
 | Auth | Better Auth (Node.js sidecar or REST proxy) | ADR-0008 |
