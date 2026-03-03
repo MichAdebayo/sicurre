@@ -11,6 +11,6 @@ Sicurre is a **French-first phishing protection** product for auto-entrepreneurs
 
 ## Key design choices (see ADRs)
 - Post-delivery architecture (not MX pre-delivery)
-- French-native transformer base (CamemBERTv2)
+- French-native transformer base (CamemBERTav2, DeBERTaV3 architecture, 3-class: phishing/spam/legitimate)
 - Open-core: open-source model weights, paid managed product
 - Cloud Run + FastAPI for minimal ops and autoscaling
