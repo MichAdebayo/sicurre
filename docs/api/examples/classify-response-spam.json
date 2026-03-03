@@ -1,0 +1,6 @@
+{
+  "label": "spam",
+  "confidence": 0.88,
+  "signals": ["Bulk sender pattern", "No personal greeting", "Unsubscribe link present"],
+  "model_version": "sicurre/camembertav2-phishing-fr@v0.1.0"
+}
