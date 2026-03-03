@@ -9,7 +9,7 @@ Sicurre's hot path — Pub/Sub push → Gmail API fetch → classifier inference
 
 1. **DMARC/SPF DNS lookups** — each call to `dmarc`/`checkdmarc` resolves sender domain DNS records (~30–80ms round-trip). The same domains recur across users (e.g., `urssaf.fr`, `impots.gouv.fr`, all major phishing impersonation targets).
 2. **Gmail access token exchange** — after reading the encrypted refresh token from DB, we exchange it for a short-lived access token via Google's token endpoint (~100–200ms). Access tokens are valid for 1 hour and can be reused across requests.
-3. **Classifier re-inference on duplicate content** — phishing campaigns deliver the same email to hundreds of users simultaneously. Re-running CamemBERTv2 ONNX inference (~80–150ms) on identical content is wasteful.
+3. **Classifier re-inference on duplicate content** — phishing campaigns deliver the same email to hundreds of users simultaneously. Re-running CamemBERTav2 ONNX inference (~80–150ms) on identical content is wasteful.
 4. **Session validation** — Better Auth session lookup hits the DB (`sessions` table) on every authenticated API call.
 
 Additionally, the public API exposes an expensive inference endpoint (`/v1/classify`) that must be protected from abuse and cost overruns. Cloud Run's auto-scaling handles burst concurrency but does not cap per-user spend.
