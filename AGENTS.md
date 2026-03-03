@@ -2,7 +2,7 @@
 
 ## Repo Overview
 
-Sicurre is a French-native, real-time phishing detection and inbox remediation system. It classifies emails with a fine-tuned CamemBERTv2 model and automatically moves phishing to Gmail Trash within 2 seconds. Target market: French auto-entrepreneurs and TPEs.
+Sicurre is a French-native, real-time phishing detection and inbox remediation system. It classifies emails into three classes (phishing, spam, legitimate) with a fine-tuned CamemBERTav2 (DeBERTaV3-based) model and automatically moves phishing to Gmail Trash within 2 seconds. Target market: French auto-entrepreneurs and TPEs.
 
 **Branch:** `docs/architecture` (current). Application code lives in future branches.  
 **Full instructions for GitHub Copilot:** `.github/copilot-instructions.md`
@@ -30,7 +30,7 @@ uv run uvicorn src.sicurre_api.main:app --reload
 |-----------|------|----------|------|
 | `sicurre-api` | FastAPI — auth, audit log, public API | Python 3.11 | ADR-0003, ADR-0008 |
 | `gmail-listener` | Cloud Run — Pub/Sub push handler | Python 3.11 | ADR-0001, ADR-0007 |
-| `phishing-api` | Cloud Run — CamemBERTv2 ONNX inference | Python 3.11 | ADR-0002 |
+| `phishing-api` | Cloud Run — CamemBERTav2 ONNX inference (3-class: phishing/spam/legit) | Python 3.11 | ADR-0002 |
 | Dashboard (POC) | Streamlit — Simplon evaluation only | Python | — |
 | Dashboard (prod) | React/TypeScript | TypeScript | — |
 | DB | Neon PostgreSQL (prod) / SQLite (dev) | SQL | ADR-0004 |
