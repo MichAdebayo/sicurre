@@ -33,8 +33,8 @@ Sicurre is not an enterprise security product. It's a quiet guardian for solo pr
 | `--color-danger-bg` | Rouge pâle | `#FEF2F2` | Alert card background |
 | `--color-safe` | Vert confiance | `#10B981` | Legitimate verdict badge, success |
 | `--color-safe-bg` | Vert pâle | `#ECFDF5` | Safe card background |
-| `--color-warning` | Jaune prudence | `#F59E0B` | Low-confidence verdicts, warnings |
-| `--color-warning-bg` | Jaune pâle | `#FFFBEB` | Warning card background |
+| `--color-warning` | Jaune prudence | `#F59E0B` | Spam verdict badge, low-confidence verdicts, warnings |
+| `--color-warning-bg` | Jaune pâle | `#FFFBEB` | Spam/warning card background |
 
 ### Neutrals (Slate scale)
 
@@ -90,6 +90,7 @@ fontFamily: {
 - Size: `16px` inline with text, `20px` standalone buttons, `24px` section icons
 - Stroke width: `1.5` (default) — do not use filled icons
 - Phishing verdict icon: `ShieldAlert` (red)
+- Spam verdict icon: `MailWarning` (amber)
 - Legitimate verdict icon: `ShieldCheck` (green)
 - Trash action: `Trash2`
 - Restore action: `RotateCcw`
@@ -138,7 +139,7 @@ transition={{ duration: 0.15, ease: 'easeIn' }}
 ### Customisation rules
 - Extend shadcn primitives; do not rewrite them.
 - Apply brand colors via CSS custom properties (see palette above), not hardcoded hex in components.
-- Verdict badges are custom — use `<VerdictBadge verdict="phishing" confidence={0.97} />` not raw `<Badge>`.
+- Verdict badges are custom — use `<VerdictBadge verdict="phishing" confidence={0.97} />` (also supports `verdict="spam"` and `verdict="legitimate"`) not raw `<Badge>`.
 - Confidence scores always rendered in `font-mono`.
 
 ---
@@ -156,6 +157,7 @@ All user-facing text is **French by default**. English only in: code, technical 
 | Situation | ✅ Do | ❌ Don't |
 |-----------|-------|---------|
 | Phishing detected | "Email de phishing détecté" | "ALERTE : Email malveillant !!!" |
+| Spam detected | "Email indésirable détecté" | "SPAM !!!" |
 | Legitimate | "Email légitime" | "Email safe / OK" |
 | Confidence score | "Confiance : 97 %" | "Score: 0.97" |
 | Action taken | "Déplacé dans la corbeille" | "Trashed" |
