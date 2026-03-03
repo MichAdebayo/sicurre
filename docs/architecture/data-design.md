@@ -42,7 +42,7 @@ erDiagram
         uuid user_id FK "NOT NULL → users.id"
         text message_id "NOT NULL — provider message id"
         timestamptz received_at
-        text verdict "NOT NULL — phishing | legitimate"
+        text verdict "NOT NULL — phishing | spam | legitimate"
         real confidence "0.0–1.0"
         jsonb signals "['DMARC fail','Suspicious URL',…]"
         text model_version "NOT NULL"
@@ -151,7 +151,7 @@ erDiagram
 | user_id | uuid | NOT NULL, FK → users(id) |
 | message_id | text | NOT NULL |
 | received_at | timestamptz | |
-| verdict | text | NOT NULL, CHECK(verdict IN ('phishing','legitimate')) |
+| verdict | text | NOT NULL, CHECK(verdict IN ('phishing','spam','legitimate')) |
 | confidence | real | CHECK(confidence BETWEEN 0 AND 1) |
 | signals | jsonb | DEFAULT '[]' |
 | model_version | text | NOT NULL |
