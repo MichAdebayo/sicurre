@@ -11,7 +11,7 @@ ADRs capture decisions that matter, including context, alternatives, and consequ
 | ADR | Title | Status | Visibility |
 |-----|-------|--------|------------|
 | [0001](0001-post-delivery-gmail.md) | Post-delivery Gmail integration via Pub/Sub | Accepted | Private |
-| [0002](0002-camembert-inference.md) | CamemBERTv2 ONNX inference runtime | Accepted | Public |
+| [0002](0002-camembertv2-french-base-model.md) | CamemBERTav2 (DeBERTaV3) 3-class ONNX inference | Accepted | Public |
 | [0003](0003-fastapi-cloud-run.md) | FastAPI + Cloud Run for API and services | Accepted | Public |
 | [0004](0004-postgres-neon.md) | Neon PostgreSQL (prod) + SQLite (dev) | Accepted | Public |
 | [0005](0005-open-core-oss.md) | Open-core OSS model distribution | Accepted | Public |
