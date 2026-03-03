@@ -4,7 +4,7 @@
 **Status:** Accepted  
 
 ## Context
-Bootstrapped build: minimize ops overhead, support autoscaling, keep costs low. The API layer must serve ML inference (CamemBERTv2), handle Gmail Pub/Sub webhooks, and proxy auth flows — all with high concurrency and low latency on Cloud Run's container-based serverless platform.
+Bootstrapped build: minimize ops overhead, support autoscaling, keep costs low. The API layer must serve ML inference (CamemBERTav2), handle Gmail Pub/Sub webhooks, and proxy auth flows — all with high concurrency and low latency on Cloud Run's container-based serverless platform.
 
 ## Decision
 Use FastAPI for all API services and deploy on Google Cloud Run.
