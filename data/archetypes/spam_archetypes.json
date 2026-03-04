@@ -1,0 +1,302 @@
+{
+  "meta": {
+    "class_label": 1,
+    "class_name": "spam",
+    "description": "French spam email archetypes for synthetic generation — EN patterns adapted to FR context",
+    "tier_distribution": {"simple": 0.30, "medium": 0.40, "hard": 0.30}
+  },
+  "archetypes": [
+    {
+      "id": "s_simple_casino",
+      "tier": "simple",
+      "name": "Casino en ligne / jeux d'argent",
+      "weight": 1.0,
+      "description": "Online gambling promotions — adapted from EN casino spam in Spam.txt",
+      "templates": [
+        "Objet : 🎰 {prenom}, {bonus} offerts sur {casino} !\n\n{casino} — Le meilleur casino en ligne\n\nBienvenue {prenom} !\n\nInscrivez-vous dès maintenant et recevez {bonus} de bonus sans dépôt !\n\n✅ Plus de {nb_jeux} jeux disponibles\n✅ Retraits en {delai_retrait}\n✅ Licence européenne\n\n→ Réclamez votre bonus : [URL]\n\nOffre valable {delai} heures seulement.\n\n{casino} — Jouez responsable. 18+\nSe désabonner : [URL]",
+        "Objet : Tournoi exclusif ce soir — {gain_max} à gagner !\n\nBonsoir {prenom},\n\n{casino} organise un tournoi exclusif ce soir à {heure} !\n\nMise de départ : {mise}\nGain maximum : {gain_max}\nPlaces limitées : {places}\n\nInscription gratuite pour les nouveaux joueurs :\n→ [URL]\n\n{casino}\nSe désinscrire : [URL]"
+      ],
+      "variables": {
+        "casino": ["Royal Vegas FR", "Casino777", "Lucky Star Casino", "JackpotCity France", "EuroBet Casino", "MegaWin"],
+        "bonus": ["200 EUR", "150 EUR", "500 EUR", "50 tours gratuits", "100 EUR + 50 tours"],
+        "nb_jeux": ["500", "1 200", "800", "2 000"],
+        "delai": ["24", "48", "72", "12"],
+        "delai_retrait": ["24 heures", "instant", "48 heures"],
+        "gain_max": ["10 000 EUR", "25 000 EUR", "50 000 EUR"],
+        "mise": ["5 EUR", "10 EUR", "1 EUR"],
+        "places": ["100", "50", "200"],
+        "heure": ["20h", "21h30", "19h"]
+      }
+    },
+    {
+      "id": "s_simple_rencontre",
+      "tier": "simple",
+      "name": "Site de rencontre / adulte",
+      "weight": 1.0,
+      "description": "Dating/adult spam — adapted from EN dating spam patterns in Spam.txt",
+      "templates": [
+        "Objet : {prenom}, {nb} personnes veulent vous rencontrer\n\n{site}\n\nBonjour {prenom},\n\nVous avez {nb} nouvelles demandes de contact dans votre ville ({ville}) !\n\n{profil_1} — {age_1} ans — {distance_1} km\n{profil_2} — {age_2} ans — {distance_2} km\n\nVoir les profils : [URL]\n\nInscription gratuite. Des milliers de membres actifs près de chez vous.\n\nSe désinscrire : [URL]",
+        "Objet : {profil_1} vous a envoyé un message\n\n{site} — Nouveau message\n\nSalut {prenom},\n\n{profil_1} ({age_1} ans, {ville}) vous a envoyé un message :\n\n\"{message}\"\n\n→ Répondre à {profil_1} : [URL]\n\nNe manquez pas cette opportunité !\n\n{site}\nPour ne plus recevoir nos notifications : [URL]"
+      ],
+      "variables": {
+        "site": ["MeetLocal.fr", "RencontresPlus", "CœurSolitaire", "Proximeo", "Affinités.fr"],
+        "nb": ["12", "8", "23", "5", "17"],
+        "profil_1": ["Sophie", "Marie", "Camille", "Laura", "Émilie", "Nathalie"],
+        "profil_2": ["Julie", "Claire", "Léa", "Chloé", "Inès"],
+        "age_1": ["28", "34", "42", "31", "27"],
+        "age_2": ["30", "26", "38", "33"],
+        "distance_1": ["3", "7", "12", "1"],
+        "distance_2": ["5", "15", "8", "2"],
+        "message": ["Salut, ton profil m'intéresse, on se parle ?", "Coucou ! Tu fais quoi ce soir ?", "J'aime beaucoup ta photo, on discute ?", "Hey ! Tu habites pas loin, ça te dit un café ?"]
+      }
+    },
+    {
+      "id": "s_simple_pharmacie",
+      "tier": "simple",
+      "name": "Pharmacie / compléments alimentaires",
+      "weight": 0.8,
+      "description": "Pharmacy, supplements and miracle products spam",
+      "templates": [
+        "Objet : -{reduction}% sur {produit} — Offre flash !\n\n{marque} — Parapharmacie en ligne\n\nBonjour {prenom},\n\n🔥 OFFRE FLASH — {delai} HEURES SEULEMENT 🔥\n\n{produit}\nPrix barré : {prix_barre}\nVotre prix : {prix}\n\n✓ {avantage_1}\n✓ {avantage_2}\n✓ Livraison gratuite dès {seuil} EUR\n\n→ Commander maintenant : [URL]\n\nSatisfait ou remboursé sous 30 jours.\n\n{marque}\nSe désinscrire : [URL]",
+        "Objet : Le secret pour {benefice} enfin révélé !\n\n{prenom}, découvrez {produit}\n\n{testimonial}\n\nFormule 100% naturelle, résultats visibles en {duree}.\n\n→ En savoir plus : [URL]\n\nLivraison offerte. {garantie}.\n\nSe désinscrire : [URL]"
+      ],
+      "variables": {
+        "produit": ["Collagène Marin Premium", "Brûleur de graisses TurboSlim", "Gummies Vitamine D3", "Sérum Anti-Âge Rétinol", "CBD Premium 30%", "Magnésium Bisglycinate"],
+        "marque": ["NaturaPharma", "BioVitalité", "SantéPlus", "PharmaNature", "LaboBien"],
+        "reduction": ["50", "40", "60", "70", "30"],
+        "prix_barre": ["89,90 EUR", "49,90 EUR", "129,00 EUR", "39,90 EUR"],
+        "prix": ["44,95 EUR", "24,95 EUR", "49,90 EUR", "19,95 EUR"],
+        "avantage_1": ["Résultats cliniquement prouvés", "Formule brevetée", "Sans effets secondaires", "100% naturel"],
+        "avantage_2": ["10 000 clients satisfaits", "Recommandé par les nutritionnistes", "Fabriqué en France", "Sans OGM"],
+        "seuil": ["29", "39", "49"],
+        "delai": ["24", "48", "72", "12"],
+        "benefice": ["perdre du poids sans effort", "retrouver une peau jeune", "dormir comme un bébé", "booster votre énergie"],
+        "testimonial": ["\"J'ai perdu 12 kg en 3 semaines !\" — Marie, 45 ans", "\"Ma peau a rajeuni de 10 ans\" — Sophie, 52 ans", "\"Je n'ai jamais aussi bien dormi\" — Pierre, 38 ans"],
+        "duree": ["2 semaines", "7 jours", "3 semaines", "10 jours"],
+        "garantie": ["Garantie 90 jours satisfait ou remboursé", "Garantie résultats 60 jours"]
+      }
+    },
+    {
+      "id": "s_simple_loterie_pub",
+      "tier": "simple",
+      "name": "Loterie publicitaire / bon d'achat",
+      "weight": 0.8,
+      "description": "Fake survey/voucher spam — not phishing because no credential theft, just lead gen",
+      "templates": [
+        "Objet : {prenom}, vous avez été sélectionné(e) pour un bon d'achat {enseigne} de {montant} !\n\nFélicitations !\n\nVous avez été choisi(e) au hasard pour participer à notre enquête de satisfaction annuelle.\n\nEn remerciement, recevez un bon d'achat {enseigne} de {montant} !\n\nIl ne vous reste que {nb_questions} questions :\n→ Commencer l'enquête : [URL]\n\nOffre limitée — {nb_restants} bons restants.\n\nSe désinscrire : [URL]"
+      ],
+      "variables": {
+        "enseigne": ["Carrefour", "Leclerc", "Amazon", "Fnac", "Décathlon", "Ikea", "Lidl"],
+        "montant": ["500 EUR", "250 EUR", "100 EUR", "1 000 EUR"],
+        "nb_questions": ["3", "5", "4"],
+        "nb_restants": ["7", "12", "3", "15"]
+      }
+    },
+    {
+      "id": "s_medium_ecommerce",
+      "tier": "medium",
+      "name": "Newsletter e-commerce agressive",
+      "weight": 1.0,
+      "description": "Aggressive e-commerce promotional emails that are spammy but not phishing",
+      "templates": [
+        "Objet : ⚡ VENTE FLASH — -{reduction}% sur TOUT le site !\n\n{boutique}\n\nBonjour {prenom},\n\n🔥 VENTE FLASH EXCEPTIONNELLE 🔥\n\n-{reduction}% sur TOUT le site avec le code {code} !\n\nNos meilleures ventes :\n• {produit_1} — {prix_1} (au lieu de {prix_barre_1})\n• {produit_2} — {prix_2} (au lieu de {prix_barre_2})\n• {produit_3} — {prix_3} (au lieu de {prix_barre_3})\n\nLivraison offerte dès {seuil} EUR d'achat !\n\n→ Profitez-en : [URL]\n\n⏰ Offre valable jusqu'à ce soir minuit !\n\n{boutique}\nVous recevez cet email car vous êtes inscrit(e) à notre newsletter.\nSe désinscrire : [URL]",
+        "Objet : {prenom}, votre panier vous attend ! -{reduction}% avec le code {code}\n\n{boutique}\n\nRebonjour {prenom} !\n\nVous avez laissé des articles dans votre panier. On ne vous juge pas, mais ils ne vont pas rester en stock longtemps !\n\nVotre panier :\n• {produit_1}\n• {produit_2}\n\nBonne nouvelle : utilisez le code {code} pour bénéficier de -{reduction}% !\n\n→ Finaliser ma commande : [URL]\n\nÀ bientôt,\nL'équipe {boutique}"
+      ],
+      "variables": {
+        "boutique": ["TrendyShop", "ModeExpress.fr", "BazarTop", "ShopDeal France", "FlashBoutique", "Le Bon Coin des Affaires"],
+        "reduction": ["40", "50", "60", "70", "30", "25"],
+        "code": ["FLASH40", "VIP50", "SOLDES60", "PROMO30", "EXCLUSIF25"],
+        "produit_1": ["Montre connectée X500", "Sac à main cuir véritable", "Sneakers limited édition", "Casque Bluetooth Pro"],
+        "produit_2": ["Lunettes de soleil polarisées", "Parfum de créateur 100ml", "Portefeuille RFID cuir", "Enceinte portable"],
+        "produit_3": ["Bracelet plaqué or", "Écharpe cachemire", "Baskets running", "Trousse de toilette voyage"],
+        "prix_1": ["49,90 EUR", "79,90 EUR", "89,90 EUR", "34,90 EUR"],
+        "prix_2": ["29,90 EUR", "59,90 EUR", "19,90 EUR", "44,90 EUR"],
+        "prix_3": ["14,90 EUR", "39,90 EUR", "24,90 EUR"],
+        "prix_barre_1": ["129,90 EUR", "199,90 EUR", "159,90 EUR", "99,90 EUR"],
+        "prix_barre_2": ["79,90 EUR", "149,90 EUR", "49,90 EUR"],
+        "prix_barre_3": ["39,90 EUR", "99,90 EUR", "59,90 EUR"],
+        "seuil": ["39", "49", "59", "29"]
+      }
+    },
+    {
+      "id": "s_medium_seo",
+      "tier": "medium",
+      "name": "Prospection SEO / webdev / marketing digital",
+      "weight": 1.0,
+      "description": "B2B cold outreach spam for SEO/web services — adapted from EN cold outreach in Spam.txt",
+      "templates": [
+        "Objet : {entreprise_cible} — Votre site perd du trafic (analyse gratuite)\n\nBonjour {prenom},\n\nJe me permets de vous contacter car j'ai analysé le site de {entreprise_cible} et j'ai identifié plusieurs problèmes qui vous font perdre du trafic :\n\n❌ {probleme_1}\n❌ {probleme_2}\n❌ {probleme_3}\n\nNous avons aidé +{nb_clients} entreprises à augmenter leur trafic organique de {pourcentage}% en moyenne.\n\nJe vous propose un audit SEO gratuit et sans engagement :\n→ Réserver mon audit : [URL]\n\nÀ bientôt,\n{agent}\n{agence}\n{phone}",
+        "Objet : Votre site {entreprise_cible} n'est pas optimisé pour Google\n\nBonjour,\n\nJe suis {agent}, consultant SEO chez {agence}.\n\nEn analysant votre positionnement, j'ai remarqué que {entreprise_cible} n'apparaît pas dans le top 10 Google pour les mots-clés suivants :\n• {keyword_1}\n• {keyword_2}\n• {keyword_3}\n\nNos solutions :\n✓ Référencement naturel (SEO) — à partir de {prix}/mois\n✓ Publicité Google Ads — gérée par nos experts\n✓ Refonte de site web optimisé\n\n→ Demander un devis gratuit : [URL]\n\n{agent}\n{agence}"
+      ],
+      "variables": {
+        "entreprise_cible": ["votre entreprise", "votre site", "votre boutique en ligne", "votre cabinet"],
+        "agence": ["WebBoost France", "DigitalPro Agency", "SEO Expert Paris", "NetRank Solutions", "ClickUp Marketing"],
+        "probleme_1": ["Temps de chargement trop lent (4,2s)", "Pas de certificat SSL", "Balises meta manquantes", "Site non responsive"],
+        "probleme_2": ["Contenu dupliqué détecté", "Aucun backlink de qualité", "Erreurs 404 multiples", "Indexation partielle"],
+        "probleme_3": ["Absence de sitemap XML", "Maillage interne insuffisant", "Images non optimisées", "Pas de Schema.org"],
+        "nb_clients": ["200", "500", "150", "1 000"],
+        "pourcentage": ["300", "250", "180", "400"],
+        "keyword_1": ["auto-entrepreneur comptabilité", "création micro-entreprise", "logiciel facturation gratuit"],
+        "keyword_2": ["expert-comptable Paris", "déclaration URSSAF en ligne", "aide micro-entreprise"],
+        "keyword_3": ["meilleur outil facturation", "formation auto-entrepreneur", "protection juridique TPE"],
+        "prix": ["299 EUR", "499 EUR", "199 EUR", "399 EUR"]
+      }
+    },
+    {
+      "id": "s_medium_journal_academique",
+      "tier": "medium",
+      "name": "Faux journal académique / conférence prédatrice",
+      "weight": 0.6,
+      "description": "Predatory journal/conference spam — based on EN academic spam in Spam.txt",
+      "templates": [
+        "Objet : Invitation à publier — {journal}\n\nCher(e) {titre_acad} {nom},\n\nNous avons le plaisir de vous inviter à soumettre un article de recherche pour publication dans {journal} ({issn}).\n\nThèmes acceptés :\n• {theme_1}\n• {theme_2}\n• {theme_3}\n\nDate limite de soumission : {date}\nPublication en {delai}\nFrais de publication (APC) : {frais}\n\nSoumettez votre manuscrit :\n→ [URL]\n\n{journal}\nComité éditorial\n{editeur}",
+        "Objet : Conférence internationale {conference} — Appel à communications\n\nCher(e) collègue,\n\nNous vous invitons à participer à {conference} qui se tiendra à {lieu} les {dates}.\n\nInscription : {frais_inscr}\nDélai de soumission des résumés : {date}\n\nAvantages :\n✓ Publication dans les actes indexés {index}\n✓ Networking avec +{nb_chercheurs} chercheurs\n✓ Certification de participation\n\n→ S'inscrire : [URL]\n\nComité d'organisation\n{conference}"
+      ],
+      "variables": {
+        "journal": ["International Journal of Computing and Management Studies", "European Review of Applied Sciences", "Global Journal of Technology and Innovation", "French Journal of Digital Transformation"],
+        "issn": ["ISSN 2834-XXXX", "ISSN 2951-XXXX", "ISSN 3012-XXXX"],
+        "titre_acad": ["Dr.", "Professeur", "M.", "Mme"],
+        "theme_1": ["Intelligence artificielle", "Cybersécurité", "Sciences des données", "NLP et TAL"],
+        "theme_2": ["Cloud computing", "IoT et systèmes embarqués", "Blockchain", "Informatique quantique"],
+        "theme_3": ["Éthique de l'IA", "Apprentissage automatique", "Traitement d'images", "Robotique"],
+        "delai": ["2 semaines", "4 semaines", "3 jours ouvrés"],
+        "frais": ["250 USD", "400 EUR", "150 USD"],
+        "conference": ["ICSDA 2026", "EuroTech Conference", "AI & Data Global Summit", "CompSci International 2026"],
+        "lieu": ["Paris, France", "Barcelone, Espagne", "Rome, Italie", "Dubaï, EAU"],
+        "dates": ["12-14 mars 2026", "5-7 juin 2026", "22-24 septembre 2026", "10-12 novembre 2026"],
+        "editeur": ["Dr. P. Moreau, Rédacteur en chef", "Comité éditorial IJCMS", "Prof. L. Bernard, Éditeur associé"],
+        "frais_inscr": ["350 EUR", "200 EUR", "500 EUR"],
+        "index": ["Scopus", "Google Scholar", "Web of Science (en cours)"],
+        "nb_chercheurs": ["500", "300", "1 000"]
+      }
+    },
+    {
+      "id": "s_medium_b2b_prospection",
+      "tier": "medium",
+      "name": "Prospection B2B générique",
+      "weight": 0.8,
+      "description": "Generic B2B cold outreach — software, services, consulting",
+      "templates": [
+        "Objet : {prenom}, une solution pour {probleme}\n\nBonjour {prenom},\n\nJe me permets de vous contacter suite à mes recherches sur {entreprise_cible}. En tant que {role_cible}, vous devez certainement faire face à {probleme}.\n\nChez {entreprise}, nous avons développé {solution} qui permet de :\n✓ {avantage_1}\n✓ {avantage_2}\n✓ {avantage_3}\n\nNos clients ({client_ref}) ont constaté {resultat}.\n\nSeriez-vous disponible pour un échange de 15 minutes cette semaine ?\n\n→ Réserver un créneau : [URL]\n\nBien cordialement,\n{agent}\n{titre}\n{entreprise}\n📞 {phone}",
+        "Objet : RE: {probleme} — Une idée pour {entreprise_cible}\n\nBonjour {prenom},\n\nJe reviens vers vous suite à mon précédent email (pas de souci si vous ne l'avez pas vu, nos boîtes de réception sont tous débordées !).\n\nJuste une question rapide : est-ce que {douleur} est un sujet chez {entreprise_cible} en ce moment ?\n\nSi oui, j'aimerais vous montrer comment {solution} en résout la cause en {duree}.\n\nUn rapide appel de 10 min ?\n→ [URL]\n\n{agent}\n{entreprise}"
+      ],
+      "variables": {
+        "probleme": ["la gestion de votre facturation", "le suivi de vos clients", "la sécurité de vos données", "la productivité de vos équipes"],
+        "douleur": ["les retards de paiement client", "la complexité des déclarations URSSAF", "la gestion des emails non sollicités", "le temps passé sur la comptabilité"],
+        "solution": ["une plateforme tout-en-un", "un logiciel de facturation automatisé", "un assistant IA", "une solution de gestion intégrée"],
+        "entreprise": ["SimpliGestion", "FacturPlus", "CyberProtect Pro", "TeamBoost", "ComptaZen"],
+        "role_cible": ["auto-entrepreneur", "dirigeant de TPE", "gérant de SARL", "freelance"],
+        "avantage_1": ["Réduire votre temps de facturation de 80%", "Automatiser vos déclarations", "Protéger vos données sensibles"],
+        "avantage_2": ["Envoyer des relances automatiques", "Générer des rapports en 1 clic", "Simplifier votre conformité RGPD"],
+        "avantage_3": ["Se connecter à votre banque", "Gérer vos clients efficacement", "Gagner 5h par semaine"],
+        "entreprise_cible": ["votre société", "votre structure", "votre cabinet", "votre agence", "votre entreprise"],
+        "titre": ["Directeur Commercial", "Responsable Growth", "Account Executive", "Consultant Senior"],
+        "client_ref": ["comme Deliveroo, ManoMano et Back Market", "plus de 3 000 micro-entreprises", "des entreprises comme la vôtre"],
+        "resultat": ["une réduction de 60% du temps administratif", "+45% de productivité en 3 mois", "0 retard de paiement après 2 mois d'utilisation"],
+        "duree": ["moins de 30 jours", "2 semaines", "quelques jours"]
+      }
+    },
+    {
+      "id": "s_hard_newsletter_tech",
+      "tier": "hard",
+      "name": "Newsletter tech presque-légitime",
+      "weight": 1.2,
+      "description": "Tech newsletter that looks almost legitimate but is unsolicited marketing spam — based on HasData/Litrevu patterns from Spam (1).txt",
+      "templates": [
+        "Objet : {sujet} — {newsletter}\n\n{newsletter} — Édition du {date}\n\nBonjour {prenom},\n\n{intro}\n\n📊 {article_1_titre}\n{article_1_resume}\n→ Lire la suite : [URL]\n\n🔧 {article_2_titre}\n{article_2_resume}\n→ Lire la suite : [URL]\n\n💡 {article_3_titre}\n{article_3_resume}\n→ Lire la suite : [URL]\n\n{cta}\n\n{newsletter}\nVous recevez cet email car votre adresse a été ajoutée à notre liste.\nSe désinscrire : [URL]",
+        "Objet : {prenom}, {accroche}\n\n{newsletter}\n\nSalut {prenom} 👋\n\n{intro_personnelle}\n\nCette semaine, on a creusé :\n\n1️⃣ {article_1_titre} — {teaser_1}\n2️⃣ {article_2_titre} — {teaser_2}\n3️⃣ {article_3_titre} — {teaser_3}\n\n→ Lire le numéro complet : [URL]\n\nÀ la semaine prochaine,\n{auteur}\nFondateur de {newsletter}\n\nPS : Si un collègue pourrait être intéressé, faites-lui suivre !\nSe désinscrire : [URL]"
+      ],
+      "variables": {
+        "newsletter": ["DataPulse Weekly", "Le Flux Dev", "French Tech Digest", "IA Hebdo", "Le Startup Brief", "CyberWatch FR"],
+        "sujet": ["Les 5 tendances IA à suivre en 2026", "Le guide ultime du scraping éthique", "Comment sécuriser votre SaaS", "L'état du marché tech en France"],
+        "accroche": ["votre veille tech de la semaine", "3 articles que vous ne voulez pas manquer", "le résumé tech qu'il vous faut", "les news IA de la semaine"],
+        "intro": ["Bienvenue dans notre édition hebdomadaire. Voici les 3 articles les plus lus de la semaine.", "Cette semaine, on décrypte les tendances qui vont impacter votre quotidien de développeur."],
+        "intro_personnelle": ["J'espère que ta semaine a été productive. Voici ce que j'ai trouvé d'intéressant ces 7 derniers jours.", "Grosse semaine dans le monde de la tech. Voici le résumé."],
+        "article_1_titre": ["OpenAI lance GPT-5 : ce que ça change", "Le scraping web en 2026 : guide complet", "RAG vs Fine-tuning : le comparatif définitif", "Sécurité des API : les 10 erreurs les plus courantes"],
+        "article_1_resume": ["Le nouveau modèle promet des performances inédites sur le raisonnement logique.", "Tout ce qu'il faut savoir pour extraire des données de manière éthique et efficace.", "On a testé les deux approches sur un cas concret — les résultats sont surprenants."],
+        "article_2_titre": ["FastAPI 1.0 : enfin stable", "Rust pour les Pythonistes", "Comment j'ai réduit ma facture cloud de 80%", "Les 7 outils no-code qui remplacent un développeur"],
+        "article_2_resume": ["Après des années de développement, FastAPI atteint sa version 1.0 avec des changements majeurs.", "Pourquoi de plus en plus de développeurs Python apprennent Rust en 2026."],
+        "article_3_titre": ["5 bibliothèques Python à découvrir", "La France attire les talents IA", "PostgreSQL 17 : les nouveautés", "Freelance tech : les tarifs en 2026"],
+        "article_3_resume": ["Des gems méconnus qui vont changer votre workflow de data scientist.", "Le French Tech Visa fait de la France une destination prisée."],
+        "teaser_1": ["vous allez être surpris", "c'est un game changer", "indispensable"],
+        "teaser_2": ["on décrypte", "notre analyse", "deep dive"],
+        "teaser_3": ["à bookmarker", "très pratique", "on adore"],
+        "cta": ["Sponsorisez cette newsletter : [URL]", "Aimez notre contenu ? Partagez-le : [URL]"],
+        "auteur": ["Thomas Mercier", "Sarah Dubois", "Maxime Legrand", "Caroline Petit"]
+      }
+    },
+    {
+      "id": "s_hard_affiliation",
+      "tier": "hard",
+      "name": "Offre d'affiliation / partenariat",
+      "weight": 0.8,
+      "description": "Affiliate marketing proposals — based on Litrevu pitch pattern from Spam (1).txt",
+      "templates": [
+        "Objet : Proposition de partenariat pour {produit_cible}\n\nBonjour {prenom},\n\nJe m'appelle {agent} et je travaille pour {entreprise}.\n\nEn parcourant votre {plateforme}, j'ai été impressionné(e) par {compliment}. Je pense que notre {produit} pourrait intéresser votre audience.\n\nNotre programme d'affiliation :\n• Commission de {commission}% sur chaque vente\n• Matériel marketing fourni (bannières, textes, liens)\n• Tableau de bord en temps réel\n• Paiement mensuel par virement\n\nSeriez-vous intéressé(e) pour en discuter ?\n\n→ Voir notre programme : [URL]\n\nBien cordialement,\n{agent}\nResponsable Partenariats\n{entreprise}",
+        "Objet : {prenom} — Gagnez {commission}% sur chaque vente\n\nSalut {prenom} !\n\nJe suis {agent} de {entreprise}. On a un super programme d'affiliation et votre {plateforme} serait le canal parfait.\n\nConcrètement :\n→ Vous partagez un lien unique\n→ Vos abonnés achètent via ce lien\n→ Vous touchez {commission}% de commission\n\nCertains de nos affiliés gagnent +{revenu} EUR/mois.\n\nIntéressé(e) ? Inscrivez-vous ici : [URL]\n\n{agent}\n{entreprise}"
+      ],
+      "variables": {
+        "entreprise": ["FormationPro", "SaaSConnect", "AffiliTech", "DigitalPartners", "LaunchPad.io"],
+        "produit": ["logiciel de productivité", "formation en ligne", "outil SaaS", "plateforme d'apprentissage"],
+        "produit_cible": ["votre site", "votre blog", "votre chaîne YouTube", "votre newsletter"],
+        "plateforme": ["site web", "blog", "chaîne YouTube", "profil LinkedIn", "newsletter"],
+        "compliment": ["la qualité de votre contenu", "votre audience engagée", "vos articles sur la tech", "votre communauté active"],
+        "commission": ["25", "30", "20", "35", "40"],
+        "revenu": ["2 000", "5 000", "1 500", "3 000"]
+      }
+    },
+    {
+      "id": "s_hard_webinaire",
+      "tier": "hard",
+      "name": "Invitation webinaire non sollicité",
+      "weight": 1.0,
+      "description": "Unsolicited webinar invitations — based on JV Academy pattern from Spam (1).txt. Very close to legitimate but unsolicited.",
+      "templates": [
+        "Objet : [Webinaire] {sujet} — {date} à {heure}\n\n{organisateur}\n\nBonjour {prenom},\n\nNous vous invitons à notre prochain webinaire gratuit :\n\n📅 {date} à {heure}\n🎯 {sujet}\n🎤 Intervenant : {intervenant}, {titre_intervenant}\n⏱️ Durée : {duree}\n\nCe que vous apprendrez :\n✓ {point_1}\n✓ {point_2}\n✓ {point_3}\n\nPlaces limitées à {places} participants !\n\n→ Réserver ma place : [URL]\n\nÀ très vite,\nL'équipe {organisateur}\n\nSe désinscrire : [URL]",
+        "Objet : {prenom}, ne manquez pas : {sujet} (replay disponible {delai}h)\n\nBonjour {prenom},\n\nVous n'avez pas pu assister à notre webinaire \"{sujet}\" ?\n\nPas de panique, le replay est disponible pendant {delai} heures :\n→ Voir le replay : [URL]\n\nAu programme :\n• {point_1}\n• {point_2}\n• Bonus : {bonus}\n\n{nb_participants} personnes ont participé. Ne manquez pas les prochaines sessions :\n→ S'inscrire à nos prochains événements : [URL]\n\n{organisateur}"
+      ],
+      "variables": {
+        "organisateur": ["JV Academy", "StartupSchool.fr", "GrowthMakers", "The Family", "Wagon Academy", "OpenClassrooms Live"],
+        "sujet": ["Comment lancer votre micro-entreprise en 2026", "Les secrets du growth hacking", "Maîtriser ChatGPT pour votre business", "Devenir freelance développeur en 90 jours", "Automatiser sa comptabilité d'auto-entrepreneur"],
+        "intervenant": ["Claire Martin", "Julien Rioux", "Sabine Lefèvre", "Thomas Nguyen"],
+        "heure": ["10h00", "14h00", "18h30", "11h00", "17h00"],
+        "titre_intervenant": ["CEO de JV Academy", "CEO de StartupSchool.fr", "Expert en entrepreneuriat", "Formatrice certifiée", "Auto-entrepreneur à succès", "CEO de GrowthMakers"],
+        "duree": ["45 min + 15 min Q&A", "1 heure", "30 minutes", "1h30"],
+        "point_1": ["Les erreurs à éviter quand on se lance", "Comment trouver ses premiers clients", "Les outils indispensables", "Optimiser son taux de conversion"],
+        "point_2": ["Comment structurer son offre", "Les stratégies de pricing", "Automatiser ses tâches répétitives", "Le mindset entrepreneurial"],
+        "point_3": ["Cas pratiques et retours d'expérience", "Session Q&A en direct", "Accès à notre communauté privée"],
+        "bonus": ["notre template de business plan offert", "un accès gratuit de 14 jours à notre plateforme", "un ebook exclusif"],
+        "places": ["100", "200", "50", "150"],
+        "nb_participants": ["342", "187", "521", "256"],
+        "delai": ["48", "72", "24"]
+      }
+    },
+    {
+      "id": "s_hard_renouvellement",
+      "tier": "hard",
+      "name": "Renouvellement abonnement non sollicité",
+      "weight": 0.8,
+      "description": "Subscription renewal notices for services user may not have — borderline spam/phishing, classified as spam here",
+      "templates": [
+        "Objet : Votre abonnement {service} arrive à expiration le {date}\n\n{service}\n\nBonjour {prenom},\n\nVotre abonnement {plan} arrive à expiration le {date}.\n\nPour continuer à bénéficier de :\n✓ {avantage_1}\n✓ {avantage_2}\n✓ {avantage_3}\n\nRenouvelez maintenant et économisez {reduction}% :\n\nPlan annuel : {prix_annuel}/an (au lieu de {prix_normal}/an)\nPlan mensuel : {prix_mensuel}/mois\n\n→ Renouveler mon abonnement : [URL]\n\nSans renouvellement, votre accès sera suspendu le {date}.\n\nL'équipe {service}\nSe désinscrire : [URL]",
+        "Objet : {prenom}, votre essai gratuit {service} se termine dans {jours} jours\n\nBonjour {prenom},\n\nVotre essai gratuit de {service} ({plan}) se termine dans {jours} jours.\n\nPendant votre essai, vous avez :\n📊 {stat_1}\n📈 {stat_2}\n\nNe perdez pas votre progression ! Passez au plan payant dès maintenant :\n→ Choisir mon plan : [URL]\n\nOffre spéciale : -{reduction}% sur votre premier {periode} avec le code {code}.\n\n{service}"
+      ],
+      "variables": {
+        "service": ["CloudSync Pro", "VPNSecure", "MailGuard Premium", "Analytics360", "BackupPlus", "SEORank Pro"],
+        "plan": ["Premium", "Business", "Pro", "Enterprise"],
+        "avantage_1": ["Stockage illimité", "Protection contre le phishing", "Analyses avancées", "Sauvegardes automatiques"],
+        "avantage_2": ["Support prioritaire 24/7", "VPN haut débit", "Rapports personnalisés", "Accès multi-appareils"],
+        "avantage_3": ["Mises à jour automatiques", "Aucune publicité", "Intégrations API", "Espace de stockage 1 To"],
+        "prix_annuel": ["79,90 EUR", "119,90 EUR", "59,90 EUR", "199,90 EUR"],
+        "prix_normal": ["119,90 EUR", "179,90 EUR", "89,90 EUR", "299,90 EUR"],
+        "prix_mensuel": ["9,90 EUR", "14,90 EUR", "7,90 EUR", "24,90 EUR"],
+        "reduction": ["30", "40", "25", "50"],
+        "jours": ["3", "5", "7", "2"],
+        "stat_1": ["Traité 1 247 emails", "Analysé 342 pages", "Sauvegardé 12 Go de données"],
+        "stat_2": ["Bloqué 89 menaces", "Identifié 23 opportunités", "Restauré 3 fichiers"],
+        "periode": ["an", "6 mois", "trimestre"],
+        "code": ["KEEP30", "RENEW40", "STAY25", "UPGRADE50"]
+      }
+    }
+  ]
+}
