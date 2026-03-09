@@ -1,14 +1,29 @@
 openapi: 3.0.3
 info:
-  title: Sicurre API
-  version: 0.1.0
+  title: Sicurre Platform API
+  version: 0.2.0
   description: >
-    Sicurre API for phishing classification and inbox remediation (post-delivery).
+    Certification-first API contract for Sicurre. The API is organized into
+    three layers: Data API for Bloc 1, Model API for Bloc 2, and Application
+    API for Bloc 3.
 servers:
   - url: https://api.sicurre.example.com
+tags:
+  - name: health
+  - name: data-sources
+  - name: data-ingestion
+  - name: data-raw-records
+  - name: data-messages
+  - name: data-annotations
+  - name: data-datasets
+  - name: model
+  - name: app
+  - name: auth
+  - name: internal
 paths:
   /health:
     get:
+      tags: [health]
       summary: Health check
       responses:
         "200":
@@ -18,11 +33,356 @@ paths:
               schema:
                 type: object
                 properties:
-                  status: { type: string, example: ok }
+                  status:
+                    type: string
+                    example: ok
 
-  /v1/classify:
+  /v1/data/sources:
+    get:
+      tags: [data-sources]
+      summary: List registered data sources
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: List of source systems
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DataSource"
+                  total:
+                    type: integer
     post:
-      summary: Classify an email (phishing, spam, or legitimate)
+      tags: [data-sources]
+      summary: Register a new data source system
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DataSourceCreate"
+      responses:
+        "201":
+          description: Data source created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataSource"
+
+  /v1/data/ingestion-runs:
+    get:
+      tags: [data-ingestion]
+      summary: List ingestion runs
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: List of ingestion runs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IngestionRun"
+                  total:
+                    type: integer
+    post:
+      tags: [data-ingestion]
+      summary: Create an ingestion run
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IngestionRunCreate"
+      responses:
+        "201":
+          description: Ingestion run created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestionRun"
+
+  /v1/data/raw-records:
+    get:
+      tags: [data-raw-records]
+      summary: List raw records extracted from collected source objects
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: source_system_id
+          schema:
+            type: string
+        - in: query
+          name: language
+          schema:
+            type: string
+            example: fr
+        - in: query
+          name: is_usable
+          schema:
+            type: boolean
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of raw records
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RawRecord"
+                  total:
+                    type: integer
+
+  /v1/data/messages:
+    get:
+      tags: [data-messages]
+      summary: List normalized messages
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: label
+          schema:
+            type: string
+            enum: [phishing, spam, legitimate, unknown]
+        - in: query
+          name: language
+          schema:
+            type: string
+            example: fr
+        - in: query
+          name: split
+          schema:
+            type: string
+            enum: [train, val, test, holdout]
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of normalized messages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/NormalizedMessage"
+                  total:
+                    type: integer
+    post:
+      tags: [data-messages]
+      summary: Create a normalized message
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NormalizedMessageCreate"
+      responses:
+        "201":
+          description: Message created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NormalizedMessage"
+
+  /v1/data/messages/{id}:
+    get:
+      tags: [data-messages]
+      summary: Get one normalized message
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Message details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NormalizedMessage"
+        "404":
+          description: Not found
+    patch:
+      tags: [data-messages]
+      summary: Update label or redaction metadata on a normalized message
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NormalizedMessageUpdate"
+      responses:
+        "200":
+          description: Message updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NormalizedMessage"
+        "404":
+          description: Not found
+    delete:
+      tags: [data-messages]
+      summary: Delete a normalized message
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  /v1/data/annotations:
+    post:
+      tags: [data-annotations]
+      summary: Add an annotation to a normalized message
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnnotationCreate"
+      responses:
+        "201":
+          description: Annotation created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Annotation"
+
+  /v1/data/datasets:
+    get:
+      tags: [data-datasets]
+      summary: List dataset versions
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: List of datasets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Dataset"
+                  total:
+                    type: integer
+    post:
+      tags: [data-datasets]
+      summary: Create a dataset version
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DatasetCreate"
+      responses:
+        "201":
+          description: Dataset created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dataset"
+
+  /v1/data/datasets/{id}/items:
+    get:
+      tags: [data-datasets]
+      summary: List items inside a dataset
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Dataset items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DatasetItem"
+                  total:
+                    type: integer
+        "404":
+          description: Dataset not found
+
+  /v1/model/classify:
+    post:
+      tags: [model]
+      summary: Classify an email as phishing, spam, or legitimate
       security:
         - ApiKeyAuth: []
       requestBody:
@@ -43,9 +403,31 @@ paths:
         "401":
           description: Unauthorized
 
-  /v1/remediate/gmail/trash:
+  /v1/model/versions:
+    get:
+      tags: [model]
+      summary: List model versions
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Model version catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ModelVersion"
+                  total:
+                    type: integer
+
+  /v1/app/remediate/gmail/trash:
     post:
-      summary: Move a Gmail message to Trash (requires OAuth token stored per user)
+      tags: [app]
+      summary: Move a Gmail message to Trash
       security:
         - ApiKeyAuth: []
       requestBody:
@@ -66,24 +448,32 @@ paths:
         "401":
           description: Unauthorized
 
-  /v1/threat-log:
+  /v1/app/threat-log:
     get:
+      tags: [app]
       summary: List threat log entries for the authenticated user
       security:
         - BearerAuth: []
       parameters:
         - in: query
           name: limit
-          schema: { type: integer, default: 50, maximum: 200 }
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
         - in: query
           name: offset
-          schema: { type: integer, default: 0 }
+          schema:
+            type: integer
+            default: 0
         - in: query
           name: verdict
-          schema: { type: string, enum: [phishing, spam, legitimate] }
+          schema:
+            type: string
+            enum: [phishing, spam, legitimate]
       responses:
         "200":
-          description: List entries
+          description: Threat log entries
           content:
             application/json:
               schema:
@@ -96,8 +486,9 @@ paths:
                   total:
                     type: integer
 
-  /v1/threat-log/{id}/restore:
+  /v1/app/threat-log/{id}/restore:
     post:
+      tags: [app]
       summary: Restore a previously trashed Gmail message
       security:
         - BearerAuth: []
@@ -105,7 +496,8 @@ paths:
         - in: path
           name: id
           required: true
-          schema: { type: string }
+          schema:
+            type: string
       responses:
         "200":
           description: Message restored
@@ -114,16 +506,20 @@ paths:
               schema:
                 type: object
                 properties:
-                  status: { type: string, example: restored }
-                  message_id: { type: string }
+                  status:
+                    type: string
+                    example: restored
+                  message_id:
+                    type: string
         "404":
           description: Threat log entry not found
         "409":
           description: Message already restored or not trashed
 
-  /v1/feedback:
+  /v1/app/feedback:
     post:
-      summary: Submit feedback on a classification verdict
+      tags: [app]
+      summary: Submit feedback on a deployed classification verdict
       security:
         - BearerAuth: []
       requestBody:
@@ -142,11 +538,12 @@ paths:
         "400":
           description: Bad request
         "409":
-          description: Feedback already submitted for this threat log entry
+          description: Feedback already submitted
 
-  /v1/users/me:
+  /v1/app/users/me:
     get:
-      summary: Get current user profile and settings
+      tags: [app]
+      summary: Get current user profile
       security:
         - BearerAuth: []
       responses:
@@ -159,15 +556,20 @@ paths:
         "401":
           description: Unauthorized
 
-  /v1/stats:
+  /v1/app/stats:
     get:
+      tags: [app]
       summary: Get summary statistics for the authenticated user
       security:
         - BearerAuth: []
       parameters:
         - in: query
           name: days
-          schema: { type: integer, default: 30, minimum: 1, maximum: 365 }
+          schema:
+            type: integer
+            default: 30
+            minimum: 1
+            maximum: 365
       responses:
         "200":
           description: User stats
@@ -178,28 +580,26 @@ paths:
 
   /auth/login/google:
     get:
-      summary: Initiate Google OAuth login (redirects to Google consent screen)
-      description: >
-        Begins the OAuth 2.0 flow requesting `gmail.modify` scope.
-        Handled by Better Auth. Redirects the user to Google's consent page.
+      tags: [auth]
+      summary: Initiate Google OAuth login
       responses:
         "302":
           description: Redirect to Google OAuth consent
 
   /auth/callback/google:
     get:
-      summary: Google OAuth callback (handled by Better Auth)
-      description: >
-        Receives the authorization code from Google, exchanges it for tokens,
-        encrypts the refresh token, stores it, and creates a session.
+      tags: [auth]
+      summary: Google OAuth callback
       parameters:
         - in: query
           name: code
           required: true
-          schema: { type: string }
+          schema:
+            type: string
         - in: query
           name: state
-          schema: { type: string }
+          schema:
+            type: string
       responses:
         "302":
           description: Redirect to dashboard after successful login
@@ -208,6 +608,7 @@ paths:
 
   /auth/logout:
     post:
+      tags: [auth]
       summary: End the current session
       security:
         - BearerAuth: []
@@ -219,14 +620,8 @@ paths:
 
   /internal/renew-watches:
     post:
-      summary: Renew Gmail users.watch subscriptions for all active users
       tags: [internal]
-      description: >
-        Called exclusively by a Cloud Scheduler job every 6 days (Gmail watch
-        expiry is 7 days). Protected via GCP IAM — only the Cloud Scheduler
-        service account with `roles/run.invoker` may call this endpoint.
-        Rate-limited to 1 request/minute. Never expose this endpoint publicly
-        or call it from client-side code.
+      summary: Renew Gmail watch subscriptions for all active users
       security:
         - InternalServiceAuth: []
       responses:
@@ -240,7 +635,6 @@ paths:
           description: Missing or invalid IAM credentials
         "429":
           description: Rate limit exceeded
-
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -254,33 +648,265 @@ components:
     InternalServiceAuth:
       type: http
       scheme: bearer
-      description: >
-        GCP IAM identity token issued to the Cloud Scheduler service account.
-        Verified by Cloud Run using `roles/run.invoker`. Not a user JWT.
-
+      description: GCP IAM identity token for internal scheduled calls.
   schemas:
+    DataSourceCreate:
+      type: object
+      required: [name, source_type]
+      properties:
+        name:
+          type: string
+          example: cert-fr-cti
+        source_type:
+          type: string
+          enum: [api, file, scraping, sql, bigdata, manual]
+        description:
+          type: string
+        owner_name:
+          type: string
+        legal_basis:
+          type: string
+        contains_personal_data:
+          type: boolean
+        retention_days:
+          type: integer
+
+    DataSource:
+      allOf:
+        - $ref: "#/components/schemas/DataSourceCreate"
+        - type: object
+          properties:
+            id:
+              type: string
+            is_active:
+              type: boolean
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+
+    IngestionRunCreate:
+      type: object
+      required: [source_system_id, started_at, status, trigger_mode]
+      properties:
+        source_system_id:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [pending, running, completed, failed, partial]
+        trigger_mode:
+          type: string
+          example: manual
+
+    IngestionRun:
+      allOf:
+        - $ref: "#/components/schemas/IngestionRunCreate"
+        - type: object
+          properties:
+            id:
+              type: string
+            finished_at:
+              type: string
+              format: date-time
+            raw_object_count:
+              type: integer
+            raw_record_count:
+              type: integer
+            log_message:
+              type: string
+
+    RawRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        raw_object_id:
+          type: string
+        record_key:
+          type: string
+        raw_content:
+          type: string
+        detected_language:
+          type: string
+        is_usable:
+          type: boolean
+        rejection_reason:
+          type: string
+        extracted_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    NormalizedMessageCreate:
+      type: object
+      required: [raw_record_id, processing_run_id, normalized_text, language, current_label]
+      properties:
+        raw_record_id:
+          type: string
+        processing_run_id:
+          type: string
+        normalized_text:
+          type: string
+        language:
+          type: string
+          example: fr
+        current_label:
+          type: string
+          enum: [phishing, spam, legitimate, unknown]
+        quality_score:
+          type: number
+        contains_pii:
+          type: boolean
+        redaction_status:
+          type: string
+          enum: [not_required, redacted, review_needed]
+
+    NormalizedMessageUpdate:
+      type: object
+      properties:
+        current_label:
+          type: string
+          enum: [phishing, spam, legitimate, unknown]
+        quality_score:
+          type: number
+        redaction_status:
+          type: string
+          enum: [not_required, redacted, review_needed]
+
+    NormalizedMessage:
+      allOf:
+        - $ref: "#/components/schemas/NormalizedMessageCreate"
+        - type: object
+          properties:
+            id:
+              type: string
+            text_sha256:
+              type: string
+            text_length:
+              type: integer
+            normalized_at:
+              type: string
+              format: date-time
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+
+    AnnotationCreate:
+      type: object
+      required: [normalized_message_id, label, label_source, annotated_at]
+      properties:
+        normalized_message_id:
+          type: string
+        label:
+          type: string
+          enum: [phishing, spam, legitimate, unknown]
+        label_source:
+          type: string
+          example: manual-review
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        comment:
+          type: string
+        is_validated:
+          type: boolean
+        annotated_at:
+          type: string
+          format: date-time
+
+    Annotation:
+      allOf:
+        - $ref: "#/components/schemas/AnnotationCreate"
+        - type: object
+          properties:
+            id:
+              type: string
+            created_at:
+              type: string
+              format: date-time
+
+    DatasetCreate:
+      type: object
+      required: [name, version_tag, target_usage, status]
+      properties:
+        name:
+          type: string
+        version_tag:
+          type: string
+          example: french-phishing-v1
+        target_usage:
+          type: string
+          example: training
+        status:
+          type: string
+          enum: [draft, frozen, archived]
+
+    Dataset:
+      allOf:
+        - $ref: "#/components/schemas/DatasetCreate"
+        - type: object
+          properties:
+            id:
+              type: string
+            frozen_at:
+              type: string
+              format: date-time
+            item_count:
+              type: integer
+            created_at:
+              type: string
+              format: date-time
+
+    DatasetItem:
+      type: object
+      properties:
+        id:
+          type: string
+        dataset_id:
+          type: string
+        normalized_message_id:
+          type: string
+        split_name:
+          type: string
+          enum: [train, val, test, holdout]
+        sample_weight:
+          type: number
+        row_order:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
     ClassifyRequest:
       type: object
       required: [subject, body, sender]
       properties:
         subject:
           type: string
-          example: "URGENT : Mise à jour URSSAF requise"
+          example: "URGENT : Mise a jour URSSAF requise"
         body:
           type: string
-          example: "Bonjour, veuillez confirmer vos informations sous 24h..."
         sender:
           type: string
-          example: "urssaf-support@secure-notice.example"
         received_at:
           type: string
           format: date-time
         message_id:
           type: string
-          description: Provider message id (Gmail message id)
         language:
           type: string
-          example: "fr"
+          example: fr
 
     ClassifyResponse:
       type: object
@@ -293,46 +919,80 @@ components:
           type: number
           minimum: 0
           maximum: 1
-          example: 0.97
         signals:
           type: array
           items:
             type: string
-          example: ["French admin impersonation", "Suspicious URL", "DMARC fail"]
         model_version:
           type: string
-          example: "sicurre/camembertav2-phishing-fr@v0.1.0"
+
+    ModelVersion:
+      type: object
+      properties:
+        id:
+          type: string
+        version_tag:
+          type: string
+        artifact_uri:
+          type: string
+        f1_score:
+          type: number
+        precision_score:
+          type: number
+        recall_score:
+          type: number
+        eval_samples:
+          type: integer
+        promoted_at:
+          type: string
+          format: date-time
 
     TrashRequest:
       type: object
       required: [user_id, message_id]
       properties:
-        user_id: { type: string }
-        message_id: { type: string }
+        user_id:
+          type: string
+        message_id:
+          type: string
         reason:
           type: string
-          example: "phishing verdict confidence>=0.85"
 
     TrashResponse:
       type: object
       properties:
-        status: { type: string, example: trashed }
-        message_id: { type: string }
+        status:
+          type: string
+          example: trashed
+        message_id:
+          type: string
 
     ThreatLogEntry:
       type: object
       properties:
-        id: { type: string }
-        message_id: { type: string }
-        received_at: { type: string, format: date-time }
-        verdict: { type: string, enum: [phishing, spam, legitimate] }
-        confidence: { type: number }
+        id:
+          type: string
+        message_id:
+          type: string
+        received_at:
+          type: string
+          format: date-time
+        verdict:
+          type: string
+          enum: [phishing, spam, legitimate]
+        confidence:
+          type: number
         signals:
           type: array
-          items: { type: string }
-        model_version: { type: string }
-        action_taken: { type: string, example: "trashed" }
-        action_at: { type: string, format: date-time }
+          items:
+            type: string
+        model_version:
+          type: string
+        action_taken:
+          type: string
+        action_at:
+          type: string
+          format: date-time
 
     FeedbackRequest:
       type: object
@@ -340,56 +1000,69 @@ components:
       properties:
         threat_log_id:
           type: string
-          description: ID of the threat log entry
         feedback_label:
           type: string
           enum: [true_positive, false_positive, false_negative, true_negative]
         comment:
           type: string
-          description: Optional free-text explanation
 
     FeedbackResponse:
       type: object
       properties:
-        id: { type: string }
-        threat_log_id: { type: string }
-        feedback_label: { type: string }
-        created_at: { type: string, format: date-time }
+        id:
+          type: string
+        threat_log_id:
+          type: string
+        feedback_label:
+          type: string
+        created_at:
+          type: string
+          format: date-time
 
     UserProfile:
       type: object
       properties:
-        id: { type: string }
-        email: { type: string }
-        display_name: { type: string }
-        plan: { type: string, enum: [free, pro, business] }
-        watch_active: { type: boolean }
-        created_at: { type: string, format: date-time }
+        id:
+          type: string
+        email:
+          type: string
+        display_name:
+          type: string
+        plan:
+          type: string
+          enum: [free, pro, business]
+        watch_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
 
     UserStats:
       type: object
       properties:
-        total_scanned: { type: integer }
-        total_phishing: { type: integer }
-        total_spam: { type: integer }
-        total_legitimate: { type: integer }
-        total_trashed: { type: integer }
-        total_restored: { type: integer }
-        false_positive_rate: { type: number }
-        period_days: { type: integer }
+        total_scanned:
+          type: integer
+        total_phishing:
+          type: integer
+        total_spam:
+          type: integer
+        total_legitimate:
+          type: integer
+        total_trashed:
+          type: integer
+        total_restored:
+          type: integer
+        false_positive_rate:
+          type: number
+        period_days:
+          type: integer
 
     RenewWatchesResponse:
       type: object
       properties:
         renewed:
           type: integer
-          description: Number of users whose watch was successfully renewed
-          example: 42
         failed:
           type: integer
-          description: Number of users whose renewal failed (logged server-side)
-          example: 0
         skipped:
           type: integer
-          description: Users whose watch is not due for renewal yet
-          example: 7
