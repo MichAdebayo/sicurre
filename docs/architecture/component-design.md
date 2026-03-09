@@ -6,14 +6,27 @@
 
 This document describes the target component architecture for the certification project.
 
-It is intentionally organized around the three required phases:
+It uses two complementary views:
 
-1. Bloc 1: data collection, storage, and exposure
-2. Bloc 2: AI integration and exposure
-3. Bloc 3: application integration
+1. official certification blocs: 3 blocs defined by the referential
+2. internal delivery blocs: Bloc 0 plus 5 execution blocs used for planning and backlog management
 
 The previous version of this document described the final SaaS product runtime only.
 That view remains valid, but it is now treated as a downstream layer built on top of a dedicated data platform.
+
+## Delivery framing
+
+The implementation roadmap is organized as follows:
+
+- Bloc 0: architecture freeze and execution baseline
+- Bloc 1: data platform
+- Bloc 2: technical survey and proof of concept
+- Bloc 3: model and classifier service
+- Bloc 4: application integration
+- Bloc 5: monitoring and incident readiness
+
+The technical architecture itself still groups runtime code into data, model, and application domains.
+The survey and monitoring blocs exist as delivery and evidence phases layered on top of those domains.
 
 ## Architectural principle
 
@@ -30,6 +43,11 @@ The product runtime becomes a second layer that consumes curated data and model 
 
 ```mermaid
 flowchart LR
+		subgraph Strategy[Delivery Bloc 2 - Technical survey and POC]
+				BENCH[Benchmark and stack comparison]
+				POC[Proof of concept and feasibility checks]
+		end
+
 		subgraph Sources[External data sources]
 				API[Public REST APIs]
 				FILE[Files: CSV / JSON / TXT]
@@ -58,6 +76,15 @@ flowchart LR
 				LISTENER[Gmail listener]
 		end
 
+		subgraph Monitoring[Delivery Bloc 5 - Monitoring]
+				OBS[Metrics, logs, alerts]
+				INC[Incident analysis and resolution evidence]
+		end
+
+		BENCH --> POC
+		POC --> INGEST
+		POC --> MODELAPI
+		POC --> APPAPI
 		API --> INGEST
 		FILE --> INGEST
 		SCRAPE --> INGEST
@@ -75,7 +102,20 @@ flowchart LR
 		REACT --> APPAPI
 		LISTENER --> MODELAPI
 		LISTENER --> APPAPI
+		DATAAPI --> OBS
+		MODELAPI --> OBS
+		APPAPI --> OBS
+		LISTENER --> OBS
+		OBS --> INC
 ```
+
+## Official certification mapping
+
+| Official certification bloc | Sicurre delivery interpretation |
+|-----------------------------|---------------------------------|
+| Bloc 1 | Delivery Bloc 1 data platform |
+| Bloc 2 | Delivery Bloc 2 technical survey and POC plus Delivery Bloc 3 model |
+| Bloc 3 | Delivery Bloc 4 app plus Delivery Bloc 5 monitoring |
 
 ## Bloc 1 components
 
@@ -145,7 +185,19 @@ flowchart LR
 
 ## Bloc 2 components
 
-### 6. Training and evaluation pipeline
+### 6. Technical survey and proof of concept
+
+- Role: justify the selected stack and prove feasibility before major implementation effort
+- Responsibility:
+	- benchmark candidate models, runtimes, frameworks, and services
+	- document accepted and rejected options
+	- run narrow proof-of-concept checks for integration risk
+- Primary repository evidence:
+	- `docs/research/tech-stack-survey.md`
+	- public architecture and planning docs
+	- later POC evidence artifacts
+
+### 7. Training and evaluation pipeline
 
 - Role: consume curated datasets from the data platform and produce versioned models
 - Inputs:
@@ -157,7 +209,7 @@ flowchart LR
 	- metrics
 	- evaluation reports
 
-### 7. Phishing API / classifier service
+### 8. Phishing API / classifier service
 
 - Role: expose the trained model through a dedicated REST API
 - Responsibility:
@@ -168,7 +220,7 @@ flowchart LR
 	- stateless service
 	- no direct database access in deployed product architecture
 
-### 8. Model observability layer
+### 9. Model observability layer
 
 - Role: monitor model performance and service behavior
 - Measures:
@@ -179,7 +231,7 @@ flowchart LR
 
 ## Bloc 3 components
 
-### 9. Sicurre API, application domain
+### 10. Sicurre API, application domain
 
 - Role: expose user-facing product functionality
 - Responsibility:
@@ -189,14 +241,14 @@ flowchart LR
 	- feedback
 	- restore and remediation endpoints
 
-### 10. Gmail listener
+### 11. Gmail listener
 
 - Role: receive push notifications, fetch message changes, call the classifier, then call the app domain to persist audit results
 - Constraint:
 	- idempotent processing is mandatory
 	- no direct database access
 
-### 11. POC dashboard
+### 12. POC dashboard
 
 - Role: demonstrate the end-to-end flow during evaluation
 - Candidate technology:
@@ -204,7 +256,26 @@ flowchart LR
 - Constraint:
 	- consumes the API only
 
-### 12. Production dashboard
+### 13. Production dashboard
+
+## Delivery Bloc 5 components
+
+### 14. Monitoring and alerting stack
+
+- Role: collect metrics, logs, and alert signals across data ingestion, classifier, and application runtime
+- Responsibility:
+	- availability checks
+	- latency and error monitoring
+	- remediation workflow visibility
+	- alert triggering
+
+### 15. Incident analysis workflow
+
+- Role: support technical incident resolution and defense evidence
+- Responsibility:
+	- trace failures to their root cause
+	- document corrective actions
+	- link monitoring outputs to issues and fixes
 
 - Role: future SaaS interface for users
 - Candidate technology:

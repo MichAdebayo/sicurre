@@ -15,6 +15,7 @@ flowchart LR
     GM[Gmail API]
     PS[Pub/Sub Topic]
     UI[Dashboard<br/>React]
+    MON[Monitoring stack<br/>metrics / logs / alerts]
   end
 
   U -->|OAuth connect| API
@@ -31,4 +32,8 @@ flowchart LR
   ING -->|Trash message| GM
   ING -->|POST audit log| API
   API -->|Store| DB
+
+  API -->|Metrics and logs| MON
+  ING -->|Metrics and logs| MON
+  CLS -->|Metrics and logs| MON
 ```

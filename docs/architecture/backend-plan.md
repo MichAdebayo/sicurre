@@ -18,6 +18,19 @@ Use one backend codebase with three internal domains:
 This is a modular monolith strategy.
 It is simpler to implement, easier to defend during the certification, and still compatible with later service extraction.
 
+The delivery roadmap is broader than the runtime domain split.
+Execution now follows Bloc 0 plus 5 delivery blocs:
+
+- Bloc 0: baseline and governance
+- Bloc 1: data platform
+- Bloc 2: technical survey and proof of concept
+- Bloc 3: model
+- Bloc 4: app
+- Bloc 5: monitoring
+
+The survey bloc produces benchmark and feasibility evidence.
+The monitoring bloc is implemented as a cross-cutting capability rather than as a separate business domain.
+
 ## Frozen naming convention
 
 The backend and database must use explicit domain prefixes.
@@ -41,6 +54,11 @@ backend/
         database.py
         logging.py
         security.py
+      observability/
+        metrics.py
+        logging_filters.py
+        alerts.py
+        incidents.md
       domains/
         data_platform/
           models/
@@ -81,6 +99,18 @@ backend/
 
 ## Domain responsibilities
 
+### Survey and proof-of-concept work
+
+Does not require a dedicated runtime domain.
+
+Its outputs are:
+
+- benchmark and recommendation documents
+- proof-of-concept experiments
+- feasibility decisions that reduce implementation risk before major coding work
+
+The main repository anchor for this bloc is the research and architecture documentation rather than backend runtime code.
+
 ### Data platform domain
 
 Owns:
@@ -119,6 +149,17 @@ Owns:
 
 This domain is downstream from the data platform and classifier layers.
 
+### Observability capability
+
+Owns:
+
+- metrics instrumentation
+- structured logging filters
+- alert definitions
+- incident response evidence
+
+This capability spans all domains and is the technical backbone of the monitoring delivery bloc.
+
 ## Table groups
 
 ### Data platform tables
@@ -150,6 +191,14 @@ This domain is downstream from the data platform and classifier layers.
 
 ## Recommended implementation order
 
+### Step 0
+
+Complete the survey and proof-of-concept evidence needed to lock the implementation path:
+
+- stack comparison
+- proof-of-concept conclusions
+- accepted and rejected options
+
 ### Step 1
 
 Implement the data platform domain first:
@@ -170,6 +219,10 @@ Implement the classifier API and model metadata contracts.
 ### Step 4
 
 Implement the application domain and runtime product features.
+
+### Step 5
+
+Instrument monitoring and incident-response evidence across the data, model, and application layers.
 
 ## API segmentation
 

@@ -2,6 +2,8 @@
 
 Sicurre is API-first, and the API is now documented as a layered platform that follows the certification sequence.
 
+The API surfaces remain organized by runtime responsibility, while planning and milestones are organized by Bloc 0 plus 5 delivery blocs.
+
 ## Canonical contract
 
 The source of truth is [openapi.yaml](openapi.yaml).
@@ -10,6 +12,17 @@ Documentation comes before implementation.
 If the architecture changes, update the OpenAPI contract first and only then implement the backend.
 
 ## API surfaces
+
+The current API contract intentionally exposes three runtime surfaces:
+
+- Data API
+- Model API
+- Application API
+
+This does not conflict with the 5 delivery blocs.
+
+- the technical survey and POC bloc produces benchmark and feasibility evidence rather than a separate business API surface
+- the monitoring bloc primarily adds health, metrics, logs, alerts, and incident evidence rather than a new user-facing resource family
 
 ### Data API
 
@@ -98,10 +111,12 @@ Yes, the project is being built incrementally and deliberately.
 
 The sequence is:
 
-1. document and freeze the Bloc 1 architecture, table names, and Data API
-2. implement the data platform backbone
-3. document and implement the Bloc 2 model endpoints on top of curated datasets
-4. document and implement the Bloc 3 application endpoints on top of the model and data layers
+1. complete Bloc 0 baseline and governance documentation
+2. implement the Bloc 1 data platform backbone
+3. complete the Bloc 2 technical survey and proof-of-concept evidence
+4. document and implement the Bloc 3 model endpoints on top of curated datasets
+5. document and implement the Bloc 4 application endpoints on top of the model and data layers
+6. instrument the Bloc 5 monitoring and incident-evidence layer
 
 This means the documentation and endpoints will continue to evolve in a controlled way as the project moves from experimental corpus work to a structured NLP platform and then to a SaaS runtime.
 
