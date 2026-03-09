@@ -1,16 +1,30 @@
 # Architecture Overview (Sicurre)
 
-Sicurre is a **French-first phishing protection** product for auto-entrepreneurs and TPEs. It operates as a **post-delivery** remediation system on Gmail and (later) Microsoft 365: emails arrive, Sicurre is notified, Sicurre classifies, and malicious emails are automatically moved to Trash/quarantine.
+The architecture is now documented in a certification-first order.
 
-## Primary workflow
-1. User connects Gmail via OAuth
-2. Sicurre configures Gmail push notifications (`users.watch`) to a Pub/Sub topic
-3. Pub/Sub push delivers mailbox change events to a Cloud Run endpoint
-4. Sicurre fetches the changed message(s), classifies, and if phishing: trashes it
-5. Sicurre stores an audit log + offers undo/restore
+## Reading order
 
-## Key design choices (see ADRs)
-- Post-delivery architecture (not MX pre-delivery)
-- French-native transformer base (CamemBERTav2, DeBERTaV3 architecture, 3-class: phishing/spam/legitimate)
-- Open-core: open-source model weights, paid managed product
-- Cloud Run + FastAPI for minimal ops and autoscaling
+1. Bloc 1 backbone: [data-design.md](data-design.md)
+2. Component architecture across the 3 blocs: [component-design.md](component-design.md)
+3. Backend target organization: [backend-plan.md](backend-plan.md)
+4. Product runtime context: [system-context.md](system-context.md)
+
+## Architectural stance
+
+Sicurre should be understood as a progression:
+
+- experimental corpus and notebooks
+- structured data platform
+- AI service layer
+- SaaS application runtime
+
+The certification requires the data platform to be explicit and defensible on its own.
+The product branch springs from that foundation rather than replacing it.
+
+## Key design choices
+
+- Bloc 1 is centered on a SQL-backed data platform and REST data API
+- Bloc 2 consumes curated datasets from the data platform and exposes the classifier as an API
+- Bloc 3 integrates the classifier into the end-user application
+- FastAPI remains the API framework target
+- PostgreSQL remains the production database target, with SQLite compatibility for development and CI

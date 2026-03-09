@@ -5,6 +5,7 @@
 ## Purpose
 
 This document describes the target component architecture for the certification project.
+
 It is intentionally organized around the three required phases:
 
 1. Bloc 1: data collection, storage, and exposure
@@ -22,6 +23,7 @@ Sicurre should be presented as a single platform with two bounded contexts insid
 - Product runtime context: user auth, inbox monitoring, remediation, audit log, and feedback
 
 For certification purposes, the data platform is the primary architecture for Bloc 1.
+
 The product runtime becomes a second layer that consumes curated data and model services.
 
 ## Target component map
@@ -259,9 +261,3 @@ flowchart LR
 - In deployed runtime architecture, only the Sicurre API owns the database connection
 - Gmail listener and classifier remain separate compute services and communicate over HTTP
 
-## Why this architecture fits the certification
-
-- It clearly demonstrates the mandatory Bloc 1 chain: collect, aggregate, store in SQL, expose through REST
-- It gives a defensible Bloc 2 boundary between curated data and model serving
-- It gives a clean Bloc 3 boundary between model API and application API
-- It avoids presenting the jury with a product-only SaaS design that hides the actual data platform work

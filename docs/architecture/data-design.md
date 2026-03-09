@@ -23,6 +23,16 @@ The data platform must prove the following chain end to end:
 For this reason, the central business object is not the end user account.
 It is the curated message dataset derived from heterogeneous sources.
 
+## Frozen table naming convention
+
+Table names are now frozen and must follow domain prefixes.
+
+- `data_` for Bloc 1 data platform tables
+- `ml_` for model lifecycle and evaluation tables
+- `app_` for runtime application tables
+
+This naming rule is part of the architecture baseline and should not be changed during implementation unless a new architecture decision record explicitly supersedes it.
+
 ## Merise MCD (conceptual model)
 
 ### Conceptual entities
@@ -58,7 +68,31 @@ It is the curated message dataset derived from heterogeneous sources.
 - `MESSAGE_NORMALISE` is the reusable NLP unit after cleaning, deduplication, and redaction.
 - `JEU_DONNEES` and `LIGNE_JEU_DONNEES` allow versioned train, validation, and test sets.
 
-## Certification ERD (logical overview)
+### MCD diagram
+
+```mermaid
+flowchart TD
+    SS[SYSTEME_SOURCE]
+    IR[EXECUTION_INGESTION]
+    RO[OBJET_BRUT]
+    RR[ENREGISTREMENT_BRUT]
+    PR[EXECUTION_TRAITEMENT]
+    NM[MESSAGE_NORMALISE]
+    AN[ANNOTATION]
+    DS[JEU_DONNEES]
+    DI[LIGNE_JEU_DONNEES]
+
+    SS -->|1,n| IR
+    IR -->|1,n| RO
+    RO -->|1,n| RR
+    PR -->|1,n| RR
+    RR -->|0,1| NM
+    NM -->|0,n| AN
+    DS -->|1,n| DI
+    NM -->|0,n| DI
+```
+
+## MLD diagram
 
 ```mermaid
 erDiagram
@@ -224,6 +258,12 @@ Recommended controlled vocabularies:
 - `split_name`: `train`, `val`, `test`, `holdout`
 - `redaction_status`: `not_required`, `redacted`, `review_needed`
 
+### MLD interpretation
+
+- The MLD keeps a strict lineage from source system to dataset item.
+- The curated NLP object is `data_normalized_message`.
+- The relational model supports SQL queries for lineage, quality control, dataset composition, and API exposure.
+
 ## MPD (physical model for PostgreSQL)
 
 ### Target SGBD
@@ -231,6 +271,20 @@ Recommended controlled vocabularies:
 - Production target: PostgreSQL
 - Local development and CI: SQLite via dialect abstraction
 - Migration tool: Alembic
+
+### MPD diagram
+
+```mermaid
+erDiagram
+    data_source_system ||--o{ data_ingestion_run : source_system_id
+    data_ingestion_run ||--o{ data_raw_object : ingestion_run_id
+    data_raw_object ||--o{ data_raw_record : raw_object_id
+    data_processing_run ||--o{ data_normalized_message : processing_run_id
+    data_raw_record ||--o| data_normalized_message : raw_record_id
+    data_normalized_message ||--o{ data_annotation : normalized_message_id
+    data_dataset ||--o{ data_dataset_item : dataset_id
+    data_normalized_message ||--o{ data_dataset_item : normalized_message_id
+```
 
 ### Physical table definitions
 
@@ -431,12 +485,12 @@ This preserves lineage and makes the SQL platform defensible during evaluation.
 
 The following runtime entities remain valid for the final SaaS application, but they are not the primary MCD for Bloc 1:
 
-- `users`
-- `oauth_tokens`
-- `watch_state`
-- `threat_log`
-- `feedback`
-- `model_versions`
-- `sessions`
+- `app_user`
+- `app_oauth_token`
+- `app_watch_state`
+- `app_threat_log`
+- `app_feedback`
+- `ml_model_version`
+- `app_session`
 
 These runtime tables should be documented and implemented as a separate application-domain schema after the data platform baseline is established.

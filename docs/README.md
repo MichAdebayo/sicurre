@@ -11,6 +11,7 @@ This repository uses a split documentation model:
 - `docs/adr/` except internal ADRs `0001`, `0006`, and `0007`
 - `docs/api/`
 - `docs/brand/`
+- `docs/model/`
 - `docs/research/`
 - `docs/README.md`
 
