@@ -13,6 +13,8 @@ __pycache__/
 venv/
 env/
 ENV/
+.venv312/
+venv312/
 
 # Distribution / packaging
 build/
@@ -77,11 +79,13 @@ data/raw/
 docs/ops/
 docs/architecture/threat-model.md
 docs/architecture/privacy-rgpd.md
+docs/architecture/diagrams/*.dot
 docs/adr/0001-post-delivery-gmail.md
 docs/adr/0006-scope-selection-gmail.md
 docs/adr/0007-idempotency-pubsub-history.md
 docs/raw_sources/
 docs/simplon/
+docs/model/
 
 tasks/
 
