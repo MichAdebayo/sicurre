@@ -18,10 +18,10 @@ Status: done
 
 ### Secondary in-scope sources
 
-| Source | Status |
-|--------|--------|
-| Synthetic French corpus | secondary |
-| Adapted EN to FR corpus | secondary |
+| Source | Type | Status |
+|--------|------|--------|
+| Synthetic French corpus | Faker | secondary |
+| Adapted EN to FR corpus | file | secondary |
 
 ### Not frozen
 
