@@ -119,7 +119,7 @@ flowchart LR
 
 ## Bloc 1 components
 
-The detailed frozen source inventory for Bloc 1 is documented in [source-perimeter.md](source-perimeter.md).
+The related issue note for the Bloc 1 source perimeter is documented in [issue-artifact.md](issue-artifact.md).
 
 ### 1. Source connectors
 
@@ -187,17 +187,17 @@ The detailed frozen source inventory for Bloc 1 is documented in [source-perimet
 
 ## Bloc 2 components
 
-### 6. Technical survey and proof of concept
+### 6. Technical survey and stack decision
 
-- Role: justify the selected stack and prove feasibility before major implementation effort
+- Role: justify the selected stack and lock implementation decisions before major implementation effort
 - Responsibility:
 	- benchmark candidate models, runtimes, frameworks, and services
 	- document accepted and rejected options
-	- run narrow proof-of-concept checks for integration risk
+	- capture the decision criteria that later validation will be checked against
 - Primary repository evidence:
 	- `docs/research/tech-stack-survey.md`
 	- public architecture and planning docs
-	- later POC evidence artifacts
+	- concise validation notes in `docs/architecture/issue-artifact.md`
 
 ### 7. Training and evaluation pipeline
 
@@ -231,9 +231,20 @@ The detailed frozen source inventory for Bloc 1 is documented in [source-perimet
 	- feedback drift
 	- evaluation metrics by version
 
-## Bloc 3 components
+## Bloc 4 components
 
-### 10. Sicurre API, application domain
+### 10. Pre-app validation evidence
+
+- Role: confirm that the selected backend and inference path still hold once the first usable model baseline exists
+- Timing:
+	- after Bloc 3 delivers a usable model and model API baseline
+	- before full Bloc 4 application integration
+- Evidence form:
+	- concise success criteria
+	- measured validation notes
+	- recorded conclusion in `docs/architecture/issue-artifact.md`
+
+### 11. Sicurre API, application domain
 
 - Role: expose user-facing product functionality
 - Responsibility:
@@ -243,14 +254,14 @@ The detailed frozen source inventory for Bloc 1 is documented in [source-perimet
 	- feedback
 	- restore and remediation endpoints
 
-### 11. Gmail listener
+### 12. Gmail listener
 
 - Role: receive push notifications, fetch message changes, call the classifier, then call the app domain to persist audit results
 - Constraint:
 	- idempotent processing is mandatory
 	- no direct database access
 
-### 12. POC dashboard
+### 13. POC dashboard
 
 - Role: demonstrate the end-to-end flow during evaluation
 - Candidate technology:
@@ -258,11 +269,11 @@ The detailed frozen source inventory for Bloc 1 is documented in [source-perimet
 - Constraint:
 	- consumes the API only
 
-### 13. Production dashboard
+### 14. Production dashboard
 
 ## Delivery Bloc 5 components
 
-### 14. Monitoring and alerting stack
+### 15. Monitoring and alerting stack
 
 - Role: collect metrics, logs, and alert signals across data ingestion, classifier, and application runtime
 - Responsibility:
@@ -271,7 +282,7 @@ The detailed frozen source inventory for Bloc 1 is documented in [source-perimet
 	- remediation workflow visibility
 	- alert triggering
 
-### 15. Incident analysis workflow
+### 16. Incident analysis workflow
 
 - Role: support technical incident resolution and defense evidence
 - Responsibility:

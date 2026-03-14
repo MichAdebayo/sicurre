@@ -11,7 +11,7 @@ Two planning lenses coexist and must not be confused:
 
 1. Delivery model and bloc mapping: [delivery-bloc-mapping.md](delivery-bloc-mapping.md)
 2. Bloc 1 backbone: [data-design.md](data-design.md)
-3. Bloc 1 source perimeter: [source-perimeter.md](source-perimeter.md)
+3. Issue artifacts: [issue-artifact.md](issue-artifact.md)
 4. Cross-bloc component architecture: [component-design.md](component-design.md)
 5. Backend target organization: [backend-plan.md](backend-plan.md)
 6. Public monitoring architecture: [monitoring-design.md](monitoring-design.md)
