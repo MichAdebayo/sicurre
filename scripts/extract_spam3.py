@@ -11,7 +11,7 @@ Steps:
   3. Strip HTML (BeautifulSoup or regex)
   4. Language detection → keep French only
   5. Label as phishing (0) except MedChemExpress → spam (1)
-  6. Run through NB12 pipeline (clean_text, anonymize, deduplicate)
+    6. Run through the shared cleaning pipeline (clean_text, anonymize, deduplicate)
   7. Save to data/processed/phishing/spam3_extract/
 
 Usage:
@@ -30,7 +30,7 @@ import pandas as pd
 from bs4 import BeautifulSoup
 from langdetect import detect, detect_langs, LangDetectException
 
-# Add scripts/ to path for NB12 imports
+# Add scripts/ to path for shared processing imports
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from process_restructure_data import (
     OUTPUT_COLS,
@@ -276,9 +276,11 @@ def main() -> None:
     df_phishing = df[df["label"] == 0].copy()
     df_spam = df[df["label"] == 1].copy()
 
-    # Process phishing through NB12 pipeline
+    # Process phishing through the shared cleaning pipeline
     if not df_phishing.empty:
-        print(f"\nProcessing {len(df_phishing)} phishing emails through NB12...")
+        print(
+            f"\nProcessing {len(df_phishing)} phishing emails through the cleaning pipeline..."
+        )
         df_phishing_clean, dropped_short, dropped_dup = process_df(df_phishing)
 
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -288,9 +290,11 @@ def main() -> None:
         save_csv(df_phishing_clean, outpath, label_name="phishing")
         print(f"  Dropped: {dropped_short} short, {dropped_dup} dups")
 
-    # Process spam through NB12 pipeline
+    # Process spam through the shared cleaning pipeline
     if not df_spam.empty:
-        print(f"\nProcessing {len(df_spam)} spam emails through NB12...")
+        print(
+            f"\nProcessing {len(df_spam)} spam emails through the cleaning pipeline..."
+        )
         df_spam_clean, dropped_short, dropped_dup = process_df(df_spam)
 
         spam_dir = BASE / "data" / "processed" / "spam" / "spam3_extract"

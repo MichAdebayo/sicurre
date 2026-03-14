@@ -14,7 +14,7 @@ Target structure:
       ├── fr_legit/        ← Real FR legit (Kaggle ham, FrenchSpamHam ham, SAP legit)
       └── fr_synthetic/    ← Synthetic FR legit (split from existing legitimate_clean)
 
-Processing pipeline (same as NB12):
+Authoritative cleaning pipeline:
   1. HTML entity decode + tag stripping
   2. Non-printable character removal
   3. Unicode NFC normalization
@@ -85,7 +85,7 @@ def anonymize_pii(text: str) -> str:
 
 
 def clean_text(text: str) -> str:
-    """Full NB12 cleaning pipeline on a single text field."""
+    """Full shared cleaning pipeline on a single text field."""
     if not isinstance(text, str) or not text.strip():
         return ""
     text = html.unescape(text)

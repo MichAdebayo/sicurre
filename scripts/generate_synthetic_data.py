@@ -4,7 +4,7 @@ Generate synthetic French emails from archetype templates.
 Uses archetype JSON files in data/archetypes/ with Faker (fr_FR) and Jinja2-style
 variable substitution to produce diverse, realistic synthetic emails.
 
-Output follows NB12 pipeline schema:
+Output follows the shared processing schema:
   text, label, source, language, archetype, text_len
 
 Processing: clean_text + anonymize_pii from process_restructure_data.py
@@ -29,7 +29,7 @@ from pathlib import Path
 import pandas as pd
 from faker import Faker
 
-# ── Add scripts/ to path so we can import NB12 functions ─────
+# ── Add scripts/ to path so we can import shared processing functions ─────
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from process_restructure_data import (
     OUTPUT_COLS,
@@ -268,10 +268,10 @@ def generate_and_save(class_name: str, count: int) -> Path | None:
     # Generate raw
     df = generate_class(class_name, count)
 
-    # Process through NB12 pipeline (clean + filter + dedup)
+    # Process through the shared cleaning pipeline (clean + filter + dedup)
     df, dropped_short, dropped_dup = process_df(df)
     print(
-        f"  🧹 After NB12 pipeline: {len(df)} rows "
+        f"  🧹 After cleaning pipeline: {len(df)} rows "
         f"(dropped {dropped_short} short, {dropped_dup} duplicates)"
     )
 

@@ -30,7 +30,7 @@ PROC = BASE / "data" / "processed"
 FINAL = BASE / "data" / "final"
 TODAY = date.today().strftime("%Y%m%d")
 
-# Output columns (from NB12 pipeline)
+# Output columns from the shared processing pipeline
 OUTPUT_COLS = ["text", "label", "source", "language", "archetype", "text_len"]
 
 # Files to EXCLUDE from text-based merge (URL metadata, not email body)
