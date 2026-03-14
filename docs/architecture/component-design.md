@@ -119,6 +119,8 @@ flowchart LR
 
 ## Bloc 1 components
 
+The detailed frozen source inventory for Bloc 1 is documented in [source-perimeter.md](source-perimeter.md).
+
 ### 1. Source connectors
 
 - Role: retrieve data from the mandatory source categories required by the certification
