@@ -37,59 +37,62 @@ This naming rule is part of the architecture baseline and should not be changed 
 
 ### Conceptual entities
 
-| Entity | Main attributes | Identifiant |
-|--------|-----------------|-------------|
-| SYSTEME_SOURCE | nom, type_source, description, proprietaire, base_legale, contient_donnees_personnelles, politique_retention, actif | id_source |
-| EXECUTION_INGESTION | date_debut, date_fin, statut, mode_declenchement, nb_objets_bruts, nb_enregistrements_bruts, message_log | id_ingestion |
-| OBJET_BRUT | reference_externe, type_objet, uri_stockage, hash_contenu, date_collecte, taille_octets, format_source, metadata_source | id_objet_brut |
-| ENREGISTREMENT_BRUT | cle_source, contenu_brut, langue_detectee, date_extraction, est_exploitable | id_enregistrement_brut |
-| EXECUTION_TRAITEMENT | date_debut, date_fin, version_pipeline, statut, nb_messages_normalises, nb_rejets, rapport | id_traitement |
-| MESSAGE_NORMALISE | texte_normalise, hash_texte, langue, categorie_courante, score_qualite, contient_pii, statut_redaction, longueur_texte, date_normalisation | id_message |
-| ANNOTATION | label, origine_label, confiance_label, commentaire, date_annotation, valide | id_annotation |
-| JEU_DONNEES | nom, version_jeu, usage_cible, date_gel, statut, nb_lignes | id_jeu |
-| LIGNE_JEU_DONNEES | split, poids_apprentissage, ordre_ligne | id_ligne_jeu |
+| Entity | Main attributes | Identifier |
+|--------|-----------------|------------|
+| SOURCE_SYSTEM | name, source_type, description, owner_name, legal_basis, contains_personal_data, retention_days, is_active | id |
+| INGESTION_RUN | started_at, finished_at, status, trigger_mode, raw_object_count, raw_record_count, log_message | id |
+| RAW_OBJECT | external_ref, object_type, storage_uri, content_hash, collected_at, size_bytes, source_format, source_metadata | id |
+| RAW_RECORD | record_key, raw_content, detected_language, extracted_at, is_usable | id |
+| PROCESSING_RUN | started_at, finished_at, pipeline_version, status, normalized_count, rejected_count, report_uri | id |
+| NORMALIZED_MESSAGE | normalized_text, text_sha256, language, current_label, quality_score, contains_pii, redaction_status, text_length, normalized_at | id |
+| ANNOTATION | label, label_source, confidence, comment, annotated_at, is_validated | id |
+| DATASET | name, version_tag, target_usage, frozen_at, status | id |
+| DATASET_ITEM | split_name, sample_weight, row_order | id |
 
 ### Conceptual associations
 
-- SYSTEME_SOURCE (1,1) - PRODUIT - (0,n) EXECUTION_INGESTION
-- EXECUTION_INGESTION (1,1) - COLLECTE - (0,n) OBJET_BRUT
-- OBJET_BRUT (1,1) - CONTIENT - (0,n) ENREGISTREMENT_BRUT
-- EXECUTION_TRAITEMENT (1,1) - TRANSFORME - (0,n) ENREGISTREMENT_BRUT
-- ENREGISTREMENT_BRUT (0,1) - DEVIENT - (0,1) MESSAGE_NORMALISE
-- MESSAGE_NORMALISE (1,1) - RECOIT - (0,n) ANNOTATION
-- JEU_DONNEES (1,1) - COMPOSE - (1,n) LIGNE_JEU_DONNEES
-- MESSAGE_NORMALISE (1,1) - APPARTIENT_A - (0,n) LIGNE_JEU_DONNEES
+- SOURCE_SYSTEM (1,1) — PRODUCES — (0,n) INGESTION_RUN
+- INGESTION_RUN (1,1) — COLLECTS — (0,n) RAW_OBJECT
+- RAW_OBJECT (1,1) — CONTAINS — (0,n) RAW_RECORD
+- PROCESSING_RUN (1,1) — PROCESSES — (0,n) RAW_RECORD
+- RAW_RECORD (0,1) — BECOMES — (1,1) NORMALIZED_MESSAGE
+- PROCESSING_RUN (1,1) — GENERATES — (0,n) NORMALIZED_MESSAGE
+- NORMALIZED_MESSAGE (1,1) — RECEIVES — (0,n) ANNOTATION
+- DATASET (1,1) — COMPOSES — (1,n) DATASET_ITEM
+- NORMALIZED_MESSAGE (1,1) — BELONGS_TO — (0,n) DATASET_ITEM
 
 ### Conceptual notes
 
-- `SYSTEME_SOURCE` captures RGPD and governance information at the source level.
-- `OBJET_BRUT` represents the collected payload or snapshot.
-- `ENREGISTREMENT_BRUT` represents a row, page, message, or extracted item inside a raw object.
-- `MESSAGE_NORMALISE` is the reusable NLP unit after cleaning, deduplication, and redaction.
-- `JEU_DONNEES` and `LIGNE_JEU_DONNEES` allow versioned train, validation, and test sets.
+- `SOURCE_SYSTEM` captures RGPD and governance information at the source level (e.g. PhishTank API, CERT-FR scrape, manual upload).
+- `RAW_OBJECT` represents the collected payload or snapshot (file, API response, HTML page).
+- `RAW_RECORD` represents a row, page, message, or extracted item inside a raw object.
+- `PROCESSING_RUN` both processes raw records (tracking which records were attempted, including rejections) and generates normalized messages (its output). The GENERATES association justifies `processing_run_id` as a FK on `data_normalized_message`.
+- `NORMALIZED_MESSAGE` is the reusable NLP unit after cleaning, deduplication, and redaction. Its `text_sha256` unique key prevents duplicate content across ingestion runs.
+- `DATASET` and `DATASET_ITEM` allow versioned train, validation, and test sets. A normalized message can belong to multiple datasets over time.
 
 ### MCD diagram
 
 ```mermaid
 flowchart TD
-    SS[SYSTEME_SOURCE]
-    IR[EXECUTION_INGESTION]
-    RO[OBJET_BRUT]
-    RR[ENREGISTREMENT_BRUT]
-    PR[EXECUTION_TRAITEMENT]
-    NM[MESSAGE_NORMALISE]
+    SS[SOURCE_SYSTEM]
+    IR[INGESTION_RUN]
+    RO[RAW_OBJECT]
+    RR[RAW_RECORD]
+    PR[PROCESSING_RUN]
+    NM[NORMALIZED_MESSAGE]
     AN[ANNOTATION]
-    DS[JEU_DONNEES]
-    DI[LIGNE_JEU_DONNEES]
+    DS[DATASET]
+    DI[DATASET_ITEM]
 
-    SS -->|1,n| IR
-    IR -->|1,n| RO
-    RO -->|1,n| RR
-    PR -->|1,n| RR
-    RR -->|0,1| NM
-    NM -->|0,n| AN
-    DS -->|1,n| DI
-    NM -->|0,n| DI
+    SS -->|"(1,1) PRODUCES (0,n)"| IR
+    IR -->|"(1,1) COLLECTS (0,n)"| RO
+    RO -->|"(1,1) CONTAINS (0,n)"| RR
+    PR -->|"(1,1) PROCESSES (0,n)"| RR
+    RR -->|"(0,1) BECOMES (1,1)"| NM
+    PR -->|"(1,1) GENERATES (0,n)"| NM
+    NM -->|"(1,1) RECEIVES (0,n)"| AN
+    DS -->|"(1,1) COMPOSES (1,n)"| DI
+    NM -->|"(1,1) BELONGS_TO (0,n)"| DI
 ```
 
 ## MLD diagram
@@ -199,6 +202,7 @@ erDiagram
         timestamptz frozen_at
         integer item_count
         timestamptz created_at
+        timestamptz updated_at
     }
 
     data_dataset_item {
@@ -214,11 +218,12 @@ erDiagram
     data_source_system ||--o{ data_ingestion_run : produces
     data_ingestion_run ||--o{ data_raw_object : collects
     data_raw_object ||--o{ data_raw_record : contains
-    data_processing_run ||--o{ data_normalized_message : creates
+    data_processing_run ||--o{ data_normalized_message : generates
+    data_processing_run ||--o{ data_raw_record : processes
     data_raw_record ||--o| data_normalized_message : becomes
     data_normalized_message ||--o{ data_annotation : receives
-    data_dataset ||--o{ data_dataset_item : contains
-    data_normalized_message ||--o{ data_dataset_item : joins
+    data_dataset ||--o{ data_dataset_item : composes
+    data_normalized_message ||--o{ data_dataset_item : belongs_to
 ```
 
 ## MLD (logical relational model)
@@ -231,7 +236,7 @@ erDiagram
 | `data_ingestion_run` | execution trace for one collection run | child of source system |
 | `data_raw_object` | collected file, payload, or snapshot | child of ingestion run |
 | `data_raw_record` | extracted row, message, page, or unit | child of raw object |
-| `data_processing_run` | execution trace for normalization pipeline | linked to normalized messages |
+| `data_processing_run` | execution trace for normalization pipeline | linked to raw records (processed) and normalized messages (generated) |
 | `data_normalized_message` | curated NLP-ready message | child of raw record and processing run |
 | `data_annotation` | labels and validation metadata | child of normalized message |
 | `data_dataset` | frozen dataset version | parent of dataset items |
@@ -243,13 +248,14 @@ erDiagram
 - one ingestion run can generate many raw objects
 - one raw object can contain many raw records
 - one raw record can yield zero or one normalized message
+- one processing run processes many raw records and generates many normalized messages
 - one normalized message can receive many annotations
 - one dataset contains many dataset items
 - one normalized message can belong to several datasets over time
 
 ### Logical enums
 
-Recommended controlled vocabularies:
+Controlled vocabularies for CHECK constraints:
 
 - `source_type`: `api`, `file`, `scraping`, `sql`, `bigdata`, `manual`
 - `status` for runs: `pending`, `running`, `completed`, `failed`, `partial`
@@ -258,7 +264,7 @@ Recommended controlled vocabularies:
 - `split_name`: `train`, `val`, `test`, `holdout`
 - `redaction_status`: `not_required`, `redacted`, `review_needed`
 
-### MLD interpretation
+### Logical interpretation
 
 - The MLD keeps a strict lineage from source system to dataset item.
 - The curated NLP object is `data_normalized_message`.
@@ -266,7 +272,7 @@ Recommended controlled vocabularies:
 
 ## MPD (physical model for PostgreSQL)
 
-### Target SGBD
+### Target RDBMS
 
 - Production target: PostgreSQL
 - Local development and CI: SQLite via dialect abstraction
@@ -343,7 +349,7 @@ Index strategy:
 Index strategy:
 
 - `idx_raw_object_ingestion` on `(ingestion_run_id)`
-- `uq_raw_object_hash` UNIQUE `(ingestion_run_id, content_hash, external_ref)`
+- `uq_raw_object_hash` UNIQUE `(content_hash, external_ref)`
 
 #### `data_raw_record`
 
@@ -431,6 +437,7 @@ Index strategy:
 | frozen_at | timestamptz | |
 | item_count | integer | NOT NULL, DEFAULT 0 |
 | created_at | timestamptz | NOT NULL, DEFAULT now() |
+| updated_at | timestamptz | |
 
 #### `data_dataset_item`
 
