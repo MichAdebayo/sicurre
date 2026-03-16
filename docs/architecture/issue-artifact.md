@@ -46,6 +46,24 @@ Status: done
 - `docs/architecture/data-design.md`
 - `tasks/TASK_PLAN.md`
 
+## Issue #2 — Shared ingestion contract
+
+Status: done
+
+### Resolution note
+
+- The shared ingestion contract is documented in `docs/architecture/component-design.md`
+- The contract applies to API, file, scraping, SQL, and big data sources
+- Required metadata is explicitly defined for ingestion runs and raw objects
+- The distinction between raw object and raw record is explicitly stated
+- The contract is aligned to `data_source_system`, `data_ingestion_run`, `data_raw_object`, and `data_raw_record` in `docs/architecture/data-design.md`
+
+### Related docs
+
+- `docs/architecture/component-design.md`
+- `docs/architecture/data-design.md`
+- `docs/api/openapi.yaml`
+
 ## Issue #13 — Bloc 0 notebook classification
 
 Status: done

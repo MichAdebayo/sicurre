@@ -303,6 +303,67 @@ The related issue note for the Bloc 1 source perimeter is documented in [issue-a
 - Pull or receive source data
 - Emit structured run metadata
 
+### Shared ingestion contract
+
+The Bloc 1 ingestion contract is shared across all supported source types:
+
+- API source
+- file source
+- scraping source
+- SQL source
+- big data source
+
+Every ingestion flow must produce the same lineage chain:
+
+- one `source system`
+- one or more `ingestion runs`
+- one or more `raw objects` per run
+- zero or more `raw records` extracted from each raw object
+
+Required metadata for each ingestion run:
+
+- `source_system_id`
+- `started_at`
+- `finished_at`
+- `status`
+- `trigger_mode`
+- `raw_object_count`
+- `raw_record_count`
+- `log_message`
+
+Required metadata for each collected raw object:
+
+- `external_ref`
+- `object_type`
+- `storage_uri`
+- `source_format`
+- `content_hash`
+- `size_bytes`
+- `source_metadata`
+- `collected_at`
+
+Raw storage rule:
+
+- `raw object` means the collected payload or snapshot kept as lineage evidence, such as an API response, a file, an HTML page, a SQL export, or a big data extract
+- `raw record` means the first extracted unit inside that raw object, such as a row, message, page fragment, or other reusable extraction unit
+
+Source-specific interpretation under the shared contract:
+
+- API -> object type `api_payload`
+- file -> object type `file`
+- scraping -> object type `html_page`
+- SQL -> object type `sql_export`
+- big data -> object type `bigdata_extract`
+
+Schema alignment:
+
+- `source system` -> `data_source_system`
+- `ingestion run` -> `data_ingestion_run`
+- `raw object` -> `data_raw_object`
+- `raw record` -> `data_raw_record`
+
+This contract is aligned with the Bloc 1 schema defined in `docs/architecture/data-design.md` and should be treated as the ingestion baseline for certification evidence and implementation.
+
 ### Ingestion jobs -> data domain API
 
 - Register:
