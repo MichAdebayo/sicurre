@@ -1,0 +1,137 @@
+-- Sicurre canonical PostgreSQL schema reference.
+--
+-- This file is the PostgreSQL-first physical reference for the data platform.
+-- Dev and CI still use the same logical schema via SQLAlchemy + Alembic on SQLite.
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE TABLE data_source_system (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    name text NOT NULL UNIQUE,
+    source_type text NOT NULL CHECK (source_type IN ('api', 'file', 'scraping', 'sql', 'bigdata', 'manual')),
+    description text,
+    owner_name text,
+    legal_basis text,
+    contains_personal_data boolean NOT NULL DEFAULT false,
+    retention_days integer,
+    is_active boolean NOT NULL DEFAULT true,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz
+);
+
+CREATE TABLE data_ingestion_run (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    source_system_id uuid NOT NULL REFERENCES data_source_system(id) ON DELETE RESTRICT,
+    started_at timestamptz NOT NULL,
+    finished_at timestamptz,
+    status text NOT NULL CHECK (status IN ('pending', 'running', 'completed', 'failed', 'partial')),
+    trigger_mode text NOT NULL,
+    raw_object_count integer NOT NULL DEFAULT 0,
+    raw_record_count integer NOT NULL DEFAULT 0,
+    log_message text,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_ingestion_source_started ON data_ingestion_run (source_system_id, started_at DESC);
+
+CREATE TABLE data_raw_object (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    ingestion_run_id uuid NOT NULL REFERENCES data_ingestion_run(id) ON DELETE CASCADE,
+    external_ref text,
+    object_type text NOT NULL CHECK (object_type IN ('file', 'api_payload', 'html_page', 'sql_export', 'bigdata_extract')),
+    storage_uri text,
+    source_format text,
+    content_hash text NOT NULL,
+    size_bytes bigint,
+    source_metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+    collected_at timestamptz NOT NULL,
+    retention_until timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_raw_object_hash UNIQUE (content_hash, external_ref)
+);
+
+CREATE INDEX idx_raw_object_ingestion ON data_raw_object (ingestion_run_id);
+
+CREATE TABLE data_raw_record (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    raw_object_id uuid NOT NULL REFERENCES data_raw_object(id) ON DELETE CASCADE,
+    record_key text NOT NULL,
+    raw_content text NOT NULL,
+    detected_language text,
+    is_usable boolean NOT NULL DEFAULT true,
+    rejection_reason text,
+    extracted_at timestamptz NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_raw_record_key UNIQUE (raw_object_id, record_key)
+);
+
+CREATE TABLE data_processing_run (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    pipeline_version text NOT NULL,
+    started_at timestamptz NOT NULL,
+    finished_at timestamptz,
+    status text NOT NULL CHECK (status IN ('pending', 'running', 'completed', 'failed', 'partial')),
+    normalized_count integer NOT NULL DEFAULT 0,
+    rejected_count integer NOT NULL DEFAULT 0,
+    report_uri text,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE data_normalized_message (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    raw_record_id uuid NOT NULL REFERENCES data_raw_record(id) ON DELETE RESTRICT,
+    processing_run_id uuid NOT NULL REFERENCES data_processing_run(id) ON DELETE RESTRICT,
+    normalized_text text NOT NULL,
+    text_sha256 text NOT NULL UNIQUE,
+    language text NOT NULL,
+    current_label text NOT NULL CHECK (current_label IN ('phishing', 'spam', 'legitimate', 'unknown')),
+    quality_score real,
+    contains_pii boolean NOT NULL DEFAULT false,
+    redaction_status text NOT NULL DEFAULT 'not_required' CHECK (redaction_status IN ('not_required', 'redacted', 'review_needed')),
+    text_length integer NOT NULL,
+    normalized_at timestamptz NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz
+);
+
+CREATE INDEX idx_message_label_lang ON data_normalized_message (current_label, language);
+CREATE INDEX idx_message_processing_run ON data_normalized_message (processing_run_id);
+
+CREATE TABLE data_annotation (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    normalized_message_id uuid NOT NULL REFERENCES data_normalized_message(id) ON DELETE CASCADE,
+    label text NOT NULL CHECK (label IN ('phishing', 'spam', 'legitimate', 'unknown')),
+    label_source text NOT NULL,
+    confidence real CHECK (confidence BETWEEN 0 AND 1),
+    comment text,
+    is_validated boolean NOT NULL DEFAULT false,
+    annotated_at timestamptz NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_annotation_message_date ON data_annotation (normalized_message_id, annotated_at DESC);
+
+CREATE TABLE data_dataset (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    name text NOT NULL,
+    version_tag text NOT NULL UNIQUE,
+    target_usage text NOT NULL,
+    status text NOT NULL CHECK (status IN ('draft', 'frozen', 'archived')),
+    frozen_at timestamptz,
+    item_count integer NOT NULL DEFAULT 0,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz
+);
+
+CREATE TABLE data_dataset_item (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    dataset_id uuid NOT NULL REFERENCES data_dataset(id) ON DELETE CASCADE,
+    normalized_message_id uuid NOT NULL REFERENCES data_normalized_message(id) ON DELETE RESTRICT,
+    split_name text NOT NULL CHECK (split_name IN ('train', 'val', 'test', 'holdout')),
+    sample_weight real NOT NULL DEFAULT 1.0,
+    row_order integer,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_dataset_message UNIQUE (dataset_id, normalized_message_id)
+);
+
+CREATE INDEX idx_dataset_split ON data_dataset_item (dataset_id, split_name);
