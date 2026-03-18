@@ -30,20 +30,20 @@ import pandas as pd
 from bs4 import BeautifulSoup
 from langdetect import detect, detect_langs, LangDetectException
 
-# Add scripts/ to path for shared processing imports
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from process_restructure_data import (
+# Add backend/src to path for shared preprocessing imports
+BASE = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE / "backend" / "src"))
+from sicurre_api.domains.data_platform.services.preprocessing import (
+    DataFramePreprocessingService,
     OUTPUT_COLS,
-    clean_text,
-    process_df,
-    save_csv,
+    save_processed_csv,
 )
 
 # ── Constants ──────────────────────────────────────────────────
-BASE = Path(__file__).resolve().parent.parent
 SPAM3_PATH = BASE / "Spam_3.txt"
 OUTPUT_DIR = BASE / "data" / "processed" / "phishing" / "spam3_extract"
 TODAY = date.today().strftime("%Y%m%d")
+preprocessing_service = DataFramePreprocessingService()
 
 # Known French brand impersonation keywords — if subject contains these,
 # force-include even if langdetect is uncertain
@@ -281,13 +281,17 @@ def main() -> None:
         print(
             f"\nProcessing {len(df_phishing)} phishing emails through the cleaning pipeline..."
         )
-        df_phishing_clean, dropped_short, dropped_dup = process_df(df_phishing)
+        processing_result = preprocessing_service.process_dataframe(df_phishing)
+        df_phishing_clean = processing_result.dataframe
+        dropped_short = processing_result.dropped_short
+        dropped_dup = processing_result.dropped_duplicate
 
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         outpath = (
             OUTPUT_DIR / f"spam3_phishing_clean_{len(df_phishing_clean)}_{TODAY}.csv"
         )
-        save_csv(df_phishing_clean, outpath, label_name="phishing")
+        save_processed_csv(df_phishing_clean, outpath)
+        print(f"  ✅ Saved {outpath} ({len(df_phishing_clean)} rows, phishing)")
         print(f"  Dropped: {dropped_short} short, {dropped_dup} dups")
 
     # Process spam through the shared cleaning pipeline
@@ -295,12 +299,16 @@ def main() -> None:
         print(
             f"\nProcessing {len(df_spam)} spam emails through the cleaning pipeline..."
         )
-        df_spam_clean, dropped_short, dropped_dup = process_df(df_spam)
+        processing_result = preprocessing_service.process_dataframe(df_spam)
+        df_spam_clean = processing_result.dataframe
+        dropped_short = processing_result.dropped_short
+        dropped_dup = processing_result.dropped_duplicate
 
         spam_dir = BASE / "data" / "processed" / "spam" / "spam3_extract"
         spam_dir.mkdir(parents=True, exist_ok=True)
         outpath = spam_dir / f"spam3_spam_clean_{len(df_spam_clean)}_{TODAY}.csv"
-        save_csv(df_spam_clean, outpath, label_name="spam")
+        save_processed_csv(df_spam_clean, outpath)
+        print(f"  ✅ Saved {outpath} ({len(df_spam_clean)} rows, spam)")
         print(f"  Dropped: {dropped_short} short, {dropped_dup} dups")
 
     print("\nDone.")
