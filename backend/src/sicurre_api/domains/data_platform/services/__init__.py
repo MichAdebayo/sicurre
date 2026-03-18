@@ -1,3 +1,7 @@
+from sicurre_api.domains.data_platform.services.adaptation import (
+    AdaptationSummary,
+    FrenchCulturalAdaptationService,
+)
 from sicurre_api.domains.data_platform.services.lineage import (
     IngestionRunService,
     SourceSystemService,
@@ -21,8 +25,10 @@ from sicurre_api.domains.data_platform.services.records import (
 
 __all__ = [
     "AnnotationService",
+    "AdaptationSummary",
     "DatasetService",
     "DataFramePreprocessingService",
+    "FrenchCulturalAdaptationService",
     "IngestionRunService",
     "NormalizedMessageService",
     "OUTPUT_COLS",
