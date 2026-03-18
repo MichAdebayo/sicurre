@@ -18,6 +18,20 @@ build-backend = "hatchling.build"
 package = false
 
 [dependency-groups]
+backend = [
+    "aiosqlite>=0.21.0",
+    "alembic>=1.14.1",
+    "cachetools>=5.5.2",
+    "fastapi>=0.115.12",
+    "httpx>=0.28.1",
+    "psycopg[binary]>=3.2.6",
+    "pydantic-settings>=2.8.1",
+    "pytest>=8.4.0",
+    "pytest-asyncio>=0.26.0",
+    "slowapi>=0.1.9",
+    "sqlalchemy>=2.0.47",
+    "uvicorn>=0.34.0",
+]
 dev = [
     "beautifulsoup4>=4.14.3",
     "datasets>=4.6.1",
@@ -39,3 +53,20 @@ dev = [
     "sqlalchemy>=2.0.47",
     "warcio>=1.7.5",
 ]
+ml = [
+    "accelerate>=1.6.0",
+    "evaluate>=0.4.3",
+    "google-cloud-storage>=3.1.0",
+    "mlflow>=2.22.0",
+    "onnx>=1.17.0",
+    "onnxruntime>=1.21.0",
+    "optimum[onnxruntime]>=1.25.0",
+    "optuna>=4.3.0",
+    "sentencepiece>=0.2.0",
+    "torch>=2.6.0",
+    "transformers>=4.51.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["backend/src"]
+testpaths = ["backend/tests"]
