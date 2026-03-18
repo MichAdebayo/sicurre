@@ -77,6 +77,7 @@ data/raw/
 
 # Private-by-default documentation (internal only)
 docs/ops/
+docs/architecture/diagrams/notebook-*.md
 docs/architecture/threat-model.md
 docs/architecture/privacy-rgpd.md
 docs/architecture/diagrams/*.dot
