@@ -71,7 +71,7 @@ Status: done
 ### Resolution note
 
 - The Bloc 1 physical schema now exists as executable SQLAlchemy models and an Alembic baseline migration
-- The canonical PostgreSQL reference DDL is versioned in `sql/bloc1_data_platform.sql`
+- The canonical PostgreSQL reference DDL is versioned in `sql/sicurre.sql`
 - The same logical schema is validated on SQLite for dev and CI through the backend test suite
 - The baseline was exercised through ORM schema creation and Alembic migration execution before route work continued
 
@@ -80,7 +80,7 @@ Status: done
 - `backend/src/sicurre_api/domains/data_platform/models/lineage.py`
 - `backend/src/sicurre_api/db/migrations/versions/20260306_0001_bloc1_baseline.py`
 - `backend/alembic.ini`
-- `sql/bloc1_data_platform.sql`
+- `sql/sicurre.sql`
 - `backend/tests/data_platform/test_bloc1_schema.py`
 
 ## Issue — Traceability persistence for source systems and ingestion runs
