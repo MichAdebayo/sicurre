@@ -7,7 +7,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()  # loads KAGGLE_USERNAME / KAGGLE_KEY from .env
+BASE = Path(__file__).resolve().parent.parent
+load_dotenv(BASE / "backend" / ".env")
 
 # Verify Kaggle credentials are available (via env or ~/.kaggle/kaggle.json)
 _kaggle_json = Path.home() / ".kaggle" / "kaggle.json"
