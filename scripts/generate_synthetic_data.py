@@ -7,7 +7,7 @@ variable substitution to produce diverse, realistic synthetic emails.
 Output follows the shared processing schema:
   text, label, source, language, archetype, text_len
 
-Processing: clean_text + anonymize_pii from process_restructure_data.py
+Processing: shared backend preprocessing service
 
 Usage:
   python scripts/generate_synthetic_data.py --class spam --count 10000
@@ -18,7 +18,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import random
 import re
@@ -29,13 +28,13 @@ from pathlib import Path
 import pandas as pd
 from faker import Faker
 
-# ── Add scripts/ to path so we can import shared processing functions ─────
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from process_restructure_data import (
+# ── Add backend/src to path so scripts share backend preprocessing logic ─────
+BASE = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE / "backend" / "src"))
+from sicurre_api.domains.data_platform.services.preprocessing import (
+    DataFramePreprocessingService,
     OUTPUT_COLS,
-    clean_text,
-    process_df,
-    save_csv,
+    save_processed_csv,
 )
 
 # ── Constants ────────────────────────────────────────────────
@@ -47,6 +46,7 @@ TODAY = date.today().strftime("%Y%m%d")
 BASE = Path(__file__).resolve().parent.parent
 ARCHETYPE_DIR = BASE / "data" / "archetypes"
 PROC = BASE / "data" / "processed"
+preprocessing_service = DataFramePreprocessingService()
 
 # Default generation targets
 DEFAULT_TARGETS: dict[str, int] = {
@@ -269,7 +269,10 @@ def generate_and_save(class_name: str, count: int) -> Path | None:
     df = generate_class(class_name, count)
 
     # Process through the shared cleaning pipeline (clean + filter + dedup)
-    df, dropped_short, dropped_dup = process_df(df)
+    processing_result = preprocessing_service.process_dataframe(df)
+    df = processing_result.dataframe
+    dropped_short = processing_result.dropped_short
+    dropped_dup = processing_result.dropped_duplicate
     print(
         f"  🧹 After cleaning pipeline: {len(df)} rows "
         f"(dropped {dropped_short} short, {dropped_dup} duplicates)"
@@ -293,7 +296,8 @@ def generate_and_save(class_name: str, count: int) -> Path | None:
     filename = f"synth_{class_name}_clean_{len(df)}_{TODAY}.csv"
     out_path = out_dir / filename
 
-    save_csv(df, out_path, class_name)
+    save_processed_csv(df, out_path)
+    print(f"  ✅ Saved {out_path} ({len(df)} rows, {class_name})")
     return out_path
 
 
