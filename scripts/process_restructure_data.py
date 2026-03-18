@@ -26,114 +26,39 @@ Authoritative cleaning pipeline:
 
 from __future__ import annotations
 
-import hashlib
-import html
 import json
-import re
 import shutil
-import unicodedata
 from datetime import date
 from pathlib import Path
+import sys
 
 import pandas as pd
 
+BASE = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE / "backend" / "src"))
+
+from sicurre_api.domains.data_platform.services.preprocessing import (
+    DataFramePreprocessingService,
+    OUTPUT_COLS,
+    save_processed_csv,
+)
+
 # ── Constants ────────────────────────────────────────────────
-MIN_TEXT_LEN: int = 30
-MAX_TEXT_LEN: int = 10_000
-DEDUP_HASH_LEN: int = 300
 TODAY: str = date.today().strftime("%Y%m%d")
 
 BASE = Path(".")
 RAW = BASE / "data" / "raw"
 PROC = BASE / "data" / "processed"
-
-# ── PII regexes (RGPD compliance) ───────────────────────────
-_RE_EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
-_RE_PHONE_FR = re.compile(r"\b0[1-9][ .-]?(?:\d{2}[ .-]?){4}\b")
-_RE_PHONE_INTL = re.compile(r"\+\d{1,3}[\s.-]?\d{1,4}[\s.-]?(?:\d{2,4}[\s.-]?){2,4}")
-_RE_IBAN = re.compile(r"\bFR\d{2}[\s]?(?:\d{4}[\s]?){5}\d{3}\b")
-_RE_SECU = re.compile(r"\b[12]\s?\d{2}\s?\d{2}\s?\d{2}\s?\d{3}\s?\d{3}\s?\d{2}\b")
-_RE_SIRET = re.compile(r"\b\d{3}\s?\d{3}\s?\d{3}\s?\d{5}\b")
-_RE_URL = re.compile(r"https?://[^\s<>\"')]+|www\.[^\s<>\"')]+", re.IGNORECASE)
-
-_RE_HTML_TAGS = re.compile(r"<[^>]+>")
-_RE_MULTI_NEWLINE = re.compile(r"\n{3,}")
-_RE_MULTI_SPACE = re.compile(r"[ \t]{2,}")
-_RE_NON_PRINTABLE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
-
-OUTPUT_COLS: list[str] = [
-    "text",
-    "label",
-    "source",
-    "language",
-    "archetype",
-    "text_len",
-]
-
-
-# ── Cleaning functions ───────────────────────────────────────
-def anonymize_pii(text: str) -> str:
-    """Replace PII with anonymization tokens."""
-    text = _RE_EMAIL.sub("[EMAIL]", text)
-    text = _RE_IBAN.sub("[IBAN]", text)
-    text = _RE_SECU.sub("[SECU]", text)
-    text = _RE_SIRET.sub("[SIRET]", text)
-    text = _RE_PHONE_INTL.sub("[PHONE]", text)
-    text = _RE_PHONE_FR.sub("[PHONE]", text)
-    text = _RE_URL.sub("[URL]", text)
-    return text
-
-
-def clean_text(text: str) -> str:
-    """Full shared cleaning pipeline on a single text field."""
-    if not isinstance(text, str) or not text.strip():
-        return ""
-    text = html.unescape(text)
-    text = _RE_HTML_TAGS.sub(" ", text)
-    text = _RE_NON_PRINTABLE.sub("", text)
-    text = unicodedata.normalize("NFC", text)
-    text = _RE_MULTI_SPACE.sub(" ", text)
-    text = _RE_MULTI_NEWLINE.sub("\n\n", text)
-    text = text.strip()
-    text = anonymize_pii(text)
-    if len(text) > MAX_TEXT_LEN:
-        text = text[:MAX_TEXT_LEN] + "…"
-    return text
+preprocessing_service = DataFramePreprocessingService()
 
 
 def process_df(df: pd.DataFrame) -> tuple[pd.DataFrame, int, int]:
-    """Apply clean + filter + dedup to a DataFrame with 'text' column."""
-    df = df.copy()
-    df["text"] = df["text"].apply(clean_text)
-    df["text_len"] = df["text"].str.len()
-    # Filter too short
-    before = len(df)
-    df = df[df["text_len"] >= MIN_TEXT_LEN].reset_index(drop=True)
-    dropped_short = before - len(df)
-    # Dedup by SHA-256 of first 300 chars
-    df["_hash"] = (
-        df["text"]
-        .str[:DEDUP_HASH_LEN]
-        .apply(lambda t: hashlib.sha256(t.encode("utf-8", errors="ignore")).hexdigest())
-    )
-    before2 = len(df)
-    df = (
-        df.drop_duplicates(subset="_hash", keep="first")
-        .drop(columns="_hash")
-        .reset_index(drop=True)
-    )
-    dropped_dup = before2 - len(df)
-    return df, dropped_short, dropped_dup
+    result = preprocessing_service.process_dataframe(df)
+    return result.dataframe, result.dropped_short, result.dropped_duplicate
 
 
 def save_csv(df: pd.DataFrame, path: Path, label_name: str) -> None:
-    """Save DataFrame with standard columns, creating dirs as needed."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    # Ensure all output columns exist
-    for col in OUTPUT_COLS:
-        if col not in df.columns:
-            df[col] = ""
-    df[OUTPUT_COLS].to_csv(path, index=False)
+    save_processed_csv(df, path)
     print(f"  ✅ Saved {path} ({len(df)} rows, {label_name})")
 
 
