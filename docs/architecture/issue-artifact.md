@@ -64,6 +64,44 @@ Status: done
 - `docs/architecture/data-design.md`
 - `docs/api/openapi.yaml`
 
+## Issue #3 — Bloc 1 SQL schema and migration baseline
+
+Status: done
+
+### Resolution note
+
+- The Bloc 1 physical schema now exists as executable SQLAlchemy models and an Alembic baseline migration
+- The canonical PostgreSQL reference DDL is versioned in `sql/bloc1_data_platform.sql`
+- The same logical schema is validated on SQLite for dev and CI through the backend test suite
+- The baseline was exercised through ORM schema creation and Alembic migration execution before route work continued
+
+### Evidence
+
+- `backend/src/sicurre_api/domains/data_platform/models/lineage.py`
+- `backend/src/sicurre_api/db/migrations/versions/20260306_0001_bloc1_baseline.py`
+- `backend/alembic.ini`
+- `sql/bloc1_data_platform.sql`
+- `backend/tests/data_platform/test_bloc1_schema.py`
+
+## Issue — Traceability persistence for source systems and ingestion runs
+
+Status: done
+
+### Resolution note
+
+- `data_source_system` and `data_ingestion_run` now have executable SQLAlchemy models and an Alembic baseline in the backend codebase
+- The one-to-many linkage is implemented through `data_ingestion_run.source_system_id -> data_source_system.id`
+- `/v1/data/sources` and `/v1/data/ingestion-runs` are implemented in the FastAPI backend and aligned with `docs/api/openapi.yaml`
+- API-level tests validate source creation/listing, ingestion run creation/listing, and rejection of ingestion runs referencing a missing source system
+
+### Evidence
+
+- `backend/src/sicurre_api/domains/data_platform/models/lineage.py`
+- `backend/src/sicurre_api/domains/data_platform/routers/source_systems.py`
+- `backend/src/sicurre_api/domains/data_platform/routers/ingestion_runs.py`
+- `backend/src/sicurre_api/db/migrations/versions/20260306_0001_bloc1_baseline.py`
+- `backend/tests/data_platform/test_lineage_api.py`
+
 ## Issue #13 — Bloc 0 notebook classification
 
 Status: done
