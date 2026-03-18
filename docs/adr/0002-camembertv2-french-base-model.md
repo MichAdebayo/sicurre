@@ -87,6 +87,13 @@ Remediation differs by class:
 - ONNX export unchanged — `optimum` supports DeBERTaV2/V3
 - Same MIT license, same team — no licensing risk
 
+## Experiment Tracking
+
+- **MLflow** on Databricks Community Edition for experiment tracking, artifact logging, and model registry
+- **Optuna** (TPESampler + MedianPruner) for hyperparameter search (15–20 trials)
+- Artifacts stored in GCS (`gs://sicurre-model/camembertav2-phishing-fr/v{date}/`)
+- Full training plan: `docs/model/training-plan.md`
+
 ## References
 
 - Paper: [CamemBERT 2.0: A Smarter French Language Model Aged to Perfection](https://arxiv.org/abs/2411.08868) (Antoun et al., 2024)
