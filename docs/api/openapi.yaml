@@ -701,7 +701,8 @@ components:
           enum: [pending, running, completed, failed, partial]
         trigger_mode:
           type: string
-          example: manual
+          enum: [manual, scheduled]
+          example: scheduled
 
     IngestionRun:
       allOf:
