@@ -319,7 +319,7 @@ erDiagram
 | started_at | timestamptz | NOT NULL |
 | finished_at | timestamptz | |
 | status | text | NOT NULL, CHECK(status IN ('pending','running','completed','failed','partial')) |
-| trigger_mode | text | NOT NULL |
+| trigger_mode | text | NOT NULL, intended values currently `manual` or `scheduled` |
 | raw_object_count | integer | NOT NULL, DEFAULT 0 |
 | raw_record_count | integer | NOT NULL, DEFAULT 0 |
 | log_message | text | |
@@ -328,6 +328,13 @@ erDiagram
 Index strategy:
 
 - `idx_ingestion_source_started` on `(source_system_id, started_at DESC)`
+
+Trigger mode semantics:
+
+- `manual`: operator-launched or ad hoc execution
+- `scheduled`: recurring execution launched by a cron or external scheduler
+
+This documentation freeze does not change the current physical schema. It clarifies how Bloc 1 recurring automation is represented in ingestion lineage.
 
 #### `data_raw_object`
 
