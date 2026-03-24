@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sicurre_api.core.database import get_async_session
-from sicurre_api.core.rate_limit import limiter
+from sicurre_api.core.rate_limit import limiter, touch_rate_limit_request
 from sicurre_api.domains.data_platform.schemas import (
     RawRecordListResponse,
     RawRecordRead,
@@ -29,6 +29,7 @@ async def list_raw_records(
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_async_session),
 ) -> RawRecordListResponse:
+    touch_rate_limit_request(request)
     items, total = await service.list(
         session,
         source_system_id=source_system_id,
