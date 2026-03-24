@@ -149,6 +149,34 @@ The related issue note for the Bloc 1 source perimeter is documented in [issue-a
 	- Python scripts or scheduled jobs
 	- documented parameters, logs, and outputs
 
+#### Automation intent
+
+- Bloc 1 automation is defined as recurring, sustainable collection that helps `pérenniser la collecte` rather than as high-volume synthetic generation.
+- The first certification-facing goal is to make collection repeatable with source-appropriate cadence.
+- A source can remain in the Bloc 1 perimeter even when its collection cadence is weekly or batch-based rather than daily.
+
+#### Frozen primary recurring-source matrix
+
+| Source | Source type | Recurring mode | Recommended cadence | Notes |
+|---|---|---|---|---|
+| PhishTank | API REST | scheduled pull | daily | Fast-moving source and the clearest daily refresh candidate. |
+| CERT-FR publications | scraping | scheduled pull | weekly | Poll `actualite`, `alerte`, and optionally `avis` indexes; apply relevance filtering before detailed extraction. |
+| BigQuery public datasets | big data | scheduled batch | weekly | Use query-driven refreshes against remote large-scale datasets. |
+| Common Crawl extracts | big data | scheduled batch | weekly or ad hoc batch | Use targeted extraction runs rather than constant polling. |
+| SQL read-back extraction | SQL database | scheduled snapshot/export | weekly or on demand | Demonstrates recurring programmatic SQL extraction. |
+| File sources | file | periodic scan/refresh | periodic | Current file corpora are mostly static; refresh is triggered when a source archive changes. |
+
+#### Frozen perimeter rule
+
+- The frozen primary perimeter for recurring Bloc 1 automation remains PhishTank, CERT-FR, BigQuery/Common Crawl, SQL read-back extraction, and file refresh.
+- Synthetic French generation remains secondary and does not count as the recurring automation evidence for C1.
+
+#### Candidate secondary scraping sources
+
+- Reddit, including `r/arnaques`, is a candidate secondary scraping source for later backlog work.
+- Its current intended role is pattern discovery, screenshot-assisted text extraction, and synthetic prompt enrichment.
+- Reddit is intentionally outside the frozen primary perimeter and does not currently justify changes to the MCD, MLD, or MPD.
+
 ### 3. Cleaning and normalization pipeline
 
 - Role: transform raw records into reusable NLP-ready normalized messages
