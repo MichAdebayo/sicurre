@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sicurre_api.core.database import get_async_session
-from sicurre_api.core.rate_limit import limiter
+from sicurre_api.core.rate_limit import limiter, touch_rate_limit_request
 from sicurre_api.domains.data_platform.models import DatasetStatus
 from sicurre_api.domains.data_platform.repositories import (
     DatasetNotFoundError,
@@ -35,6 +35,7 @@ async def list_datasets(
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_async_session),
 ) -> DatasetListResponse:
+    touch_rate_limit_request(request)
     items, total = await service.list(
         session,
         status=status,
@@ -55,6 +56,7 @@ async def create_dataset(
     payload: DatasetCreate,
     session: AsyncSession = Depends(get_async_session),
 ) -> DatasetRead:
+    touch_rate_limit_request(request)
     try:
         item = await service.create(session, payload)
     except DuplicateDatasetError as exc:
@@ -74,6 +76,7 @@ async def list_dataset_items(
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_async_session),
 ) -> DatasetItemListResponse:
+    touch_rate_limit_request(request)
     try:
         items, total = await service.list_items(
             session,
