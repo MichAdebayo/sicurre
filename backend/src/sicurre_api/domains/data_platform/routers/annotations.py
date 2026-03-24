@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sicurre_api.core.database import get_async_session
-from sicurre_api.core.rate_limit import limiter
+from sicurre_api.core.rate_limit import limiter, touch_rate_limit_request
 from sicurre_api.domains.data_platform.repositories import (
     NormalizedMessageNotFoundError,
 )
@@ -25,6 +25,7 @@ async def create_annotation(
     payload: AnnotationCreate,
     session: AsyncSession = Depends(get_async_session),
 ) -> AnnotationRead:
+    touch_rate_limit_request(request)
     try:
         item = await service.create(session, payload)
     except NormalizedMessageNotFoundError as exc:
