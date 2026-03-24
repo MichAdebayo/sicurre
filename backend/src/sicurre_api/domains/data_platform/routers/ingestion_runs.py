@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sicurre_api.core.database import get_async_session
-from sicurre_api.core.rate_limit import limiter
+from sicurre_api.core.rate_limit import limiter, touch_rate_limit_request
 from sicurre_api.domains.data_platform.models import IngestionStatus
 from sicurre_api.domains.data_platform.repositories import SourceSystemNotFoundError
 from sicurre_api.domains.data_platform.schemas import (
@@ -31,6 +31,7 @@ async def list_ingestion_runs(
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_async_session),
 ) -> IngestionRunListResponse:
+    touch_rate_limit_request(request)
     items, total = await service.list(
         session,
         source_system_id=source_system_id,
@@ -55,6 +56,7 @@ async def create_ingestion_run(
     payload: IngestionRunCreate,
     session: AsyncSession = Depends(get_async_session),
 ) -> IngestionRunRead:
+    touch_rate_limit_request(request)
     try:
         item = await service.create(session, payload)
     except SourceSystemNotFoundError as exc:
