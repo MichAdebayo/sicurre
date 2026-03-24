@@ -3,8 +3,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sicurre_api.core.rate_limit import limiter
 from sicurre_api.core.database import get_async_session
+from sicurre_api.core.rate_limit import limiter, touch_rate_limit_request
 from sicurre_api.domains.data_platform.models import SourceType
 from sicurre_api.domains.data_platform.repositories import DuplicateDataSourceError
 from sicurre_api.domains.data_platform.schemas import (
@@ -29,6 +29,7 @@ async def list_sources(
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_async_session),
 ) -> DataSourceListResponse:
+    touch_rate_limit_request(request)
     items, total = await service.list(
         session,
         source_type=source_type,
@@ -50,6 +51,7 @@ async def create_source(
     payload: DataSourceCreate,
     session: AsyncSession = Depends(get_async_session),
 ) -> DataSourceRead:
+    touch_rate_limit_request(request)
     try:
         item = await service.create(session, payload)
     except DuplicateDataSourceError as exc:
