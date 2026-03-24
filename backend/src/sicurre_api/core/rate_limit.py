@@ -18,4 +18,8 @@ def get_rate_limit_key(request: Request) -> str:
     return f"ip:{client_host}"
 
 
+def touch_rate_limit_request(request: Request) -> None:
+    _ = request.scope
+
+
 limiter = Limiter(key_func=get_rate_limit_key, default_limits=[])
