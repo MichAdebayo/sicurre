@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response,
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sicurre_api.core.database import get_async_session
-from sicurre_api.core.rate_limit import limiter
+from sicurre_api.core.rate_limit import limiter, touch_rate_limit_request
 from sicurre_api.domains.data_platform.models import NormalizedLabel, SplitName
 from sicurre_api.domains.data_platform.repositories import (
     DuplicateNormalizedMessageError,
@@ -37,6 +37,7 @@ async def list_messages(
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_async_session),
 ) -> NormalizedMessageListResponse:
+    touch_rate_limit_request(request)
     items, total = await service.list(
         session,
         label=label,
@@ -62,6 +63,7 @@ async def create_message(
     payload: NormalizedMessageCreate,
     session: AsyncSession = Depends(get_async_session),
 ) -> NormalizedMessageRead:
+    touch_rate_limit_request(request)
     try:
         item = await service.create(session, payload)
     except NormalizedMessageDependencyError as exc:
@@ -85,6 +87,7 @@ async def get_message(
     id: UUID,
     session: AsyncSession = Depends(get_async_session),
 ) -> NormalizedMessageRead:
+    touch_rate_limit_request(request)
     item = await service.get(session, id)
     if item is None:
         raise HTTPException(
@@ -101,6 +104,7 @@ async def update_message(
     payload: NormalizedMessageUpdate,
     session: AsyncSession = Depends(get_async_session),
 ) -> NormalizedMessageRead:
+    touch_rate_limit_request(request)
     try:
         item = await service.update(session, id, payload)
     except NormalizedMessageNotFoundError as exc:
@@ -118,6 +122,7 @@ async def delete_message(
     id: UUID,
     session: AsyncSession = Depends(get_async_session),
 ) -> Response:
+    touch_rate_limit_request(request)
     deleted = await service.delete(session, id)
     if not deleted:
         raise HTTPException(
