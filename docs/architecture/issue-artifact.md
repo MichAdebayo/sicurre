@@ -116,3 +116,22 @@ Status: done
 
 - `data/README.md`
 - `notebooks/`
+
+## Issue #25 — SQL evidence, import procedure, and execution steps
+
+Status: done
+
+### Resolution note
+
+- The canonical PostgreSQL evidence is versioned in `sql/sicurre.sql`
+- The executable migration baseline remains `20260306_0001_bloc1_baseline.py`
+- A dedicated runbook now documents the dev SQLite path, the preferred PostgreSQL Alembic path, and the manual PostgreSQL import path
+- The runbook includes the exact commands used to execute the baseline and validate it with the Bloc 1 backend test suite
+
+### Evidence
+
+- `docs/ops/bloc1-sql-runbook.md`
+- `sql/sicurre.sql`
+- `backend/alembic.ini`
+- `backend/src/sicurre_api/db/migrations/versions/20260306_0001_bloc1_baseline.py`
+- `backend/tests/data_platform/test_bloc1_schema.py`
