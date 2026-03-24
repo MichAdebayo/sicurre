@@ -123,7 +123,39 @@ Owns:
 - dataset versioning and split membership
 - data API endpoints
 
+For Bloc 1 automation evidence, this domain also owns the recurring ingestion intent:
+
+- scheduled execution of source connectors
+- registration of each recurring execution as an ingestion run
+- source-specific cadence decisions
+- filtering and parsing of newly collected payloads before normalization
+
 This domain is the first implementation priority.
+
+### Bloc 1 automation slice
+
+The first automation slice should remain intentionally small.
+
+Target scope:
+
+- one minimal scheduler or externally triggered recurring job mechanism
+- one daily API source job (PhishTank)
+- one weekly scraping source job (CERT-FR)
+- weekly or batch jobs for big data, SQL, and file refresh paths
+
+The purpose is to prove recurring collection, not to build a full orchestration platform.
+
+Recommended implementation style:
+
+- external scheduler or cron-triggered scripts
+- ingestion code remains in the Bloc 1 data platform boundary
+- each execution writes a `data_ingestion_run` row with a documented trigger mode
+
+Deferred scope:
+
+- no workflow engine requirement at this stage
+- no browser-automation-first design for CERT-FR
+- no schema redesign for candidate secondary sources such as Reddit
 
 ### Model runtime domain
 
@@ -207,6 +239,7 @@ Implement the data platform domain first:
 - migrations
 - repository layer
 - data API contracts
+- recurring-ingestion planning and trigger semantics
 
 ### Step 2
 
