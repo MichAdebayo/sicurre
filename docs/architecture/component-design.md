@@ -160,7 +160,7 @@ The related issue note for the Bloc 1 source perimeter is documented in [issue-a
 | Source | Source type | Recurring mode | Recommended cadence | Notes |
 |---|---|---|---|---|
 | PhishTank | API REST | scheduled pull | daily | Fast-moving source and the clearest daily refresh candidate. |
-| CERT-FR publications | scraping | scheduled pull | weekly | Poll `actualite`, `alerte`, and optionally `avis` indexes; apply relevance filtering before detailed extraction. |
+| CERT-FR publications | scraping | scheduled pull | weekly | Poll `actualite`, `alerte`, and optionally `avis` HTML or JSON indexes; apply relevance filtering before detailed extraction and avoid browser automation in the first version. |
 | BigQuery public datasets | big data | scheduled batch | weekly | Use query-driven refreshes against remote large-scale datasets. |
 | Common Crawl extracts | big data | scheduled batch | weekly or ad hoc batch | Use targeted extraction runs rather than constant polling. |
 | SQL read-back extraction | SQL database | scheduled snapshot/export | weekly or on demand | Demonstrates recurring programmatic SQL extraction. |
