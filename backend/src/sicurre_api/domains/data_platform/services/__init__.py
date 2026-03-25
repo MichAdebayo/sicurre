@@ -11,6 +11,11 @@ from sicurre_api.domains.data_platform.services.normalization import (
     anonymize_pii,
     clean_text,
 )
+from sicurre_api.domains.data_platform.services.phishtank import (
+    PhishTankFeedClient,
+    PhishTankIngestionResult,
+    PhishTankIngestionService,
+)
 from sicurre_api.domains.data_platform.services.preprocessing import (
     DataFramePreprocessingService,
     OUTPUT_COLS,
@@ -32,6 +37,9 @@ __all__ = [
     "IngestionRunService",
     "NormalizedMessageService",
     "OUTPUT_COLS",
+    "PhishTankFeedClient",
+    "PhishTankIngestionResult",
+    "PhishTankIngestionService",
     "RawRecordService",
     "SourceSystemService",
     "TextNormalizationService",
