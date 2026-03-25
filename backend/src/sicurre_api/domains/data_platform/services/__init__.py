@@ -16,6 +16,16 @@ from sicurre_api.domains.data_platform.services.phishtank import (
     PhishTankIngestionResult,
     PhishTankIngestionService,
 )
+from sicurre_api.domains.data_platform.services.certfr import (
+    CertFRFeedClient,
+    CertFRIngestionResult,
+    CertFRIngestionService,
+)
+from sicurre_api.domains.data_platform.services.snapshot_storage import (
+    LocalSnapshotStore,
+    R2SnapshotStore,
+    SnapshotWriteResult,
+)
 from sicurre_api.domains.data_platform.services.preprocessing import (
     DataFramePreprocessingService,
     OUTPUT_COLS,
@@ -37,10 +47,16 @@ __all__ = [
     "IngestionRunService",
     "NormalizedMessageService",
     "OUTPUT_COLS",
+    "CertFRFeedClient",
+    "CertFRIngestionResult",
+    "CertFRIngestionService",
     "PhishTankFeedClient",
     "PhishTankIngestionResult",
     "PhishTankIngestionService",
+    "LocalSnapshotStore",
     "RawRecordService",
+    "R2SnapshotStore",
+    "SnapshotWriteResult",
     "SourceSystemService",
     "TextNormalizationService",
     "anonymize_pii",
