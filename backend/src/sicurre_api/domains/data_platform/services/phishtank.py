@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -11,7 +10,7 @@ from typing import Any
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sicurre_api.core.config import BACKEND_ROOT
+from sicurre_api.core.config import BACKEND_ROOT, get_settings
 from sicurre_api.domains.data_platform.models import (
     DataIngestionRun,
     DataRawObject,
@@ -30,19 +29,26 @@ from sicurre_api.domains.data_platform.services.lineage import (
     IngestionRunService,
     SourceSystemService,
 )
+from sicurre_api.domains.data_platform.services.snapshot_storage import (
+    SnapshotStore,
+    SnapshotWriteResult,
+    build_snapshot_store,
+)
 
 
 REPO_ROOT = BACKEND_ROOT.parent
 DEFAULT_PHISHTANK_FEED_URL = "https://data.phishtank.com/data/online-valid.json"
 DEFAULT_PHISHTANK_SOURCE_NAME = "phishtank-online-valid"
 DEFAULT_PHISHTANK_SNAPSHOT_DIR = REPO_ROOT / "data" / "raw" / "api" / "phishtank"
+DEFAULT_PHISHTANK_SNAPSHOT_PREFIX = "phishtank"
 
 
 @dataclass(slots=True)
 class PhishTankIngestionResult:
     ingestion_run_id: str
     source_system_id: str
-    snapshot_path: Path
+    snapshot_path: Path | None
+    snapshot_storage_uri: str
     raw_object_count: int
     raw_record_count: int
 
@@ -76,11 +82,24 @@ class PhishTankIngestionService:
         feed_client: PhishTankFeedClient | None = None,
         fetch_entries: Callable[[], Awaitable[list[dict[str, Any]]]] | None = None,
         snapshot_dir: Path = DEFAULT_PHISHTANK_SNAPSHOT_DIR,
+        snapshot_store: SnapshotStore | None = None,
+        snapshot_prefix: str = DEFAULT_PHISHTANK_SNAPSHOT_PREFIX,
         source_name: str = DEFAULT_PHISHTANK_SOURCE_NAME,
     ) -> None:
+        settings = get_settings()
         self.feed_client = feed_client or PhishTankFeedClient()
         self.fetch_entries = fetch_entries or self.feed_client.fetch_entries
         self.snapshot_dir = snapshot_dir
+        self.snapshot_prefix = snapshot_prefix
+        local_snapshot_root = (
+            snapshot_dir.parent
+            if snapshot_dir.name == snapshot_prefix
+            else snapshot_dir
+        )
+        self.snapshot_store = snapshot_store or build_snapshot_store(
+            local_root_dir=local_snapshot_root,
+            repo_root=REPO_ROOT,
+        )
         self.source_name = source_name
         self.source_service = SourceSystemService()
         self.ingestion_service = IngestionRunService()
@@ -108,16 +127,14 @@ class PhishTankIngestionService:
 
         try:
             entries = await self.fetch_entries()
-            snapshot_path, content_hash, size_bytes = await self._write_snapshot(
+            snapshot_result = await self._write_snapshot(
                 ingestion_run=ingestion_run,
                 entries=entries,
             )
             raw_object = self._build_raw_object(
                 ingestion_run=ingestion_run,
                 source_system=source_system,
-                snapshot_path=snapshot_path,
-                content_hash=content_hash,
-                size_bytes=size_bytes,
+                snapshot_result=snapshot_result,
                 collected_at=run_started_at,
                 entry_count=len(entries),
             )
@@ -141,7 +158,8 @@ class PhishTankIngestionService:
             return PhishTankIngestionResult(
                 ingestion_run_id=str(ingestion_run.id),
                 source_system_id=str(source_system.id),
-                snapshot_path=snapshot_path,
+                snapshot_path=snapshot_result.local_path,
+                snapshot_storage_uri=snapshot_result.storage_uri,
                 raw_object_count=1,
                 raw_record_count=len(raw_records),
             )
@@ -179,20 +197,18 @@ class PhishTankIngestionService:
         *,
         ingestion_run: DataIngestionRun,
         entries: list[dict[str, Any]],
-    ) -> tuple[Path, str, int]:
-        self.snapshot_dir.mkdir(parents=True, exist_ok=True)
-        snapshot_path = self.snapshot_dir / f"phishtank_{ingestion_run.id}.json"
+    ) -> SnapshotWriteResult:
         snapshot_bytes = json.dumps(
             entries,
             ensure_ascii=False,
             indent=2,
             sort_keys=True,
         ).encode("utf-8")
-        snapshot_path.write_bytes(snapshot_bytes)
-        return (
-            snapshot_path,
-            hashlib.sha256(snapshot_bytes).hexdigest(),
-            len(snapshot_bytes),
+        object_key = self._build_snapshot_object_key(ingestion_run)
+        return await self.snapshot_store.write_snapshot(
+            object_key=object_key,
+            payload=snapshot_bytes,
+            content_type="application/json",
         )
 
     def _build_raw_object(
@@ -200,22 +216,18 @@ class PhishTankIngestionService:
         *,
         ingestion_run: DataIngestionRun,
         source_system: DataSourceSystem,
-        snapshot_path: Path,
-        content_hash: str,
-        size_bytes: int,
+        snapshot_result: SnapshotWriteResult,
         collected_at: datetime,
         entry_count: int,
     ) -> DataRawObject:
-        storage_uri = self._to_storage_uri(snapshot_path)
-
         return DataRawObject(
             ingestion_run_id=ingestion_run.id,
             external_ref=f"{self.feed_client.feed_url}#run:{ingestion_run.id}",
             object_type=ObjectType.API_PAYLOAD,
-            storage_uri=storage_uri,
+            storage_uri=snapshot_result.storage_uri,
             source_format="json",
-            content_hash=content_hash,
-            size_bytes=size_bytes,
+            content_hash=snapshot_result.content_hash,
+            size_bytes=snapshot_result.size_bytes,
             source_metadata={
                 "feed_url": self.feed_client.feed_url,
                 "source_name": source_system.name,
@@ -262,9 +274,9 @@ class PhishTankIngestionService:
         text = str(value).strip()
         return text or None
 
-    @staticmethod
-    def _to_storage_uri(snapshot_path: Path) -> str:
-        try:
-            return str(snapshot_path.relative_to(REPO_ROOT))
-        except ValueError:
-            return str(snapshot_path)
+    def _build_snapshot_object_key(self, ingestion_run: DataIngestionRun) -> str:
+        filename = f"phishtank_{ingestion_run.id}.json"
+        return self.snapshot_store.build_object_key(
+            source_prefix=self.snapshot_prefix,
+            filename=filename,
+        )
