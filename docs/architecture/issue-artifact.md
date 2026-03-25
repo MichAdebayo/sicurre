@@ -135,3 +135,53 @@ Status: done
 - `backend/alembic.ini`
 - `backend/src/sicurre_api/db/migrations/versions/20260306_0001_bloc1_baseline.py`
 - `backend/tests/data_platform/test_bloc1_schema.py`
+
+## Issue #38 — Clarify recurring ingestion architecture and source cadence
+
+Status: done
+
+### Resolution note
+
+- Bloc 1 architecture now states that automation means recurring, sustainable collection rather than synthetic data volume.
+- The frozen primary recurring-source matrix is documented with source-specific cadence.
+- Cadence is justified by source behavior, so weekly and batch-based jobs remain valid recurring evidence.
+- Candidate secondary scraping sources, including Reddit, are explicitly separated from the frozen primary perimeter.
+
+### Evidence
+
+- `docs/architecture/component-design.md`
+- `docs/architecture/backend-plan.md`
+- `tasks/bloc1-automation-issues.md`
+
+## Issue #39 — Document ingestion trigger semantics in data design and API contract
+
+Status: done
+
+### Resolution note
+
+- `trigger_mode` semantics are documented in the data design as `manual` and `scheduled`.
+- The OpenAPI contract now exposes the same two values for ingestion run creation.
+- The documentation explicitly states that this is a contract clarification for recurring lineage and not a schema redesign.
+
+### Evidence
+
+- `docs/architecture/data-design.md`
+- `docs/api/openapi.yaml`
+- `tasks/bloc1-automation-issues.md`
+
+## Issue #40 — Define CERT-FR automated collection strategy and filtering rules
+
+Status: done
+
+### Resolution note
+
+- The recurring CERT-FR strategy now defines `actualite`, `alerte`, and optional `avis` as the collection entry points.
+- Weekly cadence is documented as the default because CERT-FR is relevant but not a high-frequency feed.
+- Relevance filtering is required before detailed extraction or attachment handling.
+- The first version explicitly prefers HTML or JSON index polling and rejects browser-automation-first designs.
+
+### Evidence
+
+- `docs/architecture/component-design.md`
+- `docs/architecture/backend-plan.md`
+- `tasks/bloc1-automation-issues.md`
