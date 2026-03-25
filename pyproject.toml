@@ -23,6 +23,7 @@ backend = [
     "alembic>=1.14.1",
     "cachetools>=5.5.2",
     "fastapi>=0.115.12",
+    "greenlet>=3.2.4",
     "httpx>=0.28.1",
     "psycopg[binary]>=3.2.6",
     "pydantic-settings>=2.8.1",
