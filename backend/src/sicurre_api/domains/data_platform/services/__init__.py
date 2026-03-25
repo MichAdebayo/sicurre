@@ -21,6 +21,10 @@ from sicurre_api.domains.data_platform.services.certfr import (
     CertFRIngestionResult,
     CertFRIngestionService,
 )
+from sicurre_api.domains.data_platform.services.certfr_cti import (
+    CertFRCtiExtractor,
+    CertFRCtiResult,
+)
 from sicurre_api.domains.data_platform.services.snapshot_storage import (
     LocalSnapshotStore,
     R2SnapshotStore,
@@ -41,6 +45,8 @@ from sicurre_api.domains.data_platform.services.records import (
 __all__ = [
     "AnnotationService",
     "AdaptationSummary",
+    "CertFRCtiExtractor",
+    "CertFRCtiResult",
     "DatasetService",
     "DataFramePreprocessingService",
     "FrenchCulturalAdaptationService",

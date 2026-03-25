@@ -44,6 +44,7 @@ class ObjectType(StrEnum):
     FILE = "file"
     API_PAYLOAD = "api_payload"
     HTML_PAGE = "html_page"
+    PDF_DOCUMENT = "pdf_document"
     SQL_EXPORT = "sql_export"
     BIGDATA_EXTRACT = "bigdata_extract"
 
