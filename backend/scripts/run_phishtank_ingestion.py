@@ -27,7 +27,7 @@ async def main() -> None:
         f"source={result.source_system_id}",
         f"raw_objects={result.raw_object_count}",
         f"raw_records={result.raw_record_count}",
-        f"snapshot={result.snapshot_path}",
+        f"snapshot={result.snapshot_storage_uri}",
     )
 
 
