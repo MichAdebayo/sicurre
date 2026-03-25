@@ -3,6 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,6 +23,14 @@ class Settings(BaseSettings):
     better_auth_session_path: str = "/api/auth/get-session"
     better_auth_timeout_seconds: float = 5.0
     better_auth_cookie_name: str = "better-auth.session_token"
+    raw_snapshot_storage_backend: str = "local"
+    raw_snapshot_local_dir: Path = BACKEND_ROOT.parent / "data" / "raw" / "api"
+    raw_snapshot_prefix: str = "raw-snapshots"
+    raw_snapshot_r2_bucket_name: str | None = None
+    raw_snapshot_r2_endpoint_url: str | None = None
+    raw_snapshot_r2_access_key_id: str | None = None
+    raw_snapshot_r2_secret_access_key: str | None = None
+    raw_snapshot_r2_region: str = "auto"
 
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),
