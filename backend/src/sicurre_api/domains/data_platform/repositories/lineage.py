@@ -22,6 +22,14 @@ class SourceSystemNotFoundError(Exception):
 
 
 class SourceSystemRepository:
+    async def get_by_name(
+        self, session: AsyncSession, name: str
+    ) -> DataSourceSystem | None:
+        result = await session.execute(
+            select(DataSourceSystem).where(DataSourceSystem.name == name)
+        )
+        return result.scalar_one_or_none()
+
     async def list(
         self,
         session: AsyncSession,
