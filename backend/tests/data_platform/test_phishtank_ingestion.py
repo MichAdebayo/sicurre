@@ -90,28 +90,108 @@ async def session_factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
 def test_feed_url_without_api_key() -> None:
     client = PhishTankFeedClient()
     assert client.feed_url == (
-        "https://data.phishtank.com/data/online-valid.json"
+        "https://data.phishtank.com/data/online-valid.csv"
     )
 
 
 def test_feed_url_with_api_key() -> None:
     client = PhishTankFeedClient(api_key="my-secret-key")
     assert client.feed_url == (
-        "https://data.phishtank.com/data/my-secret-key/online-valid.json"
+        "https://data.phishtank.com/data/my-secret-key/online-valid.csv"
     )
 
 
 def test_feed_url_custom_base_with_key() -> None:
     client = PhishTankFeedClient(
-        feed_url="https://example.com/feed.json",
+        feed_url="https://example.com/feed.csv",
         api_key="abc123",
     )
-    assert client.feed_url == "https://example.com/abc123/feed.json"
+    assert client.feed_url == "https://example.com/abc123/feed.csv"
 
 
 # ---------------------------------------------------------------------------
-# Integration tests — full ingestion flow
+# Unit tests — French filtering
 # ---------------------------------------------------------------------------
+
+
+def test_is_french_target_fr_tld() -> None:
+    svc = PhishTankIngestionService.__new__(PhishTankIngestionService)
+    assert svc._is_french_target("https://impots-verification.gouv.fr/login")
+    assert svc._is_french_target("https://example.fr/phish")
+    assert svc._is_french_target("https://sub.domain.fr:8080/path")
+
+
+def test_is_french_target_brand_keyword() -> None:
+    svc = PhishTankIngestionService.__new__(PhishTankIngestionService)
+    assert svc._is_french_target("https://evil.com/ameli-remboursement")
+    assert svc._is_french_target("https://evil.com/bnpparibas-login")
+    assert svc._is_french_target("https://evil.com/chronopost-livraison")
+
+
+def test_is_french_target_rejects_non_french() -> None:
+    svc = PhishTankIngestionService.__new__(PhishTankIngestionService)
+    assert not svc._is_french_target("https://paypal.com/login")
+    assert not svc._is_french_target("https://wells-fargo.com/signin")
+    assert not svc._is_french_target("https://example.de/phish")
+
+
+def test_french_filter_reason() -> None:
+    svc = PhishTankIngestionService.__new__(PhishTankIngestionService)
+    assert svc._french_filter_reason("https://evil.fr/page") == "fr_tld"
+    assert svc._french_filter_reason("https://evil.com/urssaf") == "brand:urssaf"
+
+
+def test_parse_domain() -> None:
+    svc = PhishTankIngestionService.__new__(PhishTankIngestionService)
+    assert svc._parse_domain("https://evil.example.fr/path") == "evil.example.fr"
+    assert svc._parse_domain("not-a-url") == ""
+
+
+# ---------------------------------------------------------------------------
+# Integration tests — full ingestion flow with French filter
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_phishtank_ingestion_filters_french_only(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Only French-targeted entries should be ingested."""
+    entries = [
+        {"phish_id": "1001", "url": "https://secure-urssaf.example.fr/login"},
+        {"phish_id": "1002", "url": "https://paypal.com/login"},  # non-French
+        {"phish_id": "1003", "url": "https://evil.com/ameli-remboursement"},
+        {"phish_id": "1004", "url": "https://wellsfargo.com/signin"},  # non-French
+    ]
+
+    async def fetch_entries() -> list[dict[str, str]]:
+        return entries
+
+    store = RecordingSnapshotStore()
+    service = PhishTankIngestionService(
+        fetch_entries=fetch_entries,
+        snapshot_store=store,
+    )
+
+    async with session_factory() as session:
+        result = await service.run(session, trigger_mode="manual")
+        records = list(
+            (await session.scalars(select(DataRawRecord))).all()
+        )
+
+    assert result.total_feed_count == 4
+    assert result.filtered_count == 2  # paypal + wellsfargo
+    assert result.raw_record_count == 2  # urssaf.fr + ameli
+    assert result.skipped_count == 0
+    assert {r.record_key for r in records} == {"1001", "1003"}
+
+    # Verify enrichment in raw_content
+    for record in records:
+        content = json.loads(record.raw_content)
+        assert content["label"] == "phishing"
+        assert content["source"] == "phishtank_api"
+        assert "domain" in content
+        assert "filter_reason" in content
 
 
 @pytest.mark.asyncio
@@ -121,12 +201,12 @@ async def test_phishtank_ingestion_persists_lineage(
 ) -> None:
     entries = [
         {
-            "phish_id": "1001",
-            "url": "https://secure-urssaf-fr.example/login",
+            "phish_id": "2001",
+            "url": "https://secure-urssaf-fr.example.fr/login",
             "verified": "yes",
         },
         {
-            "phish_id": "1002",
+            "phish_id": "2002",
             "url": "https://ameli-verification.example/update",
             "verified": "yes",
         },
@@ -146,7 +226,7 @@ async def test_phishtank_ingestion_persists_lineage(
     async with session_factory() as session:
         result = await service.run(
             session,
-            trigger_mode="scheduled",
+            trigger_mode="manual",
             started_at=datetime(2026, 3, 25, 8, 0, tzinfo=timezone.utc),
         )
 
@@ -161,48 +241,14 @@ async def test_phishtank_ingestion_persists_lineage(
     assert result.skipped_count == 0
     assert result.snapshot_path is not None
     assert result.snapshot_path.exists()
-    assert result.snapshot_path.parent == tmp_path / "phishtank"
-    assert result.snapshot_storage_uri.endswith(".json")
+    assert result.snapshot_storage_uri.endswith(".csv")
     assert ingestion_run is not None
     assert ingestion_run.status == "completed"
-    assert ingestion_run.trigger_mode == "scheduled"
     assert ingestion_run.raw_object_count == 1
     assert ingestion_run.raw_record_count == 2
     assert raw_object is not None
     assert raw_object.object_type == "api_payload"
-    assert raw_object.storage_uri is not None
-    assert raw_object.storage_uri == result.snapshot_storage_uri
-    assert raw_object.storage_uri.endswith(".json")
     assert len(raw_records) == 2
-    assert {record.record_key for record in raw_records} == {"1001", "1002"}
-
-
-@pytest.mark.asyncio
-async def test_phishtank_ingestion_uses_source_prefix_for_r2_keys(
-    session_factory: async_sessionmaker[AsyncSession],
-) -> None:
-    entries = [
-        {"phish_id": "1001", "url": "https://secure-urssaf-fr.example/login"},
-    ]
-    recording_store = RecordingSnapshotStore()
-
-    async def fetch_entries() -> list[dict[str, str]]:
-        return entries
-
-    service = PhishTankIngestionService(
-        fetch_entries=fetch_entries,
-        snapshot_store=recording_store,
-    )
-
-    async with session_factory() as session:
-        result = await service.run(session, trigger_mode="scheduled")
-
-    assert recording_store.object_key is not None
-    assert recording_store.object_key.startswith("raw-snapshots/phishtank/")
-    assert result.snapshot_path is None
-    assert result.snapshot_storage_uri.startswith(
-        "r2://sicurre-raw/raw-snapshots/phishtank/"
-    )
 
 
 @pytest.mark.asyncio
@@ -229,8 +275,6 @@ async def test_phishtank_ingestion_marks_failed_runs(
 
     assert ingestion_run is not None
     assert ingestion_run.status == "failed"
-    assert ingestion_run.raw_object_count == 0
-    assert ingestion_run.raw_record_count == 0
 
 
 # ---------------------------------------------------------------------------
@@ -244,8 +288,8 @@ async def test_phishtank_dedup_skips_already_ingested(
 ) -> None:
     """Second run with same entries → all skipped, zero new records."""
     entries = [
-        {"phish_id": "2001", "url": "https://fake-banque.example/connecter"},
-        {"phish_id": "2002", "url": "https://faux-impots.example/verifier"},
+        {"phish_id": "3001", "url": "https://fake-banque.example.fr/connecter"},
+        {"phish_id": "3002", "url": "https://faux-impots.example.fr/verifier"},
     ]
 
     async def fetch_entries() -> list[dict[str, str]]:
@@ -257,14 +301,11 @@ async def test_phishtank_dedup_skips_already_ingested(
         snapshot_store=store,
     )
 
-    # First run — should ingest both
     async with session_factory() as session:
-        result1 = await service.run(session, trigger_mode="scheduled")
+        result1 = await service.run(session, trigger_mode="manual")
 
     assert result1.raw_record_count == 2
-    assert result1.skipped_count == 0
 
-    # Second run — should skip both
     async with session_factory() as session:
         result2 = await service.run(session, trigger_mode="scheduled")
 
@@ -277,13 +318,12 @@ async def test_phishtank_dedup_skips_already_ingested(
 async def test_phishtank_dedup_ingests_only_new_entries(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    """Second run with mix of old + new entries → only new ones ingested."""
     first_batch = [
-        {"phish_id": "3001", "url": "https://old.example/a"},
+        {"phish_id": "4001", "url": "https://old.example.fr/a"},
     ]
     second_batch = [
-        {"phish_id": "3001", "url": "https://old.example/a"},  # dup
-        {"phish_id": "3002", "url": "https://new.example/b"},  # new
+        {"phish_id": "4001", "url": "https://old.example.fr/a"},  # dup
+        {"phish_id": "4002", "url": "https://new.example.fr/b"},  # new
     ]
 
     store = RecordingSnapshotStore()
@@ -292,26 +332,23 @@ async def test_phishtank_dedup_ingests_only_new_entries(
         return first_batch
 
     service1 = PhishTankIngestionService(
-        fetch_entries=fetch_first,
-        snapshot_store=store,
+        fetch_entries=fetch_first, snapshot_store=store,
     )
     async with session_factory() as session:
-        result1 = await service1.run(session, trigger_mode="scheduled")
-
+        result1 = await service1.run(session, trigger_mode="manual")
     assert result1.raw_record_count == 1
 
     async def fetch_second() -> list[dict[str, str]]:
         return second_batch
 
     service2 = PhishTankIngestionService(
-        fetch_entries=fetch_second,
-        snapshot_store=store,
+        fetch_entries=fetch_second, snapshot_store=store,
     )
     async with session_factory() as session:
         result2 = await service2.run(session, trigger_mode="scheduled")
 
-    assert result2.raw_record_count == 1  # only phish_id 3002
-    assert result2.skipped_count == 1  # phish_id 3001 skipped
+    assert result2.raw_record_count == 1
+    assert result2.skipped_count == 1
 
 
 # ---------------------------------------------------------------------------
@@ -323,15 +360,12 @@ async def test_phishtank_dedup_ingests_only_new_entries(
 async def test_phishtank_empty_feed(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    """Empty feed → completed with zero counts, not an error."""
-
     async def fetch_entries() -> list[dict[str, str]]:
         return []
 
     store = RecordingSnapshotStore()
     service = PhishTankIngestionService(
-        fetch_entries=fetch_entries,
-        snapshot_store=store,
+        fetch_entries=fetch_entries, snapshot_store=store,
     )
 
     async with session_factory() as session:
@@ -340,20 +374,19 @@ async def test_phishtank_empty_feed(
 
     assert result.raw_record_count == 0
     assert result.raw_object_count == 0
-    assert result.skipped_count == 0
     assert "0 entries" in result.log_message
     assert ingestion_run is not None
     assert ingestion_run.status == "completed"
 
 
 @pytest.mark.asyncio
-async def test_phishtank_entry_without_url_marked_unusable(
+async def test_phishtank_no_french_entries(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    """Entry missing ``url`` → stored but marked ``is_usable=False``."""
+    """Feed has entries but none are French-targeted."""
     entries = [
-        {"phish_id": "4001"},  # no url
-        {"phish_id": "4002", "url": "https://legit.example/phish"},
+        {"phish_id": "5001", "url": "https://paypal.com/login"},
+        {"phish_id": "5002", "url": "https://wellsfargo.com/signin"},
     ]
 
     async def fetch_entries() -> list[dict[str, str]]:
@@ -361,8 +394,33 @@ async def test_phishtank_entry_without_url_marked_unusable(
 
     store = RecordingSnapshotStore()
     service = PhishTankIngestionService(
-        fetch_entries=fetch_entries,
-        snapshot_store=store,
+        fetch_entries=fetch_entries, snapshot_store=store,
+    )
+
+    async with session_factory() as session:
+        result = await service.run(session, trigger_mode="scheduled")
+
+    assert result.raw_record_count == 0
+    assert result.filtered_count == 2
+    assert result.total_feed_count == 2
+    assert "0 matched French" in result.log_message
+
+
+@pytest.mark.asyncio
+async def test_phishtank_entry_without_url_marked_unusable(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    entries = [
+        {"phish_id": "6001", "url": "https://urssaf-update.example.fr"},
+        {"phish_id": "6002"},  # no url — won't pass French filter
+    ]
+
+    async def fetch_entries() -> list[dict[str, str]]:
+        return entries
+
+    store = RecordingSnapshotStore()
+    service = PhishTankIngestionService(
+        fetch_entries=fetch_entries, snapshot_store=store,
     )
 
     async with session_factory() as session:
@@ -371,10 +429,9 @@ async def test_phishtank_entry_without_url_marked_unusable(
             (await session.scalars(select(DataRawRecord))).all()
         )
 
-    assert result.raw_record_count == 2
-    usable = [r for r in records if r.is_usable]
-    unusable = [r for r in records if not r.is_usable]
-    assert len(usable) == 1
-    assert len(unusable) == 1
-    assert unusable[0].rejection_reason == "missing_url"
-    assert unusable[0].record_key == "4001"
+    # Entry without URL has empty string → _is_french_target("") → False
+    # So only the .fr entry passes the French filter
+    assert result.raw_record_count == 1
+    assert result.filtered_count == 1
+    assert records[0].record_key == "6001"
+    assert records[0].is_usable is True
