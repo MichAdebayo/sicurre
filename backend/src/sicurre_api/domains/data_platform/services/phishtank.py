@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import csv
 import json
 import logging
+import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 from sqlalchemy import select
@@ -41,7 +44,7 @@ from sicurre_api.domains.data_platform.services.snapshot_storage import (
 logger = logging.getLogger(__name__)
 
 REPO_ROOT = BACKEND_ROOT.parent
-DEFAULT_PHISHTANK_FEED_URL = "https://data.phishtank.com/data/online-valid.json"
+DEFAULT_PHISHTANK_FEED_URL = "https://data.phishtank.com/data/online-valid.csv"
 DEFAULT_PHISHTANK_SOURCE_NAME = "phishtank-online-valid"
 DEFAULT_PHISHTANK_SNAPSHOT_DIR = REPO_ROOT / "data" / "raw" / "api" / "phishtank"
 DEFAULT_PHISHTANK_SNAPSHOT_PREFIX = "phishtank"
@@ -50,6 +53,26 @@ DEFAULT_PHISHTANK_SNAPSHOT_PREFIX = "phishtank"
 MAX_RETRIES = 3
 RETRY_BACKOFF_BASE_SECONDS = 30.0
 RETRY_STATUS_CODES: frozenset[int] = frozenset((429, 503, 509))
+
+# ── French filtering (from notebook 05_phishtank_extraction) ─────────
+FR_TLD_PATTERN: re.Pattern[str] = re.compile(r"\.fr(/|$|:)", re.IGNORECASE)
+
+FR_BRAND_KEYWORDS: tuple[str, ...] = (
+    # Government / health
+    "urssaf", "ameli", "impots", "dgfip", "caf", "cpam",
+    "securite-sociale", "france-connect", "franceconnect",
+    "service-public", "gouv",
+    # Postal / delivery
+    "laposte", "la-poste", "colissimo", "chronopost", "mondial-relay",
+    # Banking
+    "credit-agricole", "creditagricole", "bnp", "bnpparibas",
+    "banque-postale", "banquepostale", "societe-generale",
+    "societegenerale", "lcl", "caisse-epargne", "credit-mutuel",
+    # Telecom
+    "orange", "sfr", "bouygues", "free",
+    # E-commerce
+    "leboncoin", "cdiscount", "fnac",
+)
 
 
 @dataclass(slots=True)
@@ -61,6 +84,8 @@ class PhishTankIngestionResult:
     raw_object_count: int
     raw_record_count: int
     skipped_count: int
+    filtered_count: int
+    total_feed_count: int
     log_message: str
 
 
@@ -86,9 +111,9 @@ class PhishTankFeedClient:
         """Insert API key into feed URL if available.
 
         PhishTank URL pattern with key:
-            ``https://data.phishtank.com/data/{API_KEY}/online-valid.json``
+            ``https://data.phishtank.com/data/{API_KEY}/online-valid.csv``
         Without key:
-            ``https://data.phishtank.com/data/online-valid.json``
+            ``https://data.phishtank.com/data/online-valid.csv``
         """
         if not api_key:
             return base_url
@@ -101,13 +126,18 @@ class PhishTankFeedClient:
     async def fetch_entries(self) -> list[dict[str, Any]]:
         """Fetch feed with retry logic for rate-limit errors."""
         last_error: Exception | None = None
+        settings = get_settings()
 
         for attempt in range(self.max_retries + 1):
             try:
                 async with httpx.AsyncClient(
                     timeout=self.timeout_seconds,
+                    follow_redirects=True,
                 ) as client:
-                    response = await client.get(self.feed_url)
+                    response = await client.get(
+                        self.feed_url,
+                        headers={"User-Agent": settings.phishtank_user_agent},
+                    )
 
                     if response.status_code in RETRY_STATUS_CODES:
                         wait = self.retry_backoff_seconds * (2 ** attempt)
@@ -125,14 +155,22 @@ class PhishTankFeedClient:
                         response.raise_for_status()
 
                     response.raise_for_status()
-                    payload = response.json()
-
-                if not isinstance(payload, list):
-                    raise ValueError("PhishTank feed must return a JSON array")
-
-                return [
-                    entry for entry in payload if isinstance(entry, dict)
-                ]
+                    # Parse CSV payload
+                    text = response.text
+                    reader = csv.DictReader(text.splitlines())
+                    return [
+                        {
+                            "phish_id": row.get("phish_id", ""),
+                            "url": row.get("url", ""),
+                            "phish_detail_url": row.get("phish_detail_url", ""),
+                            "submission_time": row.get("submission_time", ""),
+                            "verified": row.get("verified", ""),
+                            "verification_time": row.get("verification_time", ""),
+                            "online": row.get("online", ""),
+                            "target": row.get("target", ""),
+                        }
+                        for row in reader
+                    ]
 
             except httpx.RequestError as exc:
                 last_error = exc
@@ -210,27 +248,43 @@ class PhishTankIngestionService:
         )
 
         try:
-            entries = await self.fetch_entries()
+            all_entries = await self.fetch_entries()
+            total_feed_count = len(all_entries)
 
-            if not entries:
+            if not all_entries:
                 ingestion_run.finished_at = datetime.now(timezone.utc)
                 ingestion_run.status = IngestionStatus.COMPLETED
                 ingestion_run.log_message = (
                     "PhishTank feed returned 0 entries — nothing to ingest"
                 )
                 await session.commit()
-                return PhishTankIngestionResult(
-                    ingestion_run_id=str(ingestion_run.id),
-                    source_system_id=str(source_system.id),
-                    snapshot_path=None,
-                    snapshot_storage_uri="",
-                    raw_object_count=0,
-                    raw_record_count=0,
-                    skipped_count=0,
-                    log_message=ingestion_run.log_message,
+                return self._empty_result(
+                    ingestion_run, source_system,
+                    total_feed_count=0,
                 )
 
-            # ---------- Dedup: skip already-ingested phish_ids ----------
+            # ---- Step 1: French-targeted filter ----
+            entries = [
+                e for e in all_entries
+                if self._is_french_target(e.get("url", ""))
+            ]
+            filtered_count = total_feed_count - len(entries)
+
+            if not entries:
+                ingestion_run.finished_at = datetime.now(timezone.utc)
+                ingestion_run.status = IngestionStatus.COMPLETED
+                ingestion_run.log_message = (
+                    f"PhishTank feed had {total_feed_count} entries but "
+                    f"0 matched French filters — nothing to ingest"
+                )
+                await session.commit()
+                return self._empty_result(
+                    ingestion_run, source_system,
+                    filtered_count=filtered_count,
+                    total_feed_count=total_feed_count,
+                )
+
+            # ---- Step 2: Dedup against existing DB records ----
             existing_keys = await self._existing_record_keys(session)
             new_entries = [
                 e for e in entries
@@ -242,22 +296,18 @@ class PhishTankIngestionService:
                 ingestion_run.finished_at = datetime.now(timezone.utc)
                 ingestion_run.status = IngestionStatus.COMPLETED
                 ingestion_run.log_message = (
-                    f"All {len(entries)} PhishTank entries already ingested "
-                    f"— nothing new"
+                    f"All {len(entries)} French PhishTank entries already "
+                    f"ingested — nothing new (feed={total_feed_count})"
                 )
                 await session.commit()
-                return PhishTankIngestionResult(
-                    ingestion_run_id=str(ingestion_run.id),
-                    source_system_id=str(source_system.id),
-                    snapshot_path=None,
-                    snapshot_storage_uri="",
-                    raw_object_count=0,
-                    raw_record_count=0,
+                return self._empty_result(
+                    ingestion_run, source_system,
                     skipped_count=skipped_count,
-                    log_message=ingestion_run.log_message,
+                    filtered_count=filtered_count,
+                    total_feed_count=total_feed_count,
                 )
 
-            # ---------- Snapshot only new entries ----------
+            # ---- Step 3: Snapshot + DB write ----
             snapshot_result = await self._write_snapshot(
                 ingestion_run=ingestion_run,
                 entries=new_entries,
@@ -273,13 +323,16 @@ class PhishTankIngestionService:
             await session.flush()
 
             raw_records = self._build_raw_records(
-                raw_object=raw_object, entries=new_entries
+                raw_object=raw_object, entries=new_entries,
             )
             session.add_all(raw_records)
 
             log_message = (
                 f"PhishTank ingestion completed: "
-                f"{len(raw_records)} new, {skipped_count} skipped"
+                f"{len(raw_records)} new French entries, "
+                f"{skipped_count} dedup-skipped, "
+                f"{filtered_count} non-French filtered "
+                f"(feed={total_feed_count})"
             )
             ingestion_run.finished_at = datetime.now(timezone.utc)
             ingestion_run.status = IngestionStatus.COMPLETED
@@ -296,6 +349,8 @@ class PhishTankIngestionService:
                 raw_object_count=1,
                 raw_record_count=len(raw_records),
                 skipped_count=skipped_count,
+                filtered_count=filtered_count,
+                total_feed_count=total_feed_count,
                 log_message=log_message,
             )
         except Exception as exc:
@@ -306,17 +361,73 @@ class PhishTankIngestionService:
             raise
 
     # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _empty_result(
+        self,
+        run: DataIngestionRun,
+        source: DataSourceSystem,
+        *,
+        skipped_count: int = 0,
+        filtered_count: int = 0,
+        total_feed_count: int = 0,
+    ) -> PhishTankIngestionResult:
+        return PhishTankIngestionResult(
+            ingestion_run_id=str(run.id),
+            source_system_id=str(source.id),
+            snapshot_path=None,
+            snapshot_storage_uri="",
+            raw_object_count=0,
+            raw_record_count=0,
+            skipped_count=skipped_count,
+            filtered_count=filtered_count,
+            total_feed_count=total_feed_count,
+            log_message=run.log_message or "",
+        )
+
+    # ------------------------------------------------------------------
+    # French filtering (from notebook 05)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _is_french_target(url: str) -> bool:
+        """Return ``True`` if *url* targets French users.
+
+        Checks ``.fr`` TLD and 34 French brand keywords.
+        """
+        url_lower = url.lower()
+        if FR_TLD_PATTERN.search(url_lower):
+            return True
+        return any(kw in url_lower for kw in FR_BRAND_KEYWORDS)
+
+    @staticmethod
+    def _parse_domain(url: str) -> str:
+        """Extract the network location (domain) from a URL."""
+        try:
+            return urlparse(url).netloc or ""
+        except Exception:
+            return ""
+
+    @staticmethod
+    def _french_filter_reason(url: str) -> str:
+        """Return why a URL matched the French filter."""
+        url_lower = url.lower()
+        if FR_TLD_PATTERN.search(url_lower):
+            return "fr_tld"
+        for kw in FR_BRAND_KEYWORDS:
+            if kw in url_lower:
+                return f"brand:{kw}"
+        return ""
+
+    # ------------------------------------------------------------------
     # Dedup helpers
     # ------------------------------------------------------------------
 
     async def _existing_record_keys(
         self, session: AsyncSession,
     ) -> set[str]:
-        """Return record keys already stored from PhishTank ingestion runs.
-
-        Queries ``DataRawRecord.record_key`` for records linked to
-        ``DataRawObject``s belonging to this source system.
-        """
+        """Return record keys already stored from PhishTank ingestion runs."""
         stmt = (
             select(DataRawRecord.record_key)
             .join(DataRawObject)
@@ -428,8 +539,17 @@ class PhishTankIngestionService:
             url = self._clean_string(entry.get("url"))
             phish_id = self._clean_string(entry.get("phish_id"))
             record_key = phish_id or url or f"phishtank-row-{index}"
+
+            # Enrich with domain + filter reason before storing
+            enriched = dict(entry)
+            if url:
+                enriched["domain"] = self._parse_domain(url)
+                enriched["filter_reason"] = self._french_filter_reason(url)
+            enriched["label"] = "phishing"
+            enriched["source"] = "phishtank_api"
+
             raw_content = json.dumps(
-                entry, ensure_ascii=False, sort_keys=True,
+                enriched, ensure_ascii=False, sort_keys=True,
             )
             is_usable = bool(url)
             rejection_reason = None if is_usable else "missing_url"
@@ -458,7 +578,8 @@ class PhishTankIngestionService:
     def _build_snapshot_object_key(
         self, ingestion_run: DataIngestionRun,
     ) -> str:
-        filename = f"phishtank_{ingestion_run.id}.json"
+        date_str = ingestion_run.started_at.strftime("%Y%m%d")
+        filename = f"phishtank_{date_str}_{ingestion_run.id}.csv"
         return self.snapshot_store.build_object_key(
             source_prefix=self.snapshot_prefix,
             filename=filename,
