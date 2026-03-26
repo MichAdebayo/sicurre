@@ -58,7 +58,7 @@ from sicurre_api.domains.data_platform.services.snapshot_storage import (
 REPO_ROOT = BACKEND_ROOT.parent
 CERTFR_CTI_FEED_URL = "https://www.cert.ssi.gouv.fr/cti/feed/"
 CERTFR_PDF_BASE = "https://www.cert.ssi.gouv.fr/uploads"
-CERTFR_REFERENCE_RE = re.compile(r"(CERTFR-\d{4}-CTI-\d+)", re.IGNORECASE)
+CERTFR_REFERENCE_RE = re.compile(r"(CERTFR-\d{4}-(?:CTI|IOC)-\d+)", re.IGNORECASE)
 DEFAULT_SOURCE_NAME = "cert-fr-cti"
 DEFAULT_SNAPSHOT_DIR = REPO_ROOT / "data" / "raw" / "scraping" / "cert_fr"
 DEFAULT_SNAPSHOT_PREFIX = "cert-fr"
@@ -212,6 +212,7 @@ class CertFRCtiExtractor:
         *,
         trigger_mode: str = "scheduled",
         started_at: datetime | None = None,
+        fetch_historical: bool = False,
     ) -> CertFRCtiResult:
         run_started_at = started_at or datetime.now(timezone.utc)
 
@@ -238,7 +239,7 @@ class CertFRCtiExtractor:
         )
 
         try:
-            entries = await self._discover_entries()
+            entries = await self._discover_entries(fetch_historical=fetch_historical)
             result.discovered_count = len(entries)
 
             if not entries:
@@ -318,8 +319,11 @@ class CertFRCtiExtractor:
     # Discovery
     # ------------------------------------------------------------------
 
-    async def _discover_entries(self) -> list[dict[str, Any]]:
-        """Fetch the CTI RSS feed and parse entries."""
+    async def _discover_entries(self, fetch_historical: bool = False) -> list[dict[str, Any]]:
+        """Fetch the CTI RSS feed and parse entries, or scrape historical pages."""
+        if fetch_historical:
+            return await self._discover_historical_entries()
+
         if self._fetch_feed is not None:
             return await self._fetch_feed()
 
@@ -364,6 +368,68 @@ class CertFRCtiExtractor:
             if match is not None:
                 return match.group(1).upper()
         return None
+
+    async def _discover_historical_entries(self) -> list[dict[str, Any]]:
+        """Crawl the paginated /cti/ and /ioc/ indexes to find all historical reports."""
+        from bs4 import BeautifulSoup
+        from urllib.parse import urljoin
+        
+        entries: list[dict[str, Any]] = []
+        base_urls = ["https://www.cert.ssi.gouv.fr/cti/", "https://www.cert.ssi.gouv.fr/ioc/"]
+        
+        async with httpx.AsyncClient(
+            timeout=self.timeout_seconds,
+            follow_redirects=True,
+        ) as client:
+            for base_url in base_urls:
+                page = 1
+                while True:
+                    url = base_url if page == 1 else f"{base_url}page/{page}/"
+                    response = await client.get(url)
+                    if response.status_code == 404:
+                        break
+                    response.raise_for_status()
+                    
+                    soup = BeautifulSoup(response.text, "html.parser")
+                    articles = soup.select("article.cert-alert, article.item")
+                    if not articles:
+                        articles = soup.find_all("a", href=re.compile(r"/cti/CERTFR|/ioc/CERTFR"))
+                        
+                    if not articles:
+                        break
+                        
+                    found_any = False
+                    for article in articles:
+                        link_tag = article if article.name == "a" else article.find("a")
+                        if not link_tag or not link_tag.get("href"):
+                            continue
+                            
+                        href = urljoin("https://www.cert.ssi.gouv.fr", link_tag["href"])
+                        title = link_tag.get_text(strip=True)
+                        reference = self._extract_reference(href, title)
+                        if not reference:
+                            continue
+                            
+                        date_tag = article.find("time") if article.name != "a" else None
+                        published = date_tag.get("datetime", "") if date_tag else None
+                        
+                        entries.append({
+                            "title": title,
+                            "link": href,
+                            "reference": reference,
+                            "published": published,
+                            "summary": None,
+                        })
+                        found_any = True
+                        
+                    if not found_any:
+                        break
+                        
+                    page += 1
+                    if self.delay_between_requests > 0:
+                        await asyncio.sleep(self.delay_between_requests)
+                        
+        return entries
 
     # ------------------------------------------------------------------
     # Content extraction
