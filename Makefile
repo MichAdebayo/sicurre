@@ -11,6 +11,7 @@ help:
 	@echo "  make phishtank-csv      - Run PhishTank ingestion from local CSV file (Fallback)"
 	@echo "  make certfr-ingest      - Run one-off CERT-FR CTI ingestion (Historical full backfill)"
 	@echo "  make certfr-cron        - Run recurring CERT-FR CTI ingestion (Cron target, RSS feed)"
+	@echo "  make csv-ingest         - Run Universal CSV Dataset Ingestion (Machine Learning Sources)"
 
 install:
 	uv sync
@@ -40,3 +41,7 @@ certfr-ingest:
 certfr-cron:
 	@echo "Starting scheduled CERT-FR CTI ingestion (RSS feed)..."
 	cd backend && uv run --group backend python scripts/run_certfr_cti.py --trigger scheduled
+
+csv-ingest:
+	@echo "Starting Universal CSV dataset ingestion..."
+	cd backend && uv run --group backend python scripts/csv_ingestion.py --dir ../data/raw/csv
