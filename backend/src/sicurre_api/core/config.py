@@ -11,10 +11,14 @@ BACKEND_ROOT = Path(__file__).resolve().parents[3]
 ENV_FILE = BACKEND_ROOT / ".env"
 
 
+_DB_PATH = BACKEND_ROOT / "db" / "sicurre.db"
+_DEFAULT_DB_URL = f"sqlite+aiosqlite:///{_DB_PATH.as_posix()}"
+
+
 class Settings(BaseSettings):
     app_name: str = "Sicurre API"
     environment: str = "dev"
-    database_url: str = "sqlite+aiosqlite:///./backend/dev.db"
+    database_url: str = _DEFAULT_DB_URL
     database_echo: bool = False
     auth_enabled: bool = True
     auth_allow_dev_tokens: bool | None = None
@@ -32,6 +36,7 @@ class Settings(BaseSettings):
     raw_snapshot_r2_secret_access_key: str | None = None
     raw_snapshot_r2_region: str = "auto"
     phishtank_api_key: str | None = None
+    phishtank_user_agent: str = "phishtank/sicurre-research"
 
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),
