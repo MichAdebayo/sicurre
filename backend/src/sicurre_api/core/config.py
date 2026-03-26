@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     raw_snapshot_r2_access_key_id: str | None = None
     raw_snapshot_r2_secret_access_key: str | None = None
     raw_snapshot_r2_region: str = "auto"
+    phishtank_api_key: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),

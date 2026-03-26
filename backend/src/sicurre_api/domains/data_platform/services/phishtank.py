@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -8,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sicurre_api.core.config import BACKEND_ROOT, get_settings
@@ -35,12 +38,18 @@ from sicurre_api.domains.data_platform.services.snapshot_storage import (
     build_snapshot_store,
 )
 
+logger = logging.getLogger(__name__)
 
 REPO_ROOT = BACKEND_ROOT.parent
 DEFAULT_PHISHTANK_FEED_URL = "https://data.phishtank.com/data/online-valid.json"
 DEFAULT_PHISHTANK_SOURCE_NAME = "phishtank-online-valid"
 DEFAULT_PHISHTANK_SNAPSHOT_DIR = REPO_ROOT / "data" / "raw" / "api" / "phishtank"
 DEFAULT_PHISHTANK_SNAPSHOT_PREFIX = "phishtank"
+
+# Retry config for PhishTank 509 (rate limit) responses
+MAX_RETRIES = 3
+RETRY_BACKOFF_BASE_SECONDS = 30.0
+RETRY_STATUS_CODES: frozenset[int] = frozenset((429, 503, 509))
 
 
 @dataclass(slots=True)
@@ -51,6 +60,8 @@ class PhishTankIngestionResult:
     snapshot_storage_uri: str
     raw_object_count: int
     raw_record_count: int
+    skipped_count: int
+    log_message: str
 
 
 class PhishTankFeedClient:
@@ -58,21 +69,87 @@ class PhishTankFeedClient:
         self,
         *,
         feed_url: str = DEFAULT_PHISHTANK_FEED_URL,
-        timeout_seconds: float = 30.0,
+        api_key: str | None = None,
+        timeout_seconds: float = 120.0,
+        max_retries: int = MAX_RETRIES,
+        retry_backoff_seconds: float = RETRY_BACKOFF_BASE_SECONDS,
     ) -> None:
-        self.feed_url = feed_url
+        self._base_feed_url = feed_url
+        self._api_key = api_key
+        self.feed_url = self._build_feed_url(feed_url, api_key)
         self.timeout_seconds = timeout_seconds
+        self.max_retries = max_retries
+        self.retry_backoff_seconds = retry_backoff_seconds
+
+    @staticmethod
+    def _build_feed_url(base_url: str, api_key: str | None) -> str:
+        """Insert API key into feed URL if available.
+
+        PhishTank URL pattern with key:
+            ``https://data.phishtank.com/data/{API_KEY}/online-valid.json``
+        Without key:
+            ``https://data.phishtank.com/data/online-valid.json``
+        """
+        if not api_key:
+            return base_url
+        # Insert key before the filename segment
+        parts = base_url.rsplit("/", 1)
+        if len(parts) == 2:
+            return f"{parts[0]}/{api_key}/{parts[1]}"
+        return base_url
 
     async def fetch_entries(self) -> list[dict[str, Any]]:
-        async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
-            response = await client.get(self.feed_url)
-            response.raise_for_status()
-            payload = response.json()
+        """Fetch feed with retry logic for rate-limit errors."""
+        last_error: Exception | None = None
 
-        if not isinstance(payload, list):
-            raise ValueError("PhishTank feed must return a JSON array")
+        for attempt in range(self.max_retries + 1):
+            try:
+                async with httpx.AsyncClient(
+                    timeout=self.timeout_seconds,
+                ) as client:
+                    response = await client.get(self.feed_url)
 
-        return [entry for entry in payload if isinstance(entry, dict)]
+                    if response.status_code in RETRY_STATUS_CODES:
+                        wait = self.retry_backoff_seconds * (2 ** attempt)
+                        logger.warning(
+                            "PhishTank returned %d (attempt %d/%d), "
+                            "retrying in %.0fs",
+                            response.status_code,
+                            attempt + 1,
+                            self.max_retries + 1,
+                            wait,
+                        )
+                        if attempt < self.max_retries:
+                            await asyncio.sleep(wait)
+                            continue
+                        response.raise_for_status()
+
+                    response.raise_for_status()
+                    payload = response.json()
+
+                if not isinstance(payload, list):
+                    raise ValueError("PhishTank feed must return a JSON array")
+
+                return [
+                    entry for entry in payload if isinstance(entry, dict)
+                ]
+
+            except httpx.RequestError as exc:
+                last_error = exc
+                if attempt < self.max_retries:
+                    wait = self.retry_backoff_seconds * (2 ** attempt)
+                    logger.warning(
+                        "PhishTank request failed (attempt %d/%d): %s, "
+                        "retrying in %.0fs",
+                        attempt + 1,
+                        self.max_retries + 1,
+                        exc,
+                        wait,
+                    )
+                    await asyncio.sleep(wait)
+                    continue
+
+        raise last_error or RuntimeError("PhishTank fetch failed after retries")
 
 
 class PhishTankIngestionService:
@@ -80,14 +157,21 @@ class PhishTankIngestionService:
         self,
         *,
         feed_client: PhishTankFeedClient | None = None,
-        fetch_entries: Callable[[], Awaitable[list[dict[str, Any]]]] | None = None,
+        fetch_entries: (
+            Callable[[], Awaitable[list[dict[str, Any]]]] | None
+        ) = None,
         snapshot_dir: Path = DEFAULT_PHISHTANK_SNAPSHOT_DIR,
         snapshot_store: SnapshotStore | None = None,
         snapshot_prefix: str = DEFAULT_PHISHTANK_SNAPSHOT_PREFIX,
         source_name: str = DEFAULT_PHISHTANK_SOURCE_NAME,
     ) -> None:
         settings = get_settings()
-        self.feed_client = feed_client or PhishTankFeedClient()
+
+        # Build feed client with API key from settings if available
+        api_key = getattr(settings, "phishtank_api_key", None)
+        self.feed_client = feed_client or PhishTankFeedClient(
+            api_key=api_key,
+        )
         self.fetch_entries = fetch_entries or self.feed_client.fetch_entries
         self.snapshot_dir = snapshot_dir
         self.snapshot_prefix = snapshot_prefix
@@ -127,32 +211,81 @@ class PhishTankIngestionService:
 
         try:
             entries = await self.fetch_entries()
+
+            if not entries:
+                ingestion_run.finished_at = datetime.now(timezone.utc)
+                ingestion_run.status = IngestionStatus.COMPLETED
+                ingestion_run.log_message = (
+                    "PhishTank feed returned 0 entries — nothing to ingest"
+                )
+                await session.commit()
+                return PhishTankIngestionResult(
+                    ingestion_run_id=str(ingestion_run.id),
+                    source_system_id=str(source_system.id),
+                    snapshot_path=None,
+                    snapshot_storage_uri="",
+                    raw_object_count=0,
+                    raw_record_count=0,
+                    skipped_count=0,
+                    log_message=ingestion_run.log_message,
+                )
+
+            # ---------- Dedup: skip already-ingested phish_ids ----------
+            existing_keys = await self._existing_record_keys(session)
+            new_entries = [
+                e for e in entries
+                if self._entry_key(e) not in existing_keys
+            ]
+            skipped_count = len(entries) - len(new_entries)
+
+            if not new_entries:
+                ingestion_run.finished_at = datetime.now(timezone.utc)
+                ingestion_run.status = IngestionStatus.COMPLETED
+                ingestion_run.log_message = (
+                    f"All {len(entries)} PhishTank entries already ingested "
+                    f"— nothing new"
+                )
+                await session.commit()
+                return PhishTankIngestionResult(
+                    ingestion_run_id=str(ingestion_run.id),
+                    source_system_id=str(source_system.id),
+                    snapshot_path=None,
+                    snapshot_storage_uri="",
+                    raw_object_count=0,
+                    raw_record_count=0,
+                    skipped_count=skipped_count,
+                    log_message=ingestion_run.log_message,
+                )
+
+            # ---------- Snapshot only new entries ----------
             snapshot_result = await self._write_snapshot(
                 ingestion_run=ingestion_run,
-                entries=entries,
+                entries=new_entries,
             )
             raw_object = self._build_raw_object(
                 ingestion_run=ingestion_run,
                 source_system=source_system,
                 snapshot_result=snapshot_result,
                 collected_at=run_started_at,
-                entry_count=len(entries),
+                entry_count=len(new_entries),
             )
             session.add(raw_object)
             await session.flush()
 
             raw_records = self._build_raw_records(
-                raw_object=raw_object, entries=entries
+                raw_object=raw_object, entries=new_entries
             )
             session.add_all(raw_records)
 
+            log_message = (
+                f"PhishTank ingestion completed: "
+                f"{len(raw_records)} new, {skipped_count} skipped"
+            )
             ingestion_run.finished_at = datetime.now(timezone.utc)
             ingestion_run.status = IngestionStatus.COMPLETED
             ingestion_run.raw_object_count = 1
             ingestion_run.raw_record_count = len(raw_records)
-            ingestion_run.log_message = (
-                f"PhishTank ingestion completed with {len(raw_records)} records"
-            )
+            ingestion_run.log_message = log_message
             await session.commit()
 
             return PhishTankIngestionResult(
@@ -162,6 +295,8 @@ class PhishTankIngestionService:
                 snapshot_storage_uri=snapshot_result.storage_uri,
                 raw_object_count=1,
                 raw_record_count=len(raw_records),
+                skipped_count=skipped_count,
+                log_message=log_message,
             )
         except Exception as exc:
             ingestion_run.finished_at = datetime.now(timezone.utc)
@@ -169,6 +304,42 @@ class PhishTankIngestionService:
             ingestion_run.log_message = f"PhishTank ingestion failed: {exc}"
             await session.commit()
             raise
+
+    # ------------------------------------------------------------------
+    # Dedup helpers
+    # ------------------------------------------------------------------
+
+    async def _existing_record_keys(
+        self, session: AsyncSession,
+    ) -> set[str]:
+        """Return record keys already stored from PhishTank ingestion runs.
+
+        Queries ``DataRawRecord.record_key`` for records linked to
+        ``DataRawObject``s belonging to this source system.
+        """
+        stmt = (
+            select(DataRawRecord.record_key)
+            .join(DataRawObject)
+            .join(DataIngestionRun)
+            .join(DataSourceSystem)
+            .where(DataSourceSystem.name == self.source_name)
+        )
+        rows = await session.scalars(stmt)
+        return set(rows)
+
+    @staticmethod
+    def _entry_key(entry: dict[str, Any]) -> str:
+        phish_id = entry.get("phish_id")
+        if phish_id is not None:
+            return str(phish_id).strip()
+        url = entry.get("url")
+        if url is not None:
+            return str(url).strip()
+        return ""
+
+    # ------------------------------------------------------------------
+    # Source system
+    # ------------------------------------------------------------------
 
     async def _get_or_create_source_system(
         self, session: AsyncSession
@@ -184,13 +355,19 @@ class PhishTankIngestionService:
             DataSourceCreate(
                 name=self.source_name,
                 source_type=SourceType.API,
-                description="Scheduled ingestion of the PhishTank online-valid feed",
+                description=(
+                    "Scheduled ingestion of the PhishTank online-valid feed"
+                ),
                 owner_name="PhishTank",
                 legal_basis="public_threat_intel",
                 contains_personal_data=False,
                 retention_days=30,
             ),
         )
+
+    # ------------------------------------------------------------------
+    # Snapshot & records
+    # ------------------------------------------------------------------
 
     async def _write_snapshot(
         self,
@@ -222,7 +399,9 @@ class PhishTankIngestionService:
     ) -> DataRawObject:
         return DataRawObject(
             ingestion_run_id=ingestion_run.id,
-            external_ref=f"{self.feed_client.feed_url}#run:{ingestion_run.id}",
+            external_ref=(
+                f"{self.feed_client._base_feed_url}#run:{ingestion_run.id}"
+            ),
             object_type=ObjectType.API_PAYLOAD,
             storage_uri=snapshot_result.storage_uri,
             source_format="json",
@@ -249,7 +428,9 @@ class PhishTankIngestionService:
             url = self._clean_string(entry.get("url"))
             phish_id = self._clean_string(entry.get("phish_id"))
             record_key = phish_id or url or f"phishtank-row-{index}"
-            raw_content = json.dumps(entry, ensure_ascii=False, sort_keys=True)
+            raw_content = json.dumps(
+                entry, ensure_ascii=False, sort_keys=True,
+            )
             is_usable = bool(url)
             rejection_reason = None if is_usable else "missing_url"
 
@@ -274,7 +455,9 @@ class PhishTankIngestionService:
         text = str(value).strip()
         return text or None
 
-    def _build_snapshot_object_key(self, ingestion_run: DataIngestionRun) -> str:
+    def _build_snapshot_object_key(
+        self, ingestion_run: DataIngestionRun,
+    ) -> str:
         filename = f"phishtank_{ingestion_run.id}.json"
         return self.snapshot_store.build_object_key(
             source_prefix=self.snapshot_prefix,

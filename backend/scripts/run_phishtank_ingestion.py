@@ -1,3 +1,12 @@
+"""Run the PhishTank ingestion job.
+
+Usage::
+
+    cd backend && uv run --group backend python scripts/run_phishtank_ingestion.py
+
+Designed to be called daily by a scheduler (cron / Cloud Scheduler).
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -21,14 +30,14 @@ async def main() -> None:
     async with AsyncSessionFactory() as session:
         result = await service.run(session, trigger_mode="scheduled")
 
+    print(result.log_message or "PhishTank ingestion completed")
     print(
-        "PhishTank ingestion completed:",
-        f"run={result.ingestion_run_id}",
-        f"source={result.source_system_id}",
-        f"raw_objects={result.raw_object_count}",
-        f"raw_records={result.raw_record_count}",
-        f"snapshot={result.snapshot_storage_uri}",
+        f"  new={result.raw_record_count}"
+        f"  skipped={result.skipped_count}"
+        f"  objects={result.raw_object_count}"
     )
+    if result.snapshot_storage_uri:
+        print(f"  snapshot={result.snapshot_storage_uri}")
 
 
 if __name__ == "__main__":
