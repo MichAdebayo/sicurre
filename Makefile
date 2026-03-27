@@ -20,7 +20,7 @@ test:
 	uv run pytest backend/tests/
 
 dev-api:
-	cd backend && uv run uvicorn src.sicurre_api.main:app --reload
+	cd backend && uv run uvicorn src.data_platform.api.main:app --reload
 
 phishtank-ingest:
 	@echo "Starting one-off live ingestion..."

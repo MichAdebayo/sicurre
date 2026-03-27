@@ -73,5 +73,5 @@ ml = [
 ]
 
 [tool.pytest.ini_options]
-pythonpath = ["backend/src"]
-testpaths = ["backend/tests"]
+pythonpath = ["src"]
+testpaths = ["tests"]

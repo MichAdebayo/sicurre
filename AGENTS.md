@@ -128,7 +128,7 @@ Apply these principles to **all** production code. No exceptions.
 ### Project Structure Convention
 ```
 src/
-├── common/          # Shared utilities, base classes, constants
+├── core/            # Core configuration, security, DB connections
 ├── extractors/      # One module per data source (SRP)
 │   ├── base.py      # BaseExtractor protocol/ABC
 │   ├── phishtank.py
@@ -138,7 +138,7 @@ src/
 ├── cleaning/        # Data cleaning & normalization
 ├── storage/         # DB access layer (repository pattern)
 ├── api/             # FastAPI routes
-└── ml/              # Model training, inference, evaluation
+└── datasets/        # Dataset preparation, splits, synthetic adaptation
 ```
 
 ---
