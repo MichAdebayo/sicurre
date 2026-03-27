@@ -1,1 +1,0 @@
-"""Sicurre API backend package."""
