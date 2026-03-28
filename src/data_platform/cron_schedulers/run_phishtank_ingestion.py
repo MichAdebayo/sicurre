@@ -3,10 +3,10 @@
 Usage::
 
     # From live feed
-    uv run --group backend python backend/scripts/run_phishtank_ingestion.py --trigger manual
+    uv run python scripts/data_platform/run_phishtank_ingestion.py --trigger manual
 
     # From existing CSV (when feed is rate-limited)
-    uv run --group backend python backend/scripts/run_phishtank_ingestion.py \\
+    uv run python scripts/data_platform/run_phishtank_ingestion.py \\
         --trigger manual --csv data/raw/api/phishtank/phishing-tank.csv
 
 Designed to be called daily by a scheduler (cron / Cloud Scheduler).

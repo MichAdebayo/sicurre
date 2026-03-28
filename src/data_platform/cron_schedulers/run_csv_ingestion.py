@@ -9,7 +9,7 @@ all rows as DataRawRecords into the Sicurre database.
 
 Usage::
 
-    uv run --group backend python backend/scripts/csv_ingestion.py --dir data/raw/csv
+    uv run python scripts/data_platform/csv_ingestion.py --dir data/raw/csv
 """
 
 from __future__ import annotations

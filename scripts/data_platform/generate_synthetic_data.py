@@ -28,7 +28,7 @@ from pathlib import Path
 import pandas as pd
 from faker import Faker
 
-# ── Add backend/src to path so scripts share backend preprocessing logic ─────
+# ── Add src to path so scripts share backend preprocessing logic ─────────────
 BASE = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(BASE / "src"))
 from data_platform.services.preprocessing import (

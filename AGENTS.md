@@ -19,7 +19,7 @@ uv sync
 uv run pytest
 
 # Run API locally (when src/ exists)
-uv run uvicorn src.sicurre_api.main:app --reload
+uv run uvicorn src.data_platform.api.main:app --reload
 ```
 
 ---
@@ -115,7 +115,7 @@ Apply these principles to **all** production code. No exceptions.
 - **Dependency Inversion (DIP):** Depend on abstractions (protocols/ABCs), not concrete implementations. Inject dependencies — don't instantiate them inside business logic.
 
 ### Clean Code Rules
-- **Modular structure:** Each script/module does ONE thing. `scripts/phishtank_scraper.py` scrapes. `scripts/data_cleaner.py` cleans. `scripts/data_aggregator.py` aggregates. No god-files.
+- **Modular structure:** Each script/module does ONE thing. `scripts/data_platform/phishtank_scraper.py` scrapes. `src/data_platform/cleaning/` cleans. No god-files.
 - **Meaningful names:** `extract_french_phishing_urls()` — not `do_stuff()` or `process()`. Variable names describe content: `raw_emails`, `cleaned_df`, `phishing_samples`.
 - **Small functions:** Max ~20 lines per function. If a function needs a comment to explain *what* it does, it's too long — extract a well-named helper.
 - **No magic numbers/strings:** Use constants or enums. `CONFIDENCE_THRESHOLD = 0.85` — not `if score > 0.85`.
@@ -129,16 +129,29 @@ Apply these principles to **all** production code. No exceptions.
 ```
 src/
 ├── core/            # Core configuration, security, DB connections
-├── extractors/      # One module per data source (SRP)
-│   ├── base.py      # BaseExtractor protocol/ABC
-│   ├── phishtank.py
-│   ├── certfr.py
-│   ├── bigquery.py
-│   └── synthetic.py
-├── cleaning/        # Data cleaning & normalization
-├── storage/         # DB access layer (repository pattern)
-├── api/             # FastAPI routes
-└── datasets/        # Dataset preparation, splits, synthetic adaptation
+├── db/              # Consolidated database layer
+│   ├── models/      # SQLModel/SQLAlchemy entities
+│   ├── queries/     # Repository/Query logic
+│   ├── services/    # DB-heavy business services
+│   └── migrations/  # Alembic environment
+├── data_platform/   # Specific data domain
+│   ├── api/         # Data ingestion/curation API
+│   ├── extractors/  # Source-specific connectors
+│   ├── cleaning/    # Normalization logic
+│   ├── services/    # Domain services (adaptation, snapshot)
+│   └── cron_schedulers/
+└── app/             # (Future) User-facing application domain
+
+scripts/             # Operational scripts (monorepo root)
+├── data_platform/
+└── app/
+
+notebooks/           # Exploratory work (monorepo root)
+├── data_platform/
+└── app/
+
+data/
+└── local/           # Local SQLite (sicurre.db) and SQL exports
 ```
 
 ---

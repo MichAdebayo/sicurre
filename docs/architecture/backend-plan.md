@@ -45,56 +45,34 @@ It improves readability, makes SQL ownership obvious, and prevents Bloc 1 tables
 ## Target codebase structure
 
 ```text
-backend/
-  src/
-    sicurre_api/
-      main.py
-      core/
-        config.py
-        database.py
-        logging.py
-        security.py
-      observability/
-        metrics.py
-        logging_filters.py
-        alerts.py
-        incidents.md
-      domains/
-        data_platform/
-          models/
-          schemas/
-          repositories/
-          services/
-          routers/
-          policies/
-        model_runtime/
-          schemas/
-          services/
-          routers/
-          monitoring/
-        application/
-          models/
-          schemas/
-          repositories/
-          services/
-          routers/
-      infra/
-        connectors/
-          api/
-          files/
-          scraping/
-          sql/
-          bigdata/
-        ingestion/
-        normalization/
-        datasets/
-      db/
-        migrations/
-        seeds/
-      tests/
-        data_platform/
-        model_runtime/
-        application/
+src/
+  core/              # Configuration, security, DB connections
+  db/                # Consolidated database layer
+    models/          # SQLModel/SQLAlchemy entities
+    queries/         # Repository/Query logic
+    services/        # DB-heavy business services
+    migrations/      # Alembic environment
+    sql/             # Physical SQL schemas/DDL
+  data_platform/     # Specific data domain
+    api/             # Data ingestion/curation API
+    extractors/      # Source-specific connectors
+    cleaning/        # Normalization logic
+    services/        # Domain services (adaptation, snapshot)
+    cron_schedulers/ # Periodic ingestion triggers
+  app/               # (Future) User-facing application domain
+
+scripts/             # Operational scripts (monorepo root)
+  data_platform/
+  app/
+
+notebooks/           # Exploratory work (monorepo root)
+  data_platform/
+  app/
+
+data/
+  local/             # Local SQLite (sicurre.db) and SQL exports
+  raw/               # Raw snapshots (API/Scraping)
+  processed/         # Cleaned/Normalized records
 ```
 
 ## Domain responsibilities
@@ -237,7 +215,7 @@ Implement the data platform domain first:
 
 - relational schema
 - migrations
-- repository layer
+- queries layer (formerly repositories)
 - data API contracts
 - recurring-ingestion planning and trigger semantics
 

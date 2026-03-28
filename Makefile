@@ -17,31 +17,31 @@ install:
 	uv sync
 
 test:
-	uv run pytest backend/tests/
+	uv run pytest tests/
 
 dev-api:
-	cd backend && uv run uvicorn src.data_platform.api.main:app --reload
+	uv run uvicorn src.data_platform.api.main:app --reload
 
 phishtank-ingest:
 	@echo "Starting one-off live ingestion..."
-	cd backend && uv run --group backend python scripts/run_phishtank_ingestion.py --trigger manual
+	uv run python scripts/data_platform/run_phishtank_ingestion.py --trigger manual
 
 phishtank-cron:
 	@echo "Starting scheduled live ingestion..."
-	cd backend && uv run --group backend python scripts/run_phishtank_ingestion.py --trigger scheduled
+	uv run python scripts/data_platform/run_phishtank_ingestion.py --trigger scheduled
 
 phishtank-csv:
 	@echo "Starting local CSV fallback ingestion..."
-	cd backend && uv run --group backend python scripts/run_phishtank_ingestion.py --trigger manual --csv ../data/raw/api/phishtank/phishing-tank.csv
+	uv run python scripts/data_platform/run_phishtank_ingestion.py --trigger manual --csv data/raw/api/phishtank/phishing-tank.csv
 
 certfr-ingest:
 	@echo "Starting full historical CERT-FR CTI backfill (HTML pagination)..."
-	cd backend && uv run --group backend python scripts/run_certfr_cti.py --trigger manual --historical
+	uv run python scripts/data_platform/run_certfr_cti.py --trigger manual --historical
 
 certfr-cron:
 	@echo "Starting scheduled CERT-FR CTI ingestion (RSS feed)..."
-	cd backend && uv run --group backend python scripts/run_certfr_cti.py --trigger scheduled
+	uv run python scripts/data_platform/run_certfr_cti.py --trigger scheduled
 
 csv-ingest:
 	@echo "Starting Universal CSV dataset ingestion..."
-	cd backend && uv run --group backend python scripts/csv_ingestion.py --dir ../data/raw/csv
+	uv run python scripts/data_platform/csv_ingestion.py --dir data/raw/csv
