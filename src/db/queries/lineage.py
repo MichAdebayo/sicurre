@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from storage.models import DataIngestionRun, DataSourceSystem
+from db.models import DataIngestionRun, DataSourceSystem
 from data_platform.api.schemas import (
     DataSourceCreate,
     IngestionRunCreate,
@@ -21,7 +21,7 @@ class SourceSystemNotFoundError(Exception):
     """Raised when an ingestion run references a missing source system."""
 
 
-class SourceSystemRepository:
+class SourceSystemQueries:
     async def get_by_name(
         self, session: AsyncSession, name: str
     ) -> DataSourceSystem | None:
@@ -69,7 +69,7 @@ class SourceSystemRepository:
         return source_system
 
 
-class IngestionRunRepository:
+class IngestionRunQueries:
     async def list(
         self,
         session: AsyncSession,

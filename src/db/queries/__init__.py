@@ -1,33 +1,33 @@
-from storage.repositories.lineage import (
+from db.queries.lineage import (
     DuplicateDataSourceError,
-    IngestionRunRepository,
+    IngestionRunQueries,
     SourceSystemNotFoundError,
-    SourceSystemRepository,
+    SourceSystemQueries,
 )
-from storage.repositories.records import (
-    AnnotationRepository,
+from db.queries.records import (
+    AnnotationQueries,
     DatasetNotFoundError,
-    DatasetRepository,
+    DatasetQueries,
     DuplicateDatasetError,
     DuplicateNormalizedMessageError,
     NormalizedMessageDependencyError,
     NormalizedMessageNotFoundError,
-    NormalizedMessageRepository,
-    RawRecordRepository,
+    NormalizedMessageQueries,
+    RawRecordQueries,
 )
 
 __all__ = [
     "DuplicateDataSourceError",
-    "IngestionRunRepository",
+    "IngestionRunQueries",
     "SourceSystemNotFoundError",
-    "SourceSystemRepository",
-    "AnnotationRepository",
+    "SourceSystemQueries",
+    "AnnotationQueries",
     "DatasetNotFoundError",
-    "DatasetRepository",
+    "DatasetQueries",
     "DuplicateDatasetError",
     "DuplicateNormalizedMessageError",
     "NormalizedMessageDependencyError",
     "NormalizedMessageNotFoundError",
-    "NormalizedMessageRepository",
-    "RawRecordRepository",
+    "NormalizedMessageQueries",
+    "RawRecordQueries",
 ]

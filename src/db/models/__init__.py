@@ -1,4 +1,4 @@
-from storage.models.lineage import (
+from db.models.lineage import (
     AnnotationLabel,
     DataAnnotation,
     DataDataset,

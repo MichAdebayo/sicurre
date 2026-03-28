@@ -34,8 +34,8 @@ import sys
 
 import pandas as pd
 
-BASE = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(BASE / "backend" / "src"))
+BASE = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(BASE / "src"))
 
 from data_platform.services.preprocessing import (
     DataFramePreprocessingService,

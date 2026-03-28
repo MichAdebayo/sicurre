@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 from core.database import Base, get_async_session
-from storage.models import (
+from db.models import (
     DataDataset,
     DataDatasetItem,
     DataIngestionRun,

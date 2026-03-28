@@ -15,7 +15,7 @@ if str(SRC) not in sys.path:
 
 from core.config import get_settings
 from core.database import Base
-from storage.models import lineage  # noqa: F401
+from db.models import lineage  # noqa: F401
 
 
 config = context.config

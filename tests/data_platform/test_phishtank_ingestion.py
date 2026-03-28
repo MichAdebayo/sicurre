@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.pool import StaticPool
 
 from core.database import Base
-from storage.models import (
+from db.models import (
     DataIngestionRun,
     DataRawObject,
     DataRawRecord,
@@ -28,7 +28,7 @@ from data_platform.extractors.phishtank import (
     PhishTankFeedClient,
     PhishTankIngestionService,
 )
-from storage.snapshot_storage import (
+from data_platform.services.snapshot_storage import (
     LocalSnapshotStore,
     SnapshotWriteResult,
 )

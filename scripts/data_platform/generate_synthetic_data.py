@@ -29,8 +29,8 @@ import pandas as pd
 from faker import Faker
 
 # ── Add backend/src to path so scripts share backend preprocessing logic ─────
-BASE = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(BASE / "backend" / "src"))
+BASE = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(BASE / "src"))
 from data_platform.services.preprocessing import (
     DataFramePreprocessingService,
     OUTPUT_COLS,
@@ -43,7 +43,7 @@ Faker.seed(42)
 random.seed(42)
 
 TODAY = date.today().strftime("%Y%m%d")
-BASE = Path(__file__).resolve().parent.parent
+BASE = Path(__file__).resolve().parents[2]
 ARCHETYPE_DIR = BASE / "data" / "archetypes"
 PROC = BASE / "data" / "processed"
 preprocessing_service = DataFramePreprocessingService()

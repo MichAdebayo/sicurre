@@ -7,11 +7,11 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-BACKEND_ROOT = Path(__file__).resolve().parents[3]
-ENV_FILE = BACKEND_ROOT / ".env"
+ROOT_DIR = Path(__file__).resolve().parents[2]
+ENV_FILE = ROOT_DIR / ".env"
 
 
-_DB_PATH = BACKEND_ROOT / "db" / "sicurre.db"
+_DB_PATH = ROOT_DIR / "data" / "local" / "sicurre.db"
 _DEFAULT_DB_URL = f"sqlite+aiosqlite:///{_DB_PATH.as_posix()}"
 
 
@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     better_auth_timeout_seconds: float = 5.0
     better_auth_cookie_name: str = "better-auth.session_token"
     raw_snapshot_storage_backend: str = "local"
-    raw_snapshot_local_dir: Path = BACKEND_ROOT.parent / "data" / "raw" / "api"
+    raw_snapshot_local_dir: Path = ROOT_DIR / "data" / "raw" / "api"
     raw_snapshot_prefix: str = "raw-snapshots"
     raw_snapshot_r2_bucket_name: str | None = None
     raw_snapshot_r2_endpoint_url: str | None = None

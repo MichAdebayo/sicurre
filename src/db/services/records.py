@@ -4,11 +4,11 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from storage.repositories import (
-    AnnotationRepository,
-    DatasetRepository,
-    NormalizedMessageRepository,
-    RawRecordRepository,
+from db.queries import (
+    AnnotationQueries,
+    DatasetQueries,
+    NormalizedMessageQueries,
+    RawRecordQueries,
 )
 from data_platform.api.schemas import (
     AnnotationCreate,
@@ -22,8 +22,8 @@ from data_platform.cleaning.normalization import (
 
 
 class RawRecordService:
-    def __init__(self, repository: RawRecordRepository | None = None) -> None:
-        self.repository = repository or RawRecordRepository()
+    def __init__(self, repository: RawRecordQueries | None = None) -> None:
+        self.repository = repository or RawRecordQueries()
 
     async def list(self, session: AsyncSession, **filters):
         return await self.repository.list(session, **filters)
@@ -32,10 +32,10 @@ class RawRecordService:
 class NormalizedMessageService:
     def __init__(
         self,
-        repository: NormalizedMessageRepository | None = None,
+        repository: NormalizedMessageQueries | None = None,
         normalization_service: TextNormalizationService | None = None,
     ) -> None:
-        self.repository = repository or NormalizedMessageRepository()
+        self.repository = repository or NormalizedMessageQueries()
         self.normalization_service = normalization_service or TextNormalizationService()
 
     async def list(self, session: AsyncSession, **filters):
@@ -65,16 +65,16 @@ class NormalizedMessageService:
 
 
 class AnnotationService:
-    def __init__(self, repository: AnnotationRepository | None = None) -> None:
-        self.repository = repository or AnnotationRepository()
+    def __init__(self, repository: AnnotationQueries | None = None) -> None:
+        self.repository = repository or AnnotationQueries()
 
     async def create(self, session: AsyncSession, payload: AnnotationCreate):
         return await self.repository.create(session, payload)
 
 
 class DatasetService:
-    def __init__(self, repository: DatasetRepository | None = None) -> None:
-        self.repository = repository or DatasetRepository()
+    def __init__(self, repository: DatasetQueries | None = None) -> None:
+        self.repository = repository or DatasetQueries()
 
     async def list(self, session: AsyncSession, **filters):
         return await self.repository.list(session, **filters)

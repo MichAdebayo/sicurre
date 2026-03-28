@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_async_session
 from core.rate_limit import limiter, touch_rate_limit_request
-from storage.models import DatasetStatus
-from storage.repositories import (
+from db.models import DatasetStatus
+from db.queries import (
     DatasetNotFoundError,
     DuplicateDatasetError,
 )
@@ -19,7 +19,7 @@ from data_platform.api.schemas import (
     DatasetListResponse,
     DatasetRead,
 )
-from storage.services import DatasetService
+from db.services import DatasetService
 
 
 router = APIRouter(tags=["data-datasets"])

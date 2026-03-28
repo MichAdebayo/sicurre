@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from storage.repositories import (
-    IngestionRunRepository,
-    SourceSystemRepository,
+from db.queries import (
+    IngestionRunQueries,
+    SourceSystemQueries,
 )
 from data_platform.api.schemas import (
     DataSourceCreate,
@@ -13,8 +13,8 @@ from data_platform.api.schemas import (
 
 
 class SourceSystemService:
-    def __init__(self, repository: SourceSystemRepository | None = None) -> None:
-        self.repository = repository or SourceSystemRepository()
+    def __init__(self, repository: SourceSystemQueries | None = None) -> None:
+        self.repository = repository or SourceSystemQueries()
 
     async def list(self, session: AsyncSession, **filters):
         return await self.repository.list(session, **filters)
@@ -24,8 +24,8 @@ class SourceSystemService:
 
 
 class IngestionRunService:
-    def __init__(self, repository: IngestionRunRepository | None = None) -> None:
-        self.repository = repository or IngestionRunRepository()
+    def __init__(self, repository: IngestionRunQueries | None = None) -> None:
+        self.repository = repository or IngestionRunQueries()
 
     async def list(self, session: AsyncSession, **filters):
         return await self.repository.list(session, **filters)

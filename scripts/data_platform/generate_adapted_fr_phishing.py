@@ -4,8 +4,8 @@ import argparse
 import sys
 from pathlib import Path
 
-BASE = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(BASE / "backend" / "src"))
+BASE = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(BASE / "src"))
 
 from data_platform.services.adaptation import (
     DEFAULT_TARGET_PER_ARCHETYPE,

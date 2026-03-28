@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 from core.database import Base
-from storage.models import (
+from db.models import (
     DataIngestionRun,
     DataRawObject,
     DataRawRecord,
@@ -19,7 +19,7 @@ from data_platform.extractors.certfr import (
     CertFRFeedClient,
     CertFRIngestionService,
 )
-from storage.snapshot_storage import (
+from data_platform.services.snapshot_storage import (
     LocalSnapshotStore,
     SnapshotWriteResult,
 )

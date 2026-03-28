@@ -11,7 +11,7 @@ from data_platform.api.schemas import (
     RawRecordListResponse,
     RawRecordRead,
 )
-from storage.services import RawRecordService
+from db.services import RawRecordService
 
 
 router = APIRouter(tags=["data-raw-records"])

@@ -25,7 +25,7 @@ from pathlib import Path
 import pandas as pd
 
 # ── Constants ──────────────────────────────────────────────────
-BASE = Path(__file__).resolve().parent.parent
+BASE = Path(__file__).resolve().parents[2]
 PROC = BASE / "data" / "processed"
 FINAL = BASE / "data" / "final"
 TODAY = date.today().strftime("%Y%m%d")

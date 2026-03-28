@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import create_engine, inspect
 
 from core.database import Base
-from storage.models import lineage  # noqa: F401
+from db.models import lineage  # noqa: F401
 
 
 def test_bloc1_schema_creates_all_tables() -> None:

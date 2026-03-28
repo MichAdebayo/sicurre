@@ -28,8 +28,8 @@ from typing import Any
 # Increase CSV field size limit for massive ML text blocks (e.g., Enron emails)
 csv.field_size_limit(sys.maxsize)
 
-BACKEND_ROOT = Path(__file__).resolve().parents[1]
-SRC_ROOT = BACKEND_ROOT / "src"
+ROOT_DIR = Path(__file__).resolve().parents[3]
+SRC_ROOT = ROOT_DIR / "src"
 
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
@@ -43,15 +43,15 @@ from sqlalchemy.ext.asyncio import (  # noqa: E402
 
 from core.config import get_settings  # noqa: E402
 from core.database import Base  # noqa: E402
-from storage.models import (  # noqa: E402
+from db.models import (  # noqa: E402
     DataIngestionRun,
     DataRawObject,
     DataRawRecord,
     DataSourceSystem,
 )
-from storage.repositories import (  # noqa: E402
-    IngestionRunRepository,
-    SourceSystemRepository,
+from db.queries import (  # noqa: E402
+    IngestionRunQueries,
+    SourceSystemQueries,
 )
 from data_platform.api.schemas import (  # noqa: E402
     DataSourceCreate,
@@ -75,7 +75,7 @@ def hash_text_for_dedup(text: str) -> str:
 
 async def get_or_create_source_system(
     session: AsyncSession,
-    repo: SourceSystemRepository,
+    repo: SourceSystemQueries,
     source_machine_name: str,
 ) -> DataSourceSystem:
     # Try looking up exactly by name
@@ -105,8 +105,8 @@ async def get_or_create_source_system(
 async def ingest_csv_file(
     file_path: Path,
     session: AsyncSession,
-    source_repo: SourceSystemRepository,
-    run_repo: IngestionRunRepository,
+    source_repo: SourceSystemQueries,
+    run_repo: IngestionRunQueries,
 ) -> int:
     """Read a CSV file and insert it into the database."""
     logger.info("Processing file: %s", file_path)
@@ -283,8 +283,8 @@ async def main(base_dir: str) -> None:
         engine, expire_on_commit=False, class_=AsyncSession,
     )
 
-    source_repo = SourceSystemRepository()
-    run_repo = IngestionRunRepository()
+    source_repo = SourceSystemQueries()
+    run_repo = IngestionRunQueries()
 
     search_dir = Path(base_dir).resolve()
     if not search_dir.exists() or not search_dir.is_dir():

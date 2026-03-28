@@ -16,8 +16,8 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.config import BACKEND_ROOT, get_settings
-from storage.models import (
+from core.config import ROOT_DIR, get_settings
+from db.models import (
     DataIngestionRun,
     DataRawObject,
     DataRawRecord,
@@ -26,16 +26,16 @@ from storage.models import (
     ObjectType,
     SourceType,
 )
-from storage.repositories import SourceSystemRepository
+from db.queries import SourceSystemQueries
 from data_platform.api.schemas import (
     DataSourceCreate,
     IngestionRunCreate,
 )
-from storage.services.lineage import (
+from db.services.lineage import (
     IngestionRunService,
     SourceSystemService,
 )
-from storage.snapshot_storage import (
+from data_platform.services.snapshot_storage import (
     SnapshotStore,
     SnapshotWriteResult,
     build_snapshot_store,
@@ -43,7 +43,7 @@ from storage.snapshot_storage import (
 
 logger = logging.getLogger(__name__)
 
-REPO_ROOT = BACKEND_ROOT.parent
+REPO_ROOT = ROOT_DIR
 DEFAULT_PHISHTANK_FEED_URL = "https://data.phishtank.com/data/online-valid.csv"
 DEFAULT_PHISHTANK_SOURCE_NAME = "phishtank-online-valid"
 DEFAULT_PHISHTANK_SNAPSHOT_DIR = REPO_ROOT / "data" / "raw" / "api" / "phishtank"
@@ -225,7 +225,7 @@ class PhishTankIngestionService:
         self.source_name = source_name
         self.source_service = SourceSystemService()
         self.ingestion_service = IngestionRunService()
-        self.source_repository = SourceSystemRepository()
+        self.source_repository = SourceSystemQueries()
 
     async def run(
         self,

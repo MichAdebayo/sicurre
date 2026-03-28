@@ -7,14 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_async_session
 from core.rate_limit import limiter, touch_rate_limit_request
-from storage.models import IngestionStatus
-from storage.repositories import SourceSystemNotFoundError
+from db.models import IngestionStatus
+from db.queries import SourceSystemNotFoundError
 from data_platform.api.schemas import (
     IngestionRunCreate,
     IngestionRunListResponse,
     IngestionRunRead,
 )
-from storage.services import IngestionRunService
+from db.services import IngestionRunService
 
 
 router = APIRouter(tags=["data-ingestion"])

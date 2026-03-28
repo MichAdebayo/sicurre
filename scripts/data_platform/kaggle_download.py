@@ -7,8 +7,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-BASE = Path(__file__).resolve().parent.parent
-load_dotenv(BASE / "backend" / ".env")
+BASE = Path(__file__).resolve().parents[2]
+load_dotenv(BASE / ".env")
 
 from kaggle.api.kaggle_api_extended import KaggleApi
 

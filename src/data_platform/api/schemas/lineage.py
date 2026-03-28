@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from storage.models import (
+from db.models import (
     AnnotationLabel,
     DatasetStatus,
     IngestionStatus,

@@ -7,7 +7,7 @@ from sqlalchemy import Select, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from storage.models import (
+from db.models import (
     DataAnnotation,
     DataDataset,
     DataDatasetItem,
@@ -44,7 +44,7 @@ class DatasetNotFoundError(Exception):
     """Raised when a dataset does not exist."""
 
 
-class RawRecordRepository:
+class RawRecordQueries:
     async def list(
         self,
         session: AsyncSession,
@@ -87,7 +87,7 @@ class RawRecordRepository:
         return list(items_result.scalars().all()), int(total_result.scalar_one())
 
 
-class NormalizedMessageRepository:
+class NormalizedMessageQueries:
     async def list(
         self,
         session: AsyncSession,
@@ -186,7 +186,7 @@ class NormalizedMessageRepository:
         return True
 
 
-class AnnotationRepository:
+class AnnotationQueries:
     async def create(
         self, session: AsyncSession, payload: AnnotationCreate
     ) -> DataAnnotation:
@@ -203,7 +203,7 @@ class AnnotationRepository:
         return annotation
 
 
-class DatasetRepository:
+class DatasetQueries:
     async def list(
         self,
         session: AsyncSession,

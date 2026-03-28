@@ -13,8 +13,8 @@ import feedparser
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.config import BACKEND_ROOT
-from storage.models import (
+from core.config import ROOT_DIR
+from db.models import (
     DataIngestionRun,
     DataRawObject,
     DataRawRecord,
@@ -23,23 +23,23 @@ from storage.models import (
     ObjectType,
     SourceType,
 )
-from storage.repositories import SourceSystemRepository
+from db.queries import SourceSystemQueries
 from data_platform.api.schemas import (
     DataSourceCreate,
     IngestionRunCreate,
 )
-from storage.services.lineage import (
+from db.services.lineage import (
     IngestionRunService,
     SourceSystemService,
 )
-from storage.snapshot_storage import (
+from data_platform.services.snapshot_storage import (
     SnapshotStore,
     SnapshotWriteResult,
     build_snapshot_store,
 )
 
 
-REPO_ROOT = BACKEND_ROOT.parent
+REPO_ROOT = ROOT_DIR
 DEFAULT_CERTFR_SOURCE_NAME = "cert-fr-cti"
 DEFAULT_CERTFR_SNAPSHOT_DIR = REPO_ROOT / "data" / "raw" / "scraping" / "cert_fr"
 DEFAULT_CERTFR_SNAPSHOT_PREFIX = "cert-fr"
@@ -183,7 +183,7 @@ class CertFRIngestionService:
         self.source_name = source_name
         self.source_service = SourceSystemService()
         self.ingestion_service = IngestionRunService()
-        self.source_repository = SourceSystemRepository()
+        self.source_repository = SourceSystemQueries()
 
     async def run(
         self,

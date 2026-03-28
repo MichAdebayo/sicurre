@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-ROOT = str(Path(__file__).resolve().parent.parent)
+ROOT = str(Path(__file__).resolve().parents[2])
 
 files = {
     "phishtank": "data/raw/api/phishtank/phishing-tank.csv",

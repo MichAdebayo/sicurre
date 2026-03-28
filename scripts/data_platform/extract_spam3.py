@@ -31,8 +31,8 @@ from bs4 import BeautifulSoup
 from langdetect import detect, detect_langs, LangDetectException
 
 # Add backend/src to path for shared preprocessing imports
-BASE = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(BASE / "backend" / "src"))
+BASE = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(BASE / "src"))
 from data_platform.services.preprocessing import (
     DataFramePreprocessingService,
     OUTPUT_COLS,
