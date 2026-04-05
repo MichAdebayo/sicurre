@@ -11,6 +11,7 @@ help:
 	@echo "  make phishtank-csv      - Run PhishTank ingestion from local CSV file (Fallback)"
 	@echo "  make certfr-ingest      - Run one-off CERT-FR CTI ingestion (Historical full backfill)"
 	@echo "  make certfr-cron        - Run recurring CERT-FR CTI ingestion (Cron target, RSS feed)"
+	@echo "  make sap-scrape         - Run one-off SAP Labs Blog scraping ingestion"
 	@echo "  make csv-ingest         - Run Universal CSV Dataset Ingestion (Machine Learning Sources)"
 
 install:
@@ -45,3 +46,7 @@ certfr-cron:
 csv-ingest:
 	@echo "Starting Universal CSV dataset ingestion..."
 	uv run python scripts/data_platform/csv_ingestion.py --dir data/raw/csv
+
+sap-scrape:
+	@echo "Starting SAP Labs Blog web scraping ingestion..."
+	uv run python scripts/data_platform/run_sap_labs_scraper.py
