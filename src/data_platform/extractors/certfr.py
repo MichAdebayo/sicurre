@@ -364,7 +364,7 @@ class CertFRIngestionService:
 
                 raw_records.append(
                     DataRawRecord(
-                        raw_object_id=raw_object.id,
+                        raw_object_id=raw_object.id, source_system_id=source_system.id,
                         record_key=record_key,
                         raw_content=raw_content,
                         detected_language=self._detect_language(entry),

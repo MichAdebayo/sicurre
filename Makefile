@@ -13,6 +13,8 @@ help:
 	@echo "  make certfr-cron        - Run recurring CERT-FR CTI ingestion (Cron target, RSS feed)"
 	@echo "  make sap-scrape         - Run one-off SAP Labs Blog scraping ingestion"
 	@echo "  make csv-ingest         - Run Universal CSV Dataset Ingestion (Machine Learning Sources)"
+	@echo "  make db-seed            - Seed the standalone historical external database with CSV data"
+	@echo "  make db-ingest          - Run Historical DB Ingestion from an external monolithic DB"
 
 install:
 	uv sync
@@ -50,3 +52,11 @@ csv-ingest:
 sap-scrape:
 	@echo "Starting SAP Labs Blog web scraping ingestion..."
 	uv run python scripts/data_platform/run_sap_labs_scraper.py
+
+db-seed:
+	@echo "Seeding the isolated historical external DB..."
+	uv run python scripts/data_platform/seed_external_db.py
+
+db-ingest:
+	@echo "Starting Database Ingestion from external monolithic DB..."
+	uv run python scripts/data_platform/run_db_ingestion.py

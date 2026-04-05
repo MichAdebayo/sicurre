@@ -656,7 +656,7 @@ class CertFRCtiExtractor:
             sort_keys=True,
         )
         raw_record = DataRawRecord(
-            raw_object_id=raw_object.id,
+            raw_object_id=raw_object.id, source_system_id=source_system.id,
             record_key=content.reference,
             raw_content=enriched_content,
             detected_language="fr",

@@ -210,6 +210,10 @@ class DataRawRecord(Base):
         sa.ForeignKey("data_raw_object.id", ondelete="CASCADE"),
         nullable=False,
     )
+    source_system_id: Mapped[uuid.UUID | None] = mapped_column(
+        sa.ForeignKey("data_source_system.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
     record_key: Mapped[str] = mapped_column(sa.Text(), nullable=False)
     raw_content: Mapped[str] = mapped_column(sa.Text(), nullable=False)
     detected_language: Mapped[str | None] = mapped_column(sa.Text())
@@ -223,6 +227,7 @@ class DataRawRecord(Base):
     )
 
     raw_object: Mapped[DataRawObject] = relationship(back_populates="raw_records")
+    source_system: Mapped[DataSourceSystem] = relationship()
     normalized_messages: Mapped[list[DataNormalizedMessage]] = relationship(
         back_populates="raw_record"
     )

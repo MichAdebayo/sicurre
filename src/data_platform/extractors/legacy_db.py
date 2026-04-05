@@ -1,20 +1,18 @@
+"""Extractor service that connects to an external monolithic database to fetch threats."""
+
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import httpx
-from bs4 import BeautifulSoup
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
-from core.config import ROOT_DIR, get_settings
+from core.config import ROOT_DIR
 from db.models import (
     DataIngestionRun,
     DataRawObject,
@@ -42,14 +40,15 @@ from data_platform.services.snapshot_storage import (
 logger = logging.getLogger(__name__)
 
 REPO_ROOT = ROOT_DIR
-DEFAULT_SAP_BLOG_URL = "https://community.sap.com/t5/artificial-intelligence-and-machine-learning-blogs/using-t5-s-few-shot-learning-to-spot-phishing-emails-in-french/ba-p/13572981"
-DEFAULT_SAP_SOURCE_NAME = "sap-labs-blog"
-DEFAULT_SAP_SNAPSHOT_DIR = REPO_ROOT / "data" / "raw" / "scraping" / "sap_labs"
-DEFAULT_SAP_SNAPSHOT_PREFIX = "sap_labs"
-FALLBACK_JSON_PATH = REPO_ROOT / "data" / "raw" / "scraping" / "sap_labs_fr_emails_18.json"
+DEFAULT_LEGACY_DB_PATH = REPO_ROOT / "data" / "raw" / "db" / "external_threats.db"
+DEFAULT_LEGACY_DB_URL = f"sqlite+aiosqlite:///{DEFAULT_LEGACY_DB_PATH}"
+
+DEFAULT_LEGACY_SOURCE_NAME = "database-historical"
+DEFAULT_LEGACY_SNAPSHOT_DIR = REPO_ROOT / "data" / "raw" / "db_historical"
+DEFAULT_LEGACY_SNAPSHOT_PREFIX = "db_historical"
 
 @dataclass(slots=True)
-class SapLabsIngestionResult:
+class LegacyDbIngestionResult:
     ingestion_run_id: str
     source_system_id: str
     snapshot_path: Path | None
@@ -57,67 +56,66 @@ class SapLabsIngestionResult:
     raw_object_count: int
     raw_record_count: int
     skipped_count: int
-    total_scraped_count: int
+    total_extracted_count: int
     log_message: str
 
 
-class SapLabsScraperClient:
-    """Client to scrape the SAP Labs blog for phishing email text."""
-    def __init__(self, url: str = DEFAULT_SAP_BLOG_URL) -> None:
-        self.url = url
+class LegacyDbConnector:
+    """Client to query the external historical legacy database."""
+    def __init__(self, db_url: str = DEFAULT_LEGACY_DB_URL) -> None:
+        self.db_url = db_url
 
-    async def fetch_entries(self) -> list[dict[str, Any]]:
-        """Scrape the SAP blog.
-        
-        If the SAP community URL redirects or blocks the scraper, 
-        this gracefully falls back to the locally verified JSON parsing cache.
-        """
-        settings = get_settings()
-        user_agent = getattr(settings, "phishtank_user_agent", "sicurre-research-bot")
+    async def fetch_threats(self) -> list[dict[str, Any]]:
+        """Extract threat logs from the monolithic legacy database."""
+        if not DEFAULT_LEGACY_DB_PATH.exists():
+            raise FileNotFoundError(
+                f"External DB not found at {DEFAULT_LEGACY_DB_PATH}. "
+                "Run `make db-seed` first!"
+            )
+            
+        engine = create_async_engine(self.db_url, echo=False)
         
         try:
-            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-                response = await client.get(self.url, headers={"User-Agent": user_agent})
-                response.raise_for_status()
-                # Test parsing the HTML structure 
-                soup = BeautifulSoup(response.text, "html.parser")
-                
-                # Verify we actually hit the blog text, not a Cloudflare captcha or redirect
-                if "few-shot" not in response.text.lower() and FALLBACK_JSON_PATH.exists():
-                    logger.warning("Scraped page does not appear to contain the SAP article (likely redirected). Falling back to JSON cache.")
-                    return self._read_fallback_json()
-                
-                # Extraction logic for the static blog. 
-                # (Due to unstable blog DOM redesign, falling back instantly ensures exact data structure)
-                return self._read_fallback_json()
+            async with engine.connect() as conn:
+                # We do a direct extraction from the monolithic DB tables
+                query = text("""
+                    SELECT 
+                        t.id as threat_id,
+                        t.message_id,
+                        t.subject,
+                        t.body_preview,
+                        t.verdict,
+                        t.confidence,
+                        t.signals,
+                        t.archetype,
+                        t.source_dataset,
+                        t.received_at,
+                        u.email as user_email
+                    FROM threat_log t
+                    JOIN users u ON t.user_id = u.id
+                """)
+                result = await conn.execute(query)
+                # Convert rows to dict mappings
+                rows = result.mappings().fetchall()
+                return [dict(row) for row in rows]
+        finally:
+            await engine.dispose()
 
-        except Exception as exc:
-            logger.warning(f"SAP Labs scraper encountered an error during HTTP fetch ({exc}). Falling back to JSON cache.")
-            return self._read_fallback_json()
 
-    def _read_fallback_json(self) -> list[dict[str, Any]]:
-        if not FALLBACK_JSON_PATH.exists():
-            raise RuntimeError("Scraper failed, and local JSON fallback not found.")
-        text = FALLBACK_JSON_PATH.read_text(encoding="utf-8")
-        data = json.loads(text)
-        return data.get("emails", [])
-
-
-class SapLabsIngestionService:
+class LegacyDbIngestionService:
     def __init__(
         self,
         *,
-        scraper_client: SapLabsScraperClient | None = None,
-        snapshot_dir: Path = DEFAULT_SAP_SNAPSHOT_DIR,
+        connector: LegacyDbConnector | None = None,
+        snapshot_dir: Path = DEFAULT_LEGACY_SNAPSHOT_DIR,
         snapshot_store: SnapshotStore | None = None,
-        snapshot_prefix: str = DEFAULT_SAP_SNAPSHOT_PREFIX,
-        source_name: str = DEFAULT_SAP_SOURCE_NAME,
+        snapshot_prefix: str = DEFAULT_LEGACY_SNAPSHOT_PREFIX,
+        source_name: str = DEFAULT_LEGACY_SOURCE_NAME,
     ) -> None:
-        self.scraper_client = scraper_client or SapLabsScraperClient()
+        self.connector = connector or LegacyDbConnector()
         self.snapshot_dir = snapshot_dir
         self.snapshot_prefix = snapshot_prefix
         
-        # Configure Snapshot Store (will use R2 bucket natively based on environment)
         local_snapshot_root = (
             snapshot_dir.parent if snapshot_dir.name == snapshot_prefix else snapshot_dir
         )
@@ -137,7 +135,7 @@ class SapLabsIngestionService:
         *,
         trigger_mode: str = "manual",
         started_at: datetime | None = None,
-    ) -> SapLabsIngestionResult:
+    ) -> LegacyDbIngestionResult:
         run_started_at = started_at or datetime.now(timezone.utc)
         source_system = await self._get_or_create_source_system(session)
         ingestion_run = await self.ingestion_service.create(
@@ -147,52 +145,42 @@ class SapLabsIngestionService:
                 started_at=run_started_at,
                 status=IngestionStatus.RUNNING,
                 trigger_mode=trigger_mode,
-                log_message="SAP Labs scraping started",
+                log_message="Database historical extraction started",
             ),
         )
 
         try:
-            entries = await self.scraper_client.fetch_entries()
-            total_scraped_count = len(entries)
+            entries = await self.connector.fetch_threats()
+            total_extracted_count = len(entries)
 
             if not entries:
                 ingestion_run.finished_at = datetime.now(timezone.utc)
                 ingestion_run.status = IngestionStatus.COMPLETED
-                ingestion_run.log_message = "Scraper returned 0 entries"
+                ingestion_run.log_message = "DB extraction returned 0 entries"
                 await session.commit()
                 return self._empty_result(ingestion_run, source_system)
 
-            # Dedup against existing DB records
-            existing_keys = await self._existing_record_keys(session)
-            new_entries = [
-                e for e in entries
-                if self._entry_key(e) not in existing_keys
-            ]
-            skipped_count = len(entries) - len(new_entries)
+            new_entries = entries # Since we do full snapshot extractions
+            skipped_count = 0
 
-            if not new_entries:
-                ingestion_run.finished_at = datetime.now(timezone.utc)
-                ingestion_run.status = IngestionStatus.COMPLETED
-                ingestion_run.log_message = (
-                    f"All {len(entries)} SAP Labs entries already ingested — nothing new."
-                )
-                await session.commit()
-                return self._empty_result(
-                    ingestion_run, source_system, skipped_count=skipped_count, total_scraped_count=total_scraped_count
-                )
-
-            # Write trace to Snapshot Store (R2 Bucket)
+            # Write trace to Snapshot Store
             snapshot_payload = {
-                "source": "SAP Labs France",
+                "source": "External Legacy Database",
                 "extracted_at": run_started_at.isoformat(),
-                "emails": new_entries
+                "records": []
             }
+            # Need to format date strings for JSON serialization
+            for entry in new_entries:
+                entry_copy = dict(entry)
+                if hasattr(entry_copy.get("received_at"), "isoformat"):
+                    entry_copy["received_at"] = entry_copy["received_at"].isoformat()
+                snapshot_payload["records"].append(entry_copy)
+
             snapshot_result = await self._write_snapshot(
                 ingestion_run=ingestion_run,
                 payload=snapshot_payload,
             )
 
-            # Represent the raw trace in the DB
             raw_object = self._build_raw_object(
                 ingestion_run=ingestion_run,
                 source_system=source_system,
@@ -201,17 +189,18 @@ class SapLabsIngestionService:
                 entry_count=len(new_entries),
             )
             session.add(raw_object)
-            await session.flush()  # needed to assign raw_object.id immediately
+            await session.flush()
 
-            # Create individual records for each parsed email
             raw_records = self._build_raw_records(
-                raw_object=raw_object, entries=new_entries,
+                raw_object=raw_object,
+                entries=new_entries,
+                source_system=source_system,
             )
             session.add_all(raw_records)
 
             log_message = (
-                f"SAP Labs scraping completed: "
-                f"{len(raw_records)} new entries, {skipped_count} skipped."
+                f"Historical DB extraction completed: "
+                f"{len(raw_records)} entries extracted."
             )
             ingestion_run.finished_at = datetime.now(timezone.utc)
             ingestion_run.status = IngestionStatus.COMPLETED
@@ -220,7 +209,7 @@ class SapLabsIngestionService:
             ingestion_run.log_message = log_message
             await session.commit()
 
-            return SapLabsIngestionResult(
+            return LegacyDbIngestionResult(
                 ingestion_run_id=str(ingestion_run.id),
                 source_system_id=str(source_system.id),
                 snapshot_path=snapshot_result.local_path,
@@ -228,14 +217,14 @@ class SapLabsIngestionService:
                 raw_object_count=1,
                 raw_record_count=len(raw_records),
                 skipped_count=skipped_count,
-                total_scraped_count=total_scraped_count,
+                total_extracted_count=total_extracted_count,
                 log_message=log_message,
             )
             
         except Exception as exc:
             ingestion_run.finished_at = datetime.now(timezone.utc)
             ingestion_run.status = IngestionStatus.FAILED
-            ingestion_run.log_message = f"SAP Labs ingestion failed: {exc}"
+            ingestion_run.log_message = f"Historical DB ingestion failed: {exc}"
             await session.commit()
             raise
 
@@ -249,9 +238,9 @@ class SapLabsIngestionService:
         source: DataSourceSystem,
         *,
         skipped_count: int = 0,
-        total_scraped_count: int = 0,
-    ) -> SapLabsIngestionResult:
-        return SapLabsIngestionResult(
+        total_extracted_count: int = 0,
+    ) -> LegacyDbIngestionResult:
+        return LegacyDbIngestionResult(
             ingestion_run_id=str(run.id),
             source_system_id=str(source.id),
             snapshot_path=None,
@@ -259,30 +248,14 @@ class SapLabsIngestionService:
             raw_object_count=0,
             raw_record_count=0,
             skipped_count=skipped_count,
-            total_scraped_count=total_scraped_count,
+            total_extracted_count=total_extracted_count,
             log_message=run.log_message or "",
         )
 
-    async def _existing_record_keys(
-        self, session: AsyncSession,
-    ) -> set[str]:
-        stmt = (
-            select(DataRawRecord.record_key)
-            .join(DataRawObject)
-            .join(DataIngestionRun)
-            .join(DataSourceSystem)
-            .where(DataSourceSystem.name == self.source_name)
-        )
-        rows = await session.scalars(stmt)
-        return set(rows)
-
     @staticmethod
     def _entry_key(entry: dict[str, Any]) -> str:
-        eid = entry.get("id")
-        if eid:
-            return str(eid).strip()
-        subject = entry.get("subject", "")
-        return str(hash(subject))
+        eid = entry.get("message_id") or entry.get("threat_id")
+        return str(eid).strip()
 
     async def _get_or_create_source_system(self, session: AsyncSession) -> DataSourceSystem:
         source_system = await self.source_repository.get_by_name(session, self.source_name)
@@ -293,12 +266,12 @@ class SapLabsIngestionService:
             session,
             DataSourceCreate(
                 name=self.source_name,
-                source_type=SourceType.API,
-                description="One-time scraping ingestion of the SAP Labs Phishing Dataset (French)",
-                owner_name="SAP Labs France",
-                legal_basis="public_threat_intel",
+                source_type=SourceType.SQL,
+                description="Historical extraction from the external monolithic threat database",
+                owner_name="Internal SecOps DB",
+                legal_basis="historical_threat_intel",
                 contains_personal_data=False,
-                retention_days=30,
+                retention_days=365,
             ),
         )
 
@@ -315,7 +288,7 @@ class SapLabsIngestionService:
             sort_keys=True,
         ).encode("utf-8")
         date_str = ingestion_run.started_at.strftime("%Y%m%d")
-        filename = f"sap_labs_scrape_{date_str}_{ingestion_run.id}.json"
+        filename = f"db_historical_{date_str}_{ingestion_run.id}.json"
         
         object_key = self.snapshot_store.build_object_key(
             source_prefix=self.snapshot_prefix,
@@ -338,8 +311,8 @@ class SapLabsIngestionService:
     ) -> DataRawObject:
         return DataRawObject(
             ingestion_run_id=ingestion_run.id,
-            external_ref=f"{self.scraper_client.url}#run:{ingestion_run.id}",
-            object_type=ObjectType.API_PAYLOAD,
+            external_ref=f"sqlite://external_threats.db#run:{ingestion_run.id}",
+            object_type=ObjectType.SQL_EXPORT,
             storage_uri=snapshot_result.storage_uri,
             source_format="json",
             content_hash=snapshot_result.content_hash,
@@ -347,7 +320,6 @@ class SapLabsIngestionService:
             source_metadata={
                 "source_name": source_system.name,
                 "entry_count": entry_count,
-                "blog_url": self.scraper_client.url,
             },
             collected_at=collected_at,
         )
@@ -357,6 +329,7 @@ class SapLabsIngestionService:
         *,
         raw_object: DataRawObject,
         entries: list[dict[str, Any]],
+        source_system: DataSourceSystem,
     ) -> list[DataRawRecord]:
         extracted_at = datetime.now(timezone.utc)
         raw_records: list[DataRawRecord] = []
@@ -364,20 +337,22 @@ class SapLabsIngestionService:
         for index, entry in enumerate(entries, start=1):
             record_key = self._entry_key(entry)
             
+            # Map external schema to sicurre standard raw text
             subject = entry.get("subject", "")
-            body = entry.get("body", "")
+            body = entry.get("body_preview", "")
             full_text = f"{subject}\n\n{body}" if subject else body
 
-            label = entry.get("label", "legitimate")
+            label = 1 if entry.get("verdict") == "phishing" else 0
             
             enriched = {
                 "subject": subject,
                 "body": body,
                 "text": full_text,
                 "label": label,
-                "source": "sap_labs_scrape",
-                "brand_impersonated": entry.get("brand_impersonated"),
-                "techniques": entry.get("techniques", []),
+                "confidence": entry.get("confidence"),
+                "source": entry.get("source_dataset"),
+                "archetype": entry.get("archetype"),
+                "signals": entry.get("signals"),
             }
 
             raw_content = json.dumps(
