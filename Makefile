@@ -60,3 +60,11 @@ db-seed:
 db-ingest:
 	@echo "Starting Database Ingestion from external monolithic DB..."
 	uv run python scripts/data_platform/run_db_ingestion.py
+
+bigdata-crawl:
+	@echo "Run the massive Common Crawl async extraction job to Cloudflare R2"
+	uv run python scripts/data_platform/run_common_crawl.py
+
+bigdata-ingest:
+	@echo "Run the Common Crawl ingestion pipeline mapping R2 Parquet via BigQuery to sqlite"
+	uv run python scripts/data_platform/run_bigdata_ingestion.py
