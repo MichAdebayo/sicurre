@@ -4700,6 +4700,7 @@ name = "sicurre"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "pydantic-core" },
     { name = "pypdf" },
     { name = "pypdf2" },
     { name = "virtualenv" },
@@ -4762,6 +4763,7 @@ ml = [
 
 [package.metadata]
 requires-dist = [
+    { name = "pydantic-core", specifier = ">=2.41.5" },
     { name = "pypdf", specifier = ">=6.7.4" },
     { name = "pypdf2", specifier = ">=3.0.1" },
     { name = "virtualenv", specifier = ">=21.1.0" },
