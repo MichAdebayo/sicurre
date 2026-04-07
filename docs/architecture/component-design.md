@@ -188,6 +188,10 @@ The related issue note for the Bloc 1 source perimeter is documented in [issue-a
 	- deduplication
 	- class normalization
 	- provenance preservation
+- Interim stage-two rule for skipped corpora:
+	- source-specific review services may derive structured candidates from skipped Common Crawl and CERT-FR records
+	- these derived candidates are persisted as review artifacts first, not as normalized messages
+	- only explicitly promoted candidates may later flow into the curated message table after validation
 - Existing groundwork already lives in the data processing scripts and notebooks
 
 ### 4. Sicurre API, data domain

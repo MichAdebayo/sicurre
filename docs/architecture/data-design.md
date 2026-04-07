@@ -69,6 +69,7 @@ This naming rule is part of the architecture baseline and should not be changed 
 - `PROCESSING_RUN` both processes raw records (tracking which records were attempted, including rejections) and generates normalized messages (its output). The GENERATES association justifies `processing_run_id` as a FK on `data_normalized_message`.
 - `NORMALIZED_MESSAGE` is the reusable NLP unit after cleaning, deduplication, and redaction. Its `text_sha256` unique key prevents duplicate content across ingestion runs.
 - `DATASET` and `DATASET_ITEM` allow versioned train, validation, and test sets. A normalized message can belong to multiple datasets over time.
+- Interim skipped-corpus persistence rule: source-specific derived candidates from Common Crawl and CERT-FR are persisted as structured review artifacts first. They do not become `data_normalized_message` rows unless a later reviewed promotion step approves them.
 
 ### MCD diagram
 
@@ -252,6 +253,7 @@ erDiagram
 - one normalized message can receive many annotations
 - one dataset contains many dataset items
 - one normalized message can belong to several datasets over time
+- structured skipped-corpus review artifacts are outside the relational curated schema until a future reviewed `data_*` staging table is explicitly added
 
 ### Logical enums
 
