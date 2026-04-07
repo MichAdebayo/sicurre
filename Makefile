@@ -1,4 +1,10 @@
-.PHONY: help install test dev-api phishtank-ingest phishtank-cron phishtank-csv
+.PHONY: help install test dev-api phishtank-ingest phishtank-cron phishtank-csv certfr-ingest certfr-cron sap-scrape csv-ingest db-seed db-ingest bigdata-crawl bigdata-ingest normalize normalize-dry normalize-common-crawl normalize-db-historical normalize-kaggle-fr normalize-kaggle-multilingual normalize-sap normalize-certfr adapt-phishing synthetic-data restructure-processed dataset-splits
+
+NORMALIZE_ARGS ?=
+ADAPT_ARGS ?=
+SYNTH_ARGS ?=
+RESTRUCTURE_ARGS ?=
+SPLIT_ARGS ?=
 
 help:
 	@echo "Sicurre - Available Commands:"
@@ -15,6 +21,20 @@ help:
 	@echo "  make csv-ingest         - Run Universal CSV Dataset Ingestion (Machine Learning Sources)"
 	@echo "  make db-seed            - Seed the standalone historical external database with CSV data"
 	@echo "  make db-ingest          - Run Historical DB Ingestion from an external monolithic DB"
+	@echo "  make bigdata-crawl      - Run Common Crawl extraction to Cloudflare R2"
+	@echo "  make bigdata-ingest     - Load Common Crawl extracts into the local DB"
+	@echo "  make normalize          - Normalize French raw records from the DB"
+	@echo "  make normalize-dry      - Preview normalization output without DB writes"
+	@echo "  make normalize-common-crawl      - Normalize Common Crawl records only"
+	@echo "  make normalize-db-historical     - Normalize historical DB records only"
+	@echo "  make normalize-kaggle-fr         - Normalize French SpamHam records only"
+	@echo "  make normalize-kaggle-multilingual - Normalize French multilingual Kaggle records only"
+	@echo "  make normalize-sap      - Normalize SAP Labs FR records only"
+	@echo "  make normalize-certfr   - Normalize CERT-FR records only"
+	@echo "  make adapt-phishing     - Generate culturally adapted French phishing data"
+	@echo "  make synthetic-data     - Generate synthetic data from archetypes"
+	@echo "  make restructure-processed - Build the processed 3-class export layout"
+	@echo "  make dataset-splits     - Merge processed datasets into train/val/test splits"
 
 install:
 	uv sync
@@ -68,3 +88,51 @@ bigdata-crawl:
 bigdata-ingest:
 	@echo "Run the Common Crawl ingestion pipeline mapping R2 Parquet via BigQuery to sqlite"
 	uv run python scripts/data_platform/run_bigdata_ingestion.py
+
+normalize:
+	@echo "Running DB-backed French normalization pipeline..."
+	uv run python scripts/data_platform/run_normalization.py $(NORMALIZE_ARGS)
+
+normalize-dry:
+	@echo "Previewing DB-backed French normalization pipeline..."
+	uv run python scripts/data_platform/run_normalization.py --dry-run $(NORMALIZE_ARGS)
+
+normalize-common-crawl:
+	@echo "Normalizing Common Crawl records..."
+	uv run python scripts/data_platform/run_normalization.py --source common-crawl-bigdata $(NORMALIZE_ARGS)
+
+normalize-db-historical:
+	@echo "Normalizing historical DB records..."
+	uv run python scripts/data_platform/run_normalization.py --source database-historical $(NORMALIZE_ARGS)
+
+normalize-kaggle-fr:
+	@echo "Normalizing French SpamHam records..."
+	uv run python scripts/data_platform/run_normalization.py --source kaggle_french_spamham $(NORMALIZE_ARGS)
+
+normalize-kaggle-multilingual:
+	@echo "Normalizing French multilingual Kaggle records..."
+	uv run python scripts/data_platform/run_normalization.py --source kaggle_multilingual_spam $(NORMALIZE_ARGS)
+
+normalize-sap:
+	@echo "Normalizing SAP Labs FR records..."
+	uv run python scripts/data_platform/run_normalization.py --source sap-labs-blog $(NORMALIZE_ARGS)
+
+normalize-certfr:
+	@echo "Normalizing CERT-FR records..."
+	uv run python scripts/data_platform/run_normalization.py --source cert-fr-cti $(NORMALIZE_ARGS)
+
+adapt-phishing:
+	@echo "Generating culturally adapted French phishing emails..."
+	uv run python scripts/data_platform/generate_adapted_fr_phishing.py $(ADAPT_ARGS)
+
+synthetic-data:
+	@echo "Generating synthetic dataset rows from archetypes..."
+	uv run python scripts/data_platform/generate_synthetic_data.py $(SYNTH_ARGS)
+
+restructure-processed:
+	@echo "Building processed 3-class exports from curated sources..."
+	uv run python scripts/data_platform/process_restructure_data.py $(RESTRUCTURE_ARGS)
+
+dataset-splits:
+	@echo "Building train/val/test splits from processed exports..."
+	uv run python scripts/data_platform/merge_splits.py $(SPLIT_ARGS)
