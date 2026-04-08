@@ -30,3 +30,33 @@ def test_common_crawl_stage_two_marks_promotional_spam_candidate() -> None:
     assert result.route_subtype == "promotional_spam"
     assert result.derived_payload is not None
     assert result.derived_payload["candidate_subtype"] == "promotional_spam"
+
+
+def test_common_crawl_stage_two_accepts_nested_transactional_window() -> None:
+    result = CommonCrawlStageTwoService.review(
+        (
+            "Accéder au Menu Principal Accéder au Contenu éditorial Réinitialiser votre mot de passe "
+            "Nous vous aidons à récupérer votre mot de passe en cas de perte, vol, oubli ou à sécuriser l'accès à votre espace client internet. "
+            "Choisissez l'envoi du mot de passe provisoire par SMS. Vous recevrez ensuite un code à usage unique sur votre numéro de téléphone mobile. "
+            "Accéder au Pied de page"
+        ),
+        {"category": "legitimate"},
+    )
+
+    assert result.route_outcome == "accepted"
+    assert result.route_subtype == "transactional_legitimate"
+    assert "mot de passe provisoire" in result.extracted_text
+
+
+def test_common_crawl_stage_two_demotes_product_page_with_delivery_signals() -> None:
+    result = CommonCrawlStageTwoService.review(
+        (
+            "Un accès à la gestion des comptes via votre Espace Client Internet Pour 1€/mois Découvrir la formule de compte. "
+            "L'alerte SMS vous informe automatiquement de la situation de vos comptes et vous recevrez une notification sur votre messagerie personnelle."
+        ),
+        {"category": "legitimate"},
+    )
+
+    assert result.route_outcome == "specialized_processing"
+    assert result.route_reason == "common_crawl_instructional_candidate"
+    assert result.route_subtype == "instructional_legitimate"

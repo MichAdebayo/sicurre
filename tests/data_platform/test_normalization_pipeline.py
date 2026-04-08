@@ -159,6 +159,48 @@ def test_common_crawl_promotional_candidate_gets_spam_subtype() -> None:
     assert payload.route_subtype == "promotional_spam"
 
 
+def test_common_crawl_nested_message_inside_navigation_page_is_recovered() -> None:
+    pipeline = NormalizationPipeline(session=None)  # type: ignore[arg-type]
+
+    payload = pipeline.extract_payload(
+        "common-crawl-bigdata",
+        {
+            "text": (
+                "Accéder au Menu Principal Accéder au Contenu éditorial Comment sécuriser mon espace client ? "
+                "Réinitialiser votre mot de passe. Choisissez l'envoi du mot de passe provisoire par SMS. "
+                "Vous recevrez ensuite un code à usage unique sur votre numéro de téléphone mobile. "
+                "Articles associés Accéder au Pied de page"
+            ),
+            "category": "legitimate",
+        },
+    )
+
+    assert payload.label is NormalizedLabel.LEGITIMATE
+    assert payload.route_outcome == "accepted"
+    assert payload.route_subtype == "transactional_legitimate"
+    assert payload.text is not None
+    assert "mot de passe provisoire" in payload.text
+
+
+def test_common_crawl_product_page_is_not_directly_accepted() -> None:
+    pipeline = NormalizationPipeline(session=None)  # type: ignore[arg-type]
+
+    payload = pipeline.extract_payload(
+        "common-crawl-bigdata",
+        {
+            "text": (
+                "Un accès à la gestion des comptes via votre Espace Client Internet Pour 1€/mois Découvrir la formule de compte. "
+                "L'alerte SMS vous informe automatiquement de la situation de vos comptes et vous recevrez une notification sur votre messagerie personnelle."
+            ),
+            "category": "legitimate",
+        },
+    )
+
+    assert payload.route_outcome == "specialized_processing"
+    assert payload.route_reason == "common_crawl_instructional_candidate"
+    assert payload.route_subtype == "instructional_legitimate"
+
+
 def test_extract_payload_rejects_certfr_report_like_documents() -> None:
     pipeline = NormalizationPipeline(session=None)  # type: ignore[arg-type]
 

@@ -103,6 +103,71 @@ def test_stage_two_rewrite_drafts_downgrades_duplicate_outputs() -> None:
         assert "duplicate_generated_draft" in draft["review_notes"]
 
 
+def test_stage_two_rewrite_drafts_keeps_distinct_legitimate_previews_distinct() -> None:
+    drafts = StageTwoRewriteDraftService.build_drafts(
+        {
+            "jobs": [
+                {
+                    "job_id": "job-legit-a",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "instructional_legitimate",
+                    "rewrite_mode": "institutional_page_to_notification",
+                    "target_label": "legitimate",
+                    "raw_record_id": "legit-a",
+                    "source_preview": "A réception de mail, de sms ou d'appels douteux, ne renseignez jamais vos données bancaires et personnelles.",
+                },
+                {
+                    "job_id": "job-legit-b",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "instructional_legitimate",
+                    "rewrite_mode": "institutional_page_to_notification",
+                    "target_label": "legitimate",
+                    "raw_record_id": "legit-b",
+                    "source_preview": "Si vous devez réinitialiser votre accès, utilisez uniquement votre espace habituel et attendez le code temporaire transmis par SMS.",
+                },
+            ]
+        }
+    )
+
+    assert drafts["drafts"][0]["text_sha256"] != drafts["drafts"][1]["text_sha256"]
+    assert all(
+        "duplicate_generated_draft" not in draft["review_notes"]
+        for draft in drafts["drafts"]
+    )
+
+
+def test_stage_two_rewrite_drafts_keeps_distinct_promotional_previews_distinct() -> (
+    None
+):
+    drafts = StageTwoRewriteDraftService.build_drafts(
+        {
+            "jobs": [
+                {
+                    "job_id": "job-promo-a",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "promotional_spam",
+                    "rewrite_mode": "promotional_page_to_spam_message",
+                    "target_label": "spam",
+                    "raw_record_id": "promo-a",
+                    "source_preview": "Mon Assurance Santé au prix juste avec des garanties adaptées à votre profil et une réponse rapide.",
+                },
+                {
+                    "job_id": "job-promo-b",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "promotional_spam",
+                    "rewrite_mode": "promotional_page_to_spam_message",
+                    "target_label": "spam",
+                    "raw_record_id": "promo-b",
+                    "source_preview": "Le programme de cashback vous permet de récupérer une partie de vos achats et d'activer votre cagnotte fidélité.",
+                },
+            ]
+        }
+    )
+
+    assert drafts["drafts"][0]["text_sha256"] != drafts["drafts"][1]["text_sha256"]
+    assert all(draft["review_state"] == "usable" for draft in drafts["drafts"])
+
+
 def test_stage_two_rewrite_drafts_render_markdown() -> None:
     markdown = StageTwoRewriteDraftService.render_markdown(
         {
