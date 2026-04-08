@@ -82,6 +82,12 @@ class SplitName(StrEnum):
     HOLDOUT = "holdout"
 
 
+class GenerationReviewState(StrEnum):
+    USABLE = "usable"
+    NEEDS_PROMPT_TUNING = "needs_prompt_tuning"
+    DROP = "drop"
+
+
 class DataSourceSystem(Base):
     __tablename__ = "data_source_system"
     __table_args__ = (
@@ -436,3 +442,98 @@ class DataDatasetItem(Base):
     normalized_message: Mapped[DataNormalizedMessage] = relationship(
         back_populates="dataset_items"
     )
+
+
+class DataGenerationRun(Base):
+    __tablename__ = "data_generation_run"
+    __table_args__ = (
+        sa.CheckConstraint(
+            f"status IN {enum_values(IngestionStatus)}",
+            name="status_allowed",
+        ),
+        sa.Index("idx_generation_run_source_created", "source_name", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        sa.Uuid(), primary_key=True, default=uuid.uuid4
+    )
+    generator_name: Mapped[str] = mapped_column(sa.Text(), nullable=False)
+    source_name: Mapped[str] = mapped_column(sa.Text(), nullable=False)
+    parent_source: Mapped[str | None] = mapped_column(sa.Text())
+    reference_selection_mode: Mapped[str | None] = mapped_column(sa.Text())
+    input_artifact_uri: Mapped[str | None] = mapped_column(sa.Text())
+    generated_artifact_uri: Mapped[str | None] = mapped_column(sa.Text())
+    comparison_artifact_uri: Mapped[str | None] = mapped_column(sa.Text())
+    monitor_artifact_uri: Mapped[str | None] = mapped_column(sa.Text())
+    status: Mapped[str] = mapped_column(sa.Text(), nullable=False)
+    total_draft_count: Mapped[int] = mapped_column(
+        sa.Integer(), nullable=False, default=0
+    )
+    usable_draft_count: Mapped[int] = mapped_column(
+        sa.Integer(), nullable=False, default=0
+    )
+    needs_prompt_tuning_count: Mapped[int] = mapped_column(
+        sa.Integer(), nullable=False, default=0
+    )
+    dropped_draft_count: Mapped[int] = mapped_column(
+        sa.Integer(), nullable=False, default=0
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), nullable=False, default=utc_now
+    )
+    started_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+
+    samples: Mapped[list[DataGenerationSample]] = relationship(
+        back_populates="generation_run"
+    )
+
+
+class DataGenerationSample(Base):
+    __tablename__ = "data_generation_sample"
+    __table_args__ = (
+        sa.CheckConstraint(
+            f"target_label IN {enum_values(NormalizedLabel)}",
+            name="target_label_allowed",
+        ),
+        sa.CheckConstraint(
+            f"review_state IN {enum_values(GenerationReviewState)}",
+            name="review_state_allowed",
+        ),
+        sa.UniqueConstraint(
+            "generation_run_id",
+            "draft_id",
+            "variant_index",
+            name="uq_generation_sample_run_draft_variant",
+        ),
+        sa.Index(
+            "idx_generation_sample_run_review", "generation_run_id", "review_state"
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        sa.Uuid(), primary_key=True, default=uuid.uuid4
+    )
+    generation_run_id: Mapped[uuid.UUID] = mapped_column(
+        sa.ForeignKey("data_generation_run.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    draft_id: Mapped[str] = mapped_column(sa.Text(), nullable=False)
+    scenario_id: Mapped[str | None] = mapped_column(sa.Text())
+    variant_index: Mapped[int] = mapped_column(sa.Integer(), nullable=False, default=0)
+    source_name: Mapped[str] = mapped_column(sa.Text(), nullable=False)
+    parent_source: Mapped[str | None] = mapped_column(sa.Text())
+    target_label: Mapped[str] = mapped_column(sa.Text(), nullable=False)
+    primary_theme: Mapped[str | None] = mapped_column(sa.Text())
+    review_state: Mapped[str] = mapped_column(sa.Text(), nullable=False)
+    review_notes: Mapped[list[str]] = mapped_column(
+        JSON_VARIANT, nullable=False, default=list
+    )
+    text_sha256: Mapped[str | None] = mapped_column(sa.Text())
+    nearest_reference_raw_record_id: Mapped[uuid.UUID | None] = mapped_column(sa.Uuid())
+    nearest_similarity: Mapped[float | None] = mapped_column(sa.Float())
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+    generation_run: Mapped[DataGenerationRun] = relationship(back_populates="samples")

@@ -135,3 +135,46 @@ CREATE TABLE data_dataset_item (
 );
 
 CREATE INDEX idx_dataset_split ON data_dataset_item (dataset_id, split_name);
+
+CREATE TABLE data_generation_run (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    generator_name text NOT NULL,
+    source_name text NOT NULL,
+    parent_source text,
+    reference_selection_mode text,
+    input_artifact_uri text,
+    generated_artifact_uri text,
+    comparison_artifact_uri text,
+    monitor_artifact_uri text,
+    status text NOT NULL CHECK (status IN ('pending', 'running', 'completed', 'failed', 'partial')),
+    total_draft_count integer NOT NULL DEFAULT 0,
+    usable_draft_count integer NOT NULL DEFAULT 0,
+    needs_prompt_tuning_count integer NOT NULL DEFAULT 0,
+    dropped_draft_count integer NOT NULL DEFAULT 0,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    started_at timestamptz,
+    finished_at timestamptz
+);
+
+CREATE INDEX idx_generation_run_source_created ON data_generation_run (source_name, created_at);
+
+CREATE TABLE data_generation_sample (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    generation_run_id uuid NOT NULL REFERENCES data_generation_run(id) ON DELETE CASCADE,
+    draft_id text NOT NULL,
+    scenario_id text,
+    variant_index integer NOT NULL DEFAULT 0,
+    source_name text NOT NULL,
+    parent_source text,
+    target_label text NOT NULL CHECK (target_label IN ('phishing', 'spam', 'legitimate', 'unknown')),
+    primary_theme text,
+    review_state text NOT NULL CHECK (review_state IN ('usable', 'needs_prompt_tuning', 'drop')),
+    review_notes json NOT NULL DEFAULT '[]',
+    text_sha256 text,
+    nearest_reference_raw_record_id uuid,
+    nearest_similarity real,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_generation_sample_run_draft_variant UNIQUE (generation_run_id, draft_id, variant_index)
+);
+
+CREATE INDEX idx_generation_sample_run_review ON data_generation_sample (generation_run_id, review_state);
