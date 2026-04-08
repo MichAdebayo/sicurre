@@ -36,7 +36,6 @@ class CommonCrawlStageTwoService:
         "cher client",
         "chère cliente",
         "cher(e)",
-        "veuillez",
         "cliquez",
         "votre compte",
         "cordialement",
@@ -49,12 +48,6 @@ class CommonCrawlStageTwoService:
     )
     TRANSACTION_MARKERS = (
         "vous recevrez",
-        "veuillez",
-        "nous vous aidons",
-        "nous vous invitons",
-        "en cas de difficulté",
-        "contactant votre service client",
-        "rendez-vous dans votre bureau de poste",
         "mot de passe provisoire",
         "code à usage unique",
         "certicode",
@@ -64,6 +57,42 @@ class CommonCrawlStageTwoService:
         "email",
         "espace client",
         "opération frauduleuse",
+    )
+    SECURITY_MARKERS = (
+        "mot de passe",
+        "réinitialiser",
+        "sécuriser",
+        "sécurité",
+        "code à usage unique",
+        "certicode",
+        "opération frauduleuse",
+        "espace client",
+    )
+    GUIDANCE_MARKERS = (
+        "comment me protéger",
+        "comment sécuriser",
+        "découvrez comment",
+        "ce service vous permet",
+        "nous vous aidons",
+        "nous vous invitons",
+        "en cas de difficulté",
+        "contactez votre service client",
+        "votre service client",
+        "retrouvez",
+        "consultez",
+    )
+    PRODUCT_MARKERS = (
+        "1€/mois",
+        "1 eur/mois",
+        "formule de compte",
+        "découvrir la formule",
+        "cagnotte",
+        "cashback",
+        "verser à un proche",
+        "offre",
+        "tarif",
+        "assurance habitation",
+        "banque au service de tous",
     )
     HARD_ACCEPT_MARKERS = (
         "vous recevrez",
@@ -165,9 +194,20 @@ class CommonCrawlStageTwoService:
 
     @staticmethod
     def _split_candidate_segments(text: str) -> list[str]:
+        prepared = text
+        for marker in (
+            CommonCrawlStageTwoService.NAV_MARKERS
+            + CommonCrawlStageTwoService.PAGE_MARKERS
+        ):
+            prepared = re.sub(
+                re.escape(marker),
+                f"\n{marker}\n",
+                prepared,
+                flags=re.IGNORECASE,
+            )
         segments = [
             segment.strip()
-            for segment in re.split(r"(?<=[.!?])\s+|\n+", text)
+            for segment in re.split(r"(?<=[.!?])\s+|\n+", prepared)
             if segment.strip()
         ]
         return [segment for segment in segments if len(segment) >= 30]
@@ -193,31 +233,70 @@ class CommonCrawlStageTwoService:
             return text, tuple(trace_steps)
 
         best_score = 0
-        best_index = -1
-        for index, segment in enumerate(segments):
-            transaction_hits = cls._count_markers(segment, cls.TRANSACTION_MARKERS)
-            email_hits = cls._count_markers(segment, cls.EMAIL_LIKE_MARKERS)
-            exclude_hits = cls._count_markers(segment, cls.EXCLUDE_MARKERS)
-            score = transaction_hits * 3 + email_hits * 2 - exclude_hits * 3
-            if score > best_score:
-                best_score = score
-                best_index = index
+        best_window: str | None = None
+        for start in range(len(segments)):
+            for size in range(1, 5):
+                end = start + size
+                if end > len(segments):
+                    break
+                candidate_window = " ".join(segments[start:end]).strip()
+                transaction_hits = cls._count_markers(
+                    candidate_window,
+                    cls.TRANSACTION_MARKERS,
+                )
+                delivery_hits = cls._count_markers(
+                    candidate_window,
+                    cls.DELIVERY_MARKERS,
+                )
+                notification_hits = cls._count_markers(
+                    candidate_window,
+                    cls.NOTIFICATION_MARKERS,
+                )
+                security_hits = cls._count_markers(
+                    candidate_window,
+                    cls.SECURITY_MARKERS,
+                )
+                email_hits = cls._count_markers(
+                    candidate_window,
+                    cls.EMAIL_LIKE_MARKERS,
+                )
+                guidance_hits = cls._count_markers(
+                    candidate_window,
+                    cls.GUIDANCE_MARKERS,
+                )
+                product_hits = cls._count_markers(
+                    candidate_window,
+                    cls.PRODUCT_MARKERS,
+                )
+                exclude_hits = cls._count_markers(candidate_window, cls.EXCLUDE_MARKERS)
+                score = transaction_hits * 4
+                score += delivery_hits * 4
+                score += notification_hits * 4
+                score += security_hits * 3
+                score += email_hits * 2
+                score -= guidance_hits * 2
+                score -= product_hits * 3
+                score -= exclude_hits * 3
+                if score > best_score:
+                    best_score = score
+                    best_window = candidate_window
 
-        if best_index == -1 or best_score < 4:
+        if best_window is None or best_score < 7:
             trace_steps.append("common_crawl_no_message_window_found")
             return text, tuple(trace_steps)
 
-        start = max(0, best_index - 1)
-        end = min(len(segments), best_index + 3)
-        candidate_window = " ".join(segments[start:end]).strip()
         candidate_window = cls._strip_known_phrases(
-            candidate_window,
+            best_window,
             cls.NAV_MARKERS + cls.PAGE_MARKERS,
         )
         if cls._count_markers(candidate_window, cls.EXCLUDE_MARKERS) >= 2:
             trace_steps.append("common_crawl_window_rejected_by_page_markers")
             return text, tuple(trace_steps)
-        if cls._count_markers(candidate_window, cls.TRANSACTION_MARKERS) < 2:
+        if (
+            cls._count_markers(candidate_window, cls.TRANSACTION_MARKERS)
+            + cls._count_markers(candidate_window, cls.DELIVERY_MARKERS)
+            + cls._count_markers(candidate_window, cls.SECURITY_MARKERS)
+        ) < 3:
             trace_steps.append("common_crawl_window_too_weak")
             return text, tuple(trace_steps)
 
@@ -236,6 +315,9 @@ class CommonCrawlStageTwoService:
         page_hits = cls._count_markers(text, cls.PAGE_MARKERS)
         email_hits = cls._count_markers(text, cls.EMAIL_LIKE_MARKERS)
         transaction_hits = cls._count_markers(text, cls.TRANSACTION_MARKERS)
+        security_hits = cls._count_markers(text, cls.SECURITY_MARKERS)
+        guidance_hits = cls._count_markers(text, cls.GUIDANCE_MARKERS)
+        product_hits = cls._count_markers(text, cls.PRODUCT_MARKERS)
         promo_hits = cls._count_markers(text, cls.PROMOTIONAL_MARKERS)
         hard_accept_hits = cls._count_markers(text, cls.HARD_ACCEPT_MARKERS)
         delivery_hits = cls._count_markers(text, cls.DELIVERY_MARKERS)
@@ -251,6 +333,9 @@ class CommonCrawlStageTwoService:
             "page_hits": page_hits,
             "email_hits": email_hits,
             "transaction_hits": transaction_hits,
+            "security_hits": security_hits,
+            "guidance_hits": guidance_hits,
+            "product_hits": product_hits,
             "promo_hits": promo_hits,
             "delivery_hits": delivery_hits,
             "notification_hits": notification_hits,
@@ -284,6 +369,9 @@ class CommonCrawlStageTwoService:
             and delivery_hits >= 1
             and notification_hits >= 1
             and transaction_hits >= 2
+            and security_hits >= 1
+            and guidance_hits <= 2
+            and product_hits == 0
             and nav_hits <= 1
             and page_hits <= 1
         ):
@@ -315,7 +403,11 @@ class CommonCrawlStageTwoService:
                 evidence,
             )
 
-        if transaction_hits >= 2 and email_hits >= 1 and page_hits <= 1:
+        if (
+            transaction_hits >= 2
+            and (email_hits >= 1 or delivery_hits >= 1 or security_hits >= 1)
+            and page_hits <= 2
+        ):
             trace_steps.extend(
                 [
                     "common_crawl_instructional_markers_detected",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from collections import Counter
 from datetime import datetime, timezone
@@ -167,48 +168,92 @@ class StageTwoRewriteDraftService:
     @classmethod
     def _build_legitimate_notification(cls, source_preview: str) -> tuple[str, str]:
         lowered = source_preview.lower()
+        focus = cls._infer_legitimate_focus(source_preview)
+        variant = cls._variant_index(source_preview, 4)
         if any(marker in lowered for marker in ("réseaux sociaux", "internet")):
+            subjects = (
+                f"Vigilance renforcée concernant {focus}",
+                f"Rappel de sécurité au sujet de {focus}",
+                f"Conseils utiles pour {focus}",
+                f"Point d'attention concernant {focus}",
+            )
             return (
-                "Vigilance face aux escroqueries sur Internet",
-                "Bonjour,\n\nNous vous invitons à rester particulièrement vigilant face aux messages diffusés par e-mail, SMS ou sur les réseaux sociaux lorsqu'ils demandent une action urgente.\n\nNe communiquez jamais vos données personnelles ou bancaires à la suite d'un message inattendu et privilégiez toujours votre espace habituel ou un contact direct avec votre service client.\n\nCordialement,\nVotre service client",
+                subjects[variant],
+                f"Bonjour,\n\nNous vous invitons à rester particulièrement vigilant face aux messages diffusés par e-mail, SMS ou sur les réseaux sociaux lorsqu'ils demandent une action urgente en lien avec {focus.lower()}.\n\nNe communiquez jamais vos données personnelles ou bancaires à la suite d'un message inattendu et privilégiez toujours votre espace habituel ou un contact direct avec votre service client.\n\nCordialement,\nVotre service client",
             )
 
         if any(
             marker in lowered
             for marker in ("fraude", "escroquer", "douteux", "données bancaires")
         ):
+            subjects = (
+                f"Rappel de vigilance concernant {focus}",
+                f"Alerte de prudence au sujet de {focus}",
+                f"Bonnes pratiques liées à {focus}",
+                f"Sécurité renforcée pour {focus}",
+            )
             return (
-                "Rappel de vigilance concernant vos échanges en ligne",
-                "Bonjour,\n\nNous vous rappelons de ne jamais transmettre vos données bancaires, vos codes de validation ou vos informations personnelles par e-mail, SMS ou téléphone.\n\nEn cas de message douteux, connectez-vous uniquement à votre espace habituel ou rapprochez-vous de votre service client avant toute action.\n\nCordialement,\nVotre service client",
+                subjects[variant],
+                f"Bonjour,\n\nNous vous rappelons de ne jamais transmettre vos données bancaires, vos codes de validation ou vos informations personnelles par e-mail, SMS ou téléphone, notamment lorsqu'un message inattendu évoque {focus.lower()}.\n\nEn cas de message douteux, connectez-vous uniquement à votre espace habituel ou rapprochez-vous de votre service client avant toute action.\n\nCordialement,\nVotre service client",
             )
 
         if any(
             marker in lowered
             for marker in ("mot de passe", "connexion", "accès", "compte")
         ):
+            subjects = (
+                f"Information sur la sécurisation de {focus.lower()}",
+                f"Mise à jour utile concernant {focus.lower()}",
+                f"Conseils de sécurité pour {focus.lower()}",
+                f"Point de contrôle lié à {focus.lower()}",
+            )
             return (
-                "Information sur la sécurisation de votre accès",
-                "Bonjour,\n\nSi vous devez réinitialiser votre accès, suivez uniquement les étapes disponibles depuis votre espace habituel.\n\nSelon votre situation, un code temporaire pourra vous être transmis par SMS ou par courrier. En cas de doute, contactez votre conseiller avant toute saisie d'information.\n\nCordialement,\nVotre service client",
+                subjects[variant],
+                f"Bonjour,\n\nSi vous devez réinitialiser {focus.lower()}, suivez uniquement les étapes disponibles depuis votre espace habituel.\n\nSelon votre situation, un code temporaire pourra vous être transmis par SMS ou par courrier. En cas de doute, contactez votre conseiller avant toute saisie d'information.\n\nCordialement,\nVotre service client",
             )
 
+        subjects = (
+            f"Information utile concernant {focus.lower()}",
+            f"Rappel pratique au sujet de {focus.lower()}",
+            f"Point d'information pour {focus.lower()}",
+            f"Mise au point utile concernant {focus.lower()}",
+        )
         return (
-            "Information utile concernant votre espace client",
-            "Bonjour,\n\nNous vous adressons ce rappel afin de vous aider à vérifier les bonnes pratiques liées à votre espace client et à vos échanges en ligne.\n\nPour toute demande sensible, utilisez uniquement les canaux habituels et rapprochez-vous de votre service client si vous avez le moindre doute.\n\nCordialement,\nVotre service client",
+            subjects[variant],
+            f"Bonjour,\n\nNous vous adressons ce rappel afin de vous aider à vérifier les bonnes pratiques liées à {focus.lower()} et à vos échanges en ligne.\n\nPour toute demande sensible, utilisez uniquement les canaux habituels et rapprochez-vous de votre service client si vous avez le moindre doute.\n\nCordialement,\nVotre service client",
         )
 
     @classmethod
     def _build_promotional_spam(cls, source_preview: str) -> tuple[str, str]:
         topic = cls._infer_promotional_topic(source_preview)
-        subject = f"{topic} : votre offre réservée jusqu'à ce soir"
+        variant = cls._variant_index(source_preview, 4)
+        subject_templates = (
+            f"{topic} : votre offre réservée jusqu'à ce soir",
+            f"{topic} : dernières heures pour en profiter",
+            f"{topic} : réponse prioritaire aujourd'hui",
+            f"{topic} : avantage immédiat sur demande",
+        )
+        intro_templates = (
+            f"Profitez dès maintenant de {topic.lower()} avec un avantage exclusif réservé aux demandes traitées aujourd'hui.",
+            f"Une proposition liée à {topic.lower()} est disponible dès maintenant avec une remise limitée dans le temps.",
+            f"Votre accès à {topic.lower()} peut être activé aujourd'hui avec des conditions préférentielles et une réponse rapide.",
+            f"Nous mettons à votre disposition {topic.lower()} avec une offre prioritaire valable sur les demandes reçues aujourd'hui.",
+        )
+        cta_templates = (
+            "Répondez à ce message pour recevoir le détail de l'offre et activer votre avantage avant la fin de la journée.",
+            "Confirmez simplement votre intérêt par retour d'e-mail pour recevoir la proposition complète sans attendre.",
+            "Demandez le récapitulatif de l'offre maintenant pour bloquer votre avantage avant la clôture du jour.",
+            "Répondez dès aujourd'hui pour recevoir les conditions détaillées et profiter de la priorité de traitement.",
+        )
         body = (
             "Bonjour,\n\n"
-            f"Profitez dès maintenant de {topic.lower()} avec un avantage exclusif réservé aux demandes traitées aujourd'hui. "
+            f"{intro_templates[variant]} "
             "Notre offre met en avant un tarif attractif, des conditions simplifiées et une réponse rapide.\n\n"
-            "Répondez à ce message pour recevoir le détail de l'offre et activer votre avantage avant la fin de la journée.\n\n"
+            f"{cta_templates[variant]}\n\n"
             "À très vite,\n"
             "Service commercial"
         )
-        return subject, body
+        return subject_templates[variant], body
 
     @classmethod
     def _build_repaired_spam(cls, source_preview: str) -> tuple[str, str]:
@@ -259,13 +304,70 @@ class StageTwoRewriteDraftService:
             ("assurance santé", "Assurance santé à prix avantageux"),
             ("protection juridique", "Protection juridique"),
             ("regroupement de crédit", "Regroupement de crédits"),
+            ("cashback", "Programme cashback"),
+            ("cagnotte", "Cagnotte fidélité"),
+            ("voyager moins cher", "Voyage à prix réduit"),
+            ("e-carte bleue", "Service e-Carte Bleue"),
+            ("prêt immobilier", "Prêt immobilier"),
+            ("assurance auto", "Assurance auto"),
             ("crédit", "Financement simplifié"),
             ("assurance", "Assurance personnalisée"),
         )
         for marker, topic in topic_map:
             if marker in lowered:
                 return topic
-        return "Offre exclusive réservée à votre profil"
+        return StageTwoRewriteDraftService._extract_topic_phrase(
+            source_preview,
+            fallback="Offre exclusive réservée à votre profil",
+        )
+
+    @classmethod
+    def _infer_legitimate_focus(cls, source_preview: str) -> str:
+        lowered = source_preview.lower()
+        focus_map = (
+            (("réseaux sociaux", "internet"), "vos échanges sur Internet"),
+            (
+                ("fraude", "opération frauduleuse"),
+                "la prévention des opérations frauduleuses",
+            ),
+            (("données bancaires",), "la protection de vos données bancaires"),
+            (("mot de passe", "connexion", "accès"), "votre accès en ligne"),
+            (("relevé", "document"), "vos documents mis à disposition"),
+            (("paiement", "carte"), "vos paiements par carte"),
+            (("certicode", "code à usage unique"), "l'authentification renforcée"),
+        )
+        for markers, focus in focus_map:
+            if any(marker in lowered for marker in markers):
+                return focus
+        return cls._extract_topic_phrase(source_preview, fallback="votre espace client")
+
+    @staticmethod
+    def _extract_topic_phrase(source_preview: str, *, fallback: str) -> str:
+        cleaned_preview = re.sub(r"\s+", " ", source_preview).strip()
+        cleaned_preview = re.sub(
+            r"(?i)accès à vos comptes par l'écran de connexion pleine page|accéder au menu principal|accéder au contenu éditorial|accéder au pied de page",
+            " ",
+            cleaned_preview,
+        )
+        candidates = [
+            candidate.strip(" :-")
+            for candidate in re.split(r"[.!?\n]+", cleaned_preview)
+            if candidate.strip()
+        ]
+        for candidate in candidates:
+            candidate = re.sub(r"^\d+\s*[-:]\s*", "", candidate)
+            if len(candidate) < 18:
+                continue
+            words = candidate.split()
+            phrase = " ".join(words[:6]).strip(" ,;:-")
+            if len(phrase) >= 12:
+                return phrase[0].upper() + phrase[1:]
+        return fallback
+
+    @staticmethod
+    def _variant_index(seed: str, modulo: int) -> int:
+        digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()
+        return int(digest[:8], 16) % modulo
 
     @staticmethod
     def _extract_bonus_amount(source_preview: str) -> str | None:
