@@ -109,6 +109,8 @@ class StageTwoRewriteJobService:
         key = str(rule.get("key") or "")
         if key == "instructional_legitimate":
             return "institutional_page_to_notification"
+        if key == "awareness_or_report":
+            return "awareness_page_to_warning_notification"
         if key == "promotional_spam":
             return "promotional_page_to_spam_message"
         if key == "synthetic_lure_candidate":
@@ -139,10 +141,15 @@ class StageTwoRewriteJobService:
             constraints.append(
                 "repair encoding and formatting corruption before rewriting"
             )
-        if rule_key == "instructional_legitimate":
-            constraints.append(
-                "convert page guidance into a concise customer notification"
-            )
+        match rule_key:
+            case "instructional_legitimate":
+                constraints.append(
+                    "convert page guidance into a concise customer notification"
+                )
+            case "awareness_or_report":
+                constraints.append(
+                    "shape the output as a defensive vigilance notification"
+                )
         return constraints
 
     @staticmethod
@@ -164,6 +171,9 @@ class StageTwoRewriteJobService:
             case "database-historical":
                 hints.append("repair mojibake and strip residual HTML")
 
-        if rule_key == "synthetic_lure_candidate":
-            hints.append("shape the output as a realistic phishing email")
+        match rule_key:
+            case "synthetic_lure_candidate":
+                hints.append("shape the output as a realistic phishing email")
+            case "awareness_or_report":
+                hints.append("shape the output as a defensive vigilance reminder")
         return hints

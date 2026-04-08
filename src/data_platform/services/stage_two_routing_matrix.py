@@ -67,12 +67,12 @@ class StageTwoRoutingMatrixService:
             source_name="common-crawl-bigdata",
             key_type="route_subtype",
             key="awareness_or_report",
-            action="extract_signals_only",
-            output_bucket="signal_bank",
-            adaptation_fit="low",
+            action="adapt",
+            output_bucket="adaptation_queue",
+            adaptation_fit="medium",
             rationale=(
-                "Best used for defensive phrasing, scam-awareness wording, and lexical "
-                "negative context rather than inbox messages."
+                "Fraud-awareness pages carry useful defensive wording that can be "
+                "rewritten into legitimate warning and security-notification messages."
             ),
         ),
         StageTwoRoutingRule(

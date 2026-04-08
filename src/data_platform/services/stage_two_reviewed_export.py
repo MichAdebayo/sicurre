@@ -29,6 +29,30 @@ class StageTwoReviewedExportService:
         "review_state",
         "text_sha256",
     ]
+    LEGITIMATE_EXPORT_BLOCKERS: tuple[str, ...] = ("page_like_legitimate_subject",)
+    LEGITIMATE_SUBJECT_MARKERS: tuple[str, ...] = (
+        "selon les conditions générales",
+        "en outre",
+        "en second lieu",
+        "tous les champs sont obligatoires",
+        "notice d'information",
+        "historique des remises",
+        "les 3 modes de gestion",
+        "services digitaux",
+        "gestion compte bancaire",
+        "identifier facilement les aides",
+        "des intérêts débiteurs",
+        "télécharger la notice",
+        "l’organisateur se réserve",
+        "l'organisateur se réserve",
+        "etape ",
+        "étape ",
+        "# paiement",
+        "conformément à cette dernière exigence réglementaire",
+        "actuellement nous travaillons",
+        "rapprochez-vous de votre conseiller habituel",
+        "[phone]service",
+    )
 
     def __init__(
         self,
@@ -70,6 +94,17 @@ class StageTwoReviewedExportService:
                     [str(candidate.get("normalization_rejection"))]
                 )
                 continue
+
+            if target_label := str(candidate.get("target_label") or ""):
+                if (
+                    target_label == "legitimate"
+                    and self._fails_legitimate_quality_gate(
+                        draft=draft,
+                        candidate=candidate,
+                    )
+                ):
+                    skipped_reason_summary.update(["page_like_legitimate_subject"])
+                    continue
 
             candidates.append(candidate)
             label_summary.update([str(candidate.get("target_label") or "unknown")])
@@ -191,3 +226,19 @@ class StageTwoReviewedExportService:
             "review_state": candidate.get("review_state", ""),
             "text_sha256": candidate.get("text_sha256", ""),
         }
+
+    @classmethod
+    def _fails_legitimate_quality_gate(
+        cls,
+        *,
+        draft: dict[str, Any],
+        candidate: dict[str, Any],
+    ) -> bool:
+        review_notes = {str(note) for note in draft.get("review_notes", [])}
+        if review_notes.intersection(cls.LEGITIMATE_EXPORT_BLOCKERS):
+            return True
+        subject_line = str(candidate.get("normalized_text") or "").split("\n", 1)[0]
+        lowered_subject = subject_line.lower()
+        return any(
+            marker in lowered_subject for marker in cls.LEGITIMATE_SUBJECT_MARKERS
+        )
