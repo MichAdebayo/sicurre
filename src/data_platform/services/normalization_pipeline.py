@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from data_platform.cleaning.normalization import TextNormalizationService
 from data_platform.services.certfr_stage_two import CertFRStageTwoService
+from data_platform.services.common_crawl_content import CommonCrawlContentService
 from data_platform.services.common_crawl_stage_two import CommonCrawlStageTwoService
 from data_platform.services.historical_stage_two import HistoricalStageTwoService
 from db.models.lineage import (
@@ -88,20 +89,7 @@ class DryRunSample:
 class WebCleaner:
     @staticmethod
     def clean_web_text(text: str, max_length: int = 2500) -> str:
-        """Strip HTML menus, repetitive UI artifacts, and truncate."""
-        # Simple heuristic to remove excessive newlines and tab artifacts from scrapers
-        clean_text = re.sub(r"(\n\s*){3,}", "\n\n", text)
-        clean_text = re.sub(
-            r"(?i)(accepter les cookies|tous droits réservés|all rights reserved|cliquez ici|contactez-nous)",
-            "",
-            clean_text,
-        )
-        clean_text = clean_text.strip()
-
-        if len(clean_text) > max_length:
-            clean_text = f"{clean_text[:max_length]}... [TRUNCATED_WEB]"
-
-        return clean_text
+        return CommonCrawlContentService.clean_web_text(text, max_length=max_length)
 
 
 class NormalizationPipeline:
@@ -521,6 +509,8 @@ class NormalizationPipeline:
     def _map_binary_label(value: Any) -> NormalizedLabel | None:
         if value in {1, "1", True, "phishing"}:
             return NormalizedLabel.PHISHING
+        if value in {"spam", "spam_like"}:
+            return NormalizedLabel.SPAM
         if value in {0, "0", False, "legitimate", "ham"}:
             return NormalizedLabel.LEGITIMATE
         return None
