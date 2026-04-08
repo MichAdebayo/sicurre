@@ -41,7 +41,8 @@ Current stage-two implementation notes:
 - A downstream artifact builder now materializes those routing decisions into three no-write outputs: an adaptation queue, a signal bank, and an archive manifest.
 - The adaptation queue can now be converted into prompt-ready rewrite jobs for reviewed sampled records.
 - Those rewrite jobs can now be executed into deterministic no-write draft subject/body outputs, each with a heuristic review state: `usable`, `needs_prompt_tuning`, or `drop`.
-- The CERT-FR signal bank can now be condensed into family, theme, and IOC summaries to guide later phishing synthesis work.
+- Usable rewrite drafts can now be exported into reviewed candidate corpus rows in JSON, Markdown, and CSV form without touching the DB.
+- The CERT-FR signal bank can now be condensed into family, theme, and IOC summaries and then converted into grouped phishing-synthesis scenarios for later prompt-driven generation.
 
 All normalized DB writes now create a `DataProcessingRun`, stamp `started_at`, `finished_at`, and `normalized_at`, and skip duplicate normalized texts using the same `text_sha256` uniqueness rule enforced by the schema.
 
@@ -98,4 +99,6 @@ Verification Notes
 - A dedicated downstream builder now emits `stage-two-adaptation-queue.json`, `stage-two-signal-bank.json`, `stage-two-archive-manifest.json`, and a Markdown summary from the live review artifacts.
 - Dedicated follow-on builders now emit `stage-two-rewrite-jobs.json` and `certfr-signal-summary.json` from those downstream artifacts.
 - The rewrite-job layer now also emits `stage-two-rewrite-drafts.json` and `stage-two-rewrite-drafts.md`, which contain actual draft outputs plus review-state scoring.
+- The reviewed export layer now emits `stage-two-reviewed-export.json`, `stage-two-reviewed-export.md`, and `stage-two-reviewed-export.csv` for corpus review before any DB persistence decision.
+- The CERT-FR synthesis layer now emits `certfr-synthesis-inputs.json` and `certfr-synthesis-inputs.md` as grouped phishing-generation scenario inputs.
 - The local arm64 environment is now able to run the normalization review commands and focused pytest validation.
