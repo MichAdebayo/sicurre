@@ -8,6 +8,7 @@ dependencies = [
     "pydantic-core>=2.41.5",
     "pypdf>=6.7.4",
     "pypdf2>=3.0.1",
+    "pytest>=9.0.2",
     "virtualenv>=21.1.0",
 ]
 
@@ -59,18 +60,8 @@ dev = [
     "sqlalchemy>=2.0.47",
     "warcio>=1.7.5",
 ]
-ml = [
-    "accelerate>=1.6.0",
-    "evaluate>=0.4.3",
+storage = [
     "google-cloud-storage>=3.1.0",
-    "mlflow>=2.22.0",
-    "onnx>=1.17.0",
-    "onnxruntime>=1.21.0",
-    "optimum[onnxruntime]>=1.25.0",
-    "optuna>=4.3.0",
-    "sentencepiece>=0.2.0",
-    "torch>=2.6.0",
-    "transformers>=4.51.0",
 ]
 
 [tool.pytest.ini_options]
