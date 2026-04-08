@@ -10,6 +10,16 @@ This document now separates two distinct but related schemas:
 The certification schema is the primary source of truth for MCD, MLD, and MPD.
 The runtime schema remains necessary, but it is downstream from the data platform.
 
+## Generation analytics extension
+
+The current no-write generation lanes emit reviewed JSON and Markdown artifacts before any curated-message promotion.
+To preserve lineage for those generation runs without forcing full metric persistence into the curated message schema, the data platform now introduces a thin analytics extension:
+
+- `data_generation_run`: one row per generation or evaluation pass, storing source, parent source, artifact URIs, and aggregate review counts
+- `data_generation_sample`: one row per generated draft variant, storing review state, theme, `text_sha256`, and nearest-reference linkage
+
+Rich monitoring and comparison metrics remain artifact-backed JSON/Markdown outputs and are referenced from the run row through artifact URIs.
+
 ## Scope of the Bloc 1 data platform
 
 The data platform must prove the following chain end to end:
@@ -242,6 +252,8 @@ erDiagram
 | `data_annotation` | labels and validation metadata | child of normalized message |
 | `data_dataset` | frozen dataset version | parent of dataset items |
 | `data_dataset_item` | membership of a message in a dataset split | child of dataset and normalized message |
+| `data_generation_run` | lineage row for one generation/evaluation pass | parent of generation samples |
+| `data_generation_sample` | thin per-draft generation trace | child of generation run |
 
 ### Logical constraints
 

@@ -43,6 +43,7 @@ Current stage-two implementation notes:
 - Those rewrite jobs can now be executed into deterministic no-write draft subject/body outputs, each with a heuristic review state: `usable`, `needs_prompt_tuning`, or `drop`.
 - Usable rewrite drafts can now be exported into reviewed candidate corpus rows in JSON, Markdown, and CSV form without touching the DB.
 - The CERT-FR signal bank can now be condensed into family, theme, and IOC summaries and then converted into grouped phishing-synthesis scenarios for later prompt-driven generation.
+- Those CERT-FR synthesis scenarios can now be converted into deterministic phishing draft outputs, again in no-write mode, before any reviewed export or persistence decision.
 
 All normalized DB writes now create a `DataProcessingRun`, stamp `started_at`, `finished_at`, and `normalized_at`, and skip duplicate normalized texts using the same `text_sha256` uniqueness rule enforced by the schema.
 
@@ -101,4 +102,5 @@ Verification Notes
 - The rewrite-job layer now also emits `stage-two-rewrite-drafts.json` and `stage-two-rewrite-drafts.md`, which contain actual draft outputs plus review-state scoring.
 - The reviewed export layer now emits `stage-two-reviewed-export.json`, `stage-two-reviewed-export.md`, and `stage-two-reviewed-export.csv` for corpus review before any DB persistence decision.
 - The CERT-FR synthesis layer now emits `certfr-synthesis-inputs.json` and `certfr-synthesis-inputs.md` as grouped phishing-generation scenario inputs.
+- The CERT-FR draft layer now emits `certfr-generated-drafts.json` and `certfr-generated-drafts.md` as concrete phishing-email candidates derived from those scenarios.
 - The local arm64 environment is now able to run the normalization review commands and focused pytest validation.
