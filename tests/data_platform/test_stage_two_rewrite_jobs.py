@@ -66,3 +66,40 @@ def test_stage_two_rewrite_jobs_render_markdown() -> None:
 
     assert "# Stage-Two Rewrite Jobs" in markdown
     assert "job-1" in markdown
+
+
+def test_stage_two_rewrite_jobs_assigns_awareness_mode_and_hint() -> None:
+    jobs = StageTwoRewriteJobService.build_jobs(
+        {
+            "sources": [
+                {
+                    "source_name": "common-crawl-bigdata",
+                    "rules": [
+                        {
+                            "key": "awareness_or_report",
+                            "adaptation_fit": "medium",
+                            "rationale": "rewrite awareness page into warning notification",
+                            "label_summary": {"legitimate": 1},
+                            "sampled_records": [
+                                {
+                                    "raw_record_id": "aware-1",
+                                    "extracted_label": "legitimate",
+                                    "normalized_preview": "Comment reconnaître un appel frauduleux ? Ne divulguez jamais vos informations personnelles.",
+                                    "normalized_length": 120,
+                                    "similarity_score": 0.2,
+                                    "trace_summary": "trace",
+                                    "derived_payload": {
+                                        "marker_evidence": {"awareness_hits": 1}
+                                    },
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+
+    job = jobs["jobs"][0]
+    assert job["rewrite_mode"] == "awareness_page_to_warning_notification"
+    assert "shape the output as a defensive vigilance reminder" in job["prompt_hints"]

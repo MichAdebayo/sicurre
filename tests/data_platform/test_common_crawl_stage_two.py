@@ -60,3 +60,36 @@ def test_common_crawl_stage_two_demotes_product_page_with_delivery_signals() -> 
     assert result.route_outcome == "specialized_processing"
     assert result.route_reason == "common_crawl_instructional_candidate"
     assert result.route_subtype == "instructional_legitimate"
+
+
+def test_common_crawl_stage_two_recovers_weak_notification_window() -> None:
+    result = CommonCrawlStageTwoService.review(
+        (
+            "Selon les conditions générales d'Apple Pay et de Samsung Pay. "
+            "Des virements par SMS ! Je rembourse mes amis instantanément par SMS, plus de RIB à mémoriser. "
+            "Des notifications paramétrables vous informent automatiquement des mouvements sur votre compte."
+        ),
+        {"category": "legitimate"},
+    )
+
+    assert result.route_outcome == "specialized_processing"
+    assert result.route_reason == "common_crawl_instructional_candidate"
+    assert result.route_subtype == "instructional_legitimate"
+    assert "notifications paramétrables" in result.extracted_text
+
+
+def test_common_crawl_stage_two_recovers_product_offer_page_for_spam_adaptation() -> (
+    None
+):
+    result = CommonCrawlStageTwoService.review(
+        (
+            "Accéder au Menu Principal Accéder au Contenu éditorial Accéder au Pied de page "
+            "Article Petits budgets : trouvez une assurance habitation pas chère. "
+            "Comparez les tarifs pour protéger votre logement avec une formule adaptée à votre budget."
+        ),
+        {"category": "legitimate"},
+    )
+
+    assert result.route_outcome == "specialized_processing"
+    assert result.route_reason == "common_crawl_product_offer_candidate"
+    assert result.route_subtype == "promotional_spam"

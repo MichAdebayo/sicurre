@@ -168,6 +168,51 @@ def test_stage_two_rewrite_drafts_keeps_distinct_promotional_previews_distinct()
     assert all(draft["review_state"] == "usable" for draft in drafts["drafts"])
 
 
+def test_stage_two_rewrite_drafts_downgrades_page_like_legitimate_subject() -> None:
+    drafts = StageTwoRewriteDraftService.build_drafts(
+        {
+            "jobs": [
+                {
+                    "job_id": "job-page-like",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "instructional_legitimate",
+                    "rewrite_mode": "institutional_page_to_notification",
+                    "target_label": "legitimate",
+                    "raw_record_id": "page-like-1",
+                    "source_preview": "Tous les champs sont obligatoires. Merci de vérifier les informations demandées avant validation depuis votre espace habituel.",
+                }
+            ]
+        }
+    )
+
+    draft = drafts["drafts"][0]
+    assert draft["review_state"] == "needs_prompt_tuning"
+    assert "page_like_legitimate_subject" in draft["review_notes"]
+
+
+def test_stage_two_rewrite_drafts_builds_awareness_warning_notification() -> None:
+    drafts = StageTwoRewriteDraftService.build_drafts(
+        {
+            "jobs": [
+                {
+                    "job_id": "job-aware-1",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "awareness_or_report",
+                    "rewrite_mode": "awareness_page_to_warning_notification",
+                    "target_label": "legitimate",
+                    "raw_record_id": "aware-1",
+                    "source_preview": "Comment reconnaître un appel frauduleux ? La Banque Postale vous conseille de faire preuve de vigilance en cas d'appel suspect et de ne jamais divulguer vos informations personnelles.",
+                }
+            ]
+        }
+    )
+
+    draft = drafts["drafts"][0]
+    assert draft["review_state"] == "usable"
+    assert "appel" in draft["subject"].lower()
+    assert "vigil" in draft["body"].lower() or "par téléphone" in draft["body"].lower()
+
+
 def test_stage_two_rewrite_drafts_render_markdown() -> None:
     markdown = StageTwoRewriteDraftService.render_markdown(
         {
