@@ -57,6 +57,9 @@ class CommonCrawlStageTwoService:
         "email",
         "espace client",
         "opération frauduleuse",
+        "virement par sms",
+        "virements par sms",
+        "virement instantané",
     )
     SECURITY_MARKERS = (
         "mot de passe",
@@ -124,9 +127,14 @@ class CommonCrawlStageTwoService:
         "mot de passe provisoire",
         "vous êtes informé de la mise en ligne",
         "alerte sms",
+        "alertes sms",
         "notification vous sera adressé",
         "notification vous sera adressée",
         "a été envoyé dans ma messagerie sécurisée",
+        "notification paramétrable",
+        "notifications paramétrables",
+        "notification push",
+        "notifications push",
     )
     EXCLUDE_MARKERS = (
         "serious game",
@@ -296,6 +304,7 @@ class CommonCrawlStageTwoService:
             cls._count_markers(candidate_window, cls.TRANSACTION_MARKERS)
             + cls._count_markers(candidate_window, cls.DELIVERY_MARKERS)
             + cls._count_markers(candidate_window, cls.SECURITY_MARKERS)
+            + cls._count_markers(candidate_window, cls.NOTIFICATION_MARKERS)
         ) < 3:
             trace_steps.append("common_crawl_window_too_weak")
             return text, tuple(trace_steps)
@@ -404,8 +413,16 @@ class CommonCrawlStageTwoService:
             )
 
         if (
-            transaction_hits >= 2
-            and (email_hits >= 1 or delivery_hits >= 1 or security_hits >= 1)
+            (
+                transaction_hits >= 2
+                or (transaction_hits + delivery_hits + notification_hits) >= 3
+            )
+            and (
+                email_hits >= 1
+                or delivery_hits >= 1
+                or security_hits >= 1
+                or notification_hits >= 1
+            )
             and page_hits <= 2
         ):
             trace_steps.extend(
@@ -418,6 +435,58 @@ class CommonCrawlStageTwoService:
                 "specialized_processing",
                 "common_crawl_instructional_candidate",
                 "instructional_legitimate",
+                tuple(trace_steps),
+                evidence,
+            )
+
+        if (
+            any(
+                step in extraction_trace
+                for step in (
+                    "common_crawl_no_message_window_found",
+                    "common_crawl_window_too_weak",
+                )
+            )
+            and raw_category == "legitimate"
+            and nav_hits <= 1
+            and page_hits == 0
+            and guidance_hits <= 1
+            and (transaction_hits + delivery_hits + notification_hits + security_hits)
+            >= 3
+        ):
+            trace_steps.extend(
+                [
+                    "common_crawl_weak_window_recovered",
+                    "common_crawl_route_to_specialized_extractor",
+                ]
+            )
+            return (
+                "specialized_processing",
+                "common_crawl_weak_window_candidate",
+                "instructional_legitimate",
+                tuple(trace_steps),
+                evidence,
+            )
+
+        if (
+            raw_category == "legitimate"
+            and product_hits >= 1
+            and (promo_hits >= 1 or nav_hits >= 2)
+            and page_hits <= 1
+            and transaction_hits == 0
+            and delivery_hits == 0
+            and security_hits == 0
+        ):
+            trace_steps.extend(
+                [
+                    "common_crawl_product_offer_recovered",
+                    "common_crawl_route_to_specialized_extractor",
+                ]
+            )
+            return (
+                "specialized_processing",
+                "common_crawl_product_offer_candidate",
+                "promotional_spam",
                 tuple(trace_steps),
                 evidence,
             )
