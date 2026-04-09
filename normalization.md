@@ -10,7 +10,7 @@ Phase 2 now has three concrete paths:
 
 Current DB-Backed Normalization Scope
 
-The normalization runner is `scripts/data_platform/run_normalization.py` and the routing logic lives in `src/data_platform/services/normalization_pipeline.py`.
+The normalization runner is `scripts/data_platform/shared/normalization/run_normalization.py` and the routing logic lives in `src/data_platform/services/normalization_pipeline.py`.
 
 It currently supports these French-capable source systems already present in the SQLite dev database:
 
@@ -57,11 +57,11 @@ These sources are intentionally not part of the direct French normalization pipe
 - `zefang_phishing`
 - `phishtank-online-valid`
 
-The English phishing path is implemented by `scripts/data_platform/generate_adapted_fr_phishing.py`, backed by `src/data_platform/services/adaptation.py`.
+The English phishing path is implemented by `scripts/data_platform/datasets/generation/generate_adapted_fr_phishing.py`, backed by `src/data_platform/services/adaptation.py`.
 
 Processed Export Path
 
-The processed three-class export builder is `scripts/data_platform/process_restructure_data.py`.
+The processed three-class export builder is `scripts/data_platform/datasets/preparation/process_restructure_data.py`.
 
 It assembles:
 
@@ -73,7 +73,7 @@ It assembles:
 - real French legitimate exports
 - synthetic French legitimate exports
 
-`scripts/data_platform/merge_splits.py` is the follow-on step that merges processed outputs into train, validation, and test splits.
+`scripts/data_platform/datasets/preparation/merge_splits.py` is the follow-on step that merges processed outputs into train, validation, and test splits.
 
 Make Targets For This Stage
 

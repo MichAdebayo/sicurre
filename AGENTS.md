@@ -115,7 +115,7 @@ Apply these principles to **all** production code. No exceptions.
 - **Dependency Inversion (DIP):** Depend on abstractions (protocols/ABCs), not concrete implementations. Inject dependencies — don't instantiate them inside business logic.
 
 ### Clean Code Rules
-- **Modular structure:** Each script/module does ONE thing. `scripts/data_platform/phishtank_scraper.py` scrapes. `src/data_platform/cleaning/` cleans. No god-files.
+- **Modular structure:** Each script/module does ONE thing. Source-specific entrypoints live under `scripts/data_platform/<source>/<phase>/`, while reusable business logic lives under `src/data_platform/`. No god-files.
 - **Meaningful names:** `extract_french_phishing_urls()` — not `do_stuff()` or `process()`. Variable names describe content: `raw_emails`, `cleaned_df`, `phishing_samples`.
 - **Small functions:** Max ~20 lines per function. If a function needs a comment to explain *what* it does, it's too long — extract a well-named helper.
 - **No magic numbers/strings:** Use constants or enums. `CONFIDENCE_THRESHOLD = 0.85` — not `if score > 0.85`.
