@@ -68,6 +68,8 @@ class StageTwoRewriteDraftService:
         "gestion compte bancaire",
         "nos services",
         "des intérêts débiteurs",
+        "# paiement",
+        "service e-carte bleue",
     )
     BAD_TOPIC_SUBSTRINGS: tuple[str, ...] = (
         "menu principal",
@@ -104,6 +106,28 @@ class StageTwoRewriteDraftService:
         "actuellement nous travaillons",
         "rapprochez-vous de votre conseiller habituel",
         "[phone]service",
+    )
+    NOISY_TOPIC_MARKERS: tuple[str, ...] = (
+        "ensemble contre les arnaques",
+        "signaler une arnaque",
+        "s'inscrire à la newsletter",
+        "alertes du moment",
+        "sujets les plus consultés",
+        "arnaques classées par catégories",
+        "en savoir +",
+        "up vote down vote",
+        "commentaire / explications",
+        "contenu de l'arnaque",
+        "créer un groupe prive",
+        "creer un groupe prive",
+        "les avis et commentaires laissés par les internautes",
+        "les avis et commentaires laisses par les internautes",
+        "répondre ajouter une image",
+        "repondre ajouter une image",
+        "laisser une réponse",
+        "laisser une reponse",
+        "etre notifié des nouveaux commentaires",
+        "etre notifie des nouveaux commentaires",
     )
     GENERIC_LEGITIMATE_SUBJECT_PREFIXES: tuple[str, ...] = (
         "information utile concernant",
@@ -246,7 +270,7 @@ class StageTwoRewriteDraftService:
             case "repair_then_rewrite":
                 return cls._build_repaired_spam(source_preview)
             case "embedded_lure_to_phishing_email":
-                return cls._build_phishing_draft(source_preview)
+                return cls._build_phishing_draft(job, source_preview)
             case _:
                 return cls._build_generic_rewrite(source_preview, job)
 
@@ -475,11 +499,221 @@ class StageTwoRewriteDraftService:
         return subject, body
 
     @classmethod
-    def _build_phishing_draft(cls, source_preview: str) -> tuple[str, str]:
-        return (
-            "Action requise pour confirmer votre accès",
-            "Bonjour,\n\nUne vérification de sécurité est en attente sur votre espace et doit être traitée sans délai pour éviter une restriction temporaire de votre accès.\n\nVeuillez confirmer vos informations depuis la procédure indiquée et finaliser la vérification aujourd'hui.\n\nCordialement,\nService sécurité",
+    def _build_phishing_draft(
+        cls,
+        job: dict[str, Any],
+        source_preview: str,
+    ) -> tuple[str, str]:
+        del job
+        theme = cls._infer_phishing_theme(source_preview)
+        entity = cls._infer_phishing_entity(source_preview, theme=theme)
+        reference = cls._build_phishing_reference(source_preview, theme=theme)
+        variant = cls._variant_index(source_preview, 4)
+
+        match theme:
+            case "delivery":
+                subjects = (
+                    f"{entity} : confirmation requise pour votre livraison {reference}",
+                    f"{entity} : votre colis reste en attente aujourd'hui",
+                    f"{entity} : dernière étape avant remise du colis {reference}",
+                    f"{entity} : régularisation nécessaire avant nouvelle livraison",
+                )
+                bodies = (
+                    "Bonjour,\n\n"
+                    f"Votre colis référencé {reference} n'a pas pu être remis ce matin. Une vérification de vos coordonnées est attendue sans délai afin d'éviter le retour du pli au centre de distribution.\n\n"
+                    "Veuillez confirmer votre créneau de livraison et finaliser la procédure aujourd'hui depuis le formulaire sécurisé mis à votre disposition.\n\n"
+                    f"Cordialement,\n{entity}",
+                    "Bonjour,\n\n"
+                    f"Une tentative de livraison liée au dossier {reference} reste suspendue après un échec de remise. Pour maintenir l'acheminement, nous vous demandons de confirmer votre adresse et vos informations de réception sans délai.\n\n"
+                    "Merci d'effectuer la vérification demandée aujourd'hui afin d'éviter une suspension définitive de la distribution.\n\n"
+                    f"Cordialement,\n{entity}",
+                    "Bonjour,\n\n"
+                    f"Votre expédition {reference} nécessite une action requise avant remise au point relais. Une confirmation de votre disponibilité est attendue aujourd'hui pour débloquer la livraison.\n\n"
+                    "Veuillez vérifier les informations demandées et confirmer votre choix de remise depuis la procédure sécurisée prévue à cet effet.\n\n"
+                    f"Cordialement,\n{entity}",
+                    "Bonjour,\n\n"
+                    f"Un complément d'information est nécessaire pour relancer la livraison du colis {reference}. Sans vérification de votre dossier aujourd'hui, l'envoi restera suspendu et sera retourné à l'expéditeur.\n\n"
+                    "Merci de confirmer immédiatement vos informations de réception afin de finaliser la nouvelle présentation du colis.\n\n"
+                    f"Cordialement,\n{entity}",
+                )
+            case "payment":
+                subjects = (
+                    f"{entity} : facture en attente de vérification {reference}",
+                    f"{entity} : action requise pour confirmer votre règlement",
+                    f"{entity} : document de paiement à valider aujourd'hui",
+                    f"{entity} : suspension prévue sans vérification de votre dossier",
+                )
+                bodies = (
+                    "Bonjour,\n\n"
+                    f"Une facture liée au dossier {reference} n'a pas pu être traitée automatiquement. Une vérification de vos informations de paiement est requise sans délai afin d'éviter le blocage du traitement.\n\n"
+                    "Veuillez confirmer votre règlement depuis la procédure indiquée et finaliser la validation aujourd'hui.\n\n"
+                    f"Cordialement,\n{entity}",
+                    "Bonjour,\n\n"
+                    f"Nous avons détecté une anomalie sur le règlement associé à la référence {reference}. Votre dossier restera suspendu tant que la vérification demandée n'aura pas été confirmée.\n\n"
+                    "Merci de confirmer immédiatement vos informations de paiement afin d'éviter une interruption de service.\n\n"
+                    f"Cordialement,\n{entity}",
+                    "Bonjour,\n\n"
+                    f"Le document de paiement {reference} nécessite une action requise avant clôture. Une vérification de sécurité doit être effectuée aujourd'hui pour maintenir la prise en charge de votre dossier.\n\n"
+                    "Veuillez confirmer votre accès et valider les informations demandées depuis le formulaire sécurisé.\n\n"
+                    f"Cordialement,\n{entity}",
+                    "Bonjour,\n\n"
+                    f"Suite à un contrôle de routine, la référence {reference} doit être confirmée sans délai pour éviter une suspension automatique de votre dossier.\n\n"
+                    "Merci de procéder à la vérification aujourd'hui et de confirmer votre règlement afin de lever l'alerte en cours.\n\n"
+                    f"Cordialement,\n{entity}",
+                )
+            case "admin":
+                subjects = (
+                    f"{entity} : mise à jour obligatoire de votre dossier {reference}",
+                    f"{entity} : vérification requise pour maintenir votre accès",
+                    f"{entity} : confirmation attendue aujourd'hui sur votre espace",
+                    f"{entity} : action immédiate nécessaire sur votre dossier",
+                )
+                bodies = (
+                    "Bonjour,\n\n"
+                    f"Une mise à jour liée à votre dossier {reference} doit être confirmée sans délai pour maintenir l'accès à votre espace personnel. Une vérification de vos informations est désormais requise.\n\n"
+                    "Veuillez confirmer les éléments demandés aujourd'hui depuis la procédure sécurisée afin d'éviter une suspension temporaire de vos services.\n\n"
+                    f"Cordialement,\n{entity}",
+                    "Bonjour,\n\n"
+                    f"Votre espace fait actuellement l'objet d'une vérification obligatoire concernant la référence {reference}. Sans confirmation aujourd'hui, votre dossier sera placé en attente de régularisation.\n\n"
+                    "Merci de confirmer immédiatement vos informations depuis le formulaire indiqué pour maintenir votre accès.\n\n"
+                    f"Cordialement,\n{entity}",
+                    "Bonjour,\n\n"
+                    f"Une action requise a été enregistrée sur le dossier {reference}. Afin d'éviter une suspension de traitement, nous vous demandons de vérifier votre identité et de confirmer votre accès sans délai.\n\n"
+                    "Veuillez finaliser la procédure aujourd'hui pour maintenir vos services actifs.\n\n"
+                    f"Cordialement,\n{entity}",
+                    "Bonjour,\n\n"
+                    f"Le maintien de votre dossier {reference} dépend d'une vérification immédiate de vos informations. À défaut de confirmation aujourd'hui, votre accès pourra être restreint temporairement.\n\n"
+                    "Merci de procéder sans délai à la vérification requise via la procédure sécurisée mise à disposition.\n\n"
+                    f"Cordialement,\n{entity}",
+                )
+            case _:
+                subjects = (
+                    f"{entity} : action requise pour confirmer votre accès {reference}",
+                    f"{entity} : vérification de sécurité en attente aujourd'hui",
+                    f"{entity} : suspension prévue sans confirmation de votre dossier",
+                    f"{entity} : confirmation nécessaire pour maintenir votre accès",
+                )
+                bodies = (
+                    "Bonjour,\n\n"
+                    f"Une vérification de sécurité liée à la référence {reference} est en attente sur votre espace. Cette procédure doit être traitée sans délai afin d'éviter une restriction temporaire de votre accès.\n\n"
+                    "Veuillez confirmer vos informations depuis la procédure indiquée et finaliser la vérification aujourd'hui.\n\n"
+                    f"Cordialement,\n{entity}",
+                    "Bonjour,\n\n"
+                    f"Nous avons détecté une activité nécessitant la confirmation du dossier {reference}. Sans action requise de votre part aujourd'hui, votre accès restera suspendu à titre préventif.\n\n"
+                    "Merci de confirmer immédiatement vos informations afin de finaliser la vérification de sécurité en cours.\n\n"
+                    f"Cordialement,\n{entity}",
+                    "Bonjour,\n\n"
+                    f"Votre compte fait l'objet d'une vérification urgente portant sur la référence {reference}. Une confirmation sans délai est nécessaire pour éviter une suspension automatique des services associés.\n\n"
+                    "Veuillez vérifier les informations demandées et confirmer votre accès depuis la procédure sécurisée prévue à cet effet.\n\n"
+                    f"Cordialement,\n{entity}",
+                    "Bonjour,\n\n"
+                    f"Une action de contrôle a été déclenchée sur le dossier {reference}. Pour maintenir votre accès actif, nous vous demandons de confirmer les éléments de sécurité aujourd'hui.\n\n"
+                    "Merci de procéder à la vérification demandée dès réception de ce message afin d'éviter toute interruption temporaire.\n\n"
+                    f"Cordialement,\n{entity}",
+                )
+
+        return subjects[variant], bodies[variant]
+
+    @staticmethod
+    def _build_phishing_reference(source_preview: str, *, theme: str) -> str:
+        prefix_map = {
+            "delivery": "CL",
+            "payment": "PAI",
+            "admin": "DOS",
+            "account": "ACC",
+        }
+        prefix = prefix_map.get(theme, "REF")
+        digest = hashlib.sha256(source_preview.lower().encode("utf-8")).hexdigest()
+        return f"{prefix}-{digest[:6].upper()}"
+
+    @staticmethod
+    def _infer_phishing_theme(source_preview: str) -> str:
+        lowered = source_preview.lower()
+        if any(
+            marker in lowered
+            for marker in (
+                "mondial relay",
+                "relay",
+                "colis",
+                "livraison",
+                "coursier",
+                "livreur",
+                "distribution-retard",
+                "relais",
+            )
+        ):
+            return "delivery"
+        if any(
+            marker in lowered
+            for marker in (
+                "urssaf",
+                "ameli",
+                "impot",
+                "impôts",
+                "service public",
+                "carte vitale",
+                "caf",
+                "cpam",
+            )
+        ):
+            return "admin"
+        if any(
+            marker in lowered
+            for marker in (
+                "paiement",
+                "facture",
+                "carte",
+                "bancaire",
+                "virement",
+                "douane",
+                "règlement",
+                "reglement",
+            )
+        ):
+            return "payment"
+        if any(
+            marker in lowered
+            for marker in (
+                "compte",
+                "accès",
+                "acces",
+                "connexion",
+                "mot de passe",
+                "espace client",
+                "suspension",
+            )
+        ):
+            return "account"
+        return "account"
+
+    @staticmethod
+    def _infer_phishing_entity(source_preview: str, *, theme: str) -> str:
+        lowered = source_preview.lower()
+        entity_map = (
+            ("mondial relay", "Mondial Relay"),
+            ("chronopost", "Chronopost"),
+            ("la poste", "La Poste"),
+            ("laposte", "La Poste"),
+            ("ameli", "Ameli"),
+            ("urssaf", "URSSAF"),
+            ("impot", "Service fiscal"),
+            ("impôts", "Service fiscal"),
+            ("service public", "Service Public"),
+            ("caf", "CAF"),
+            ("cpam", "Assurance Maladie"),
         )
+        for marker, entity in entity_map:
+            if marker in lowered:
+                return entity
+        match theme:
+            case "delivery":
+                return "Service livraison"
+            case "payment":
+                return "Service facturation"
+            case "admin":
+                return "Service dossier"
+            case _:
+                return "Service sécurité"
 
     @classmethod
     def _build_generic_rewrite(
@@ -494,7 +728,7 @@ class StageTwoRewriteDraftService:
             case "spam":
                 return cls._build_promotional_spam(source_preview)
             case "phishing":
-                return cls._build_phishing_draft(source_preview)
+                return cls._build_phishing_draft(job, source_preview)
             case _:
                 return (
                     "Message reformulé à vérifier",
@@ -531,6 +765,30 @@ class StageTwoRewriteDraftService:
         focus_map = (
             (
                 (
+                    "mondial relay",
+                    "colis",
+                    "livraison",
+                    "point relais",
+                    "chronopost",
+                    "coursier",
+                    "livreur",
+                ),
+                "vos notifications de livraison",
+            ),
+            (
+                ("emploi", "cv", "recrutement", "temps partiel"),
+                "vos offres d'emploi reçues",
+            ),
+            (
+                ("loterie", "gain", "gagnants", "euro-millions"),
+                "les promesses de gain",
+            ),
+            (
+                ("location", "locataire", "location saisonnière"),
+                "les demandes de location",
+            ),
+            (
+                (
                     "notification",
                     "notifications",
                     "virement",
@@ -546,6 +804,10 @@ class StageTwoRewriteDraftService:
             (
                 ("fraude", "opération frauduleuse"),
                 "la prévention des opérations frauduleuses",
+            ),
+            (
+                ("arnaque", "escroquerie", "signalement"),
+                "les messages suspects",
             ),
             (("données bancaires",), "la protection de vos données bancaires"),
             (("mot de passe", "connexion", "accès"), "votre accès en ligne"),
@@ -563,6 +825,30 @@ class StageTwoRewriteDraftService:
         lowered = source_preview.lower()
         focus_map = (
             (
+                (
+                    "mondial relay",
+                    "colis",
+                    "livraison",
+                    "point relais",
+                    "chronopost",
+                    "coursier",
+                    "livreur",
+                ),
+                "les faux messages de livraison",
+            ),
+            (
+                ("emploi", "cv", "recrutement", "temps partiel"),
+                "les faux messages d'emploi",
+            ),
+            (
+                ("loterie", "gain", "gagnants", "euro-millions"),
+                "les faux gains et loteries",
+            ),
+            (
+                ("location", "locataire", "location saisonnière"),
+                "les demandes de location suspectes",
+            ),
+            (
                 ("appel frauduleux", "appel suspect", "téléphone"),
                 "les appels frauduleux",
             ),
@@ -574,6 +860,7 @@ class StageTwoRewriteDraftService:
                 ("réseaux sociaux", "internet"),
                 "les fraudes sur Internet et les réseaux sociaux",
             ),
+            (("arnaque", "escroquerie", "signalement"), "les messages suspects"),
             (("mail", "e-mail", "sms"), "les messages suspects"),
             (("fraude", "opération frauduleuse"), "les opérations frauduleuses"),
         )
@@ -602,6 +889,8 @@ class StageTwoRewriteDraftService:
             if len(candidate) < 18:
                 continue
             lowered_candidate = candidate.lower()
+            if cls._is_noisy_topic_candidate(lowered_candidate):
+                continue
             score = sum(
                 keyword in lowered_candidate
                 for keyword in cls.LEGITIMATE_TOPIC_KEYWORDS
@@ -619,13 +908,19 @@ class StageTwoRewriteDraftService:
             phrase = " ".join(words[:7]).strip(" ,;:-")
             if len(phrase) < 12:
                 continue
+            if cls._is_noisy_topic_candidate(phrase.lower()):
+                continue
             if score > best_score:
                 best_score = score
                 best_phrase = phrase[0].upper() + phrase[1:]
-        return best_phrase if best_phrase is not None and best_score >= 0 else fallback
+        if best_phrase is None or best_score < 1:
+            return fallback
+        if cls._count_page_like_subject_hits(best_phrase) > 0:
+            return fallback
+        return best_phrase
 
-    @staticmethod
-    def _extract_topic_phrase(source_preview: str, *, fallback: str) -> str:
+    @classmethod
+    def _extract_topic_phrase(cls, source_preview: str, *, fallback: str) -> str:
         cleaned_preview = re.sub(r"\s+", " ", source_preview).strip()
         cleaned_preview = re.sub(
             r"(?i)accès à vos comptes par l'écran de connexion pleine page|accéder au menu principal|accéder au contenu éditorial|accéder au pied de page",
@@ -641,11 +936,39 @@ class StageTwoRewriteDraftService:
             candidate = re.sub(r"^\d+\s*[-:]\s*", "", candidate)
             if len(candidate) < 18:
                 continue
+            if cls._is_noisy_topic_candidate(candidate.lower()):
+                continue
             words = candidate.split()
             phrase = " ".join(words[:6]).strip(" ,;:-")
-            if len(phrase) >= 12:
+            if len(phrase) >= 12 and not cls._is_noisy_topic_candidate(phrase.lower()):
                 return phrase[0].upper() + phrase[1:]
         return fallback
+
+    @classmethod
+    def _is_noisy_topic_candidate(cls, text: str) -> bool:
+        lowered = text.lower().strip()
+        if any(marker in lowered for marker in cls.NOISY_TOPIC_MARKERS):
+            return True
+        if any(marker in lowered for marker in cls.BAD_TOPIC_SUBSTRINGS):
+            return True
+        if "[phone]" in lowered or "[email]" in lowered or "[url]" in lowered:
+            return True
+        if re.search(r"\b\d+\s*commentaires?\b", lowered):
+            return True
+        if re.search(r"\b(?:up vote|down vote)\b", lowered):
+            return True
+        if re.search(r"\b(?:le|la)\s+\d{2}/\d{2}/\d{4}\b", lowered):
+            return True
+        if re.match(
+            (
+                r"^(?:je|j'|moi|mon|ma|mes|nous|notre|guy\s+le|ps\s*:|bref\b|ce qui m'a|"
+                r"bonjour\b|choisissez\b|pensez\b|sur mon compte\b|ils ont\b|en cas de besoin\b|"
+                r"votre engagement massif\b|\"\s*j'ai\b)"
+            ),
+            lowered,
+        ):
+            return True
+        return False
 
     @staticmethod
     def _variant_index(seed: str, modulo: int) -> int:

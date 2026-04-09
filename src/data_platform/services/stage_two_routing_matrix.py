@@ -78,6 +78,18 @@ class StageTwoRoutingMatrixService:
         StageTwoRoutingRule(
             source_name="common-crawl-bigdata",
             key_type="route_subtype",
+            key="phishing_lure_candidate",
+            action="adapt",
+            output_bucket="adaptation_queue",
+            adaptation_fit="high",
+            rationale=(
+                "Scam-report pages expose recurring French lure wording and delivery/account "
+                "pretexts that can be rewritten into phishing examples after review."
+            ),
+        ),
+        StageTwoRoutingRule(
+            source_name="common-crawl-bigdata",
+            key_type="route_subtype",
             key="navigation_heavy_holdout",
             action="archive",
             output_bucket="dead_holdout_archive",

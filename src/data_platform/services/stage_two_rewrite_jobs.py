@@ -96,7 +96,7 @@ class StageTwoRewriteJobService:
         key = str(rule.get("key") or "")
         if key == "promotional_spam":
             return "spam"
-        if key == "synthetic_lure_candidate":
+        if key in {"synthetic_lure_candidate", "phishing_lure_candidate"}:
             return "phishing"
 
         label_summary = rule.get("label_summary") or {}
@@ -113,7 +113,7 @@ class StageTwoRewriteJobService:
             return "awareness_page_to_warning_notification"
         if key == "promotional_spam":
             return "promotional_page_to_spam_message"
-        if key == "synthetic_lure_candidate":
+        if key in {"synthetic_lure_candidate", "phishing_lure_candidate"}:
             return "embedded_lure_to_phishing_email"
         return "repair_then_rewrite" if key.startswith("historical_") else "rewrite"
 
@@ -150,6 +150,10 @@ class StageTwoRewriteJobService:
                 constraints.append(
                     "shape the output as a defensive vigilance notification"
                 )
+            case "phishing_lure_candidate":
+                constraints.append(
+                    "extract the underlying lure from the scam-report context without copying the report scaffolding"
+                )
         return constraints
 
     @staticmethod
@@ -168,11 +172,17 @@ class StageTwoRewriteJobService:
                     hints.append("retain offer and promotional vocabulary")
                 if int(marker_evidence.get("awareness_hits", 0)) > 0:
                     hints.append("retain defensive fraud-awareness vocabulary")
+                if int(marker_evidence.get("phishing_report_hits", 0)) > 0:
+                    hints.append(
+                        "extract the embedded scam pretext from the report wording"
+                    )
+                if int(marker_evidence.get("phishing_lure_hits", 0)) > 0:
+                    hints.append("retain parcel, account, or delivery lure vocabulary")
             case "database-historical":
                 hints.append("repair mojibake and strip residual HTML")
 
         match rule_key:
-            case "synthetic_lure_candidate":
+            case "synthetic_lure_candidate" | "phishing_lure_candidate":
                 hints.append("shape the output as a realistic phishing email")
             case "awareness_or_report":
                 hints.append("shape the output as a defensive vigilance reminder")

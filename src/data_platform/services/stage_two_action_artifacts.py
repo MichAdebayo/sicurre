@@ -168,6 +168,8 @@ class StageTwoActionArtifactsService:
             if rule.get("action") != action:
                 continue
             matching_samples = cls._match_samples_for_rule(rule, source_samples)
+            if action == "adapt":
+                matching_samples = cls._deduplicate_adaptation_samples(matching_samples)
             rule_payloads.append(
                 {
                     "source_name": source_name,
@@ -204,6 +206,35 @@ class StageTwoActionArtifactsService:
                 if (sample.get("rejection_reason") or sample.get("route_reason")) == key
             ]
         return []
+
+    @staticmethod
+    def _deduplicate_adaptation_samples(
+        samples: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        best_by_signature: dict[str, dict[str, Any]] = {}
+        for sample in samples:
+            signature = StageTwoActionArtifactsService._sample_signature(sample)
+            existing = best_by_signature.get(signature)
+            if existing is None or StageTwoActionArtifactsService._sample_rank(
+                sample
+            ) > StageTwoActionArtifactsService._sample_rank(existing):
+                best_by_signature[signature] = sample
+        return list(best_by_signature.values())
+
+    @staticmethod
+    def _sample_signature(sample: dict[str, Any]) -> str:
+        preview = str(sample.get("normalized_preview") or "").lower()
+        preview = " ".join(preview.split())
+        if preview:
+            return preview
+        return str(sample.get("raw_record_id") or "unknown")
+
+    @staticmethod
+    def _sample_rank(sample: dict[str, Any]) -> tuple[int, float]:
+        return (
+            int(sample.get("normalized_length") or 0),
+            float(sample.get("similarity_score") or 0.0),
+        )
 
     @staticmethod
     def _serialize_sample(sample: dict[str, Any]) -> dict[str, Any]:
