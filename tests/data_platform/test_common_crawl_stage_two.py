@@ -93,3 +93,76 @@ def test_common_crawl_stage_two_recovers_product_offer_page_for_spam_adaptation(
     assert result.route_outcome == "specialized_processing"
     assert result.route_reason == "common_crawl_product_offer_candidate"
     assert result.route_subtype == "promotional_spam"
+
+
+def test_common_crawl_stage_two_routes_signal_arnaques_pages_to_phishing_lane() -> None:
+    result = CommonCrawlStageTwoService.review(
+        (
+            "Ensemble contre les Arnaques Signaler une Arnaque Alertes du moment "
+            "Distribution-retard.com Site internet frauduleux Page miroir mondial Relay. "
+            "Aucun livreur n'est passé pendant cette plage horaire. "
+            "Autre arnaque Message reçu ce jour. Escroquerie au faux colis."
+        ),
+        {
+            "category": "phishing_related",
+            "query": "signal-arnaques.com/*",
+            "query_label": "scam_reports_fr",
+            "url": "https://www.signal-arnaques.com/",
+        },
+    )
+
+    assert result.route_outcome == "specialized_processing"
+    assert result.route_reason == "common_crawl_phishing_lure_candidate"
+    assert result.route_subtype == "phishing_lure_candidate"
+    assert result.derived_payload is not None
+    assert result.derived_payload["phishing_relevance"] is True
+
+
+def test_common_crawl_stage_two_recovers_service_contact_holdout() -> None:
+    result = CommonCrawlStageTwoService.review(
+        (
+            "Tous les champs sont obligatoires. Contactez votre service client depuis la messagerie sécurisée. "
+            "Une notification dédiée vous guidera ensuite dans votre espace habituel."
+        ),
+        {"category": "legitimate", "query_label": "bank_fr"},
+    )
+
+    assert result.route_outcome == "specialized_processing"
+    assert result.route_reason == "common_crawl_account_recovery_candidate"
+    assert result.route_subtype == "instructional_legitimate"
+
+
+def test_common_crawl_stage_two_routes_cybermalveillance_pages_to_awareness() -> None:
+    result = CommonCrawlStageTwoService.review(
+        (
+            "Assistance aux victimes de cybermalveillance. Cybermalveillance.gouv.fr a pour missions "
+            "de sensibiliser au risque cyber, d'informer sur les menaces numériques et les moyens de s'en protéger."
+        ),
+        {
+            "category": "phishing_related",
+            "query": "cybermalveillance.gouv.fr/*",
+            "query_label": "cert_gov_fr",
+            "url": "https://www.cybermalveillance.gouv.fr/",
+        },
+    )
+
+    assert result.route_outcome == "specialized_processing"
+    assert result.route_reason == "common_crawl_phishing_awareness_content"
+    assert result.route_subtype == "awareness_or_report"
+
+
+def test_common_crawl_stage_two_keeps_signal_spam_barometer_out_of_awareness() -> None:
+    result = CommonCrawlStageTwoService.review(
+        (
+            "Baromètre de la perception du spam pour le deuxième trimestre 2019. "
+            "Téléchargez le baromètre et consultez les anciens baromètres."
+        ),
+        {
+            "category": "phishing_related",
+            "query": "signal-spam.fr/*",
+            "query_label": "signal_spam_fr",
+            "url": "https://www.signal-spam.fr/barometre-du-spam/",
+        },
+    )
+
+    assert result.route_subtype != "awareness_or_report"

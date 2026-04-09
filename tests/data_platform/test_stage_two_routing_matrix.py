@@ -23,6 +23,7 @@ def test_stage_two_routing_matrix_assigns_counts_and_actions() -> None:
                                     "instructional_legitimate": 2,
                                     "promotional_spam": 1,
                                     "awareness_or_report": 1,
+                                    "phishing_lure_candidate": 1,
                                     "navigation_heavy_holdout": 1,
                                     "no_window_holdout": 1,
                                 },
@@ -89,6 +90,8 @@ def test_stage_two_routing_matrix_assigns_counts_and_actions() -> None:
     assert common_crawl_rows["instructional_legitimate"]["current_count"] == 2
     assert common_crawl_rows["awareness_or_report"]["action"] == "adapt"
     assert common_crawl_rows["awareness_or_report"]["current_count"] == 1
+    assert common_crawl_rows["phishing_lure_candidate"]["action"] == "adapt"
+    assert common_crawl_rows["phishing_lure_candidate"]["current_count"] == 1
 
     cert_rows = {row["key"]: row for row in sources["cert-fr-cti"]["rows"]}
     assert cert_rows["threat_intel"]["action"] == "extract_signals_only"

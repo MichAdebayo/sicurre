@@ -103,3 +103,48 @@ def test_stage_two_rewrite_jobs_assigns_awareness_mode_and_hint() -> None:
     job = jobs["jobs"][0]
     assert job["rewrite_mode"] == "awareness_page_to_warning_notification"
     assert "shape the output as a defensive vigilance reminder" in job["prompt_hints"]
+
+
+def test_stage_two_rewrite_jobs_assigns_common_crawl_phishing_mode_and_hints() -> None:
+    jobs = StageTwoRewriteJobService.build_jobs(
+        {
+            "sources": [
+                {
+                    "source_name": "common-crawl-bigdata",
+                    "rules": [
+                        {
+                            "key": "phishing_lure_candidate",
+                            "adaptation_fit": "high",
+                            "rationale": "rewrite scam report into phishing example",
+                            "label_summary": {"phishing": 1},
+                            "sampled_records": [
+                                {
+                                    "raw_record_id": "phish-1",
+                                    "extracted_label": "phishing",
+                                    "normalized_preview": "Site internet frauduleux. Message reçu ce jour. Escroquerie au faux colis.",
+                                    "normalized_length": 120,
+                                    "similarity_score": 0.2,
+                                    "trace_summary": "trace",
+                                    "derived_payload": {
+                                        "marker_evidence": {
+                                            "phishing_report_hits": 2,
+                                            "phishing_lure_hits": 2,
+                                        }
+                                    },
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+
+    job = jobs["jobs"][0]
+    assert job["target_label"] == "phishing"
+    assert job["rewrite_mode"] == "embedded_lure_to_phishing_email"
+    assert (
+        "extract the embedded scam pretext from the report wording"
+        in job["prompt_hints"]
+    )
+    assert "shape the output as a realistic phishing email" in job["prompt_hints"]

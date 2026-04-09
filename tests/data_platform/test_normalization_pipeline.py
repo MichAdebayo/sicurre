@@ -201,6 +201,55 @@ def test_common_crawl_product_page_is_not_directly_accepted() -> None:
     assert payload.route_subtype == "instructional_legitimate"
 
 
+def test_common_crawl_phishing_related_payload_maps_to_phishing_lane() -> None:
+    pipeline = NormalizationPipeline(session=None)  # type: ignore[arg-type]
+
+    payload = pipeline.extract_payload(
+        "common-crawl-bigdata",
+        {
+            "text": (
+                "Ensemble contre les Arnaques Site internet frauduleux Page miroir mondial Relay. "
+                "Aucun livreur n'est passé pendant cette plage horaire. "
+                "Message reçu ce jour. Escroquerie au faux colis."
+            ),
+            "label": "scam_reports_fr",
+            "category": "phishing_related",
+            "query": "signal-arnaques.com/*",
+            "query_label": "scam_reports_fr",
+            "url": "https://www.signal-arnaques.com/",
+        },
+    )
+
+    assert payload.label is NormalizedLabel.PHISHING
+    assert payload.route_outcome == "specialized_processing"
+    assert payload.route_reason == "common_crawl_phishing_lure_candidate"
+    assert payload.route_subtype == "phishing_lure_candidate"
+
+
+def test_common_crawl_phishing_awareness_payload_maps_to_awareness_lane() -> None:
+    pipeline = NormalizationPipeline(session=None)  # type: ignore[arg-type]
+
+    payload = pipeline.extract_payload(
+        "common-crawl-bigdata",
+        {
+            "text": (
+                "Assistance aux victimes de cybermalveillance. Cybermalveillance.gouv.fr a pour missions "
+                "de sensibiliser au risque cyber, d'informer sur les menaces numériques et les moyens de s'en protéger."
+            ),
+            "label": "cert_gov_fr",
+            "category": "phishing_related",
+            "query": "cybermalveillance.gouv.fr/*",
+            "query_label": "cert_gov_fr",
+            "url": "https://www.cybermalveillance.gouv.fr/",
+        },
+    )
+
+    assert payload.label is NormalizedLabel.PHISHING
+    assert payload.route_outcome == "specialized_processing"
+    assert payload.route_reason == "common_crawl_phishing_awareness_content"
+    assert payload.route_subtype == "awareness_or_report"
+
+
 def test_extract_payload_rejects_certfr_report_like_documents() -> None:
     pipeline = NormalizationPipeline(session=None)  # type: ignore[arg-type]
 

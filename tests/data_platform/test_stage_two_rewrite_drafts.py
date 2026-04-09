@@ -190,6 +190,78 @@ def test_stage_two_rewrite_drafts_downgrades_page_like_legitimate_subject() -> N
     assert "page_like_legitimate_subject" in draft["review_notes"]
 
 
+def test_stage_two_rewrite_drafts_falls_back_from_page_like_focus_phrase() -> None:
+    drafts = StageTwoRewriteDraftService.build_drafts(
+        {
+            "jobs": [
+                {
+                    "job_id": "job-page-focus",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "instructional_legitimate",
+                    "rewrite_mode": "institutional_page_to_notification",
+                    "target_label": "legitimate",
+                    "raw_record_id": "page-focus-1",
+                    "source_preview": "# paiement Service e-Carte Bleue. Vous recevrez une notification sur votre messagerie sécurisée après validation.",
+                }
+            ]
+        }
+    )
+
+    draft = drafts["drafts"][0]
+    assert "page_like_legitimate_subject" not in draft["review_notes"]
+    assert draft["review_state"] == "usable"
+
+
+def test_stage_two_rewrite_drafts_avoids_scam_report_scaffold_in_legitimate_subject() -> (
+    None
+):
+    drafts = StageTwoRewriteDraftService.build_drafts(
+        {
+            "jobs": [
+                {
+                    "job_id": "job-scaffold-focus",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "instructional_legitimate",
+                    "rewrite_mode": "institutional_page_to_notification",
+                    "target_label": "legitimate",
+                    "raw_record_id": "scaffold-focus-1",
+                    "source_preview": "Ne manquez pas cette vidéo choc. En Savoir + Arnaques classées par catégories. Arnaques par SMS et arnaques via Paylib signalées cette semaine.",
+                }
+            ]
+        }
+    )
+
+    draft = drafts["drafts"][0]
+    assert draft["review_state"] == "usable"
+    assert "en savoir" not in draft["subject"].lower()
+    assert "arnaques classées" not in draft["subject"].lower()
+
+
+def test_stage_two_rewrite_drafts_avoids_first_person_delivery_subject() -> None:
+    drafts = StageTwoRewriteDraftService.build_drafts(
+        {
+            "jobs": [
+                {
+                    "job_id": "job-first-person-delivery",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "instructional_legitimate",
+                    "rewrite_mode": "institutional_page_to_notification",
+                    "target_label": "legitimate",
+                    "raw_record_id": "first-person-delivery-1",
+                    "source_preview": "Je viens de recevoir un SMS de Mondial Relay indiquant qu'un colis ne peut pas être livré sans nouvelle confirmation du point relais aujourd'hui.",
+                }
+            ]
+        }
+    )
+
+    draft = drafts["drafts"][0]
+    assert draft["review_state"] == "usable"
+    assert "je viens de recevoir" not in draft["subject"].lower()
+    assert (
+        "livraison" in draft["subject"].lower() or "colis" in draft["subject"].lower()
+    )
+
+
 def test_stage_two_rewrite_drafts_builds_awareness_warning_notification() -> None:
     drafts = StageTwoRewriteDraftService.build_drafts(
         {
@@ -211,6 +283,81 @@ def test_stage_two_rewrite_drafts_builds_awareness_warning_notification() -> Non
     assert draft["review_state"] == "usable"
     assert "appel" in draft["subject"].lower()
     assert "vigil" in draft["body"].lower() or "par téléphone" in draft["body"].lower()
+
+
+def test_stage_two_rewrite_drafts_builds_distinct_phishing_lures() -> None:
+    drafts = StageTwoRewriteDraftService.build_drafts(
+        {
+            "jobs": [
+                {
+                    "job_id": "job-phish-a",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "phishing_lure_candidate",
+                    "rewrite_mode": "embedded_lure_to_phishing_email",
+                    "target_label": "phishing",
+                    "raw_record_id": "phish-a",
+                    "source_preview": "Distribution-retard.com Page miroir Mondial Relay. Message reçu ce jour indiquant qu'un colis ne peut pas être livré sans confirmation de l'adresse.",
+                },
+                {
+                    "job_id": "job-phish-b",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "phishing_lure_candidate",
+                    "rewrite_mode": "embedded_lure_to_phishing_email",
+                    "target_label": "phishing",
+                    "raw_record_id": "phish-b",
+                    "source_preview": "Alerte signalée : faux suivi de livraison demandant de confirmer un colis en attente et de finaliser la reprogrammation aujourd'hui.",
+                },
+            ]
+        }
+    )
+
+    first, second = drafts["drafts"]
+    assert first["review_state"] == "usable"
+    assert second["review_state"] == "usable"
+    assert first["text_sha256"] != second["text_sha256"]
+    assert "duplicate_generated_draft" not in first["review_notes"]
+    assert "duplicate_generated_draft" not in second["review_notes"]
+    assert (
+        "livraison" in first["subject"].lower() or "colis" in first["subject"].lower()
+    )
+    assert (
+        "vérification" in first["body"].lower() or "confirmer" in first["body"].lower()
+    )
+
+
+def test_stage_two_rewrite_drafts_downgrades_duplicate_phishing_lures() -> None:
+    drafts = StageTwoRewriteDraftService.build_drafts(
+        {
+            "jobs": [
+                {
+                    "job_id": "job-phish-dup-a",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "phishing_lure_candidate",
+                    "rewrite_mode": "embedded_lure_to_phishing_email",
+                    "target_label": "phishing",
+                    "raw_record_id": "phish-dup-a",
+                    "source_preview": "Distribution-retard.com Page miroir Mondial Relay. Message reçu ce jour indiquant qu'un colis ne peut pas être livré sans confirmation de l'adresse.",
+                },
+                {
+                    "job_id": "job-phish-dup-b",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "phishing_lure_candidate",
+                    "rewrite_mode": "embedded_lure_to_phishing_email",
+                    "target_label": "phishing",
+                    "raw_record_id": "phish-dup-b",
+                    "source_preview": "Distribution-retard.com Page miroir Mondial Relay. Message reçu ce jour indiquant qu'un colis ne peut pas être livré sans confirmation de l'adresse.",
+                },
+            ]
+        }
+    )
+
+    assert all(
+        draft["review_state"] == "needs_prompt_tuning" for draft in drafts["drafts"]
+    )
+    assert all(
+        "duplicate_generated_draft" in draft["review_notes"]
+        for draft in drafts["drafts"]
+    )
 
 
 def test_stage_two_rewrite_drafts_render_markdown() -> None:

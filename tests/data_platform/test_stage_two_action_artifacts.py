@@ -148,3 +148,73 @@ def test_stage_two_action_artifacts_render_markdown() -> None:
     assert "Adaptation Queue" in markdown
     assert "Signal Bank" in markdown
     assert "Archive Manifest" in markdown
+
+
+def test_stage_two_action_artifacts_deduplicates_adaptation_samples_by_preview() -> (
+    None
+):
+    artifacts = StageTwoActionArtifactsService.build_artifacts(
+        matrix_payload={
+            "sources": [
+                {
+                    "source_name": "common-crawl-bigdata",
+                    "rows": [
+                        {
+                            "key_type": "route_subtype",
+                            "key": "promotional_spam",
+                            "action": "adapt",
+                            "output_bucket": "adaptation_queue",
+                            "adaptation_fit": "high",
+                            "rationale": "rewrite page into spam",
+                            "current_count": 2,
+                        }
+                    ],
+                }
+            ]
+        },
+        review_payloads=[
+            {
+                "source_name": "common-crawl-bigdata",
+                "result": {
+                    "parent_sources": {
+                        "bigdata": [
+                            {
+                                "samples": [
+                                    {
+                                        "raw_record_id": "promo-1",
+                                        "route_subtype": "promotional_spam",
+                                        "route_reason": "common_crawl_promotional_candidate",
+                                        "rejection_reason": "common_crawl_promotional_candidate",
+                                        "extracted_label": "spam",
+                                        "normalized_preview": "Profitez de notre offre exclusive aujourd'hui.",
+                                        "transformation_strength": "major",
+                                        "similarity_score": 0.3,
+                                        "normalized_length": 80,
+                                        "trace_summary": "trace",
+                                        "derived_payload": {},
+                                    },
+                                    {
+                                        "raw_record_id": "promo-2",
+                                        "route_subtype": "promotional_spam",
+                                        "route_reason": "common_crawl_promotional_candidate",
+                                        "rejection_reason": "common_crawl_promotional_candidate",
+                                        "extracted_label": "spam",
+                                        "normalized_preview": "Profitez de notre offre exclusive aujourd'hui.",
+                                        "transformation_strength": "major",
+                                        "similarity_score": 0.4,
+                                        "normalized_length": 100,
+                                        "trace_summary": "trace",
+                                        "derived_payload": {},
+                                    },
+                                ]
+                            }
+                        ]
+                    }
+                },
+            }
+        ],
+    )
+
+    rules = artifacts["adaptation_queue"]["sources"][0]["rules"]
+    assert rules[0]["sampled_record_count"] == 1
+    assert rules[0]["sampled_records"][0]["raw_record_id"] == "promo-2"
