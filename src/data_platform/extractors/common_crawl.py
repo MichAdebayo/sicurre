@@ -44,6 +44,7 @@ DEFAULT_CC_SOURCE_NAME = "common-crawl-bigdata"
 DEFAULT_CC_SNAPSHOT_DIR = REPO_ROOT / "data" / "raw" / "bigdata" / "common_crawl"
 DEFAULT_CC_SNAPSHOT_PREFIX = "common_crawl"
 
+
 @dataclass(slots=True)
 class CommonCrawlIngestionResult:
     ingestion_run_id: str
@@ -67,31 +68,43 @@ class CommonCrawlBigQueryClient:
         self.dataset_id = os.environ.get("DATASET_ID", "sicurre_dataset")
         self.table_name = "common_crawl_raw"
         self.full_table_id = f"{self.project_id}.{self.dataset_id}.{self.table_name}"
-        
+
         # R2 credentials
-        self.r2_bucket = os.environ.get("SICURRE_RAW_SNAPSHOT_R2_BUCKET_NAME", "sicurre-raw")
+        self.r2_bucket = os.environ.get(
+            "SICURRE_RAW_SNAPSHOT_R2_BUCKET_NAME", "sicurre-raw"
+        )
         self.s3_client = boto3.client(
             "s3",
             endpoint_url=os.environ.get("SICURRE_RAW_SNAPSHOT_R2_ENDPOINT_URL"),
             aws_access_key_id=os.environ.get("SICURRE_RAW_SNAPSHOT_R2_ACCESS_KEY_ID"),
-            aws_secret_access_key=os.environ.get("SICURRE_RAW_SNAPSHOT_R2_SECRET_ACCESS_KEY"),
+            aws_secret_access_key=os.environ.get(
+                "SICURRE_RAW_SNAPSHOT_R2_SECRET_ACCESS_KEY"
+            ),
             region_name=os.environ.get("SICURRE_RAW_SNAPSHOT_R2_REGION", "auto"),
         )
 
     def fetch_latest_parquet_from_r2(self) -> pd.DataFrame:
         """Finds the most recently created fr_usable parquet file in R2 and downloads it into Pandas."""
-        logger.info(f"Searching R2 bucket '{self.r2_bucket}' for latest Common Crawl parquet...")
+        logger.info(
+            f"Searching R2 bucket '{self.r2_bucket}' for latest Common Crawl parquet..."
+        )
         prefix = "raw-snapshots/bigdata/common_crawl/fr_usable/"
-        
+
         response = self.s3_client.list_objects_v2(Bucket=self.r2_bucket, Prefix=prefix)
         if "Contents" not in response:
-            raise FileNotFoundError(f"No objects found in r2://{self.r2_bucket}/{prefix}")
+            raise FileNotFoundError(
+                f"No objects found in r2://{self.r2_bucket}/{prefix}"
+            )
 
         # Find the most recent .parquet file
-        objects = [obj for obj in response["Contents"] if obj["Key"].endswith(".parquet")]
+        objects = [
+            obj for obj in response["Contents"] if obj["Key"].endswith(".parquet")
+        ]
         if not objects:
-            raise FileNotFoundError(f"No .parquet files found in r2://{self.r2_bucket}/{prefix}")
-            
+            raise FileNotFoundError(
+                f"No .parquet files found in r2://{self.r2_bucket}/{prefix}"
+            )
+
         latest_obj = max(objects, key=lambda x: x["LastModified"])
         object_key = latest_obj["Key"]
         logger.info(f"Found latest parquet: r2://{self.r2_bucket}/{object_key}")
@@ -100,7 +113,7 @@ class CommonCrawlBigQueryClient:
         buf = io.BytesIO()
         self.s3_client.download_fileobj(self.r2_bucket, object_key, buf)
         buf.seek(0)
-        
+
         logger.info("Parsing Parquet with PyArrow...")
         df = pd.read_parquet(buf, engine="pyarrow")
         logger.info(f"Parsed DataFrame with {len(df)} rows.")
@@ -113,8 +126,12 @@ class CommonCrawlBigQueryClient:
         dataset_ref.location = os.environ.get("SICURRE_GCP_REGION", "europe-west1")
         self.bq_client.create_dataset(dataset_ref, exists_ok=True)
 
-        logger.info(f"Pushing {len(df)} rows to BigQuery native table: {self.full_table_id}")
-        job_config = bigquery.LoadJobConfig(write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE)
+        logger.info(
+            f"Pushing {len(df)} rows to BigQuery native table: {self.full_table_id}"
+        )
+        job_config = bigquery.LoadJobConfig(
+            write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE
+        )
         load_job = self.bq_client.load_table_from_dataframe(
             dataframe=df,
             destination=self.full_table_id,
@@ -123,6 +140,9 @@ class CommonCrawlBigQueryClient:
         load_job.result()  # Wait for upload completion
 
         logger.info("Executing analytical Big Data SQL Deduplication Query...")
+        query_label_select = (
+            "\n            query_label," if "query_label" in df.columns else ""
+        )
         # Big SQL Query demonstrating competency C1
         sql = f"""
         SELECT
@@ -132,6 +152,7 @@ class CommonCrawlBigQueryClient:
             language,
             category,
             label,
+            {query_label_select}
             query,
             crawl_id,
             content_hash
@@ -143,11 +164,13 @@ class CommonCrawlBigQueryClient:
             ORDER BY text_length DESC
         ) = 1
         """
-        
+
         query_job = self.bq_client.query(sql)
         results_df = query_job.to_dataframe()
-        
-        logger.info(f"BigQuery aggregation generated {len(results_df)} pristine deduplicated records.")
+
+        logger.info(
+            f"BigQuery aggregation generated {len(results_df)} pristine deduplicated records."
+        )
         # Convert DataFrame rows into a list of dicts for the ingestion service
         return results_df.to_dict(orient="records")
 
@@ -165,15 +188,17 @@ class CommonCrawlIngestionService:
         self.bq_client = bq_client or CommonCrawlBigQueryClient()
         self.snapshot_dir = snapshot_dir
         self.snapshot_prefix = snapshot_prefix
-        
+
         local_snapshot_root = (
-            snapshot_dir.parent if snapshot_dir.name == snapshot_prefix else snapshot_dir
+            snapshot_dir.parent
+            if snapshot_dir.name == snapshot_prefix
+            else snapshot_dir
         )
         self.snapshot_store = snapshot_store or build_snapshot_store(
             local_root_dir=local_snapshot_root,
             repo_root=REPO_ROOT,
         )
-        
+
         self.source_name = source_name
         self.source_service = SourceSystemService()
         self.ingestion_service = IngestionRunService()
@@ -218,25 +243,29 @@ class CommonCrawlIngestionService:
             # 2. Dedup against Sicurre DB
             existing_keys = await self._existing_record_keys(session)
             new_entries = [
-                e for e in entries
-                if self._entry_key(e) not in existing_keys
+                e for e in entries if self._entry_key(e) not in existing_keys
             ]
             skipped_count = len(entries) - len(new_entries)
 
             if not new_entries:
                 ingestion_run.finished_at = datetime.now(timezone.utc)
                 ingestion_run.status = IngestionStatus.COMPLETED
-                ingestion_run.log_message = f"All {len(entries)} Common Crawl entries already processed."
+                ingestion_run.log_message = (
+                    f"All {len(entries)} Common Crawl entries already processed."
+                )
                 await session.commit()
                 return self._empty_result(
-                    ingestion_run, source_system, skipped_count=skipped_count, total_extracted_count=total_extracted_count
+                    ingestion_run,
+                    source_system,
+                    skipped_count=skipped_count,
+                    total_extracted_count=total_extracted_count,
                 )
 
             # 3. Snapshot logic
             snapshot_payload = {
                 "source": "Common Crawl BigQuery Transformation",
                 "extracted_at": run_started_at.isoformat(),
-                "records": new_entries
+                "records": new_entries,
             }
             snapshot_result = await self._write_snapshot(
                 ingestion_run=ingestion_run,
@@ -311,7 +340,8 @@ class CommonCrawlIngestionService:
         )
 
     async def _existing_record_keys(
-        self, session: AsyncSession,
+        self,
+        session: AsyncSession,
     ) -> set[str]:
         stmt = (
             select(DataRawRecord.record_key)
@@ -328,8 +358,12 @@ class CommonCrawlIngestionService:
         # We rely on BigQuery FARM_FINGERPRINT
         return str(entry.get("record_key", "")).strip()
 
-    async def _get_or_create_source_system(self, session: AsyncSession) -> DataSourceSystem:
-        source_system = await self.source_repository.get_by_name(session, self.source_name)
+    async def _get_or_create_source_system(
+        self, session: AsyncSession
+    ) -> DataSourceSystem:
+        source_system = await self.source_repository.get_by_name(
+            session, self.source_name
+        )
         if source_system is not None:
             return source_system
 
@@ -357,7 +391,7 @@ class CommonCrawlIngestionService:
         ).encode("utf-8")
         date_str = ingestion_run.started_at.strftime("%Y%m%d")
         filename = f"common_crawl_extract_{date_str}_{ingestion_run.id}.json"
-        
+
         object_key = self.snapshot_store.build_object_key(
             source_prefix=self.snapshot_prefix,
             filename=filename,
@@ -404,25 +438,33 @@ class CommonCrawlIngestionService:
 
         for entry in entries:
             record_key = self._entry_key(entry)
-            
+
             # Map BigQuery output to Standard sicurre format
             url = entry.get("url", "")
             raw_text = entry.get("text", "")
-            
-            # Basic Labeling Mapping
-            label_val = entry.get("label", "legitimate")
-            if label_val == "phishing":
-                is_label = 1
+            original_label = str(entry.get("label") or "").strip() or None
+            query_label = (
+                str(entry.get("query_label") or original_label or "").strip() or None
+            )
+            category = str(entry.get("category") or "").strip() or None
+
+            binary_label: int | None
+            if category == "phishing_related" or original_label == "phishing":
+                binary_label = 1
+            elif category in {"legitimate", "spam_like"}:
+                binary_label = 0
             else:
-                is_label = 0
-                
+                binary_label = None
+
             enriched = {
                 "url": url,
                 "text": raw_text,
-                "label": is_label,
-                "category": entry.get("category"),
+                "label": original_label,
+                "binary_label": binary_label,
+                "category": category,
                 "crawl_id": entry.get("crawl_id"),
                 "query": entry.get("query"),
+                "query_label": query_label,
                 "content_hash": entry.get("content_hash"),
             }
 

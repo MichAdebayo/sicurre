@@ -166,6 +166,103 @@ class CommonCrawlStageTwoService:
         "bons plans",
         "vente privée",
     )
+    ACCOUNT_RECOVERY_MARKERS = (
+        "messagerie sécurisée",
+        "adresse email personnelle",
+        "numéro de téléphone mobile",
+        "service client",
+        "espace client",
+        "conseiller",
+        "mot de passe provisoire",
+        "code à usage unique",
+        "notification",
+        "alertes sms",
+        "notification push",
+    )
+    PHISHING_REPORT_MARKERS = (
+        "site internet frauduleux",
+        "page miroir",
+        "message reçu ce jour",
+        "message recu ce jour",
+        "sms reçu",
+        "sms recu",
+        "faux colis",
+        "potentiel phishing",
+        "phishing de données",
+        "données personnelles et bancaires",
+        "arnaque téléphonique",
+        "arnaque telephonique",
+        "arnaque sms",
+        "lien frauduleux",
+        "escroquerie au faux colis",
+        "soyez vigilant",
+    )
+    PHISHING_LURE_MARKERS = (
+        "mondial relay",
+        "coursier",
+        "livreur",
+        "livraison",
+        "colis",
+        "suspension",
+        "confirmez votre compte",
+        "vérifier votre compte",
+        "sans délai",
+        "lien sécurisé",
+        "réattrib",
+        "je reçois un message",
+        "je recois un message",
+        "dirige vers un site internet",
+        "récupérer un colis",
+        "recuperer un colis",
+    )
+    PHISHING_QUERY_HINTS = (
+        "signal-arnaques",
+        "scam_reports_fr",
+        "signal-spam",
+        "signal_spam_fr",
+        "openphish",
+        "phishing_feed",
+    )
+    PHISHING_AWARENESS_MARKERS = (
+        "assistance aux victimes de cybermalveillance",
+        "sensibiliser au risque cyber",
+        "menaces numériques",
+        "menaces numeriques",
+        "moyens de s'en protéger",
+        "moyens de s'en proteger",
+        "alerte cyber",
+        "campagne de messages d'escroquerie",
+        "campagne de messages d’escroquerie",
+        "campagne de phishing",
+        "campagne de hameçonnage",
+        "campagne de hameconnage",
+        "signaler un spam",
+        "signalez les spams",
+        "pages de phishing bloquées",
+        "pages de phishing bloquees",
+    )
+    PHISHING_AWARENESS_EXCLUDE_MARKERS = (
+        "événements passés",
+        "evenements passes",
+        "journée européenne",
+        "journee europeenne",
+        "expoprotection",
+        "paris games week",
+        "viva technology",
+        "baromètre",
+        "barometre",
+        "trimestre",
+        "téléchargez le baromètre",
+        "telechargez le barometre",
+    )
+    PHISHING_AWARENESS_QUERY_HINTS = (
+        "cert_gov_fr",
+        "reporting_gov_fr",
+        "signal_spam_fr",
+        "cybermalveillance.gouv.fr",
+        "internet-signalement.gouv.fr",
+        "signal-spam.fr",
+    )
 
     @classmethod
     def review(
@@ -183,6 +280,9 @@ class CommonCrawlStageTwoService:
             "promotion_eligible": route_outcome == "accepted",
             "source_category": raw_content.get("category"),
             "source_query": raw_content.get("query"),
+            "source_query_label": raw_content.get("query_label"),
+            "source_url": raw_content.get("url"),
+            "phishing_relevance": route_subtype == "phishing_lure_candidate",
             "marker_evidence": evidence,
         }
         return StageTwoReviewResult(
@@ -320,6 +420,7 @@ class CommonCrawlStageTwoService:
         extraction_trace: tuple[str, ...],
     ) -> tuple[str, str | None, str, tuple[str, ...], dict[str, int | str | None]]:
         trace_steps = ["common_crawl_cleaned"]
+        lowered_text = text.lower()
         nav_hits = cls._count_markers(text, cls.NAV_MARKERS)
         page_hits = cls._count_markers(text, cls.PAGE_MARKERS)
         email_hits = cls._count_markers(text, cls.EMAIL_LIKE_MARKERS)
@@ -332,10 +433,30 @@ class CommonCrawlStageTwoService:
         delivery_hits = cls._count_markers(text, cls.DELIVERY_MARKERS)
         notification_hits = cls._count_markers(text, cls.NOTIFICATION_MARKERS)
         awareness_hits = cls._count_markers(text, cls.AWARENESS_MARKERS)
+        account_recovery_hits = cls._count_markers(text, cls.ACCOUNT_RECOVERY_MARKERS)
+        phishing_report_hits = cls._count_markers(text, cls.PHISHING_REPORT_MARKERS)
+        phishing_lure_hits = cls._count_markers(text, cls.PHISHING_LURE_MARKERS)
+        phishing_awareness_hits = cls._count_markers(
+            text, cls.PHISHING_AWARENESS_MARKERS
+        )
+        phishing_awareness_exclude_hits = cls._count_markers(
+            text, cls.PHISHING_AWARENESS_EXCLUDE_MARKERS
+        )
         raw_category = str(raw_content.get("category", "")).lower()
+        raw_label = str(raw_content.get("label") or "").lower()
+        raw_query = str(raw_content.get("query") or "").lower()
+        raw_url = str(raw_content.get("url") or "").lower()
         raw_query_label = str(
-            raw_content.get("query_label") or raw_content.get("query") or ""
+            raw_content.get("query_label") or raw_label or raw_query or ""
         ).lower()
+        phishing_query_hint = any(
+            hint in raw_query_label or hint in raw_query or hint in raw_url
+            for hint in cls.PHISHING_QUERY_HINTS
+        )
+        phishing_awareness_query_hint = any(
+            hint in raw_query_label or hint in raw_query or hint in raw_url
+            for hint in cls.PHISHING_AWARENESS_QUERY_HINTS
+        )
 
         evidence = {
             "nav_hits": nav_hits,
@@ -349,7 +470,13 @@ class CommonCrawlStageTwoService:
             "delivery_hits": delivery_hits,
             "notification_hits": notification_hits,
             "awareness_hits": awareness_hits,
+            "account_recovery_hits": account_recovery_hits,
+            "phishing_report_hits": phishing_report_hits,
+            "phishing_lure_hits": phishing_lure_hits,
+            "phishing_awareness_hits": phishing_awareness_hits,
+            "phishing_awareness_exclude_hits": phishing_awareness_exclude_hits,
             "raw_category": raw_category or None,
+            "raw_query_label": raw_query_label or None,
         }
 
         trace_steps.extend(
@@ -359,9 +486,58 @@ class CommonCrawlStageTwoService:
                 (bool(page_hits), "common_crawl_page_markers_detected"),
                 (bool(email_hits), "common_crawl_email_markers_detected"),
                 (bool(awareness_hits), "common_crawl_awareness_markers_detected"),
+                (
+                    bool(phishing_report_hits),
+                    "common_crawl_phishing_report_markers_detected",
+                ),
             )
             if condition
         )
+
+        if (raw_category == "phishing_related" or phishing_query_hint) and (
+            phishing_report_hits >= 2
+            or (phishing_report_hits >= 1 and phishing_lure_hits >= 2)
+            or (
+                phishing_report_hits >= 1
+                and any(
+                    marker in lowered_text
+                    for marker in ("confirmez", "vérification", "sans délai", "cliquez")
+                )
+            )
+        ):
+            trace_steps.extend(
+                [
+                    "common_crawl_phishing_lure_markers_detected",
+                    "common_crawl_route_to_specialized_extractor",
+                ]
+            )
+            return (
+                "specialized_processing",
+                "common_crawl_phishing_lure_candidate",
+                "phishing_lure_candidate",
+                tuple(trace_steps),
+                evidence,
+            )
+
+        if (
+            raw_category == "phishing_related"
+            and phishing_awareness_query_hint
+            and phishing_awareness_hits >= 1
+            and phishing_awareness_exclude_hits == 0
+        ):
+            trace_steps.extend(
+                [
+                    "common_crawl_phishing_awareness_markers_detected",
+                    "common_crawl_route_to_specialized_extractor",
+                ]
+            )
+            return (
+                "specialized_processing",
+                "common_crawl_phishing_awareness_content",
+                "awareness_or_report",
+                tuple(trace_steps),
+                evidence,
+            )
 
         if awareness_hits:
             trace_steps.append("common_crawl_route_to_specialized_extractor")
@@ -408,6 +584,35 @@ class CommonCrawlStageTwoService:
                 "specialized_processing",
                 "common_crawl_promotional_candidate",
                 "promotional_spam",
+                tuple(trace_steps),
+                evidence,
+            )
+
+        if (
+            any(
+                step in extraction_trace
+                for step in (
+                    "common_crawl_no_message_window_found",
+                    "common_crawl_window_too_weak",
+                )
+            )
+            and raw_category == "legitimate"
+            and product_hits == 0
+            and account_recovery_hits >= 3
+            and (delivery_hits + notification_hits + security_hits) >= 1
+            and nav_hits <= 2
+            and page_hits <= 1
+        ):
+            trace_steps.extend(
+                [
+                    "common_crawl_account_recovery_markers_detected",
+                    "common_crawl_route_to_specialized_extractor",
+                ]
+            )
+            return (
+                "specialized_processing",
+                "common_crawl_account_recovery_candidate",
+                "instructional_legitimate",
                 tuple(trace_steps),
                 evidence,
             )

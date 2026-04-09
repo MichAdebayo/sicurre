@@ -30,6 +30,49 @@ from db.models.lineage import (
 
 logger = logging.getLogger(__name__)
 
+PHISHING_LABEL_VALUES = {
+    "phishing",
+    "phishing_related",
+    "abuse_ch",
+    "cert_gov_fr",
+    "consumer_forum_fr",
+    "phishing_feed",
+    "reporting_gov_fr",
+    "scam_reports_fr",
+    "science_forum_fr",
+    "security_news",
+    "security_news_fr",
+    "signal_spam_fr",
+    "tech_forum_fr",
+    "threat_intel_fr",
+    "url_scanning",
+}
+SPAM_LABEL_VALUES = {
+    "spam",
+    "spam_like",
+    "deal_aggregator_fr",
+    "ecommerce_promo_fr",
+    "retail_newsletter_fr",
+}
+LEGITIMATE_LABEL_VALUES = {
+    "legitimate",
+    "ham",
+    "bank_fr",
+    "gov_education_fr",
+    "gov_economy_fr",
+    "gov_employment_fr",
+    "gov_interior_fr",
+    "gov_legal_fr",
+    "gov_services_fr",
+    "health_authority_fr",
+    "health_insurance_fr",
+    "health_portal_fr",
+    "postal_fr",
+    "social_fr",
+    "telecom_fr",
+    "utility_fr",
+}
+
 
 class NormalizationLane(StrEnum):
     DIRECT_MESSAGE = "direct_message"
@@ -507,11 +550,23 @@ class NormalizationPipeline:
 
     @staticmethod
     def _map_binary_label(value: Any) -> NormalizedLabel | None:
-        if value in {1, "1", True, "phishing"}:
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            return NormalizedLabel.PHISHING if value else NormalizedLabel.LEGITIMATE
+        if isinstance(value, int):
+            if value == 1:
+                return NormalizedLabel.PHISHING
+            if value == 0:
+                return NormalizedLabel.LEGITIMATE
+            return None
+
+        normalized = str(value).strip().lower()
+        if normalized in {"1"} | PHISHING_LABEL_VALUES:
             return NormalizedLabel.PHISHING
-        if value in {"spam", "spam_like"}:
+        if normalized in SPAM_LABEL_VALUES:
             return NormalizedLabel.SPAM
-        if value in {0, "0", False, "legitimate", "ham"}:
+        if normalized in {"0"} | LEGITIMATE_LABEL_VALUES:
             return NormalizedLabel.LEGITIMATE
         return None
 
