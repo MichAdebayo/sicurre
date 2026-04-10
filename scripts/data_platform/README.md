@@ -32,6 +32,9 @@ This folder is organized by source and by pipeline phase so source-specific reco
 
 ## Boundary rules
 
+- Put source-facing operational code in `src/data_platform/extractors/` or shared domain logic in `src/data_platform/services/`.
+- Keep scripts in this tree limited to orchestration, CLI wiring, manual recovery entrypoints, or no-write investigative/probing workflows.
+- If a script starts owning network fetch logic, parsing, retry policy, or persistence rules, move that logic back into `src/` and let the script call it.
 - Keep source-specific manual recovery workflows under the relevant source folder.
 - Put reusable cross-source builders in `stage_two/`, not under `common_crawl/` or `certfr/`.
 - Automated steady-state runners should stay distinct from one-time manual recovery scripts.
