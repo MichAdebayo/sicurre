@@ -1,8 +1,8 @@
-"""Run the Common Crawl Big Data ingestion job.
+"""Manually ingest the latest Common Crawl big-data snapshot.
 
 Usage::
 
-    uv run python scripts/data_platform/common_crawl/ingestion/run_bigdata_ingestion.py
+    uv run python scripts/data_platform/common_crawl/ingestion/ingest_latest_common_crawl_snapshot.py
 """
 
 from __future__ import annotations
@@ -81,7 +81,7 @@ async def main() -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Common Crawl Big Data Ingestion via BigQuery"
+        description="Manually ingest the latest Common Crawl R2 snapshot via BigQuery"
     )
     args = parser.parse_args()
     asyncio.run(main())

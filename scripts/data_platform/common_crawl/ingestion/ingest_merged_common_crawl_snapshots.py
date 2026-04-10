@@ -1,4 +1,4 @@
-"""Run a one-time Common Crawl ingestion over the latest two R2 fr_usable parquet snapshots.
+"""Manually ingest a merged set of recent Common Crawl snapshots.
 
 This script is intentionally transient and does not change the default extractor behavior,
 which should continue selecting only the latest parquet for steady-state cron ingestion.
@@ -92,7 +92,7 @@ class LatestMergedCommonCrawlBigQueryClient(CommonCrawlBigQueryClient):
 
 async def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Run a one-time merged Common Crawl ingestion using the latest two R2 fr_usable parquet files."
+        description="Manually ingest a merged set of the latest R2 Common Crawl fr_usable parquet files."
     )
     parser.add_argument(
         "--parquet-count",
