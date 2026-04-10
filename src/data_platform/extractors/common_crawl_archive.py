@@ -83,6 +83,12 @@ EXCLUDED_DOMAINS = frozenset(
     }
 )
 
+CATEGORY_SELECTION_PRIORITY: tuple[str, ...] = (
+    "phishing_related",
+    "spam_like",
+    "legitimate",
+)
+
 
 @dataclass(frozen=True, slots=True)
 class CrawlQuery:
@@ -350,6 +356,7 @@ class CommonCrawlArchiveExtractor:
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         artifacts = await self._write_outputs(
             dataframe_all=dataframe_all,
+            download_frame=download_frame,
             usable_frame=usable_frame,
             tracker=tracker,
             timestamp=timestamp,
@@ -421,7 +428,107 @@ class CommonCrawlArchiveExtractor:
                 by=["_url_priority_score", "url"],
                 ascending=[False, True],
             )
-        return filtered.head(self.settings.max_warc_downloads).reset_index(drop=True)
+        limit = min(self.settings.max_warc_downloads, len(filtered))
+        if limit == 0:
+            return filtered.head(0).reset_index(drop=True)
+        if "_category" not in filtered.columns:
+            return filtered.head(limit).reset_index(drop=True)
+        return self._select_balanced_download_frame(filtered, limit)
+
+    @classmethod
+    def _select_balanced_download_frame(
+        cls,
+        dataframe: pd.DataFrame,
+        limit: int,
+    ) -> pd.DataFrame:
+        category_frames = {
+            str(category): frame.reset_index(drop=True)
+            for category, frame in dataframe.groupby("_category", sort=False)
+        }
+        category_order = cls._ordered_categories(category_frames)
+        category_targets = {category: 0 for category in category_order}
+
+        for index in range(limit):
+            category = category_order[index % len(category_order)]
+            category_targets[category] += 1
+
+        selected_records: list[dict[str, Any]] = []
+        remaining_records_by_category: dict[str, list[dict[str, Any]]] = {}
+        for category in category_order:
+            selected_rows, remaining_rows = cls._select_query_diverse_rows(
+                category_frames[category],
+                limit=category_targets[category],
+            )
+            selected_records.extend(selected_rows)
+            remaining_records_by_category[category] = remaining_rows
+
+        remaining_slots = limit - len(selected_records)
+        if remaining_slots > 0:
+            for category in category_order:
+                if remaining_slots == 0:
+                    break
+                remaining_rows = remaining_records_by_category.get(category, [])
+                if not remaining_rows:
+                    continue
+                extra_rows = remaining_rows[:remaining_slots]
+                selected_records.extend(extra_rows)
+                remaining_slots -= len(extra_rows)
+
+        return pd.DataFrame(selected_records, columns=list(dataframe.columns))
+
+    @staticmethod
+    def _select_query_diverse_rows(
+        dataframe: pd.DataFrame,
+        *,
+        limit: int,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        records = dataframe.to_dict("records")
+        if limit <= 0 or not records:
+            return [], records
+
+        query_buckets: dict[str, list[dict[str, Any]]] = {}
+        query_order: list[str] = []
+        for record in records:
+            query_key = str(
+                record.get("_label") or record.get("query") or record.get("url")
+            )
+            if query_key not in query_buckets:
+                query_buckets[query_key] = []
+                query_order.append(query_key)
+            query_buckets[query_key].append(record)
+
+        selected: list[dict[str, Any]] = []
+        while len(selected) < limit:
+            progressed = False
+            for query_key in query_order:
+                bucket = query_buckets[query_key]
+                if not bucket:
+                    continue
+                selected.append(bucket.pop(0))
+                progressed = True
+                if len(selected) == limit:
+                    break
+            if not progressed:
+                break
+
+        remaining = [
+            record for query_key in query_order for record in query_buckets[query_key]
+        ]
+        return selected, remaining
+
+    @staticmethod
+    def _ordered_categories(category_frames: dict[str, pd.DataFrame]) -> list[str]:
+        priority_index = {
+            category: index
+            for index, category in enumerate(CATEGORY_SELECTION_PRIORITY)
+        }
+        return sorted(
+            category_frames,
+            key=lambda category: (
+                priority_index.get(category, len(priority_index)),
+                category,
+            ),
+        )
 
     async def _download_warc_pages(
         self,
@@ -475,6 +582,7 @@ class CommonCrawlArchiveExtractor:
         self,
         *,
         dataframe_all: pd.DataFrame,
+        download_frame: pd.DataFrame,
         usable_frame: pd.DataFrame,
         tracker: CommonCrawlArchiveStats,
         timestamp: str,
@@ -503,6 +611,7 @@ class CommonCrawlArchiveExtractor:
             timestamp=timestamp,
             settings=self.settings,
             tracker=tracker,
+            download_frame=download_frame,
             usable_french_count=len(usable_frame),
         )
         report_result = await self.archive_store.write_report(
@@ -685,8 +794,26 @@ class CommonCrawlArchiveExtractor:
         timestamp: str,
         settings: CommonCrawlArchiveSettings,
         tracker: CommonCrawlArchiveStats,
+        download_frame: pd.DataFrame,
         usable_french_count: int,
     ) -> dict[str, Any]:
+        selection_distribution = {
+            "category": (
+                download_frame["_category"].value_counts(dropna=False).to_dict()
+                if "_category" in download_frame.columns
+                else {}
+            ),
+            "label": (
+                download_frame["_label"].value_counts(dropna=False).head(20).to_dict()
+                if "_label" in download_frame.columns
+                else {}
+            ),
+            "query": (
+                download_frame["_query"].value_counts(dropna=False).head(20).to_dict()
+                if "_query" in download_frame.columns
+                else {}
+            ),
+        }
         return {
             "extraction_date": timestamp,
             "config": {
@@ -707,6 +834,7 @@ class CommonCrawlArchiveExtractor:
                 "skipped_short": tracker.skipped_short,
                 "skipped_duplicate": tracker.skipped_duplicate,
             },
+            "selection_distribution": selection_distribution,
             "language_distribution": tracker.per_language,
             "category_distribution": tracker.per_category,
         }

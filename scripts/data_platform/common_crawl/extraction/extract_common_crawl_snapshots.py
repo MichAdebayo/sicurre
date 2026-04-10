@@ -63,9 +63,11 @@ def build_settings(args: argparse.Namespace) -> CommonCrawlArchiveSettings:
         "request_timeout": args.request_timeout,
         "batch_size": args.batch_size,
     }
-    return CommonCrawlArchiveSettings(
-        **{key: value for key, value in overrides.items() if value is not None}
-    )
+    settings = CommonCrawlArchiveSettings()
+    for key, value in overrides.items():
+        if value is not None:
+            setattr(settings, key, value)
+    return settings
 
 
 async def main() -> None:

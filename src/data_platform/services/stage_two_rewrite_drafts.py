@@ -129,6 +129,46 @@ class StageTwoRewriteDraftService:
         "etre notifié des nouveaux commentaires",
         "etre notifie des nouveaux commentaires",
     )
+    PROMOTIONAL_TOPIC_KEYWORDS: tuple[str, ...] = (
+        "prêt relais",
+        "pret relais",
+        "crédit renouvelable",
+        "credit renouvelable",
+        "microcrédit personnel",
+        "microcredit personnel",
+        "assurance habitation",
+        "assurance santé",
+        "assurance auto",
+        "protection juridique",
+        "prêt personnel",
+        "prêt immobilier",
+        "open payment",
+        "lettre chèque",
+        "lettre cheque",
+        "paiement sans contact",
+        "visa premier",
+        "tarifs bancaires",
+        "nvei",
+        "camping-car",
+        "camping-cars",
+        "regroupement de crédit",
+        "regroupement de credits",
+        "cashback",
+        "cagnotte",
+        "e-carte bleue",
+        "paiement",
+        "carte bancaire",
+        "financement",
+        "crédit",
+        "credit",
+        "voyage",
+        "livret",
+        "épargne",
+        "epargne",
+        "responsabilité civile",
+        "responsabilite civile",
+        "garanties",
+    )
     GENERIC_LEGITIMATE_SUBJECT_PREFIXES: tuple[str, ...] = (
         "information utile concernant",
         "rappel pratique au sujet de",
@@ -738,7 +778,26 @@ class StageTwoRewriteDraftService:
     @staticmethod
     def _infer_promotional_topic(source_preview: str) -> str:
         lowered = source_preview.lower()
+        if topic := StageTwoRewriteDraftService._extract_promotional_topic(
+            source_preview
+        ):
+            return topic
         topic_map = (
+            ("prêt relais", "Prêt relais"),
+            ("pret relais", "Prêt relais"),
+            ("crédit renouvelable", "Crédit renouvelable"),
+            ("credit renouvelable", "Crédit renouvelable"),
+            ("microcrédit personnel", "Microcrédit personnel"),
+            ("microcredit personnel", "Microcrédit personnel"),
+            ("open payment", "Open Payment"),
+            ("lettre chèque", "Lettre chèque"),
+            ("lettre cheque", "Lettre chèque"),
+            ("paiement sans contact", "Paiement sans contact"),
+            ("visa premier", "Carte Visa Premier"),
+            ("tarifs bancaires", "Tarifs bancaires"),
+            ("nvei", "Assurance mobilité NVEI"),
+            ("camping-car", "Assurance camping-car"),
+            ("camping-cars", "Assurance camping-car"),
             ("assurance santé", "Assurance santé à prix avantageux"),
             ("protection juridique", "Protection juridique"),
             ("regroupement de crédit", "Regroupement de crédits"),
@@ -748,6 +807,10 @@ class StageTwoRewriteDraftService:
             ("e-carte bleue", "Service e-Carte Bleue"),
             ("prêt immobilier", "Prêt immobilier"),
             ("assurance auto", "Assurance auto"),
+            ("prêt personnel", "Prêt personnel"),
+            ("assurance habitation", "Assurance habitation"),
+            ("responsabilité civile", "Responsabilité civile"),
+            ("credit", "Financement simplifié"),
             ("crédit", "Financement simplifié"),
             ("assurance", "Assurance personnalisée"),
         )
@@ -758,6 +821,54 @@ class StageTwoRewriteDraftService:
             source_preview,
             fallback="Offre exclusive réservée à votre profil",
         )
+
+    @classmethod
+    def _extract_promotional_topic(cls, source_preview: str) -> str | None:
+        cleaned_preview = re.sub(r"\s+", " ", source_preview).strip()
+        cleaned_preview = re.sub(
+            r"(?i)accès à vos comptes par l'écran de connexion pleine page|accéder au menu principal|accéder au contenu éditorial|accéder au pied de page|accéder aux autres espaces|devenir client|mon espace|nous contacter|découvrez nos métiers|metiers|banque privée|particulier|professionnel|entreprise|etudiant|journaliste",
+            " ",
+            cleaned_preview,
+        )
+        candidates = [
+            candidate.strip(" :-")
+            for candidate in re.split(r"[.!?\n]+", cleaned_preview)
+            if candidate.strip()
+        ]
+        best_phrase: str | None = None
+        best_score = -10_000
+        for candidate in candidates:
+            candidate = cls._clean_topic_candidate(candidate)
+            if len(candidate) < 18:
+                continue
+            lowered_candidate = candidate.lower()
+            if cls._is_noisy_topic_candidate(lowered_candidate):
+                continue
+            score = sum(
+                keyword in lowered_candidate
+                for keyword in cls.PROMOTIONAL_TOPIC_KEYWORDS
+            )
+            if any(
+                lowered_candidate.startswith(prefix)
+                for prefix in cls.BAD_TOPIC_PREFIXES
+            ):
+                score -= 5
+            if any(
+                substring in lowered_candidate for substring in cls.BAD_TOPIC_SUBSTRINGS
+            ):
+                score -= 5
+            words = candidate.split()
+            phrase = " ".join(words[:7]).strip(" ,;:-")
+            if len(phrase) < 12:
+                continue
+            if cls._is_noisy_topic_candidate(phrase.lower()):
+                continue
+            if score > best_score:
+                best_score = score
+                best_phrase = phrase[0].upper() + phrase[1:]
+        if best_phrase is None or best_score < 1:
+            return None
+        return best_phrase
 
     @classmethod
     def _infer_legitimate_focus(cls, source_preview: str) -> str:
@@ -933,7 +1044,7 @@ class StageTwoRewriteDraftService:
             if candidate.strip()
         ]
         for candidate in candidates:
-            candidate = re.sub(r"^\d+\s*[-:]\s*", "", candidate)
+            candidate = cls._clean_topic_candidate(candidate)
             if len(candidate) < 18:
                 continue
             if cls._is_noisy_topic_candidate(candidate.lower()):
@@ -943,6 +1054,26 @@ class StageTwoRewriteDraftService:
             if len(phrase) >= 12 and not cls._is_noisy_topic_candidate(phrase.lower()):
                 return phrase[0].upper() + phrase[1:]
         return fallback
+
+    @staticmethod
+    def _clean_topic_candidate(candidate: str) -> str:
+        cleaned_candidate = re.sub(r"^\d+\s*[-:]\s*", "", candidate).strip()
+        cleaned_candidate = re.sub(
+            r"(?i)^(article|offres? et services|la banque postale|lcl banque privée|lcl banque et|lcl wealth management)\s+",
+            "",
+            cleaned_candidate,
+        )
+        cleaned_candidate = re.split(
+            r"(?i)\s+(?:accéder|découvrez|vous|avec|pour|comment|quelles?|quel(?:le|s)?|retrouvez|simplement|afin de)\b",
+            cleaned_candidate,
+            maxsplit=1,
+        )[0].strip()
+        cleaned_candidate = re.sub(
+            r"(?i)\b(?:de la banque postale|chez lcl|chez la banque postale)\b",
+            "",
+            cleaned_candidate,
+        )
+        return cleaned_candidate.strip(" ,;:-")
 
     @classmethod
     def _is_noisy_topic_candidate(cls, text: str) -> bool:
@@ -1138,5 +1269,3 @@ class StageTwoRewriteDraftService:
             if "duplicate_generated_draft" not in review_notes:
                 review_notes.append("duplicate_generated_draft")
             draft["review_notes"] = review_notes
-            if draft.get("review_state") != "drop":
-                draft["review_state"] = "needs_prompt_tuning"

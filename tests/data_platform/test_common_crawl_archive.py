@@ -85,3 +85,208 @@ def test_build_usable_frame_keeps_only_french_rows_above_length_threshold() -> N
     usable = extractor._build_usable_frame(dataframe)
 
     assert list(usable["url"]) == ["https://a.example"]
+
+
+def test_prepare_download_frame_balances_categories_and_query_labels() -> None:
+    extractor = CommonCrawlArchiveExtractor(settings=CommonCrawlArchiveSettings())
+    extractor.settings.max_warc_downloads = 6
+    dataframe = pd.DataFrame(
+        [
+            {
+                "url": "https://phish-a.example/1",
+                "status": "200",
+                "mime": "text/html",
+                "_category": "phishing_related",
+                "_label": "phish_a",
+                "_query": "phish-a/*",
+                "_url_priority_score": 9,
+            },
+            {
+                "url": "https://phish-a.example/2",
+                "status": "200",
+                "mime": "text/html",
+                "_category": "phishing_related",
+                "_label": "phish_a",
+                "_query": "phish-a/*",
+                "_url_priority_score": 8,
+            },
+            {
+                "url": "https://phish-b.example/1",
+                "status": "200",
+                "mime": "text/html",
+                "_category": "phishing_related",
+                "_label": "phish_b",
+                "_query": "phish-b/*",
+                "_url_priority_score": 7,
+            },
+            {
+                "url": "https://spam-a.example/1",
+                "status": "200",
+                "mime": "text/html",
+                "_category": "spam_like",
+                "_label": "spam_a",
+                "_query": "spam-a/*",
+                "_url_priority_score": 9,
+            },
+            {
+                "url": "https://spam-b.example/1",
+                "status": "200",
+                "mime": "text/html",
+                "_category": "spam_like",
+                "_label": "spam_b",
+                "_query": "spam-b/*",
+                "_url_priority_score": 8,
+            },
+            {
+                "url": "https://bank-a.example/1",
+                "status": "200",
+                "mime": "text/html",
+                "_category": "legitimate",
+                "_label": "bank_a",
+                "_query": "bank-a/*",
+                "_url_priority_score": 10,
+            },
+            {
+                "url": "https://bank-a.example/2",
+                "status": "200",
+                "mime": "text/html",
+                "_category": "legitimate",
+                "_label": "bank_a",
+                "_query": "bank-a/*",
+                "_url_priority_score": 9,
+            },
+            {
+                "url": "https://bank-b.example/1",
+                "status": "200",
+                "mime": "text/html",
+                "_category": "legitimate",
+                "_label": "bank_b",
+                "_query": "bank-b/*",
+                "_url_priority_score": 8,
+            },
+        ]
+    )
+
+    selected = extractor._prepare_download_frame(dataframe)
+
+    assert len(selected) == 6
+    assert selected["_category"].value_counts().to_dict() == {
+        "phishing_related": 2,
+        "spam_like": 2,
+        "legitimate": 2,
+    }
+    legitimate_labels = set(
+        selected.loc[selected["_category"] == "legitimate", "_label"].tolist()
+    )
+    assert legitimate_labels == {"bank_a", "bank_b"}
+
+
+def test_prepare_download_frame_redistributes_unused_category_capacity() -> None:
+    extractor = CommonCrawlArchiveExtractor(settings=CommonCrawlArchiveSettings())
+    extractor.settings.max_warc_downloads = 5
+    dataframe = pd.DataFrame(
+        [
+            {
+                "url": "https://phish-a.example/1",
+                "status": "200",
+                "mime": "text/html",
+                "_category": "phishing_related",
+                "_label": "phish_a",
+                "_query": "phish-a/*",
+                "_url_priority_score": 9,
+            },
+            {
+                "url": "https://phish-b.example/1",
+                "status": "200",
+                "mime": "text/html",
+                "_category": "phishing_related",
+                "_label": "phish_b",
+                "_query": "phish-b/*",
+                "_url_priority_score": 8,
+            },
+            {
+                "url": "https://spam-a.example/1",
+                "status": "200",
+                "mime": "text/html",
+                "_category": "spam_like",
+                "_label": "spam_a",
+                "_query": "spam-a/*",
+                "_url_priority_score": 7,
+            },
+            {
+                "url": "https://bank-a.example/1",
+                "status": "200",
+                "mime": "text/html",
+                "_category": "legitimate",
+                "_label": "bank_a",
+                "_query": "bank-a/*",
+                "_url_priority_score": 10,
+            },
+            {
+                "url": "https://bank-b.example/1",
+                "status": "200",
+                "mime": "text/html",
+                "_category": "legitimate",
+                "_label": "bank_b",
+                "_query": "bank-b/*",
+                "_url_priority_score": 9,
+            },
+        ]
+    )
+
+    selected = extractor._prepare_download_frame(dataframe)
+
+    assert len(selected) == 5
+    assert selected["_category"].value_counts().to_dict() == {
+        "phishing_related": 2,
+        "spam_like": 1,
+        "legitimate": 2,
+    }
+
+
+def test_build_quality_report_includes_selection_distribution() -> None:
+    settings = CommonCrawlArchiveSettings()
+    tracker = type(
+        "Tracker",
+        (),
+        {
+            "total_index_hits": 12,
+            "total_downloaded": 6,
+            "extracted": 5,
+            "download_errors": 1,
+            "skipped_short": 0,
+            "skipped_duplicate": 1,
+            "per_language": {"fr": 5},
+            "per_category": {"phishing_related": 2, "legitimate": 3},
+        },
+    )()
+    download_frame = pd.DataFrame(
+        [
+            {
+                "_category": "phishing_related",
+                "_label": "phish_a",
+                "_query": "phish-a/*",
+            },
+            {"_category": "spam_like", "_label": "spam_a", "_query": "spam-a/*"},
+            {"_category": "legitimate", "_label": "bank_a", "_query": "bank-a/*"},
+        ]
+    )
+
+    report = CommonCrawlArchiveExtractor.build_quality_report(
+        timestamp="20260410_120000",
+        settings=settings,
+        tracker=tracker,
+        download_frame=download_frame,
+        usable_french_count=3,
+    )
+
+    assert report["selection_distribution"]["category"] == {
+        "phishing_related": 1,
+        "spam_like": 1,
+        "legitimate": 1,
+    }
+    assert report["selection_distribution"]["label"] == {
+        "phish_a": 1,
+        "spam_a": 1,
+        "bank_a": 1,
+    }

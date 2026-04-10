@@ -99,7 +99,7 @@ def test_stage_two_rewrite_drafts_downgrades_duplicate_outputs() -> None:
     )
 
     for draft in drafts["drafts"]:
-        assert draft["review_state"] == "needs_prompt_tuning"
+        assert draft["review_state"] == "usable"
         assert "duplicate_generated_draft" in draft["review_notes"]
 
 
@@ -351,13 +351,91 @@ def test_stage_two_rewrite_drafts_downgrades_duplicate_phishing_lures() -> None:
         }
     )
 
-    assert all(
-        draft["review_state"] == "needs_prompt_tuning" for draft in drafts["drafts"]
-    )
+    assert all(draft["review_state"] == "usable" for draft in drafts["drafts"])
     assert all(
         "duplicate_generated_draft" in draft["review_notes"]
         for draft in drafts["drafts"]
     )
+
+
+def test_stage_two_rewrite_drafts_extracts_specific_promotional_topic() -> None:
+    drafts = StageTwoRewriteDraftService.build_drafts(
+        {
+            "jobs": [
+                {
+                    "job_id": "job-promo-specific",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "promotional_spam",
+                    "rewrite_mode": "promotional_page_to_spam_message",
+                    "target_label": "spam",
+                    "raw_record_id": "promo-specific",
+                    "source_preview": "Article Dépannage serrurier : quelle prise en charge par votre assurance habitation et quels services pour déclarer votre sinistre rapidement.",
+                }
+            ]
+        }
+    )
+
+    draft = drafts["drafts"][0]
+    assert draft["review_state"] == "usable"
+    assert "assurance habitation" in draft["subject"].lower()
+
+
+def test_stage_two_rewrite_drafts_prefers_specific_credit_topic_over_generic_financing() -> (
+    None
+):
+    drafts = StageTwoRewriteDraftService.build_drafts(
+        {
+            "jobs": [
+                {
+                    "job_id": "job-credit-specific-a",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "promotional_spam",
+                    "rewrite_mode": "promotional_page_to_spam_message",
+                    "target_label": "spam",
+                    "raw_record_id": "credit-specific-a",
+                    "source_preview": "Accès à vos comptes par l'écran de connexion pleine page Accéder au Menu Principal Accéder au Contenu éditorial Accéder au Pied de page Prêt relais Vous cherchez une solution pour préfinancer vos subventions, votre TVA ou une opération immobilière ou foncière.",
+                },
+                {
+                    "job_id": "job-credit-specific-b",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "promotional_spam",
+                    "rewrite_mode": "promotional_page_to_spam_message",
+                    "target_label": "spam",
+                    "raw_record_id": "credit-specific-b",
+                    "source_preview": "Accès à vos comptes par l'écran de connexion pleine page Accéder au Menu Principal Accéder au Contenu éditorial Accéder au Pied de page Crédit Renouvelable Le Crédit Renouvelable de La Banque Postale est une solution de financement souple et flexible.",
+                },
+            ]
+        }
+    )
+
+    first, second = drafts["drafts"]
+    assert first["review_state"] == "usable"
+    assert second["review_state"] == "usable"
+    assert "prêt relais" in first["subject"].lower()
+    assert "crédit renouvelable" in second["subject"].lower()
+    assert first["text_sha256"] != second["text_sha256"]
+
+
+def test_stage_two_rewrite_drafts_extracts_specific_assurance_offer_topic() -> None:
+    drafts = StageTwoRewriteDraftService.build_drafts(
+        {
+            "jobs": [
+                {
+                    "job_id": "job-assurance-specific",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "promotional_spam",
+                    "rewrite_mode": "promotional_page_to_spam_message",
+                    "target_label": "spam",
+                    "raw_record_id": "assurance-specific",
+                    "source_preview": "LCL enrichit son offre d’assurance pour les NVEI Accéder aux autres espaces Particulier Banque privée Professionnel Entreprise Etudiant Journaliste Nous contacter Devenir client Mon espace METIERS Découvrez nos métiers LCL vous propose des produits et services.",
+                }
+            ]
+        }
+    )
+
+    draft = drafts["drafts"][0]
+    assert draft["review_state"] == "usable"
+    assert "nvei" in draft["subject"].lower()
 
 
 def test_stage_two_rewrite_drafts_render_markdown() -> None:

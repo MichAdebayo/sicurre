@@ -151,6 +151,47 @@ def test_common_crawl_stage_two_routes_cybermalveillance_pages_to_awareness() ->
     assert result.route_subtype == "awareness_or_report"
 
 
+def test_common_crawl_stage_two_routes_cybermalveillance_awareness_without_phishing_category() -> (
+    None
+):
+    result = CommonCrawlStageTwoService.review(
+        (
+            "Assistance aux victimes de cybermalveillance. Que faire en cas de phishing ou hameçonnage ? "
+            "Comment se protéger contre une tentative de phishing et que faire si on en est victime ?"
+        ),
+        {
+            "category": "legitimate",
+            "query": "cybermalveillance.gouv.fr/*",
+            "query_label": "cert_gov_fr",
+            "url": "https://www.cybermalveillance.gouv.fr/tous-nos-contenus/fiches-reflexes/hameconnage-phishing",
+        },
+    )
+
+    assert result.route_outcome == "specialized_processing"
+    assert result.route_reason == "common_crawl_phishing_awareness_content"
+    assert result.route_subtype == "awareness_or_report"
+
+
+def test_common_crawl_stage_two_recovers_bank_faq_help_page() -> None:
+    result = CommonCrawlStageTwoService.review(
+        (
+            "Comment puis-je consulter mes plafonds de paiement et de retrait ? "
+            "Vous pouvez consulter vos plafonds de paiement et de retrait depuis votre Espace Client. "
+            "Connectez-vous à votre espace client et accédez au détail de votre carte pour consulter ces informations."
+        ),
+        {
+            "category": "legitimate",
+            "query": "www.labanquepostale.fr/*",
+            "query_label": "bank_fr",
+            "url": "https://www.labanquepostale.fr/particulier/faq-centre-aide/comptes-et-cartes/comptes-bancaires.question.html/comment-puis-je-consulter-mes-plafonds-de-paiement-et-de-retrait.html",
+        },
+    )
+
+    assert result.route_outcome == "specialized_processing"
+    assert result.route_reason == "common_crawl_faq_candidate"
+    assert result.route_subtype == "instructional_legitimate"
+
+
 def test_common_crawl_stage_two_keeps_signal_spam_barometer_out_of_awareness() -> None:
     result = CommonCrawlStageTwoService.review(
         (

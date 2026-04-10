@@ -7,6 +7,32 @@ from data_platform.services.stage_two_models import StageTwoReviewResult
 
 
 class CommonCrawlStageTwoService:
+    FAQ_URL_HINTS = (
+        "faq",
+        "centre-aide",
+        "question.html",
+        "question",
+        "comment-",
+        "comment_",
+        "aide",
+        "formulaire",
+        "contestation",
+        "plafond",
+    )
+    FAQ_ACTION_MARKERS = (
+        "vous pouvez",
+        "consulter",
+        "connectez-vous",
+        "complétez",
+        "compléter",
+        "complétez le formulaire",
+        "accéder au formulaire",
+        "espace client",
+        "gérez",
+        "prélèvements",
+        "paiement",
+        "retrait",
+    )
     NAV_MARKERS = (
         "accès à vos comptes par l'écran de connexion pleine page",
         "accéder au menu principal",
@@ -520,8 +546,7 @@ class CommonCrawlStageTwoService:
             )
 
         if (
-            raw_category == "phishing_related"
-            and phishing_awareness_query_hint
+            phishing_awareness_query_hint
             and phishing_awareness_hits >= 1
             and phishing_awareness_exclude_hits == 0
         ):
@@ -612,6 +637,34 @@ class CommonCrawlStageTwoService:
             return (
                 "specialized_processing",
                 "common_crawl_account_recovery_candidate",
+                "instructional_legitimate",
+                tuple(trace_steps),
+                evidence,
+            )
+
+        if (
+            any(
+                step in extraction_trace
+                for step in (
+                    "common_crawl_no_message_window_found",
+                    "common_crawl_window_too_weak",
+                )
+            )
+            and raw_category == "legitimate"
+            and raw_query_label == "bank_fr"
+            and any(hint in raw_url for hint in cls.FAQ_URL_HINTS)
+            and cls._count_markers(text, cls.FAQ_ACTION_MARKERS) >= 2
+            and nav_hits <= 3
+        ):
+            trace_steps.extend(
+                [
+                    "common_crawl_faq_help_recovered",
+                    "common_crawl_route_to_specialized_extractor",
+                ]
+            )
+            return (
+                "specialized_processing",
+                "common_crawl_faq_candidate",
                 "instructional_legitimate",
                 tuple(trace_steps),
                 evidence,
