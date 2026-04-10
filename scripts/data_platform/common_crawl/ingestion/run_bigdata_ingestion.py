@@ -31,7 +31,7 @@ from sqlalchemy.ext.asyncio import (  # noqa: E402
 
 from core.config import get_settings  # noqa: E402
 from core.database import Base  # noqa: E402
-from data_platform.extractors.common_crawl import (  # noqa: E402
+from data_platform.extractors.common_crawl_ingestion import (  # noqa: E402
     CommonCrawlIngestionService,
 )
 

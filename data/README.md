@@ -53,7 +53,7 @@ notebooks/
 
 ### Migrated script replacements
 
-- `scripts/run_common_crawl.py` replaces the deleted Common Crawl extraction notebook.
+- `scripts/data_platform/common_crawl/extraction/run_common_crawl.py` replaces the deleted Common Crawl extraction notebook.
 - `scripts/generate_synthetic_data.py` replaces the deleted synthetic phishing generation notebook.
 - `scripts/process_restructure_data.py` and shared backend preprocessing replace the deleted cleaning notebook.
 - `scripts/generate_adapted_fr_phishing.py` replaces the deleted cultural adaptation notebook.

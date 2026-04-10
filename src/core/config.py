@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     environment: str = "dev"
     database_url: str = _DEFAULT_DB_URL
     database_echo: bool = False
+    gcp_project: str = "sicurre"
+    gcp_region: str = "europe-west1"
+    bigquery_dataset_id: str = Field(
+        default="sicurre_dataset",
+        validation_alias="DATASET_ID",
+    )
     auth_enabled: bool = True
     auth_allow_dev_tokens: bool | None = None
     auth_dev_bearer_tokens: str = "dev-token,dev-rate-limit"

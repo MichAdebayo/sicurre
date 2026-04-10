@@ -1,11 +1,10 @@
-"""Extractor service that connects to BigQuery to process parsed Parquet from Common Crawl, then loads into Sicurre DB."""
+"""Ingest prepared Common Crawl parquet snapshots into the Sicurre DB."""
 
 from __future__ import annotations
 
 import io
 import json
 import logging
-import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,11 +13,10 @@ from typing import Any
 import boto3
 import pandas as pd
 from google.cloud import bigquery
-from google.cloud.exceptions import NotFound
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.config import ROOT_DIR, get_settings
+from core.config import ROOT_DIR, Settings, get_settings
 from data_platform.api.schemas import DataSourceCreate, IngestionRunCreate
 from data_platform.services.snapshot_storage import (
     SnapshotStore,
@@ -45,6 +43,36 @@ DEFAULT_CC_SNAPSHOT_DIR = REPO_ROOT / "data" / "raw" / "bigdata" / "common_crawl
 DEFAULT_CC_SNAPSHOT_PREFIX = "common_crawl"
 
 
+@dataclass(frozen=True, slots=True)
+class CommonCrawlIngestionSettings:
+    gcp_project: str = "sicurre"
+    gcp_region: str = "europe-west1"
+    dataset_id: str = "sicurre_dataset"
+    raw_snapshot_r2_bucket_name: str = "sicurre-raw"
+    raw_snapshot_r2_endpoint_url: str | None = None
+    raw_snapshot_r2_access_key_id: str | None = None
+    raw_snapshot_r2_secret_access_key: str | None = None
+    raw_snapshot_r2_region: str = "auto"
+
+    @classmethod
+    def from_app_settings(
+        cls,
+        app_settings: Settings | None = None,
+    ) -> CommonCrawlIngestionSettings:
+        settings = app_settings or get_settings()
+        return cls(
+            gcp_project=settings.gcp_project,
+            gcp_region=settings.gcp_region,
+            dataset_id=settings.bigquery_dataset_id,
+            raw_snapshot_r2_bucket_name=settings.raw_snapshot_r2_bucket_name
+            or cls.raw_snapshot_r2_bucket_name,
+            raw_snapshot_r2_endpoint_url=settings.raw_snapshot_r2_endpoint_url,
+            raw_snapshot_r2_access_key_id=settings.raw_snapshot_r2_access_key_id,
+            raw_snapshot_r2_secret_access_key=settings.raw_snapshot_r2_secret_access_key,
+            raw_snapshot_r2_region=settings.raw_snapshot_r2_region,
+        )
+
+
 @dataclass(slots=True)
 class CommonCrawlIngestionResult:
     ingestion_run_id: str
@@ -61,26 +89,24 @@ class CommonCrawlIngestionResult:
 class CommonCrawlBigQueryClient:
     """Handles fetching Parquet from Cloudflare R2 and processing it in Google BigQuery."""
 
-    def __init__(self) -> None:
-        settings = get_settings()
+    def __init__(
+        self,
+        settings: CommonCrawlIngestionSettings | None = None,
+    ) -> None:
+        self.settings = settings or CommonCrawlIngestionSettings.from_app_settings()
         self.bq_client = bigquery.Client()
-        self.project_id = os.environ.get("SICURRE_GCP_PROJECT", "sicurre")
-        self.dataset_id = os.environ.get("DATASET_ID", "sicurre_dataset")
+        self.project_id = self.settings.gcp_project
+        self.dataset_id = self.settings.dataset_id
         self.table_name = "common_crawl_raw"
         self.full_table_id = f"{self.project_id}.{self.dataset_id}.{self.table_name}"
 
-        # R2 credentials
-        self.r2_bucket = os.environ.get(
-            "SICURRE_RAW_SNAPSHOT_R2_BUCKET_NAME", "sicurre-raw"
-        )
+        self.r2_bucket = self.settings.raw_snapshot_r2_bucket_name
         self.s3_client = boto3.client(
             "s3",
-            endpoint_url=os.environ.get("SICURRE_RAW_SNAPSHOT_R2_ENDPOINT_URL"),
-            aws_access_key_id=os.environ.get("SICURRE_RAW_SNAPSHOT_R2_ACCESS_KEY_ID"),
-            aws_secret_access_key=os.environ.get(
-                "SICURRE_RAW_SNAPSHOT_R2_SECRET_ACCESS_KEY"
-            ),
-            region_name=os.environ.get("SICURRE_RAW_SNAPSHOT_R2_REGION", "auto"),
+            endpoint_url=self.settings.raw_snapshot_r2_endpoint_url,
+            aws_access_key_id=self.settings.raw_snapshot_r2_access_key_id,
+            aws_secret_access_key=self.settings.raw_snapshot_r2_secret_access_key,
+            region_name=self.settings.raw_snapshot_r2_region,
         )
 
     def fetch_latest_parquet_from_r2(self) -> pd.DataFrame:
@@ -115,7 +141,7 @@ class CommonCrawlBigQueryClient:
         buf.seek(0)
 
         logger.info("Parsing Parquet with PyArrow...")
-        df = pd.read_parquet(buf, engine="pyarrow")
+        df = pd.read_parquet(buf)
         logger.info(f"Parsed DataFrame with {len(df)} rows.")
         return df
 
@@ -123,7 +149,7 @@ class CommonCrawlBigQueryClient:
         """Loads data to BigQuery, deduplicates using FARM_FINGERPRINT, and extracts the results."""
         logger.info(f"Ensuring internal dataset {self.dataset_id} exists...")
         dataset_ref = bigquery.Dataset(f"{self.project_id}.{self.dataset_id}")
-        dataset_ref.location = os.environ.get("SICURRE_GCP_REGION", "europe-west1")
+        dataset_ref.location = self.settings.gcp_region
         self.bq_client.create_dataset(dataset_ref, exists_ok=True)
 
         logger.info(

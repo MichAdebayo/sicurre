@@ -30,7 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from core.config import get_settings
 from core.database import Base
-from data_platform.extractors.common_crawl import (
+from data_platform.extractors.common_crawl_ingestion import (
     CommonCrawlBigQueryClient,
     CommonCrawlIngestionService,
 )

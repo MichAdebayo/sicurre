@@ -45,3 +45,7 @@ This folder is organized by source and by pipeline phase so source-specific reco
 - `common_crawl/ingestion/run_bigdata_ingestion.py`: steady-state latest-parquet ingestion.
 - `common_crawl/ingestion/run_bigdata_merged_ingestion.py`: one-time manual merged ingestion of the latest two `fr_usable` parquets.
 - `common_crawl/evaluation/evaluate_common_crawl_live_source.py`: exhaustive no-write three-class evaluation over live DB raw records.
+
+Implementation note:
+- `src/data_platform/extractors/common_crawl_archive.py` owns upstream archive collection and snapshot building.
+- `src/data_platform/extractors/common_crawl_ingestion.py` owns downstream ingestion of prepared Common Crawl snapshots into Sicurre lineage tables.
