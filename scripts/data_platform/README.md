@@ -44,6 +44,7 @@ This folder is organized by source and by pipeline phase so source-specific reco
 - In `scripts/`, reserve verb-first names such as `extract_*`, `ingest_*`, `reset_*`, `inspect_*`, and `evaluate_*` for manual entrypoints, recovery tools, and no-write probes.
 - In `src/data_platform/cron_schedulers/`, reserve `run_<source>_<stage>.py` for scheduled entrypoints that are intended to be invoked by cron or Cloud Scheduler.
 - For Common Crawl specifically, keep manual entrypoints as `common_crawl/extraction/extract_common_crawl_snapshots.py` and `common_crawl/ingestion/ingest_latest_common_crawl_snapshot.py` plus `common_crawl/ingestion/ingest_merged_common_crawl_snapshots.py`, while future scheduled runners should use `run_*` under `src/data_platform/cron_schedulers/`.
+- Apply the same rule to other manual source wrappers: for example `historical_db/ingestion/ingest_legacy_db_source.py` and `sap_labs/ingestion/ingest_sap_labs_blog.py` stay in `scripts/`, while any future scheduled versions would use `run_*` under `src/data_platform/cron_schedulers/`.
 
 ## Current Common Crawl phases
 

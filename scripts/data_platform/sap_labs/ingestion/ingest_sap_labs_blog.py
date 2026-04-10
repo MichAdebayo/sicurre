@@ -1,8 +1,9 @@
-"""Run the DB historical ingestion job.
+"""Manually ingest the SAP Labs phishing blog source.
 
 Usage::
 
-    uv run python scripts/data_platform/historical_db/ingestion/run_db_ingestion.py
+    # From live feed
+    uv run python scripts/data_platform/sap_labs/ingestion/ingest_sap_labs_blog.py
 """
 
 from __future__ import annotations
@@ -27,8 +28,8 @@ from sqlalchemy.ext.asyncio import (  # noqa: E402
 
 from core.config import get_settings  # noqa: E402
 from core.database import Base  # noqa: E402
-from data_platform.extractors.legacy_db import (  # noqa: E402
-    LegacyDbIngestionService,
+from data_platform.extractors.sap_labs import (  # noqa: E402
+    SapLabsIngestionService,
 )
 
 logging.basicConfig(
@@ -41,13 +42,13 @@ logger = logging.getLogger(__name__)
 async def main() -> None:
     settings = get_settings()
     db_url = settings.database_url
-    logger.info("Using Sicurre main database: %s", db_url)
+    logger.info("Using database: %s", db_url)
 
     engine = create_async_engine(db_url, echo=False)
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        logger.info("Tables ensured on Sicurre DB")
+        logger.info("Tables ensured")
 
     session_factory = async_sessionmaker(
         engine,
@@ -55,16 +56,16 @@ async def main() -> None:
         class_=AsyncSession,
     )
 
-    service = LegacyDbIngestionService()
+    service = SapLabsIngestionService()
 
     async with session_factory() as session:
         result = await service.run(session, trigger_mode="manual")
 
-    print(result.log_message or "DB ingestion completed")
+    print(result.log_message or "SAP Labs ingestion completed")
     print(
         f"  new={result.raw_record_count}"
         f"  skipped={result.skipped_count}"
-        f"  extracted={result.total_extracted_count}"
+        f"  scraped={result.total_scraped_count}"
         f"  objects={result.raw_object_count}"
     )
     if result.snapshot_storage_uri:
@@ -74,6 +75,8 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="External Legacy Database Ingestion")
+    parser = argparse.ArgumentParser(
+        description="SAP Labs Web Scraper ingestion (fallback resilient)"
+    )
     args = parser.parse_args()
     asyncio.run(main())

@@ -71,7 +71,7 @@ csv-ingest:
 
 sap-scrape:
 	@echo "Starting SAP Labs Blog web scraping ingestion..."
-	uv run python scripts/data_platform/sap_labs/ingestion/run_sap_labs_scraper.py
+	uv run python scripts/data_platform/sap_labs/ingestion/ingest_sap_labs_blog.py
 
 db-seed:
 	@echo "Seeding the isolated historical external DB..."
@@ -79,7 +79,7 @@ db-seed:
 
 db-ingest:
 	@echo "Starting Database Ingestion from external monolithic DB..."
-	uv run python scripts/data_platform/historical_db/ingestion/run_db_ingestion.py
+	uv run python scripts/data_platform/historical_db/ingestion/ingest_legacy_db_source.py
 
 bigdata-crawl:
 	@echo "Run the massive Common Crawl async extraction job to Cloudflare R2"
