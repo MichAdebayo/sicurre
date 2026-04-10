@@ -43,11 +43,11 @@ This folder is organized by source and by pipeline phase so source-specific reco
 
 - In `scripts/`, reserve verb-first names such as `extract_*`, `ingest_*`, `reset_*`, `inspect_*`, and `evaluate_*` for manual entrypoints, recovery tools, and no-write probes.
 - In `src/data_platform/cron_schedulers/`, reserve `run_<source>_<stage>.py` for scheduled entrypoints that are intended to be invoked by cron or Cloud Scheduler.
-- For Common Crawl specifically, keep manual entrypoints as `common_crawl/extraction/run_common_crawl.py` for now and `common_crawl/ingestion/ingest_latest_common_crawl_snapshot.py` plus `common_crawl/ingestion/ingest_merged_common_crawl_snapshots.py`, while a future scheduled ingestion runner should be named `run_common_crawl_ingestion.py` or `run_common_crawl_latest_snapshot_ingestion.py` under `src/data_platform/cron_schedulers/`.
+- For Common Crawl specifically, keep manual entrypoints as `common_crawl/extraction/extract_common_crawl_snapshots.py` and `common_crawl/ingestion/ingest_latest_common_crawl_snapshot.py` plus `common_crawl/ingestion/ingest_merged_common_crawl_snapshots.py`, while future scheduled runners should use `run_*` under `src/data_platform/cron_schedulers/`.
 
 ## Current Common Crawl phases
 
-- `common_crawl/extraction/run_common_crawl.py`: upstream Common Crawl extraction into R2.
+- `common_crawl/extraction/extract_common_crawl_snapshots.py`: manual upstream Common Crawl extraction into R2.
 - `common_crawl/ingestion/ingest_latest_common_crawl_snapshot.py`: manual latest-parquet ingestion.
 - `common_crawl/ingestion/ingest_merged_common_crawl_snapshots.py`: one-time manual merged ingestion of the latest two `fr_usable` parquets.
 - `common_crawl/evaluation/evaluate_common_crawl_live_source.py`: exhaustive no-write three-class evaluation over live DB raw records.

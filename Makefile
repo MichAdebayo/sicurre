@@ -22,7 +22,7 @@ help:
 	@echo "  make db-seed            - Seed the standalone historical external database with CSV data"
 	@echo "  make db-ingest          - Run Historical DB Ingestion from an external monolithic DB"
 	@echo "  make bigdata-crawl      - Run Common Crawl extraction to Cloudflare R2"
-	@echo "  make bigdata-ingest     - Load Common Crawl extracts into the local DB"
+	@echo "  make bigdata-ingest     - Manually ingest the latest Common Crawl snapshot into the local DB"
 	@echo "  make normalize          - Normalize French raw records from the DB"
 	@echo "  make normalize-dry      - Preview normalization output without DB writes"
 	@echo "  make normalize-common-crawl      - Normalize Common Crawl records only"
@@ -47,92 +47,92 @@ dev-api:
 
 phishtank-ingest:
 	@echo "Starting one-off live ingestion..."
-	uv run python scripts/data_platform/run_phishtank_ingestion.py --trigger manual
+	uv run python src/data_platform/cron_schedulers/run_phishtank_ingestion.py --trigger manual
 
 phishtank-cron:
 	@echo "Starting scheduled live ingestion..."
-	uv run python scripts/data_platform/run_phishtank_ingestion.py --trigger scheduled
+	uv run python src/data_platform/cron_schedulers/run_phishtank_ingestion.py --trigger scheduled
 
 phishtank-csv:
 	@echo "Starting local CSV fallback ingestion..."
-	uv run python scripts/data_platform/run_phishtank_ingestion.py --trigger manual --csv data/raw/api/phishtank/phishing-tank.csv
+	uv run python src/data_platform/cron_schedulers/run_phishtank_ingestion.py --trigger manual --csv data/raw/api/phishtank/phishing-tank.csv
 
 certfr-ingest:
 	@echo "Starting full historical CERT-FR CTI backfill (HTML pagination)..."
-	uv run python scripts/data_platform/run_certfr_cti.py --trigger manual --historical
+	uv run python src/data_platform/cron_schedulers/run_certfr_cti.py --trigger manual --historical
 
 certfr-cron:
 	@echo "Starting scheduled CERT-FR CTI ingestion (RSS feed)..."
-	uv run python scripts/data_platform/run_certfr_cti.py --trigger scheduled
+	uv run python src/data_platform/cron_schedulers/run_certfr_cti.py --trigger scheduled
 
 csv-ingest:
 	@echo "Starting Universal CSV dataset ingestion..."
-	uv run python scripts/data_platform/csv_ingestion.py --dir data/raw/csv
+	uv run python src/data_platform/cron_schedulers/run_csv_ingestion.py --dir data/raw/csv
 
 sap-scrape:
 	@echo "Starting SAP Labs Blog web scraping ingestion..."
-	uv run python scripts/data_platform/run_sap_labs_scraper.py
+	uv run python scripts/data_platform/sap_labs/ingestion/run_sap_labs_scraper.py
 
 db-seed:
 	@echo "Seeding the isolated historical external DB..."
-	uv run python scripts/data_platform/seed_external_db.py
+	uv run python scripts/data_platform/historical_db/setup/seed_external_db.py
 
 db-ingest:
 	@echo "Starting Database Ingestion from external monolithic DB..."
-	uv run python scripts/data_platform/run_db_ingestion.py
+	uv run python scripts/data_platform/historical_db/ingestion/run_db_ingestion.py
 
 bigdata-crawl:
 	@echo "Run the massive Common Crawl async extraction job to Cloudflare R2"
-	uv run python scripts/data_platform/run_common_crawl.py
+	uv run python scripts/data_platform/common_crawl/extraction/extract_common_crawl_snapshots.py
 
 bigdata-ingest:
-	@echo "Run the Common Crawl ingestion pipeline mapping R2 Parquet via BigQuery to sqlite"
-	uv run python scripts/data_platform/run_bigdata_ingestion.py
+	@echo "Manually ingest the latest Common Crawl snapshot via BigQuery into sqlite"
+	uv run python scripts/data_platform/common_crawl/ingestion/ingest_latest_common_crawl_snapshot.py
 
 normalize:
 	@echo "Running DB-backed French normalization pipeline..."
-	uv run python scripts/data_platform/run_normalization.py $(NORMALIZE_ARGS)
+	uv run python scripts/data_platform/shared/normalization/run_normalization.py $(NORMALIZE_ARGS)
 
 normalize-dry:
 	@echo "Previewing DB-backed French normalization pipeline..."
-	uv run python scripts/data_platform/run_normalization.py --dry-run $(NORMALIZE_ARGS)
+	uv run python scripts/data_platform/shared/normalization/run_normalization.py --dry-run $(NORMALIZE_ARGS)
 
 normalize-common-crawl:
 	@echo "Normalizing Common Crawl records..."
-	uv run python scripts/data_platform/run_normalization.py --source common-crawl-bigdata $(NORMALIZE_ARGS)
+	uv run python scripts/data_platform/shared/normalization/run_normalization.py --source common-crawl-bigdata $(NORMALIZE_ARGS)
 
 normalize-db-historical:
 	@echo "Normalizing historical DB records..."
-	uv run python scripts/data_platform/run_normalization.py --source database-historical $(NORMALIZE_ARGS)
+	uv run python scripts/data_platform/shared/normalization/run_normalization.py --source database-historical $(NORMALIZE_ARGS)
 
 normalize-kaggle-fr:
 	@echo "Normalizing French SpamHam records..."
-	uv run python scripts/data_platform/run_normalization.py --source kaggle_french_spamham $(NORMALIZE_ARGS)
+	uv run python scripts/data_platform/shared/normalization/run_normalization.py --source kaggle_french_spamham $(NORMALIZE_ARGS)
 
 normalize-kaggle-multilingual:
 	@echo "Normalizing French multilingual Kaggle records..."
-	uv run python scripts/data_platform/run_normalization.py --source kaggle_multilingual_spam $(NORMALIZE_ARGS)
+	uv run python scripts/data_platform/shared/normalization/run_normalization.py --source kaggle_multilingual_spam $(NORMALIZE_ARGS)
 
 normalize-sap:
 	@echo "Normalizing SAP Labs FR records..."
-	uv run python scripts/data_platform/run_normalization.py --source sap-labs-blog $(NORMALIZE_ARGS)
+	uv run python scripts/data_platform/shared/normalization/run_normalization.py --source sap-labs-blog $(NORMALIZE_ARGS)
 
 normalize-certfr:
 	@echo "Normalizing CERT-FR records..."
-	uv run python scripts/data_platform/run_normalization.py --source cert-fr-cti $(NORMALIZE_ARGS)
+	uv run python scripts/data_platform/shared/normalization/run_normalization.py --source cert-fr-cti $(NORMALIZE_ARGS)
 
 adapt-phishing:
 	@echo "Generating culturally adapted French phishing emails..."
-	uv run python scripts/data_platform/generate_adapted_fr_phishing.py $(ADAPT_ARGS)
+	uv run python scripts/data_platform/datasets/generation/generate_adapted_fr_phishing.py $(ADAPT_ARGS)
 
 synthetic-data:
 	@echo "Generating synthetic dataset rows from archetypes..."
-	uv run python scripts/data_platform/generate_synthetic_data.py $(SYNTH_ARGS)
+	uv run python scripts/data_platform/datasets/generation/generate_synthetic_data.py $(SYNTH_ARGS)
 
 restructure-processed:
 	@echo "Building processed 3-class exports from curated sources..."
-	uv run python scripts/data_platform/process_restructure_data.py $(RESTRUCTURE_ARGS)
+	uv run python scripts/data_platform/datasets/preparation/process_restructure_data.py $(RESTRUCTURE_ARGS)
 
 dataset-splits:
 	@echo "Building train/val/test splits from processed exports..."
-	uv run python scripts/data_platform/merge_splits.py $(SPLIT_ARGS)
+	uv run python scripts/data_platform/datasets/preparation/merge_splits.py $(SPLIT_ARGS)

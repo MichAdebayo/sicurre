@@ -1,4 +1,4 @@
-"""Run the Common Crawl archive extraction pipeline.
+"""Manually extract Common Crawl snapshots into the configured snapshot store.
 
 This script is a thin CLI wrapper around
 ``data_platform.extractors.common_crawl_archive.CommonCrawlArchiveExtractor``.

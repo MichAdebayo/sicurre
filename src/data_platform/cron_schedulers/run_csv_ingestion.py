@@ -9,7 +9,7 @@ all rows as DataRawRecords into the Sicurre database.
 
 Usage::
 
-    uv run python scripts/data_platform/csv_ingestion.py --dir data/raw/csv
+    uv run python src/data_platform/cron_schedulers/run_csv_ingestion.py --dir data/raw/csv
 """
 
 from __future__ import annotations
@@ -79,18 +79,16 @@ async def get_or_create_source_system(
     source_machine_name: str,
 ) -> DataSourceSystem:
     # Try looking up exactly by name
-    query = select(DataSourceSystem).where(
-        DataSourceSystem.name == source_machine_name
-    )
+    query = select(DataSourceSystem).where(DataSourceSystem.name == source_machine_name)
     result = await session.execute(query)
     source_sys = result.scalar_one_or_none()
-    
+
     if source_sys:
         return source_sys
 
     # Infer a display name
     display_name = source_machine_name.replace("_", " ").title()
-    
+
     logger.info("Creating new SourceSystem: %s", source_machine_name)
     return await repo.create(
         session,
@@ -130,20 +128,24 @@ async def ingest_csv_file(
         source_machine_name = file_path.stem.lower()
 
     # Get or create SourceSystem
-    source_sys = await get_or_create_source_system(session, source_repo, source_machine_name)
+    source_sys = await get_or_create_source_system(
+        session, source_repo, source_machine_name
+    )
 
     file_stat = file_path.stat()
     file_content_hash = hashlib.sha256(file_path.read_bytes()).hexdigest()
     external_ref = f"local://{file_path.name}"
-    
+
     # Idempotency check: Have we processed this EXACT file before?
     query = select(DataRawObject).where(
         DataRawObject.external_ref == external_ref,
-        DataRawObject.content_hash == file_content_hash
+        DataRawObject.content_hash == file_content_hash,
     )
     result = await session.execute(query)
     if result.scalar_one_or_none():
-        logger.info("File %s is already ingested (hash matches). Skipping.", file_path.name)
+        logger.info(
+            "File %s is already ingested (hash matches). Skipping.", file_path.name
+        )
         return 0
 
     # Note: We group files by ingestion run. A single file load is one run.
@@ -179,17 +181,17 @@ async def ingest_csv_file(
     # Create RawRecord for each row
     extracted_at = datetime.now(timezone.utc)
     records_to_add: list[DataRawRecord] = []
-    
+
     raw_keys_seen = set()
 
     for idx, row in enumerate(rows, start=1):
         text = str(row.get("text", "")).strip()
         label = str(row.get("label", "")).strip()
         lang = str(row.get("language", "")).strip() or None
-        
+
         # Build deduplication key
         record_key = hash_text_for_dedup(text) if text else f"empty-text-{idx}"
-        
+
         # Intra-file deduplication (if a CSV has duplicated texts right inside it)
         if record_key in raw_keys_seen:
             continue
@@ -236,19 +238,20 @@ async def ingest_csv_file(
     try:
         await session.commit()
         logger.info(
-            "Successfully inserted %d unique records for %s", 
-            len(records_to_add), 
-            file_path.name
+            "Successfully inserted %d unique records for %s",
+            len(records_to_add),
+            file_path.name,
         )
         return len(records_to_add)
     except Exception as e:
         await session.rollback()
-        # Fall back to doing a manual merge if there are unique constraint violations 
+        # Fall back to doing a manual merge if there are unique constraint violations
         # (meaning the text is already in the database from a previous ingestion!)
         logger.warning(
-            "Constraint violation (likely duplicate DataRawRecord record_key). Retrying with merge... (%s)", e
+            "Constraint violation (likely duplicate DataRawRecord record_key). Retrying with merge... (%s)",
+            e,
         )
-        
+
         inserted_count = 0
         for record in records_to_add:
             try:
@@ -258,13 +261,13 @@ async def ingest_csv_file(
                 inserted_count += 1
             except Exception:
                 pass
-        
+
         ingestion_run.raw_record_count = inserted_count
         await session.commit()
         logger.info(
-            "Merge complete. Inserted %d unique new records for %s.", 
-            inserted_count, 
-            file_path.name
+            "Merge complete. Inserted %d unique new records for %s.",
+            inserted_count,
+            file_path.name,
         )
         return inserted_count
 
@@ -280,7 +283,9 @@ async def main(base_dir: str) -> None:
         await conn.run_sync(Base.metadata.create_all)
 
     session_factory = async_sessionmaker(
-        engine, expire_on_commit=False, class_=AsyncSession,
+        engine,
+        expire_on_commit=False,
+        class_=AsyncSession,
     )
 
     source_repo = SourceSystemQueries()
@@ -305,7 +310,9 @@ async def main(base_dir: str) -> None:
             inserted = await ingest_csv_file(csv_file, session, source_repo, run_repo)
             total_inserted += inserted
 
-    logger.info("All CSV files processed. Total new records inserted: %d", total_inserted)
+    logger.info(
+        "All CSV files processed. Total new records inserted: %d", total_inserted
+    )
 
 
 if __name__ == "__main__":

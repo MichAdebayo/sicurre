@@ -3,10 +3,10 @@
 Usage::
 
     # From live feed
-    uv run python scripts/data_platform/run_phishtank_ingestion.py --trigger manual
+    uv run python src/data_platform/cron_schedulers/run_phishtank_ingestion.py --trigger manual
 
     # From existing CSV (when feed is rate-limited)
-    uv run python scripts/data_platform/run_phishtank_ingestion.py \\
+    uv run python src/data_platform/cron_schedulers/run_phishtank_ingestion.py \\
         --trigger manual --csv data/raw/api/phishtank/phishing-tank.csv
 
 Designed to be called daily by a scheduler (cron / Cloud Scheduler).
@@ -57,16 +57,18 @@ def _load_csv_entries(csv_path: Path) -> list[dict[str, Any]]:
     with csv_path.open(encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            entries.append({
-                "phish_id": row.get("phish_id", ""),
-                "url": row.get("url", ""),
-                "phish_detail_url": row.get("phish_detail_url", ""),
-                "submission_time": row.get("submission_time", ""),
-                "verified": row.get("verified", ""),
-                "verification_time": row.get("verification_time", ""),
-                "online": row.get("online", ""),
-                "target": row.get("target", ""),
-            })
+            entries.append(
+                {
+                    "phish_id": row.get("phish_id", ""),
+                    "url": row.get("url", ""),
+                    "phish_detail_url": row.get("phish_detail_url", ""),
+                    "submission_time": row.get("submission_time", ""),
+                    "verified": row.get("verified", ""),
+                    "verification_time": row.get("verification_time", ""),
+                    "online": row.get("online", ""),
+                    "target": row.get("target", ""),
+                }
+            )
     return entries
 
 
@@ -82,7 +84,9 @@ async def main(trigger_mode: str = "scheduled", csv_path: str | None = None) -> 
         logger.info("Tables ensured")
 
     session_factory = async_sessionmaker(
-        engine, expire_on_commit=False, class_=AsyncSession,
+        engine,
+        expire_on_commit=False,
+        class_=AsyncSession,
     )
 
     # Build the service — optionally with a CSV-based fetch function
@@ -94,7 +98,9 @@ async def main(trigger_mode: str = "scheduled", csv_path: str | None = None) -> 
 
         csv_entries = _load_csv_entries(csv_file)
         logger.info(
-            "Loaded %d entries from CSV: %s", len(csv_entries), csv_file.name,
+            "Loaded %d entries from CSV: %s",
+            len(csv_entries),
+            csv_file.name,
         )
 
         async def fetch_from_csv() -> list[dict[str, Any]]:
@@ -124,11 +130,14 @@ async def main(trigger_mode: str = "scheduled", csv_path: str | None = None) -> 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="PhishTank ingestion")
     parser.add_argument(
-        "--trigger", default="scheduled", choices=["manual", "scheduled"],
+        "--trigger",
+        default="scheduled",
+        choices=["manual", "scheduled"],
         help="Trigger mode (default: scheduled)",
     )
     parser.add_argument(
-        "--csv", default=None,
+        "--csv",
+        default=None,
         help="Path to a local CSV file to ingest instead of the live feed",
     )
     args = parser.parse_args()
