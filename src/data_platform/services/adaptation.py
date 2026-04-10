@@ -174,6 +174,7 @@ EXPORT_COLUMNS: list[str] = [
     "fr_entity",
     "en_source_hash",
     "en_source_dataset",
+    "en_source_raw_record_id",
     "text_hash",
 ]
 
@@ -239,8 +240,8 @@ class FrenchCulturalAdaptationService:
 
     def attach_archetype_matches(self, phishing_df: pd.DataFrame) -> pd.DataFrame:
         matched_df = phishing_df.copy()
-        matched_df["archetypes"] = matched_df["text"].astype(str).apply(
-            self.match_archetypes
+        matched_df["archetypes"] = (
+            matched_df["text"].astype(str).apply(self.match_archetypes)
         )
         matched_df["n_archetypes"] = matched_df["archetypes"].apply(len)
         return matched_df
@@ -290,9 +291,11 @@ class FrenchCulturalAdaptationService:
                     str(source_row["text"]).encode("utf-8")
                 ).hexdigest()[:16]
                 source_dataset = str(source_row.get("source", "unknown"))
+                source_raw_record_id = str(source_row.get("raw_record_id") or "unknown")
             else:
                 source_hash = "no_match"
                 source_dataset = "template_only"
+                source_raw_record_id = "template_only"
 
             subject, body = self.random.choice(templates)()
             full_text = f"Objet : {subject}\n\n{body}"
@@ -306,14 +309,19 @@ class FrenchCulturalAdaptationService:
                     "fr_entity": str(ARCHETYPES[archetype]["fr_entity"]),
                     "en_source_hash": source_hash,
                     "en_source_dataset": source_dataset,
+                    "en_source_raw_record_id": source_raw_record_id,
                 }
             )
         return rows
 
-    def deduplicate_generated(self, adapted_df: pd.DataFrame) -> tuple[pd.DataFrame, int]:
+    def deduplicate_generated(
+        self, adapted_df: pd.DataFrame
+    ) -> tuple[pd.DataFrame, int]:
         deduplicated_df = adapted_df.copy()
-        deduplicated_df["text_hash"] = deduplicated_df["text"].astype(str).apply(
-            lambda text: hashlib.sha256(text.encode("utf-8")).hexdigest()
+        deduplicated_df["text_hash"] = (
+            deduplicated_df["text"]
+            .astype(str)
+            .apply(lambda text: hashlib.sha256(text.encode("utf-8")).hexdigest())
         )
         before = len(deduplicated_df)
         deduplicated_df = deduplicated_df.drop_duplicates(
@@ -339,8 +347,8 @@ class FrenchCulturalAdaptationService:
         scored_df = adapted_df.copy()
         scored_df["text_len"] = scored_df["text"].astype(str).str.len()
         scored_df["fr_score"] = scored_df["text"].astype(str).apply(self.french_score)
-        scored_df["has_urgency"] = scored_df["text"].astype(str).apply(
-            self.has_urgency_marker
+        scored_df["has_urgency"] = (
+            scored_df["text"].astype(str).apply(self.has_urgency_marker)
         )
 
         return AdaptationSummary(
@@ -351,10 +359,18 @@ class FrenchCulturalAdaptationService:
             generated_per_archetype=generated_per_archetype,
             deduplicated_rows=len(scored_df),
             removed_duplicates=removed_duplicates,
-            mean_text_length=float(scored_df["text_len"].mean()) if len(scored_df) else 0.0,
-            min_french_markers=int(scored_df["fr_score"].min()) if len(scored_df) else 0,
-            mean_french_markers=float(scored_df["fr_score"].mean()) if len(scored_df) else 0.0,
-            urgency_ratio=float(scored_df["has_urgency"].mean()) if len(scored_df) else 0.0,
+            mean_text_length=(
+                float(scored_df["text_len"].mean()) if len(scored_df) else 0.0
+            ),
+            min_french_markers=(
+                int(scored_df["fr_score"].min()) if len(scored_df) else 0
+            ),
+            mean_french_markers=(
+                float(scored_df["fr_score"].mean()) if len(scored_df) else 0.0
+            ),
+            urgency_ratio=(
+                float(scored_df["has_urgency"].mean()) if len(scored_df) else 0.0
+            ),
         )
 
     def export_adapted_dataframe(
@@ -364,9 +380,13 @@ class FrenchCulturalAdaptationService:
     ) -> AdaptationExportResult:
         output_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d")
-        timestamped_path = output_dir / f"adapted_fr_phishing_{len(adapted_df)}_{timestamp}.csv"
+        timestamped_path = (
+            output_dir / f"adapted_fr_phishing_{len(adapted_df)}_{timestamp}.csv"
+        )
         stable_path = output_dir / "adapted_fr_phishing.csv"
-        adapted_df[EXPORT_COLUMNS].to_csv(timestamped_path, index=False, encoding="utf-8")
+        adapted_df[EXPORT_COLUMNS].to_csv(
+            timestamped_path, index=False, encoding="utf-8"
+        )
         adapted_df[EXPORT_COLUMNS].to_csv(stable_path, index=False, encoding="utf-8")
         return AdaptationExportResult(
             dataframe=adapted_df,
@@ -573,7 +593,13 @@ class FrenchCulturalAdaptationService:
 
     def _bank_unusual_login(self) -> tuple[str, str]:
         bank_name = self.random.choice(
-            ["BNP Paribas", "Crédit Agricole", "Société Générale", "LCL", "Banque Populaire"]
+            [
+                "BNP Paribas",
+                "Crédit Agricole",
+                "Société Générale",
+                "LCL",
+                "Banque Populaire",
+            ]
         )
         return (
             "Alerte sécurité — Connexion inhabituelle à votre compte",
@@ -641,7 +667,9 @@ class FrenchCulturalAdaptationService:
         )
 
     def _invoice_suspension(self) -> tuple[str, str]:
-        operator_name = self.random.choice(["SFR", "Orange", "Free", "Bouygues Telecom"])
+        operator_name = self.random.choice(
+            ["SFR", "Orange", "Free", "Bouygues Telecom"]
+        )
         return (
             f"Facture impayée — Suspension de votre ligne {operator_name}",
             (

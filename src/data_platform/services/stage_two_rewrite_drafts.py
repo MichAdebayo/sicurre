@@ -175,6 +175,60 @@ class StageTwoRewriteDraftService:
         "point d'information pour",
         "mise au point utile concernant",
     )
+    LEGITIMATE_SUBJECT_PREFIXES: tuple[str, ...] = (
+        "information utile concernant",
+        "rappel pratique au sujet de",
+        "point d'information pour",
+        "mise au point utile concernant",
+        "rappel utile concernant",
+        "notification liée à",
+        "mise à jour utile pour",
+        "information sur la sécurisation de",
+        "mise à jour utile concernant",
+        "conseils de sécurité pour",
+        "point de contrôle lié à",
+        "rappel de vigilance concernant",
+        "alerte de prudence au sujet de",
+        "bonnes pratiques liées à",
+        "sécurité renforcée pour",
+        "vigilance renforcée concernant",
+        "rappel de prudence au sujet de",
+        "conseils utiles concernant",
+        "point de vigilance lié à",
+    )
+    FRAGMENT_LIKE_SUBJECT_MARKERS: tuple[str, ...] = (
+        "toujours plus de contrôle",
+        "toujours plus de controle",
+        "le fraudeur prétexte",
+        "le fraudeur pretexte",
+        "prix de l'appel",
+        "prix de l’appel",
+        "a partir",
+        "à partir",
+    )
+    FRAGMENT_LIKE_SUBJECT_SUFFIXES: tuple[str, ...] = (
+        " pour",
+        " de",
+        " du",
+        " des",
+        " à",
+        " a",
+        " une",
+        " un",
+    )
+    AWARENESS_FRAGMENT_PREFIXES: tuple[str, ...] = (
+        "a réception de",
+        "a reception de",
+        "comment ",
+        "serious game ",
+    )
+    AWARENESS_FRAGMENT_MARKERS: tuple[str, ...] = (
+        "a la fois ludique et",
+        "à la fois ludique et",
+        ", de sms ou",
+        "comment reconnaître",
+        "comment reconnaitre",
+    )
     TARGET_CUES: dict[str, tuple[str, ...]] = {
         "legitimate": (
             "service client",
@@ -470,24 +524,23 @@ class StageTwoRewriteDraftService:
 
     @classmethod
     def _build_awareness_notification(cls, source_preview: str) -> tuple[str, str]:
-        focus = cls._extract_legitimate_topic(
-            source_preview,
-            fallback=cls._infer_awareness_focus(source_preview),
-        )
+        focus = cls._extract_awareness_topic(source_preview)
         channels = cls._describe_risk_channels(source_preview)
         action = cls._extract_warning_action(source_preview)
         variant = cls._variant_index(source_preview, 4)
+        de_focus = cls._prepend_topic_preposition(focus, "de")
+        a_focus = cls._prepend_topic_preposition(focus, "à")
         subjects = (
             f"Vigilance renforcée concernant {focus}",
-            f"Rappel de prudence au sujet de {focus}",
+            f"Rappel de prudence au sujet {de_focus}",
             f"Conseils utiles concernant {focus}",
-            f"Point de vigilance lié à {focus}",
+            f"Point de vigilance lié {a_focus}",
         )
         bodies = (
-            f"Bonjour,\n\nNous vous invitons à rester vigilant face aux sollicitations reçues {channels} lorsqu'elles mentionnent {focus.lower()}.\n\n{action}\n\nEn cas de doute, reconnectez-vous uniquement à votre espace habituel ou contactez directement votre service client.\n\nCordialement,\nVotre service client",
+            f"Bonjour,\n\nNous vous invitons à rester vigilant face aux sollicitations reçues {channels} lorsqu'elles évoquent {focus.lower()}.\n\n{action}\n\nEn cas de doute, reconnectez-vous uniquement à votre espace habituel ou contactez directement votre service client.\n\nCordialement,\nVotre service client",
             f"Bonjour,\n\nCe rappel de prudence concerne les contacts inattendus reçus {channels} et portant sur {focus.lower()}.\n\n{action}\n\nSi une demande vous semble inhabituelle, interrompez l'échange et vérifiez son origine via vos canaux officiels.\n\nCordialement,\nVotre service client",
             f"Bonjour,\n\nNous attirons votre attention sur les sollicitations {channels} qui tentent de provoquer une réaction rapide en évoquant {focus.lower()}.\n\n{action}\n\nAvant toute validation, assurez-vous que la demande provient bien de vos canaux habituels.\n\nCordialement,\nVotre service client",
-            f"Bonjour,\n\nCe message rappelle les vérifications utiles à effectuer lorsque {focus.lower()} est mentionné dans un message, un appel ou une notification inattendue.\n\n{action}\n\nPour toute situation ambiguë, privilégiez un accès direct à votre espace personnel ou un appel au service client.\n\nCordialement,\nVotre service client",
+            f"Bonjour,\n\nCe message rappelle les vérifications utiles à effectuer lorsqu'il est question {de_focus} dans un message, un appel ou une notification inattendue.\n\n{action}\n\nPour toute situation ambiguë, privilégiez un accès direct à votre espace personnel ou un appel au service client.\n\nCordialement,\nVotre service client",
         )
         return subjects[variant], bodies[variant]
 
@@ -960,7 +1013,13 @@ class StageTwoRewriteDraftService:
                 "les demandes de location suspectes",
             ),
             (
-                ("appel frauduleux", "appel suspect", "téléphone"),
+                (
+                    "appel frauduleux",
+                    "appel suspect",
+                    "appels douteux",
+                    "appel douteux",
+                    "téléphone",
+                ),
                 "les appels frauduleux",
             ),
             (
@@ -979,6 +1038,29 @@ class StageTwoRewriteDraftService:
             if any(marker in lowered for marker in markers):
                 return focus
         return "les messages suspects"
+
+    @classmethod
+    def _extract_awareness_topic(cls, source_preview: str) -> str:
+        fallback = cls._infer_awareness_focus(source_preview)
+        focus = cls._extract_legitimate_topic(source_preview, fallback=fallback)
+        if cls._is_fragment_like_awareness_focus(focus):
+            return fallback
+        return focus
+
+    @staticmethod
+    def _prepend_topic_preposition(focus: str, preposition: str) -> str:
+        lowered = focus.lower().strip()
+        if preposition == "de":
+            if lowered.startswith("les "):
+                return f"des {lowered[4:]}"
+            if lowered.startswith("le "):
+                return f"du {lowered[3:]}"
+        if preposition == "à":
+            if lowered.startswith("les "):
+                return f"aux {lowered[4:]}"
+            if lowered.startswith("le "):
+                return f"au {lowered[3:]}"
+        return f"{preposition} {lowered}"
 
     @classmethod
     def _extract_legitimate_topic(cls, source_preview: str, *, fallback: str) -> str:
@@ -1188,6 +1270,10 @@ class StageTwoRewriteDraftService:
             )
         ):
             review_notes.append("page_like_legitimate_subject")
+        if target_label == "legitimate" and cls._is_fragment_like_legitimate_subject(
+            subject
+        ):
+            review_notes.append("fragment_like_legitimate_subject")
 
         if {
             "insufficient_source_context",
@@ -1225,6 +1311,45 @@ class StageTwoRewriteDraftService:
             lowered.startswith(prefix)
             for prefix in cls.GENERIC_LEGITIMATE_SUBJECT_PREFIXES
         )
+
+    @classmethod
+    def _is_fragment_like_legitimate_subject(cls, subject: str) -> bool:
+        focus = cls._extract_legitimate_subject_focus(subject)
+        if not focus:
+            return True
+
+        if any(marker in focus for marker in cls.FRAGMENT_LIKE_SUBJECT_MARKERS):
+            return True
+        if re.search(r"\(\d+\)", focus):
+            return True
+        if re.search(r"\d+\s*€/min", focus):
+            return True
+        if re.search(r"\+\s*prix de l['’]appel", focus):
+            return True
+        if any(focus.endswith(suffix) for suffix in cls.FRAGMENT_LIKE_SUBJECT_SUFFIXES):
+            return True
+        return False
+
+    @classmethod
+    def _is_fragment_like_awareness_focus(cls, focus: str) -> bool:
+        lowered = focus.lower().strip()
+        if not lowered:
+            return True
+        if any(
+            lowered.startswith(prefix) for prefix in cls.AWARENESS_FRAGMENT_PREFIXES
+        ):
+            return True
+        if any(marker in lowered for marker in cls.AWARENESS_FRAGMENT_MARKERS):
+            return True
+        return False
+
+    @classmethod
+    def _extract_legitimate_subject_focus(cls, subject: str) -> str:
+        lowered = subject.lower().strip()
+        for prefix in cls.LEGITIMATE_SUBJECT_PREFIXES:
+            if lowered.startswith(prefix):
+                return lowered[len(prefix) :].strip(" :-")
+        return lowered
 
     @classmethod
     def _describe_risk_channels(cls, source_preview: str) -> str:

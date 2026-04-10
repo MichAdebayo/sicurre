@@ -140,6 +140,35 @@ def test_stage_two_reviewed_export_skips_page_like_legitimate_subjects() -> None
     assert export_payload["skipped_reason_summary"]["page_like_legitimate_subject"] == 1
 
 
+def test_stage_two_reviewed_export_skips_fragment_like_legitimate_subjects() -> None:
+    service = StageTwoReviewedExportService()
+    export_payload = service.build_export(
+        {
+            "drafts": [
+                {
+                    "draft_id": "draft-fragment-like",
+                    "job_id": "job-fragment-like",
+                    "raw_record_id": "raw-fragment-like",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "instructional_legitimate",
+                    "rewrite_mode": "institutional_page_to_notification",
+                    "target_label": "legitimate",
+                    "review_state": "usable",
+                    "review_notes": ["fragment_like_legitimate_subject"],
+                    "quality_signals": {},
+                    "full_text": "Objet : Point d'information pour 15 €/min + prix de l'appel pour\n\nBonjour, utilisez uniquement votre espace habituel.",
+                }
+            ]
+        }
+    )
+
+    assert export_payload["exported_candidate_count"] == 0
+    assert (
+        export_payload["skipped_reason_summary"]["fragment_like_legitimate_subject"]
+        == 1
+    )
+
+
 def test_stage_two_reviewed_export_skips_subject_marker_without_review_note() -> None:
     service = StageTwoReviewedExportService()
     export_payload = service.build_export(

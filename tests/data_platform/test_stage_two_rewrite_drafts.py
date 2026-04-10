@@ -190,6 +190,28 @@ def test_stage_two_rewrite_drafts_downgrades_page_like_legitimate_subject() -> N
     assert "page_like_legitimate_subject" in draft["review_notes"]
 
 
+def test_stage_two_rewrite_drafts_downgrades_fragment_like_legitimate_subject() -> None:
+    drafts = StageTwoRewriteDraftService.build_drafts(
+        {
+            "jobs": [
+                {
+                    "job_id": "job-fragment-like",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "instructional_legitimate",
+                    "rewrite_mode": "institutional_page_to_notification",
+                    "target_label": "legitimate",
+                    "raw_record_id": "fragment-like-1",
+                    "source_preview": "15 €/min + prix de l’appel pour poursuivre la demande en ligne et confirmer votre espace habituel aujourd'hui.",
+                }
+            ]
+        }
+    )
+
+    draft = drafts["drafts"][0]
+    assert draft["review_state"] == "needs_prompt_tuning"
+    assert "fragment_like_legitimate_subject" in draft["review_notes"]
+
+
 def test_stage_two_rewrite_drafts_falls_back_from_page_like_focus_phrase() -> None:
     drafts = StageTwoRewriteDraftService.build_drafts(
         {
@@ -235,6 +257,69 @@ def test_stage_two_rewrite_drafts_avoids_scam_report_scaffold_in_legitimate_subj
     assert draft["review_state"] == "usable"
     assert "en savoir" not in draft["subject"].lower()
     assert "arnaques classées" not in draft["subject"].lower()
+
+
+def test_stage_two_rewrite_drafts_falls_back_from_fragment_like_awareness_topic() -> (
+    None
+):
+    drafts = StageTwoRewriteDraftService.build_drafts(
+        {
+            "jobs": [
+                {
+                    "job_id": "job-awareness-fragment",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "awareness_or_report",
+                    "rewrite_mode": "awareness_page_to_warning_notification",
+                    "target_label": "legitimate",
+                    "raw_record_id": "awareness-fragment-1",
+                    "source_preview": "Serious Game A la fois ludique et pédagogique pour sensibiliser aux arnaques par mail et sms.",
+                }
+            ]
+        }
+    )
+
+    draft = drafts["drafts"][0]
+    assert draft["review_state"] == "usable"
+    assert "serious game" not in draft["subject"].lower()
+    assert draft["subject"].lower().endswith("les messages suspects")
+
+
+def test_stage_two_rewrite_drafts_falls_back_from_how_to_awareness_title() -> None:
+    drafts = StageTwoRewriteDraftService.build_drafts(
+        {
+            "jobs": [
+                {
+                    "job_id": "job-awareness-howto",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "awareness_or_report",
+                    "rewrite_mode": "awareness_page_to_warning_notification",
+                    "target_label": "legitimate",
+                    "raw_record_id": "awareness-howto-1",
+                    "source_preview": "Comment reconnaître un appel frauduleux et éviter de divulguer vos données bancaires par téléphone.",
+                }
+            ]
+        }
+    )
+
+    draft = drafts["drafts"][0]
+    assert draft["review_state"] == "usable"
+    assert "comment reconnaître" not in draft["subject"].lower()
+    assert "appels frauduleux" in draft["subject"].lower()
+
+
+def test_stage_two_rewrite_drafts_contracts_awareness_articles() -> None:
+    assert (
+        StageTwoRewriteDraftService._prepend_topic_preposition(
+            "les appels frauduleux", "à"
+        )
+        == "aux appels frauduleux"
+    )
+    assert (
+        StageTwoRewriteDraftService._prepend_topic_preposition(
+            "les messages suspects", "de"
+        )
+        == "des messages suspects"
+    )
 
 
 def test_stage_two_rewrite_drafts_avoids_first_person_delivery_subject() -> None:

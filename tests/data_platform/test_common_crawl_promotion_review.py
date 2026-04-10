@@ -52,3 +52,133 @@ def test_common_crawl_promotion_review_builds_plan() -> None:
     assert plan["manual_review_count"] == 1
     assert plan["autopromotable_record_ids"] == ["a"]
     assert plan["manual_review_record_ids"] == ["b"]
+
+
+def test_common_crawl_acceptance_review_rejects_non_comparable_subtypes() -> None:
+    payload = {
+        "candidates": [
+            {
+                "candidate_id": "cand-awareness",
+                "draft_id": "draft-awareness",
+                "raw_record_id": "raw-awareness",
+                "source_name": "common-crawl-bigdata",
+                "rule_key": "awareness_or_report",
+                "rewrite_mode": "awareness_page_to_warning_notification",
+                "target_label": "legitimate",
+                "review_state": "usable",
+                "review_notes": [],
+                "quality_signals": {
+                    "french_marker_count": 5,
+                    "target_cue_hits": 3,
+                },
+                "text_length": 410,
+                "text_sha256": "hash-awareness",
+                "normalized_text": "Objet : Vigilance renforcée concernant les messages suspects\n\nBonjour, restez vigilant.",
+                "contains_pii": False,
+                "redaction_status": "not_required",
+            }
+        ]
+    }
+
+    review = CommonCrawlPromotionReviewService.build_acceptance_review(payload)
+
+    assert review["accepted_candidate_count"] == 0
+    assert review["rejection_summary"]["subtype_not_comparable_to_direct_write"] == 1
+
+
+def test_common_crawl_acceptance_review_accepts_clean_promotional_candidate() -> None:
+    payload = {
+        "candidates": [
+            {
+                "candidate_id": "cand-spam",
+                "draft_id": "draft-spam",
+                "raw_record_id": "raw-spam",
+                "source_name": "common-crawl-bigdata",
+                "rule_key": "promotional_spam",
+                "rewrite_mode": "promotional_page_to_spam_message",
+                "target_label": "spam",
+                "review_state": "usable",
+                "review_notes": [],
+                "quality_signals": {
+                    "french_marker_count": 4,
+                    "target_cue_hits": 1,
+                },
+                "text_length": 420,
+                "text_sha256": "hash-spam",
+                "normalized_text": "Objet : Offre prioritaire aujourd'hui\n\nBonjour, profitez dès maintenant de cette offre avec des conditions simplifiées. Répondez à ce message pour recevoir les détails.\n\nÀ très vite,\nService commercial",
+                "contains_pii": False,
+                "redaction_status": "not_required",
+            }
+        ]
+    }
+
+    review = CommonCrawlPromotionReviewService.build_acceptance_review(payload)
+
+    assert review["accepted_candidate_count"] == 1
+    assert review["accepted_label_summary"]["spam"] == 1
+    assert review["proposed_normalized_messages"][0]["raw_record_id"] == "raw-spam"
+    assert review["proposed_annotations"][0]["label"] == "spam"
+
+
+def test_common_crawl_acceptance_review_rejects_grammar_residue() -> None:
+    payload = {
+        "candidates": [
+            {
+                "candidate_id": "cand-legit",
+                "draft_id": "draft-legit",
+                "raw_record_id": "raw-legit",
+                "source_name": "common-crawl-bigdata",
+                "rule_key": "instructional_legitimate",
+                "rewrite_mode": "institutional_page_to_notification",
+                "target_label": "legitimate",
+                "review_state": "usable",
+                "review_notes": [],
+                "quality_signals": {
+                    "french_marker_count": 5,
+                    "target_cue_hits": 2,
+                },
+                "text_length": 390,
+                "text_sha256": "hash-legit",
+                "normalized_text": "Objet : Rappel pratique au sujet de les messages suspects\n\nBonjour, utilisez vos canaux habituels.",
+                "contains_pii": False,
+                "redaction_status": "not_required",
+            }
+        ]
+    }
+
+    review = CommonCrawlPromotionReviewService.build_acceptance_review(payload)
+
+    assert review["accepted_candidate_count"] == 0
+    assert review["rejection_summary"]["grammar_residue_detected"] == 1
+
+
+def test_common_crawl_acceptance_review_rejects_promotional_page_residue() -> None:
+    payload = {
+        "candidates": [
+            {
+                "candidate_id": "cand-promo-residue",
+                "draft_id": "draft-promo-residue",
+                "raw_record_id": "raw-promo-residue",
+                "source_name": "common-crawl-bigdata",
+                "rule_key": "promotional_spam",
+                "rewrite_mode": "promotional_page_to_spam_message",
+                "target_label": "spam",
+                "review_state": "usable",
+                "review_notes": [],
+                "quality_signals": {
+                    "french_marker_count": 4,
+                    "target_cue_hits": 2,
+                },
+                "text_length": 430,
+                "text_sha256": "hash-promo-residue",
+                "normalized_text": "Objet : Questions Diverses - Ferry Cdiscount Ce site : votre offre réservée jusqu'à ce soir\n\nBonjour, profitez dès maintenant de cette offre.",
+                "contains_pii": False,
+                "redaction_status": "not_required",
+            }
+        ]
+    }
+
+    review = CommonCrawlPromotionReviewService.build_acceptance_review(payload)
+
+    assert review["accepted_candidate_count"] == 0
+    assert review["rejection_summary"]["promotional_page_residue_detected"] == 1

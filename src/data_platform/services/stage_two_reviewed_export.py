@@ -29,7 +29,10 @@ class StageTwoReviewedExportService:
         "review_state",
         "text_sha256",
     ]
-    LEGITIMATE_EXPORT_BLOCKERS: tuple[str, ...] = ("page_like_legitimate_subject",)
+    LEGITIMATE_EXPORT_BLOCKERS: tuple[str, ...] = (
+        "page_like_legitimate_subject",
+        "fragment_like_legitimate_subject",
+    )
     LEGITIMATE_SUBJECT_MARKERS: tuple[str, ...] = (
         "selon les conditions générales",
         "en outre",
@@ -96,15 +99,14 @@ class StageTwoReviewedExportService:
                 continue
 
             if target_label := str(candidate.get("target_label") or ""):
-                if (
-                    target_label == "legitimate"
-                    and self._fails_legitimate_quality_gate(
+                if target_label == "legitimate":
+                    blocker_reason = self._legitimate_quality_blocker(
                         draft=draft,
                         candidate=candidate,
                     )
-                ):
-                    skipped_reason_summary.update(["page_like_legitimate_subject"])
-                    continue
+                    if blocker_reason is not None:
+                        skipped_reason_summary.update([blocker_reason])
+                        continue
 
             candidates.append(candidate)
             label_summary.update([str(candidate.get("target_label") or "unknown")])
@@ -228,17 +230,19 @@ class StageTwoReviewedExportService:
         }
 
     @classmethod
-    def _fails_legitimate_quality_gate(
+    def _legitimate_quality_blocker(
         cls,
         *,
         draft: dict[str, Any],
         candidate: dict[str, Any],
-    ) -> bool:
+    ) -> str | None:
         review_notes = {str(note) for note in draft.get("review_notes", [])}
         if review_notes.intersection(cls.LEGITIMATE_EXPORT_BLOCKERS):
-            return True
+            for blocker in cls.LEGITIMATE_EXPORT_BLOCKERS:
+                if blocker in review_notes:
+                    return blocker
         subject_line = str(candidate.get("normalized_text") or "").split("\n", 1)[0]
         lowered_subject = subject_line.lower()
-        return any(
-            marker in lowered_subject for marker in cls.LEGITIMATE_SUBJECT_MARKERS
-        )
+        if any(marker in lowered_subject for marker in cls.LEGITIMATE_SUBJECT_MARKERS):
+            return "page_like_legitimate_subject"
+        return None
