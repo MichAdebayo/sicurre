@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import sys
 from pathlib import Path
 
@@ -10,8 +9,10 @@ SRC_ROOT = ROOT_DIR / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from data_platform.cron_schedulers.run_dataset_build import main
+from data_platform.cli._legacy import run_legacy_script  # noqa: E402
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    run_legacy_script(
+        "scripts/data_platform/datasets/generation/generate_synthetic_data.py"
+    )
