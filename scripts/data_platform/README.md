@@ -2,6 +2,8 @@
 
 This folder is organized by source and by pipeline phase so source-specific recovery workflows do not get mixed with shared tooling.
 
+`scripts/` is no longer the canonical launcher surface for Make or day-to-day operational commands. Those entrypoints now live under `src/data_platform/cli/`. This tree is reserved for investigation, manual recovery, one-off backfills, audits, and no-write probes.
+
 ## Layout
 
 - `common_crawl/`
@@ -33,23 +35,24 @@ This folder is organized by source and by pipeline phase so source-specific reco
 ## Boundary rules
 
 - Put source-facing operational code in `src/data_platform/extractors/` or shared domain logic in `src/data_platform/services/`.
-- Keep scripts in this tree limited to orchestration, CLI wiring, manual recovery entrypoints, or no-write investigative/probing workflows.
+- Keep scripts in this tree limited to investigation, manual recovery entrypoints, one-off backfills, audits, or no-write investigative/probing workflows.
 - If a script starts owning network fetch logic, parsing, retry policy, or persistence rules, move that logic back into `src/` and let the script call it.
 - Keep source-specific manual recovery workflows under the relevant source folder.
 - Put reusable cross-source builders in `stage_two/`, not under `common_crawl/` or `certfr/`.
 - Automated steady-state runners should stay distinct from one-time manual recovery scripts.
+- Make should call `src/data_platform/cli/` only. `scripts/` should not be a Make entrypoint surface.
 
 ## Naming split
 
-- In `scripts/`, reserve verb-first names such as `extract_*`, `ingest_*`, `reset_*`, `inspect_*`, and `evaluate_*` for manual entrypoints, recovery tools, and no-write probes.
-- In `src/data_platform/cron_schedulers/`, reserve `run_<source>_<stage>.py` for scheduled entrypoints that are intended to be invoked by cron or Cloud Scheduler.
-- For Common Crawl specifically, keep manual entrypoints as `common_crawl/extraction/extract_common_crawl_snapshots.py` and `common_crawl/ingestion/ingest_latest_common_crawl_snapshot.py` plus `common_crawl/ingestion/ingest_merged_common_crawl_snapshots.py`, while future scheduled runners should use `run_*` under `src/data_platform/cron_schedulers/`.
-- Apply the same rule to other manual source wrappers: for example `historical_db/ingestion/ingest_legacy_db_source.py` and `sap_labs/ingestion/ingest_sap_labs_blog.py` stay in `scripts/`, while any future scheduled versions would use `run_*` under `src/data_platform/cron_schedulers/`.
+- In `src/data_platform/cli/`, use task-oriented entrypoint names grouped by domain, for example `cli/ingest/phishtank.py` or `cli/datasets/build.py`.
+- In `src/data_platform/cron_schedulers/`, reserve `run_<source>_<stage>.py` for scheduler-triggered entrypoints only.
+- In `scripts/`, reserve verb-first names such as `extract_*`, `inspect_*`, `reset_*`, and `evaluate_*` for manual probes, recovery tools, and no-write workflows.
+- If a command belongs in Make or in normal operator usage, promote it to `src/data_platform/cli/` instead of adding another script launcher here.
 
 ## Current Common Crawl phases
 
-- `common_crawl/extraction/extract_common_crawl_snapshots.py`: manual upstream Common Crawl extraction into R2.
-- `common_crawl/ingestion/ingest_latest_common_crawl_snapshot.py`: manual latest-parquet ingestion.
+- `common_crawl/extraction/extract_common_crawl_snapshots.py`: legacy/manual upstream Common Crawl extraction into R2.
+- `common_crawl/ingestion/ingest_latest_common_crawl_snapshot.py`: legacy/manual latest-parquet ingestion.
 - `common_crawl/ingestion/ingest_merged_common_crawl_snapshots.py`: one-time manual merged ingestion of the latest two `fr_usable` parquets.
 - `common_crawl/evaluation/evaluate_common_crawl_live_source.py`: exhaustive no-write three-class evaluation over live DB raw records.
 

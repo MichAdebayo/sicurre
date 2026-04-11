@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import argparse
+import logging
 import sys
 from pathlib import Path
 
@@ -9,8 +11,14 @@ SRC_ROOT = ROOT_DIR / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from data_platform.cli._legacy import run_legacy_script  # noqa: E402
+from data_platform.services.external_db_seed import seed_external_database  # noqa: E402
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 
 if __name__ == "__main__":
-    run_legacy_script("scripts/data_platform/historical_db/setup/seed_external_db.py")
+    parser = argparse.ArgumentParser(
+        description="Seed the standalone historical external database with synthetic and adapted data"
+    )
+    parser.parse_args()
+    seed_external_database()
