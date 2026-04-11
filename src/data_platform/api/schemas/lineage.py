@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from db.models import (
     AnnotationLabel,
+    AnnotationLabelSource,
     DatasetStatus,
     IngestionStatus,
     NormalizedLabel,
@@ -71,7 +72,7 @@ class NormalizedMessageListResponse(BaseModel):
 class AnnotationCreate(BaseModel):
     normalized_message_id: UUID
     label: AnnotationLabel
-    label_source: str = Field(min_length=1)
+    label_source: AnnotationLabelSource
     confidence: float | None = None
     comment: str | None = None
     is_validated: bool = False

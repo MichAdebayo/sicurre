@@ -1,5 +1,6 @@
 from db.models.lineage import (
     AnnotationLabel,
+    AnnotationLabelSource,
     DataAnnotation,
     DataDataset,
     DataDatasetItem,
@@ -23,6 +24,7 @@ from db.models.lineage import (
 
 __all__ = [
     "AnnotationLabel",
+    "AnnotationLabelSource",
     "DataAnnotation",
     "DataDataset",
     "DataDatasetItem",

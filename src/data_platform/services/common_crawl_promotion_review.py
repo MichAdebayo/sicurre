@@ -5,6 +5,8 @@ import re
 from statistics import mean
 from typing import Any
 
+from db.models import AnnotationLabelSource
+
 
 class CommonCrawlPromotionReviewService:
     DEFAULT_APPROVED_SUBTYPES = (
@@ -181,7 +183,7 @@ class CommonCrawlPromotionReviewService:
                 "candidate_id": candidate["candidate_id"],
                 "raw_record_id": candidate["raw_record_id"],
                 "label": candidate["target_label"],
-                "label_source": "common_crawl_acceptance_review",
+                "label_source": AnnotationLabelSource.COMMON_CRAWL_ACCEPTANCE_REVIEW.value,
                 "confidence": 0.8,
                 "comment": "No-write proposed annotation pending curated promotion.",
                 "is_validated": False,

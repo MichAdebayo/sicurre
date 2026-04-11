@@ -69,6 +69,13 @@ class AnnotationLabel(StrEnum):
     UNKNOWN = "unknown"
 
 
+class AnnotationLabelSource(StrEnum):
+    COMMON_CRAWL_ACCEPTANCE_REVIEW = "common_crawl_acceptance_review"
+    GENERATION_GATED_PROMOTION = "generation_gated_promotion"
+    MANUAL_REVIEW = "manual_review"
+    NORMALIZED_MESSAGE_BACKFILL = "normalized_message_backfill"
+
+
 class DatasetStatus(StrEnum):
     DRAFT = "draft"
     FROZEN = "frozen"

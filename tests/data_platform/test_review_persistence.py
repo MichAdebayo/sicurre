@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
+import json
+from pathlib import Path
 
 import pytest
 import pytest_asyncio
@@ -12,6 +14,7 @@ from sqlalchemy.pool import StaticPool
 from core.database import Base
 from db.models import (
     DataAnnotation,
+    AnnotationLabelSource,
     DataGenerationRun,
     DataGenerationSample,
     DataIngestionRun,
@@ -214,4 +217,267 @@ async def test_persist_common_crawl_acceptance_review_creates_messages_and_annot
     assert len(messages) == 1
     assert messages[0].current_label == "spam"
     assert len(annotations) == 1
-    assert annotations[0].label_source == "common_crawl_acceptance_review"
+    assert (
+        annotations[0].label_source
+        == AnnotationLabelSource.COMMON_CRAWL_ACCEPTANCE_REVIEW.value
+    )
+
+
+@pytest.mark.asyncio
+async def test_persist_generated_promotion_review_creates_raw_lineage_and_annotations(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    payload = {
+        "run": {
+            "generator_name": "adapted_phishing_generator",
+            "source_name": "adapted_en_fr",
+            "generated_artifact_uri": "tasks/generated-adapted.json",
+        },
+        "selected_draft_ids": ["draft-2"],
+        "promoted_samples": [
+            {
+                "draft_id": "draft-1",
+                "variant_index": 0,
+                "review_state": "usable",
+                "target_label": "phishing",
+                "normalized_text": (
+                    "Objet : Mise a jour\n\nBonjour,\n\n"
+                    "Ceci est le brouillon non promu."
+                ),
+                "text_sha256": "generated-hash-1",
+                "language": "fr",
+            },
+            {
+                "draft_id": "draft-2",
+                "variant_index": 0,
+                "review_state": "usable",
+                "target_label": "phishing",
+                "normalized_text": "Objet : Verification urgente\n\nBonjour,\n\nMerci de verifier votre compte.",
+                "text_sha256": "generated-hash-2",
+                "language": "fr",
+                "annotation": {
+                    "label": "phishing",
+                    "label_source": "generated_promotion_review",
+                    "confidence": 0.91,
+                    "comment": "Eligible for curator review.",
+                    "is_validated": False,
+                },
+            },
+        ],
+    }
+
+    async with session_factory() as session:
+        result = await ReviewPersistenceService.persist_generated_promotion_review(
+            session,
+            payload,
+            pipeline_version="generated_reviewed_promotion_v1",
+            report_uri="tasks/generated-review.json",
+        )
+        source_systems = (
+            (await session.execute(select(DataSourceSystem))).scalars().all()
+        )
+        ingestion_runs = (
+            (await session.execute(select(DataIngestionRun))).scalars().all()
+        )
+        raw_objects = (await session.execute(select(DataRawObject))).scalars().all()
+        raw_records = (await session.execute(select(DataRawRecord))).scalars().all()
+        processing_runs = (
+            (await session.execute(select(DataProcessingRun))).scalars().all()
+        )
+        messages = (
+            (await session.execute(select(DataNormalizedMessage))).scalars().all()
+        )
+        annotations = (await session.execute(select(DataAnnotation))).scalars().all()
+
+    assert result["raw_record_count"] == 1
+    assert result["normalized_message_count"] == 1
+    assert result["annotation_count"] == 1
+    assert len(source_systems) == 1
+    assert source_systems[0].name == (
+        "synthetic-generated-adapted-phishing-generator-adapted-en-fr"
+    )
+    assert source_systems[0].source_type == "manual"
+    assert len(ingestion_runs) == 1
+    assert ingestion_runs[0].trigger_mode == "promotion"
+    assert len(raw_objects) == 1
+    assert len(raw_records) == 1
+    assert raw_records[0].record_key == "draft-2:0"
+    assert raw_records[0].source_system_id == source_systems[0].id
+    assert len(processing_runs) == 1
+    assert len(messages) == 1
+    assert messages[0].current_label == "phishing"
+    assert messages[0].raw_record_id == raw_records[0].id
+    assert len(annotations) == 1
+    assert (
+        annotations[0].label_source
+        == AnnotationLabelSource.GENERATION_GATED_PROMOTION.value
+    )
+    assert annotations[0].normalized_message_id == messages[0].id
+
+
+@pytest.mark.asyncio
+async def test_persist_generated_promotion_review_rejects_existing_curated_text(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    payload = {
+        "run": {
+            "generator_name": "certfr_generator",
+            "source_name": "certfr_phishing_signal",
+        },
+        "promoted_samples": [
+            {
+                "draft_id": "draft-1",
+                "variant_index": 0,
+                "review_state": "usable",
+                "target_label": "phishing",
+                "normalized_text": "Objet : Alerte\n\nBonjour,\n\nAction immediate requise.",
+                "text_sha256": "generated-hash-rerun",
+                "language": "fr",
+            }
+        ],
+    }
+
+    async with session_factory() as session:
+        await ReviewPersistenceService.persist_generated_promotion_review(
+            session,
+            payload,
+            pipeline_version="generated_reviewed_promotion_v1",
+        )
+
+        with pytest.raises(ValueError, match="already present in curated storage"):
+            await ReviewPersistenceService.persist_generated_promotion_review(
+                session,
+                payload,
+                pipeline_version="generated_reviewed_promotion_v1",
+            )
+
+
+@pytest.mark.asyncio
+async def test_persist_generation_bundle_with_gated_promotion_stages_all_and_promotes_usable(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    payload = {
+        "run": {
+            "generator_name": "bundle_generator",
+            "source_name": "adapted_en_fr",
+            "generated_artifact_uri": "tasks/generated-bundle.json",
+            "status": "completed",
+            "total_draft_count": 2,
+            "usable_draft_count": 1,
+            "needs_prompt_tuning_count": 0,
+            "dropped_draft_count": 1,
+        },
+        "samples": [
+            {
+                "draft_id": "draft-usable",
+                "variant_index": 0,
+                "review_state": "usable",
+                "target_label": "phishing",
+                "normalized_text": "Objet : Controle\n\nBonjour,\n\nMerci de confirmer.",
+                "text_sha256": "bundle-hash-1",
+                "language": "fr",
+            },
+            {
+                "draft_id": "draft-drop",
+                "variant_index": 0,
+                "review_state": "drop",
+                "target_label": "phishing",
+                "normalized_text": "Objet : Brouillon a rejeter",
+                "text_sha256": "bundle-hash-2",
+                "language": "fr",
+            },
+        ],
+    }
+
+    async with session_factory() as session:
+        result = await ReviewPersistenceService.persist_generation_bundle_with_gated_promotion(
+            session,
+            payload,
+            pipeline_version="generation_gated_promotion_v1",
+            report_uri="tasks/generated-bundle.json",
+        )
+        runs = (await session.execute(select(DataGenerationRun))).scalars().all()
+        samples = (await session.execute(select(DataGenerationSample))).scalars().all()
+        ingestion_runs = (
+            (await session.execute(select(DataIngestionRun))).scalars().all()
+        )
+        raw_records = (await session.execute(select(DataRawRecord))).scalars().all()
+        processing_runs = (
+            (await session.execute(select(DataProcessingRun))).scalars().all()
+        )
+        messages = (
+            (await session.execute(select(DataNormalizedMessage))).scalars().all()
+        )
+        annotations = (await session.execute(select(DataAnnotation))).scalars().all()
+
+    assert result["sample_count"] == 2
+    assert result["raw_record_count"] == 1
+    assert result["normalized_message_count"] == 1
+    assert result["annotation_count"] == 1
+    assert len(runs) == 1
+    assert len(samples) == 2
+    assert len(ingestion_runs) == 1
+    assert len(raw_records) == 1
+    assert raw_records[0].record_key == "draft-usable:0"
+    assert len(processing_runs) == 1
+    assert len(messages) == 1
+    assert messages[0].text_sha256 == "bundle-hash-1"
+    assert len(annotations) == 1
+    assert (
+        annotations[0].label_source
+        == AnnotationLabelSource.GENERATION_GATED_PROMOTION.value
+    )
+
+
+@pytest.mark.asyncio
+async def test_persist_generated_promotion_review_hydrates_text_from_json_artifact(
+    session_factory: async_sessionmaker[AsyncSession],
+    tmp_path: Path,
+) -> None:
+    artifact_path = tmp_path / "generated-drafts.json"
+    artifact_path.write_text(
+        json.dumps(
+            {
+                "drafts": [
+                    {
+                        "draft_id": "artifact-draft-1",
+                        "text_sha256": "artifact-hash-1",
+                        "full_text": "Objet : Piece jointe\n\nBonjour,\n\nMerci de verifier la piece jointe.",
+                    }
+                ]
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    payload = {
+        "run": {
+            "generator_name": "certfr_signal_synthetic",
+            "source_name": "certfr-phishing-signal",
+            "generated_artifact_uri": str(artifact_path),
+        },
+        "promoted_samples": [
+            {
+                "draft_id": "artifact-draft-1",
+                "variant_index": 0,
+                "review_state": "usable",
+                "target_label": "phishing",
+                "text_sha256": "artifact-hash-1",
+                "language": "fr",
+            }
+        ],
+    }
+
+    async with session_factory() as session:
+        result = await ReviewPersistenceService.persist_generated_promotion_review(
+            session,
+            payload,
+            pipeline_version="generated_reviewed_promotion_v1",
+        )
+        messages = (
+            (await session.execute(select(DataNormalizedMessage))).scalars().all()
+        )
+
+    assert result["normalized_message_count"] == 1
+    assert len(messages) == 1
+    assert messages[0].normalized_text.startswith("Objet : Piece jointe")
