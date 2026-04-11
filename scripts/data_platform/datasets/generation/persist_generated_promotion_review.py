@@ -10,7 +10,7 @@ SRC_ROOT = ROOT_DIR / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from data_platform.cron_schedulers.run_generation_bundle_persistence import main
+from data_platform.cron_schedulers.run_generated_promotion_review import main
 
 
 if __name__ == "__main__":
