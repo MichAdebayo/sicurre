@@ -246,3 +246,67 @@ def test_common_crawl_acceptance_review_rejects_imperative_subject_fragment() ->
 
     assert review["accepted_candidate_count"] == 0
     assert review["rejection_summary"]["malformed_subject_fragment_detected"] == 1
+
+
+def test_common_crawl_acceptance_review_rejects_weak_page_title_subject() -> None:
+    payload = {
+        "candidates": [
+            {
+                "candidate_id": "cand-weak-subject",
+                "draft_id": "draft-weak-subject",
+                "raw_record_id": "raw-weak-subject",
+                "source_name": "common-crawl-bigdata",
+                "rule_key": "promotional_spam",
+                "rewrite_mode": "promotional_page_to_spam_message",
+                "target_label": "spam",
+                "review_state": "usable",
+                "review_notes": [],
+                "quality_signals": {
+                    "french_marker_count": 4,
+                    "target_cue_hits": 2,
+                },
+                "text_length": 390,
+                "text_sha256": "hash-weak-subject",
+                "normalized_text": "Objet : Comment préparer sa rentrée universitaire : votre offre réservée jusqu'à ce soir\n\nBonjour, profitez dès maintenant de cette offre.",
+                "contains_pii": False,
+                "redaction_status": "not_required",
+            }
+        ]
+    }
+
+    review = CommonCrawlPromotionReviewService.build_acceptance_review(payload)
+
+    assert review["accepted_candidate_count"] == 0
+    assert review["rejection_summary"]["weak_subject_detected"] == 1
+
+
+def test_common_crawl_acceptance_review_rejects_subject_grammar_residue() -> None:
+    payload = {
+        "candidates": [
+            {
+                "candidate_id": "cand-subject-grammar",
+                "draft_id": "draft-subject-grammar",
+                "raw_record_id": "raw-subject-grammar",
+                "source_name": "common-crawl-bigdata",
+                "rule_key": "instructional_legitimate",
+                "rewrite_mode": "institutional_page_to_notification",
+                "target_label": "legitimate",
+                "review_state": "usable",
+                "review_notes": [],
+                "quality_signals": {
+                    "french_marker_count": 5,
+                    "target_cue_hits": 2,
+                },
+                "text_length": 390,
+                "text_sha256": "hash-subject-grammar",
+                "normalized_text": "Objet : Sécurité renforcée pour Dans le cas des escroqueries à la\n\nBonjour, utilisez uniquement vos canaux habituels.",
+                "contains_pii": False,
+                "redaction_status": "not_required",
+            }
+        ]
+    }
+
+    review = CommonCrawlPromotionReviewService.build_acceptance_review(payload)
+
+    assert review["accepted_candidate_count"] == 0
+    assert review["rejection_summary"]["grammar_residue_detected"] == 1

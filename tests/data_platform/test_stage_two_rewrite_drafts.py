@@ -24,7 +24,7 @@ def test_stage_two_rewrite_drafts_builds_usable_legitimate_notification() -> Non
     draft = drafts["drafts"][0]
     assert draft["review_state"] == "usable"
     assert "Bonjour" in draft["body"]
-    assert "service client" in draft["body"].lower()
+    assert draft["body"].split("\n")[-1]
 
 
 def test_stage_two_rewrite_drafts_builds_french_repaired_spam() -> None:
@@ -258,6 +258,50 @@ def test_stage_two_rewrite_drafts_rejects_pdf_title_fragment_focus() -> None:
         "certicode" in draft["subject"].lower()
         or "authentification" in draft["subject"].lower()
     )
+
+
+def test_stage_two_rewrite_drafts_filters_page_title_promotional_topic() -> None:
+    drafts = StageTwoRewriteDraftService.build_drafts(
+        {
+            "jobs": [
+                {
+                    "job_id": "job-promo-page-title",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "promotional_spam",
+                    "rewrite_mode": "promotional_page_to_spam_message",
+                    "target_label": "spam",
+                    "raw_record_id": "promo-page-title-1",
+                    "source_preview": "Comment préparer sa rentrée universitaire. Offre réservée aujourd'hui avec une réponse rapide et des conditions préférentielles.",
+                }
+            ]
+        }
+    )
+
+    draft = drafts["drafts"][0]
+    assert draft["review_state"] == "usable"
+    assert not draft["subject"].lower().startswith("comment préparer")
+
+
+def test_stage_two_rewrite_drafts_filters_grammar_corrupt_legitimate_focus() -> None:
+    drafts = StageTwoRewriteDraftService.build_drafts(
+        {
+            "jobs": [
+                {
+                    "job_id": "job-legit-grammar-focus",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "instructional_legitimate",
+                    "rewrite_mode": "institutional_page_to_notification",
+                    "target_label": "legitimate",
+                    "raw_record_id": "legit-grammar-focus-1",
+                    "source_preview": "Dans le cas des escroqueries à la carte bancaire, utilisez uniquement votre espace client et vos canaux habituels.",
+                }
+            ]
+        }
+    )
+
+    draft = drafts["drafts"][0]
+    assert draft["review_state"] == "usable"
+    assert "dans le cas" not in draft["subject"].lower()
 
 
 def test_stage_two_rewrite_drafts_rejects_imperative_fragment_focus() -> None:

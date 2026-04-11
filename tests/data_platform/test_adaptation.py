@@ -44,7 +44,9 @@ def test_generate_and_export_adapted_dataset(tmp_path: Path) -> None:
         }
     )
 
-    generated_df = service.generate_all_adapted_emails(matched_df, target_per_archetype=2)
+    generated_df = service.generate_all_adapted_emails(
+        matched_df, target_per_archetype=2
+    )
     deduplicated_df, removed_duplicates = service.deduplicate_generated(generated_df)
     summary = service.build_summary(
         matched_df,
@@ -60,3 +62,16 @@ def test_generate_and_export_adapted_dataset(tmp_path: Path) -> None:
     assert summary.min_french_markers >= 1
     assert export_result.timestamped_path.exists()
     assert export_result.stable_path.exists()
+
+
+def test_adaptation_high_frequency_templates_vary_subjects_and_signatures() -> None:
+    service = FrenchCulturalAdaptationService(seed=42)
+
+    ameli_subjects = {service._ameli_carte_vitale()[0] for _ in range(12)}
+    edf_messages = [service._edf_regularisation() for _ in range(12)]
+    edf_subjects = {subject for subject, _ in edf_messages}
+    edf_signatures = {body.split("\n")[-1] for _, body in edf_messages}
+
+    assert len(ameli_subjects) > 1
+    assert len(edf_subjects) > 1
+    assert len(edf_signatures) > 1

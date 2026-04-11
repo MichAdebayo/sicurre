@@ -26,11 +26,13 @@ def test_certfr_generated_drafts_builds_banking_phishing_email() -> None:
     assert draft["target_label"] == "phishing"
     assert draft["review_state"] == "usable"
     assert "paiement" in draft["body"].lower() or "facture" in draft["body"].lower()
-    assert "[LIEN_" in draft["body"]
+    assert ".example/" in draft["body"]
+    assert "[LIEN_" not in draft["body"]
     assert draft["quality_signals"]["cta_present"] is True
     assert draft["quality_signals"]["structure_opening"]
     assert draft["quality_signals"]["structure_context"]
     assert draft["quality_signals"]["structure_pressure"]
+    assert ".example/" in draft["quality_signals"]["safe_link"]
     assert draft["quality_signals"]["cta_position"] in {
         "after_opening",
         "after_context",
@@ -107,6 +109,27 @@ def test_certfr_generated_drafts_flags_missing_cta() -> None:
     assert review_state == "needs_prompt_tuning"
     assert "missing_action_cta" in review_notes
     assert quality_signals["cta_present"] is False
+
+
+def test_certfr_generated_drafts_emits_safe_link_for_generic_campaign() -> None:
+    payload = CertFRGeneratedDraftService.build_drafts(
+        {
+            "scenarios": [
+                {
+                    "scenario_id": "certfr-synth:generic:generic_campaign:email",
+                    "attack_family": "generic",
+                    "primary_theme": "generic_campaign",
+                    "delivery_channel": "email",
+                    "sampled_record_ids": ["a"],
+                    "prompt_brief": "brief a",
+                }
+            ]
+        }
+    )
+
+    draft = payload["drafts"][0]
+    assert "document.example/" in draft["body"]
+    assert draft["quality_signals"]["cta_present"] is True
 
 
 def test_certfr_generated_drafts_varies_cta_by_scenario() -> None:

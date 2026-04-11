@@ -34,9 +34,37 @@ def test_common_crawl_signal_synthetic_builds_phishing_drafts() -> None:
         draft["nearest_reference_raw_record_id"] == "raw-1"
         for draft in drafts["drafts"]
     )
-    assert all("[LIEN_" in draft["normalized_text"] for draft in drafts["drafts"])
+    assert all("https://" in draft["normalized_text"] for draft in drafts["drafts"])
+    assert all("[LIEN_" not in draft["normalized_text"] for draft in drafts["drafts"])
     assert any(
-        "Cellule de suivi livraison" in draft["normalized_text"]
+        "Mondial Relay" in draft["normalized_text"] for draft in drafts["drafts"]
+    )
+
+
+def test_common_crawl_signal_synthetic_replaces_generic_delivery_entity() -> None:
+    payload = {
+        "candidates": [
+            {
+                "raw_record_id": "raw-generic-delivery",
+                "rule_key": "phishing_lure_candidate",
+                "target_label": "phishing",
+                "normalized_text": (
+                    "Objet : Service livraison : votre colis reste en attente aujourd'hui\n\n"
+                    "Bonjour,\n\n"
+                    "Une tentative de livraison reste suspendue après un échec de remise.\n\n"
+                    "Merci d'effectuer la vérification demandée aujourd'hui.\n\n"
+                    "Cordialement,\nService livraison"
+                ),
+            }
+        ]
+    }
+
+    drafts = CommonCrawlSignalSyntheticService.build_drafts(
+        payload, variants_per_seed=2
+    )
+
+    assert all(
+        "Service livraison :" not in draft["normalized_text"]
         for draft in drafts["drafts"]
     )
 
