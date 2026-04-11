@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import unicodedata
 from collections import Counter
 from datetime import datetime, timezone
 from typing import Any
@@ -32,13 +33,60 @@ class CommonCrawlSignalSyntheticService:
         "maintenir",
     )
 
-    DELIVERY_CTA_TEMPLATES: tuple[str, ...] = (
-        "Veuillez confirmer votre créneau de livraison et vos coordonnées de réception depuis [LIEN_CONFIRMATION_LIVRAISON].",
-        "Pour relancer l'acheminement, ouvrez [LIEN_MISE_A_JOUR_RECEPTION] et validez les informations demandées sans délai.",
+    DELIVERY_FALLBACK_ENTITIES: tuple[str, ...] = (
+        "Mondial Relay",
+        "Colissimo",
+        "Chronopost",
+        "La Poste",
+        "Relais Colis",
     )
-    ACCOUNT_CTA_TEMPLATES: tuple[str, ...] = (
-        "Veuillez confirmer vos éléments de sécurité depuis [LIEN_VERIFICATION_SECURITE] afin d'éviter la suspension préventive de votre accès.",
-        "Merci d'ouvrir [LIEN_MAINTIEN_ACCES] pour vérifier les informations demandées et conserver l'accès à votre espace.",
+    ACCOUNT_FALLBACK_ENTITIES: tuple[str, ...] = (
+        "FranceConnect",
+        "Espace client sécurisé",
+        "Portail d'authentification",
+        "Centre de sécurité",
+    )
+    DELIVERY_SUBJECT_TEMPLATES: tuple[str, ...] = (
+        "{entity} : confirmation requise pour votre livraison {reference}",
+        "{entity} : votre colis reste suspendu aujourd'hui",
+        "{entity} : dernière vérification avant remise du colis {reference}",
+        "{entity} : nouvelle présentation bloquée sans confirmation",
+        "{entity} : confirmez votre point relais pour le dossier {reference}",
+        "{entity} : échec de remise, mise à jour attendue aujourd'hui",
+    )
+    DELIVERY_BODY_TEMPLATES: tuple[str, ...] = (
+        "Bonjour,\n\nVotre colis référencé {reference} ne peut pas être remis tant qu'une vérification de vos coordonnées n'a pas été effectuée.\n\nVeuillez confirmer votre créneau de livraison depuis {link}.\n\nCordialement,\n{signature}",
+        "Bonjour,\n\nUne nouvelle tentative de livraison liée au dossier {reference} reste suspendue après un échec de remise.\n\nPour relancer l'acheminement, ouvrez {link} et validez les informations demandées sans délai.\n\nCordialement,\n{signature}",
+        "Bonjour,\n\nLe colis {reference} reste en attente au centre de distribution car la vérification de réception n'a pas été finalisée.\n\nMerci de confirmer votre disponibilité et votre adresse depuis {link} afin d'éviter le retour du pli.\n\nCordialement,\n{signature}",
+        "Bonjour,\n\nNous n'avons pas pu confirmer la remise du dossier {reference} lors du dernier passage.\n\nUne mise à jour rapide de vos coordonnées est requise via {link} pour planifier une nouvelle présentation.\n\nCordialement,\n{signature}",
+        "Bonjour,\n\nLe point relais associé au dossier {reference} reste bloqué faute de validation de votre part.\n\nVeuillez finaliser la vérification demandée depuis {link} pour conserver votre créneau de retrait.\n\nCordialement,\n{signature}",
+        "Bonjour,\n\nVotre suivi {reference} signale une anomalie de distribution nécessitant une confirmation aujourd'hui.\n\nMerci de vérifier les informations de réception via {link} afin d'éviter une suspension définitive de l'acheminement.\n\nCordialement,\n{signature}",
+    )
+    ACCOUNT_SUBJECT_TEMPLATES: tuple[str, ...] = (
+        "{entity} : confirmation nécessaire pour maintenir votre accès {reference}",
+        "{entity} : vérification de sécurité en attente aujourd'hui",
+        "{entity} : activité inhabituelle détectée sur votre espace",
+        "{entity} : votre accès sera suspendu sans confirmation {reference}",
+        "{entity} : action requise pour finaliser la vérification en cours",
+        "{entity} : mise à jour de sécurité requise aujourd'hui",
+    )
+    ACCOUNT_BODY_TEMPLATES: tuple[str, ...] = (
+        "Bonjour,\n\nUne activité inhabituelle a été détectée sur le dossier {reference}.\n\nVeuillez confirmer vos éléments de sécurité depuis {link} afin d'éviter la suspension préventive de votre accès.\n\nCordialement,\n{signature}",
+        "Bonjour,\n\nNous avons besoin d'une confirmation liée au dossier {reference} pour finaliser la vérification de sécurité en cours.\n\nMerci d'ouvrir {link} pour vérifier les informations demandées et conserver l'accès à votre espace.\n\nCordialement,\n{signature}",
+        "Bonjour,\n\nUne alerte de sécurité empêche la validation du dossier {reference} tant que votre identité numérique n'a pas été confirmée.\n\nUtilisez {link} pour vérifier les éléments demandés et maintenir votre accès sans interruption.\n\nCordialement,\n{signature}",
+        "Bonjour,\n\nUne tentative de connexion non reconnue reste associée à la référence {reference}.\n\nAfin d'éviter une restriction temporaire, merci de confirmer vos informations depuis {link} dès réception de ce message.\n\nCordialement,\n{signature}",
+        "Bonjour,\n\nLa vérification automatique du dossier {reference} n'a pas pu être finalisée.\n\nVeuillez reprendre la procédure via {link} pour conserver l'accès à vos services aujourd'hui.\n\nCordialement,\n{signature}",
+        "Bonjour,\n\nNous avons suspendu à titre préventif une opération liée au dossier {reference} en attente d'une confirmation de sécurité.\n\nMerci d'ouvrir {link} afin de valider les informations demandées et lever l'alerte en cours.\n\nCordialement,\n{signature}",
+    )
+    DELIVERY_SIGNATURE_TEMPLATES: tuple[str, ...] = (
+        "{entity}",
+        "{entity} — Cellule de suivi",
+        "{entity} — Service distribution",
+    )
+    ACCOUNT_SIGNATURE_TEMPLATES: tuple[str, ...] = (
+        "{entity}",
+        "{entity} — Support accès",
+        "{entity} — Vérification identité",
     )
 
     @classmethod
@@ -179,12 +227,31 @@ class CommonCrawlSignalSyntheticService:
     @staticmethod
     def _infer_entity(subject: str, body: str, theme: str) -> str:
         if ":" in subject:
-            return subject.split(":", 1)[0].strip()
+            entity = subject.split(":", 1)[0].strip()
+            if theme == "delivery" and entity.lower() in {
+                "service livraison",
+                "service client",
+            }:
+                return CommonCrawlSignalSyntheticService._fallback_entity(
+                    seed_text=f"{subject}\n{body}",
+                    theme=theme,
+                )
+            if theme == "account_security" and entity.lower() in {
+                "service sécurité",
+                "service securite",
+                "service client",
+            }:
+                return CommonCrawlSignalSyntheticService._fallback_entity(
+                    seed_text=f"{subject}\n{body}",
+                    theme=theme,
+                )
+            return entity
         if theme == "delivery" and "Mondial Relay" in body:
             return "Mondial Relay"
-        if theme == "account_security":
-            return "Service sécurité"
-        return "Service client"
+        return CommonCrawlSignalSyntheticService._fallback_entity(
+            seed_text=f"{subject}\n{body}",
+            theme=theme,
+        )
 
     @staticmethod
     def _build_reference(seed: dict[str, Any], variant_index: int, theme: str) -> str:
@@ -205,52 +272,108 @@ class CommonCrawlSignalSyntheticService:
         reference: str,
         variant_index: int,
     ) -> tuple[str, str]:
+        variant_count = 6
+        delivery_variant = CommonCrawlSignalSyntheticService._rotation_index(
+            seed=f"delivery:{entity}:{reference}",
+            variant_index=variant_index,
+            modulo=variant_count,
+        )
+        account_variant = CommonCrawlSignalSyntheticService._rotation_index(
+            seed=f"account:{entity}:{reference}",
+            variant_index=variant_index,
+            modulo=variant_count,
+        )
         if theme == "delivery":
-            signatures = (
-                entity,
-                f"{entity} — Cellule de suivi livraison",
+            link = CommonCrawlSignalSyntheticService._build_safe_link(
+                entity=entity,
+                theme=theme,
+                reference=reference,
+                action=delivery_variant,
             )
-            subjects = (
-                f"{entity} : confirmation requise pour votre livraison {reference}",
-                f"{entity} : votre colis reste suspendu aujourd'hui",
+            signature = CommonCrawlSignalSyntheticService.DELIVERY_SIGNATURE_TEMPLATES[
+                delivery_variant
+                % len(CommonCrawlSignalSyntheticService.DELIVERY_SIGNATURE_TEMPLATES)
+            ].format(entity=entity)
+            subjects = tuple(
+                template.format(entity=entity, reference=reference)
+                for template in CommonCrawlSignalSyntheticService.DELIVERY_SUBJECT_TEMPLATES
             )
-            bodies = (
-                "Bonjour,\n\n"
-                f"Votre colis référencé {reference} ne peut pas être remis tant qu'une vérification de vos coordonnées n'a pas été effectuée.\n\n"
-                f"{CommonCrawlSignalSyntheticService.DELIVERY_CTA_TEMPLATES[0]}\n\n"
-                f"Cordialement,\n{signatures[0]}",
-                "Bonjour,\n\n"
-                f"Une nouvelle tentative de livraison liée au dossier {reference} reste suspendue après un échec de remise.\n\n"
-                f"{CommonCrawlSignalSyntheticService.DELIVERY_CTA_TEMPLATES[1]}\n\n"
-                f"Cordialement,\n{signatures[1]}",
+            bodies = tuple(
+                template.format(reference=reference, link=link, signature=signature)
+                for template in CommonCrawlSignalSyntheticService.DELIVERY_BODY_TEMPLATES
             )
             return (
-                subjects[variant_index % len(subjects)],
-                bodies[variant_index % len(bodies)],
+                subjects[delivery_variant],
+                bodies[delivery_variant],
             )
 
-        signatures = (
-            entity,
-            f"{entity} — Support accès",
+        link = CommonCrawlSignalSyntheticService._build_safe_link(
+            entity=entity,
+            theme=theme,
+            reference=reference,
+            action=account_variant,
         )
-        subjects = (
-            f"{entity} : confirmation nécessaire pour maintenir votre accès {reference}",
-            f"{entity} : vérification de sécurité en attente aujourd'hui",
+        signature = CommonCrawlSignalSyntheticService.ACCOUNT_SIGNATURE_TEMPLATES[
+            account_variant
+            % len(CommonCrawlSignalSyntheticService.ACCOUNT_SIGNATURE_TEMPLATES)
+        ].format(entity=entity)
+        subjects = tuple(
+            template.format(entity=entity, reference=reference)
+            for template in CommonCrawlSignalSyntheticService.ACCOUNT_SUBJECT_TEMPLATES
         )
-        bodies = (
-            "Bonjour,\n\n"
-            f"Une activité inhabituelle a été détectée sur le dossier {reference}.\n\n"
-            f"{CommonCrawlSignalSyntheticService.ACCOUNT_CTA_TEMPLATES[0]}\n\n"
-            f"Cordialement,\n{signatures[0]}",
-            "Bonjour,\n\n"
-            f"Nous avons besoin d'une confirmation liée au dossier {reference} pour finaliser la vérification de sécurité en cours.\n\n"
-            f"{CommonCrawlSignalSyntheticService.ACCOUNT_CTA_TEMPLATES[1]}\n\n"
-            f"Cordialement,\n{signatures[1]}",
+        bodies = tuple(
+            template.format(reference=reference, link=link, signature=signature)
+            for template in CommonCrawlSignalSyntheticService.ACCOUNT_BODY_TEMPLATES
         )
         return (
-            subjects[variant_index % len(subjects)],
-            bodies[variant_index % len(bodies)],
+            subjects[account_variant],
+            bodies[account_variant],
         )
+
+    @staticmethod
+    def _rotation_index(seed: str, variant_index: int, modulo: int) -> int:
+        digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()
+        base = int(digest[:8], 16) % modulo
+        return (base + variant_index) % modulo
+
+    @staticmethod
+    def _slugify_entity(entity: str) -> str:
+        normalized = unicodedata.normalize("NFKD", entity)
+        ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
+        slug = re.sub(r"[^a-z0-9]+", "-", ascii_text.lower()).strip("-")
+        return slug or "espace-client"
+
+    @classmethod
+    def _build_safe_link(
+        cls,
+        *,
+        entity: str,
+        theme: str,
+        reference: str,
+        action: int,
+    ) -> str:
+        entity_slug = cls._slugify_entity(entity)
+        action_slug = "livraison" if theme == "delivery" else "verification"
+        endpoint = (
+            "confirmer",
+            "maintien",
+            "controle",
+            "mise-a-jour",
+            "validation",
+            "acces",
+        )[action % 6]
+        return f"https://{entity_slug}.{action_slug}.example/{endpoint}/{reference.lower()}"
+
+    @classmethod
+    def _fallback_entity(cls, *, seed_text: str, theme: str) -> str:
+        pools = {
+            "delivery": cls.DELIVERY_FALLBACK_ENTITIES,
+            "account_security": cls.ACCOUNT_FALLBACK_ENTITIES,
+            "generic_security": cls.ACCOUNT_FALLBACK_ENTITIES,
+        }
+        pool = pools.get(theme, cls.ACCOUNT_FALLBACK_ENTITIES)
+        digest = hashlib.sha256(seed_text.encode("utf-8")).hexdigest()
+        return pool[int(digest[:8], 16) % len(pool)]
 
     @classmethod
     def _assess_variant(cls, text: str) -> tuple[str, list[str]]:

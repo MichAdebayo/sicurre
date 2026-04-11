@@ -420,6 +420,9 @@ class FrenchCulturalAdaptationService:
     def _phone_fr(self) -> str:
         return self.fake.phone_number()
 
+    def _pick(self, *options: str) -> str:
+        return self.random.choice(options)
+
     @property
     def template_map(self) -> dict[str, list[TemplateFactory]]:
         return {
@@ -474,7 +477,11 @@ class FrenchCulturalAdaptationService:
 
     def _dgfip_refund(self) -> tuple[str, str]:
         return (
-            "Remboursement fiscal en attente — Action requise",
+            self._pick(
+                "Remboursement fiscal en attente — Action requise",
+                "DGFiP — Confirmez votre remboursement fiscal",
+                "Validation requise pour votre remboursement d'impôt",
+            ),
             (
                 f"Cher(e) contribuable,\n\n"
                 f"Suite au traitement de votre déclaration de revenus, nous avons constaté un trop-perçu de {self._amount()} en votre faveur.\n\n"
@@ -511,7 +518,11 @@ class FrenchCulturalAdaptationService:
 
     def _urssaf_update(self) -> tuple[str, str]:
         return (
-            "Mise à jour obligatoire — Espace URSSAF",
+            self._pick(
+                "Mise à jour obligatoire — Espace URSSAF",
+                "URSSAF — Vérification requise sur votre espace",
+                "Contrôle de vos informations URSSAF en attente",
+            ),
             (
                 "Bonjour,\n\n"
                 "Suite à une mise à jour de notre système, nous vous demandons de vérifier vos informations personnelles et bancaires sur votre espace URSSAF.\n\n"
@@ -536,7 +547,11 @@ class FrenchCulturalAdaptationService:
 
     def _ameli_carte_vitale(self) -> tuple[str, str]:
         return (
-            "Renouvellement obligatoire de votre Carte Vitale",
+            self._pick(
+                "Renouvellement obligatoire de votre Carte Vitale",
+                "Carte Vitale expirée — Mise à jour requise",
+                "Ameli — Vérifiez le renouvellement de votre Carte Vitale",
+            ),
             (
                 f"Madame, Monsieur {self.fake.last_name()},\n\n"
                 f"Votre Carte Vitale arrive à expiration le {self._date_fr()}. Pour éviter toute interruption de vos remboursements de soins, veuillez renouveler votre carte en ligne.\n\n"
@@ -547,7 +562,11 @@ class FrenchCulturalAdaptationService:
 
     def _caf_suspension(self) -> tuple[str, str]:
         return (
-            "Suspension de vos allocations — Action immédiate requise",
+            self._pick(
+                "Suspension de vos allocations — Action immédiate requise",
+                "CAF — Votre dossier risque une suspension immédiate",
+                "Déclaration CAF manquante — Régularisation urgente",
+            ),
             (
                 f"Madame, Monsieur {self.fake.last_name()},\n\n"
                 f"Nous vous informons que vos allocations seront suspendues à compter du {self._date_fr()} en raison d'un défaut de déclaration trimestrielle.\n\n"
@@ -559,7 +578,11 @@ class FrenchCulturalAdaptationService:
 
     def _caf_exceptional_payment(self) -> tuple[str, str]:
         return (
-            "Versement exceptionnel CAF — Confirmez vos coordonnées",
+            self._pick(
+                "Versement exceptionnel CAF — Confirmez vos coordonnées",
+                "CAF — Validation requise pour votre versement exceptionnel",
+                "Paiement CAF en attente — Confirmez vos informations",
+            ),
             (
                 "Bonjour,\n\n"
                 f"Dans le cadre des mesures de soutien au pouvoir d'achat, vous êtes éligible à un versement exceptionnel de {self._amount()}.\n\n"
@@ -582,7 +605,11 @@ class FrenchCulturalAdaptationService:
 
     def _chronopost_customs(self) -> tuple[str, str]:
         return (
-            "Chronopost — Frais de douane à régler",
+            self._pick(
+                "Chronopost — Frais de douane à régler",
+                "Chronopost — Régularisation douanière requise",
+                "Votre colis Chronopost reste bloqué en douane",
+            ),
             (
                 "Madame, Monsieur,\n\n"
                 f"Votre colis international (réf. {self._ref()}) est bloqué en douane. Des frais de {self._amount()} sont à régler pour le dédouanement.\n\n"
@@ -602,7 +629,11 @@ class FrenchCulturalAdaptationService:
             ]
         )
         return (
-            "Alerte sécurité — Connexion inhabituelle à votre compte",
+            self._pick(
+                "Alerte sécurité — Connexion inhabituelle à votre compte",
+                "Tentative de connexion inhabituelle — Vérification requise",
+                f"{bank_name} — Accès suspect détecté sur votre espace",
+            ),
             (
                 "Cher(e) client(e),\n\n"
                 f"Nous avons détecté une tentative de connexion inhabituelle à votre compte {bank_name} depuis une adresse IP non reconnue ({self.fake.ipv4()}).\n\n"
@@ -617,7 +648,11 @@ class FrenchCulturalAdaptationService:
             ["BNP Paribas", "Crédit Agricole", "Société Générale"]
         )
         return (
-            "Virement suspect détecté — Validation requise",
+            self._pick(
+                "Virement suspect détecté — Validation requise",
+                "Validation urgente d'un virement suspect",
+                f"{bank_name} — Opposition requise sur un virement en cours",
+            ),
             (
                 f"Bonjour {self.fake.last_name()},\n\n"
                 f"Un virement de {self._amount()} vers un compte étranger (IBAN: {self.fake.lexify('??').upper()}{self.fake.numerify('## #### #### #### #### ####')}) a été initié depuis votre compte.\n\n"
@@ -632,7 +667,11 @@ class FrenchCulturalAdaptationService:
             ["BNP Paribas", "Crédit Agricole", "Société Générale", "CIC"]
         )
         return (
-            "Mise à jour 3D Secure obligatoire",
+            self._pick(
+                "Mise à jour 3D Secure obligatoire",
+                "Authentification 3D Secure à confirmer",
+                f"{bank_name} — Mise à jour 3D Secure requise",
+            ),
             (
                 "Madame, Monsieur,\n\n"
                 f"Conformément à la directive européenne DSP2, vous devez mettre à jour votre dispositif d'authentification 3D Secure avant le {self._date_fr()}.\n\n"
@@ -644,7 +683,11 @@ class FrenchCulturalAdaptationService:
 
     def _franceconnect_suspicious_login(self) -> tuple[str, str]:
         return (
-            "Tentative de connexion suspecte — FranceConnect",
+            self._pick(
+                "Tentative de connexion suspecte — FranceConnect",
+                "FranceConnect — Vérification de sécurité requise",
+                "FranceConnect — Activité inhabituelle sur votre identité numérique",
+            ),
             (
                 "Bonjour,\n\n"
                 f"Une tentative de connexion à votre compte FranceConnect a été détectée le {self._date_fr()} à {self.random.randint(1, 23)}h{self.random.randint(10, 59)} depuis {self.random.choice(['Russie', 'Nigeria', 'Turquie', 'Chine', 'Roumanie'])}.\n\n"
@@ -656,7 +699,11 @@ class FrenchCulturalAdaptationService:
 
     def _service_public_identity_check(self) -> tuple[str, str]:
         return (
-            "Vérification d'identité obligatoire — Service-Public.fr",
+            self._pick(
+                "Vérification d'identité obligatoire — Service-Public.fr",
+                "Service-Public.fr — Contrôle d'identité en attente",
+                "Maintien de vos services publics — Vérification requise",
+            ),
             (
                 f"Madame, Monsieur {self.fake.last_name()},\n\n"
                 "Dans le cadre du renforcement de la sécurité numérique, une vérification de votre identité est requise pour maintenir l'accès à vos services publics en ligne.\n\n"
@@ -682,14 +729,23 @@ class FrenchCulturalAdaptationService:
         )
 
     def _edf_regularisation(self) -> tuple[str, str]:
+        signature = self._pick(
+            "EDF — Cellule facturation",
+            "EDF — Service contrats",
+            "EDF — Assistance facturation",
+        )
         return (
-            "EDF — Régularisation annuelle de votre contrat",
+            self._pick(
+                "EDF — Régularisation annuelle de votre contrat",
+                "EDF — Solde annuel à régler sur votre contrat",
+                "Votre contrat EDF nécessite une régularisation immédiate",
+            ),
             (
                 "Cher(e) client(e),\n\n"
                 f"Suite à la régularisation annuelle de votre contrat d'électricité, un solde de {self._amount()} est à régler avant le {self._date_fr()}.\n\n"
                 f"Numéro de contrat : {self.fake.numerify('#### #### ####')}\n"
                 f"Point de livraison : {self.fake.numerify('## ### ### ### ### ###')}\n\n"
                 f"→ Payer ma facture : https://edf-regularisation.fr/{self.fake.lexify('??????')}\n\n"
-                "En cas de non-paiement, une coupure d'alimentation électrique pourra être programmée.\n\nEDF — Service Client"
+                f"En cas de non-paiement, une coupure d'alimentation électrique pourra être programmée.\n\n{signature}"
             ),
         )

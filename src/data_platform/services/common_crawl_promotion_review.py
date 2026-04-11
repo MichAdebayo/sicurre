@@ -54,6 +54,17 @@ class CommonCrawlPromotionReviewService:
         r"\b(?:cliquez|ouvrez|changez|confirmez|validez|activez|renseignez|consultez)\b",
         r"\b(?:à|de|du|des|sur|avec|pour)\s*$",
     )
+    WEAK_SUBJECT_PATTERNS: tuple[str, ...] = (
+        r"^objet\s*:\s*(?:vous\s|comment\b|qu[’']est-ce que\b|révélez\b|revelez\b)",
+        r"^objet\s*:\s*(?:loisirs vacances voyage|investissement financement territoire|dans le cas|accéder\b|acceder\b)",
+        r"\blecture\s*:",
+    )
+    SUBJECT_GRAMMAR_RESIDUE_PATTERNS: tuple[str, ...] = (
+        r"\bde des\b",
+        r"\bsur accéder\b",
+        r"\bsur acceder\b",
+        r"\bpour dans le cas\b",
+    )
     REVIEW_NOTE_BLOCKERS: tuple[str, ...] = (
         "duplicate_generated_draft",
         "page_like_legitimate_subject",
@@ -267,10 +278,20 @@ class CommonCrawlPromotionReviewService:
 
         normalized_text = str(candidate.get("normalized_text") or "")
         lowered_text = f" {normalized_text.lower()} "
+        subject_line = normalized_text.split("\n", 1)[0].lower().strip()
         if any(marker in lowered_text for marker in cls.TEXT_RESIDUE_MARKERS):
+            return "grammar_residue_detected"
+        if any(
+            re.search(pattern, subject_line)
+            for pattern in cls.SUBJECT_GRAMMAR_RESIDUE_PATTERNS
+        ):
             return "grammar_residue_detected"
         if any(marker in lowered_text for marker in cls.BODY_RESIDUE_MARKERS):
             return "body_residue_detected"
+        if any(
+            re.search(pattern, subject_line) for pattern in cls.WEAK_SUBJECT_PATTERNS
+        ):
+            return "weak_subject_detected"
         if cls._has_malformed_subject_fragment(normalized_text):
             return "malformed_subject_fragment_detected"
         if rule_key == "promotional_spam" and cls._has_promotional_page_residue(

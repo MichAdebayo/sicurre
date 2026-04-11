@@ -10,6 +10,7 @@ from data_platform.cleaning.normalization import clean_text, text_sha256
 
 
 class CertFRGeneratedDraftService:
+    SAFE_LINK_DOMAIN_SUFFIX = ".example"
     IOC_LEAK_PATTERNS: tuple[re.Pattern[str], ...] = (
         re.compile(r"https?://", re.IGNORECASE),
         re.compile(r"\[url\]", re.IGNORECASE),
@@ -42,7 +43,6 @@ class CertFRGeneratedDraftService:
         "ouvrir",
         "accéder",
     )
-    SAFE_LINK_TOKEN_PREFIX = "[LIEN_"
     CTA_INSERTION_MODES: tuple[str, ...] = (
         "after_opening",
         "after_context",
@@ -51,29 +51,29 @@ class CertFRGeneratedDraftService:
     )
     CTA_LIBRARY: dict[str, tuple[str, ...]] = {
         "banking_malware": (
-            "Vous pouvez valider l'opération depuis [LIEN_VALIDATION_PAIEMENT].",
-            "Le document reste accessible pour contrôle via [LIEN_PIECE_PAIEMENT].",
-            "Pour confirmer le règlement, ouvrez [LIEN_CONFIRMATION_VIREMENT].",
+            "Vous pouvez valider l'opération depuis {safe_link}.",
+            "Le document reste accessible pour contrôle via {safe_link}.",
+            "Pour confirmer le règlement, ouvrez {safe_link}.",
         ),
         "credential_theft": (
-            "Veuillez vérifier votre accès depuis [LIEN_VERIFICATION_COMPTE].",
-            "La confirmation de votre session reste disponible via [LIEN_MAINTIEN_ACCES].",
-            "Pour conserver l'accès, accédez à [LIEN_CONFIRMATION_IDENTIFIANTS].",
+            "Veuillez vérifier votre accès depuis {safe_link}.",
+            "La confirmation de votre session reste disponible via {safe_link}.",
+            "Pour conserver l'accès, accédez à {safe_link}.",
         ),
         "phishing": (
-            "Veuillez confirmer votre accès sécurisé via [LIEN_CONFIRMATION_ACCES].",
-            "Vous pouvez confirmer votre compte et maintenir votre accès en ouvrant [LIEN_MAINTIEN_COMPTE].",
-            "Pour la vérification de sécurité de votre accès, consultez [LIEN_VERIFICATION_SERVICE].",
+            "Veuillez confirmer votre accès sécurisé via {safe_link}.",
+            "Vous pouvez confirmer votre compte et maintenir votre accès en ouvrant {safe_link}.",
+            "Pour la vérification de sécurité de votre accès, consultez {safe_link}.",
         ),
         "ransomware": (
-            "Le document prioritaire peut être consulté depuis [LIEN_INCIDENT_PRIORITAIRE].",
-            "Pour ouvrir le document transmis sans délai, consultez [LIEN_NOTE_URGENCE].",
-            "Pour consulter la pièce d'incident et ouvrir le document de coordination, utilisez [LIEN_DOCUMENT_COORDINATION].",
+            "Le document prioritaire peut être consulté depuis {safe_link}.",
+            "Pour ouvrir le document transmis sans délai, consultez {safe_link}.",
+            "Pour consulter la pièce d'incident et ouvrir le document de coordination, utilisez {safe_link}.",
         ),
         "generic_campaign": (
-            "Une action requise reste accessible via [LIEN_DOSSIER_URGENT].",
-            "Pour consulter la demande en attente sans délai, ouvrez [LIEN_DOCUMENT_PARTAGE].",
-            "Vous pouvez confirmer la prise en charge du document depuis [LIEN_REPONSE_ATTENDUE].",
+            "Une action requise reste accessible via {safe_link}.",
+            "Pour consulter la demande en attente sans délai, ouvrez {safe_link}.",
+            "Vous pouvez confirmer la prise en charge du document depuis {safe_link}.",
         ),
     }
     THEME_SENTENCE_LIBRARY: dict[str, dict[str, tuple[str, ...]]] = {
@@ -115,7 +115,7 @@ class CertFRGeneratedDraftService:
                 "Une absence d'action rapide peut entraîner un verrouillage préventif de votre session.",
             ),
             "signature": (
-                "Support sécurité",
+                "Assistance sécurité",
                 "Assistance accès",
             ),
         },
@@ -442,9 +442,11 @@ class CertFRGeneratedDraftService:
         signature: str,
     ) -> tuple[str, str, dict[str, Any]]:
         cta_options = cls.CTA_LIBRARY.get(theme, cls.CTA_LIBRARY["generic_campaign"])
-        cta_sentence = cta_options[
+        cta_template = cta_options[
             cls._deterministic_index(f"{scenario_id}:{theme}:cta", len(cta_options))
         ]
+        safe_link = cls._build_safe_link(scenario_id=scenario_id, theme=theme)
+        cta_sentence = cta_template.format(safe_link=safe_link)
         cta_position = cls.CTA_INSERTION_MODES[
             cls._deterministic_index(
                 f"{scenario_id}:{theme}:position",
@@ -476,12 +478,34 @@ class CertFRGeneratedDraftService:
                 "structure_context": context,
                 "structure_pressure": pressure,
                 "structure_signature": signature,
+                "safe_link": safe_link,
             },
         )
 
     @staticmethod
     def _deterministic_index(seed: str, modulo: int) -> int:
         return 0 if modulo <= 0 else int(text_sha256(seed)[:8], 16) % modulo
+
+    @classmethod
+    def _build_safe_link(cls, *, scenario_id: str, theme: str) -> str:
+        path_map = {
+            "banking_malware": "document-paiement",
+            "credential_theft": "verification-acces",
+            "phishing": "confirmation-compte",
+            "ransomware": "note-prioritaire",
+            "generic_campaign": "dossier-transmis",
+        }
+        prefix_map = {
+            "banking_malware": "reglement",
+            "credential_theft": "connexion",
+            "phishing": "securite",
+            "ransomware": "incident",
+            "generic_campaign": "document",
+        }
+        digest = text_sha256(f"{scenario_id}:{theme}:safe-link")[:10]
+        subdomain = prefix_map.get(theme, "document")
+        path = path_map.get(theme, "dossier")
+        return f"{subdomain}{cls.SAFE_LINK_DOMAIN_SUFFIX}/{path}/{digest}"
 
     @classmethod
     def _assess_draft(
@@ -499,7 +523,12 @@ class CertFRGeneratedDraftService:
         phishing_cue_hits = len(
             [marker for marker in cls.PHISHING_CUES if marker in lowered]
         )
-        cta_present = cls.SAFE_LINK_TOKEN_PREFIX.lower() in lowered
+        cta_present = bool(
+            re.search(
+                rf"\b[a-z0-9-]+\{cls.SAFE_LINK_DOMAIN_SUFFIX}/[a-z0-9-]+/[a-f0-9]+\b",
+                lowered,
+            )
+        )
         prompt_brief = str(scenario.get("prompt_brief") or "")
         similarity_to_prompt = (
             round(

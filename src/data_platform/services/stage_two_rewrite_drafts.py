@@ -19,6 +19,10 @@ class StageTwoRewriteDraftService:
         "vous",
         "aujourd'hui",
         "service client",
+        "assistance",
+        "cellule",
+        "centre",
+        "conseiller",
         "offre",
         "accès",
         "compte",
@@ -57,12 +61,19 @@ class StageTwoRewriteDraftService:
         "en outre",
         "en second lieu",
         "avec ses",
+        "vous bénéficiez",
+        "vous beneficiez",
         "pour faire",
         "ce type de",
         "une recrudescence",
         "la validation",
         "découvrez",
         "decouvrez",
+        "qu'est-ce que",
+        "qu’est-ce que",
+        "comment ",
+        "révélez",
+        "revelez",
         "retrouvez",
         "les essentiels de",
         "nouveautés",
@@ -77,8 +88,13 @@ class StageTwoRewriteDraftService:
         "historique des remises",
         "services digitaux",
         "gestion compte bancaire",
+        "loisirs vacances voyage",
+        "investissement financement territoire",
         "nos services",
         "des intérêts débiteurs",
+        "dans le cas",
+        "accéder",
+        "acceder",
         "# paiement",
         "service e-carte bleue",
     )
@@ -96,7 +112,22 @@ class StageTwoRewriteDraftService:
         "conformément à cette dernière exigence réglementaire",
         "actuellement nous travaillons",
         "rapprochez-vous de votre conseiller habituel",
+        "lecture :",
         "[phone]service",
+    )
+    BAD_TOPIC_PATTERNS: tuple[str, ...] = (
+        r"^qu[’']est-ce que\b",
+        r"^comment\b",
+        r"^vous\s",
+        r"^révélez\b",
+        r"^revelez\b",
+        r"^loisirs vacances voyage\b",
+        r"^investissement financement territoire\b",
+        r"^dans le cas\b",
+        r"^accéder\b",
+        r"^acceder\b",
+        r"\blecture\s*:",
+        r"\b\d{1,2}\s+[a-zéûîôàèç-]+,\s+\d{4}\b",
     )
     PAGE_LIKE_SUBJECT_MARKERS: tuple[str, ...] = (
         "selon les conditions générales",
@@ -250,6 +281,14 @@ class StageTwoRewriteDraftService:
             "en cas de doute",
             "espace habituel",
             "sécurité",
+            "canaux officiels",
+            "espace personnel",
+            "environnement habituel",
+            "validation sensible",
+            "conseiller",
+            "cellule",
+            "assistance",
+            "centre",
         ),
         "spam": (
             "offre",
@@ -356,6 +395,63 @@ class StageTwoRewriteDraftService:
         }
 
     @classmethod
+    def _legitimate_signature(cls, source_preview: str, category: str) -> str:
+        signatures_by_category = {
+            "payment": (
+                "Cellule vigilance paiements",
+                "Assistance paiements sécurisés",
+                "Centre notifications clients",
+                "Service prévention monétique",
+            ),
+            "access": (
+                "Cellule sécurité des accès",
+                "Assistance authentification",
+                "Centre protection compte",
+                "Service vérification identités",
+            ),
+            "document": (
+                "Cellule documentation sécurisée",
+                "Assistance espace documentaire",
+                "Centre relation documentaire",
+                "Service suivi des documents",
+            ),
+            "vigilance": (
+                "Cellule prévention fraude",
+                "Assistance vigilance numérique",
+                "Centre d'alerte clients",
+                "Service sécurité relationnelle",
+            ),
+            "general": (
+                "Cellule information sécurisée",
+                "Assistance parcours client",
+                "Centre relation sécurisée",
+                "Service accompagnement numérique",
+            ),
+        }
+        signatures = signatures_by_category.get(
+            category, signatures_by_category["general"]
+        )
+        return signatures[
+            cls._variant_index(
+                f"{source_preview}:{category}:signature", len(signatures)
+            )
+        ]
+
+    @classmethod
+    def _promotional_signature(cls, source_preview: str) -> str:
+        signatures = (
+            "Cellule avantages premium",
+            "Conseiller offres privées",
+            "Équipe services exclusifs",
+            "Pôle relation abonnés",
+        )
+        return signatures[
+            cls._variant_index(
+                f"{source_preview}:promotional:signature", len(signatures)
+            )
+        ]
+
+    @classmethod
     def _rewrite_job(
         cls,
         job: dict[str, Any],
@@ -437,6 +533,7 @@ class StageTwoRewriteDraftService:
             fallback=cls._infer_legitimate_focus(source_preview),
         )
         variant = cls._variant_index(source_preview, 4)
+        signature = cls._legitimate_signature(source_preview, "payment")
         subjects = (
             f"Point d'information sur {focus.lower()}",
             f"Rappel utile concernant {focus.lower()}",
@@ -444,10 +541,10 @@ class StageTwoRewriteDraftService:
             f"Mise à jour utile pour {focus.lower()}",
         )
         bodies = (
-            f"Bonjour,\n\nNous vous rappelons que les opérations liées à {focus.lower()} doivent être consultées uniquement depuis vos canaux habituels.\n\nSelon votre situation, vous pouvez recevoir une information par SMS, notification ou messagerie sécurisée. En cas de doute, vérifiez toujours la demande depuis votre espace client.\n\nCordialement,\nVotre service client",
-            f"Bonjour,\n\nCe message vous rappelle les bons réflexes à adopter pour {focus.lower()} et les notifications associées.\n\nAvant toute validation sensible, contrôlez la demande depuis votre environnement habituel et ne partagez jamais d'informations confidentielles en réponse à un message inattendu.\n\nCordialement,\nVotre service client",
-            f"Bonjour,\n\nPour toute démarche relative à {focus.lower()}, utilisez uniquement les notifications et parcours disponibles dans votre espace habituel.\n\nSi une demande paraît inhabituelle, interrompez l'action et rapprochez-vous de votre service client avant toute saisie d'information.\n\nCordialement,\nVotre service client",
-            f"Bonjour,\n\nNous vous invitons à vérifier avec attention toute alerte reçue au sujet de {focus.lower()}.\n\nLes confirmations sensibles doivent toujours être traitées depuis vos canaux officiels, sans passer par un lien ou un message inattendu.\n\nCordialement,\nVotre service client",
+            f"Bonjour,\n\nNous vous rappelons que les opérations liées à {focus.lower()} doivent être consultées uniquement depuis vos canaux habituels.\n\nSelon votre situation, vous pouvez recevoir une information par SMS, notification ou messagerie sécurisée. En cas de doute, vérifiez toujours la demande depuis votre espace client.\n\nCordialement,\n{signature}",
+            f"Bonjour,\n\nCe message vous rappelle les bons réflexes à adopter pour {focus.lower()} et les notifications associées.\n\nAvant toute validation sensible, contrôlez la demande depuis votre environnement habituel et ne partagez jamais d'informations confidentielles en réponse à un message inattendu.\n\nCordialement,\n{signature}",
+            f"Bonjour,\n\nPour toute démarche relative à {focus.lower()}, utilisez uniquement les notifications et parcours disponibles dans votre espace habituel.\n\nSi une demande paraît inhabituelle, interrompez l'action et rapprochez-vous d'un conseiller via vos canaux officiels avant toute saisie d'information.\n\nCordialement,\n{signature}",
+            f"Bonjour,\n\nNous vous invitons à vérifier avec attention toute alerte reçue au sujet de {focus.lower()}.\n\nLes confirmations sensibles doivent toujours être traitées depuis vos canaux officiels, sans passer par un lien ou un message inattendu.\n\nCordialement,\n{signature}",
         )
         return subjects[variant], bodies[variant]
 
@@ -460,6 +557,7 @@ class StageTwoRewriteDraftService:
             fallback=cls._infer_legitimate_focus(source_preview),
         )
         variant = cls._variant_index(source_preview, 4)
+        signature = cls._legitimate_signature(source_preview, "access")
         subjects = (
             f"Information sur la sécurisation de {focus.lower()}",
             f"Mise à jour utile concernant {focus.lower()}",
@@ -467,10 +565,10 @@ class StageTwoRewriteDraftService:
             f"Point de contrôle lié à {focus.lower()}",
         )
         bodies = (
-            f"Bonjour,\n\nSi vous devez réinitialiser {focus.lower()}, suivez uniquement les étapes disponibles depuis votre espace habituel.\n\nSelon votre situation, un code temporaire pourra vous être transmis par SMS ou par courrier. En cas de doute, contactez votre conseiller avant toute saisie d'information.\n\nCordialement,\nVotre service client",
-            f"Bonjour,\n\nPour toute action portant sur {focus.lower()}, utilisez exclusivement vos parcours de connexion et de validation habituels.\n\nN'acceptez jamais une demande urgente sans avoir confirmé son origine via vos canaux officiels.\n\nCordialement,\nVotre service client",
-            f"Bonjour,\n\nNous vous rappelons que les vérifications liées à {focus.lower()} doivent être traitées uniquement depuis votre espace habituel.\n\nSi un code ou une demande de confirmation vous paraît inattendu, interrompez la procédure et rapprochez-vous de votre service client.\n\nCordialement,\nVotre service client",
-            f"Bonjour,\n\nCe message rappelle les bonnes pratiques de sécurité à suivre pour {focus.lower()}.\n\nAvant toute saisie d'information, contrôlez toujours l'origine de la demande et privilégiez un accès direct à votre espace personnel.\n\nCordialement,\nVotre service client",
+            f"Bonjour,\n\nSi vous devez réinitialiser {focus.lower()}, suivez uniquement les étapes disponibles depuis votre espace habituel.\n\nSelon votre situation, un code temporaire pourra vous être transmis par SMS ou par courrier. En cas de doute, contactez votre conseiller avant toute saisie d'information.\n\nCordialement,\n{signature}",
+            f"Bonjour,\n\nPour toute action portant sur {focus.lower()}, utilisez exclusivement vos parcours de connexion et de validation habituels.\n\nN'acceptez jamais une demande urgente sans avoir confirmé son origine via vos canaux officiels.\n\nCordialement,\n{signature}",
+            f"Bonjour,\n\nNous vous rappelons que les vérifications liées à {focus.lower()} doivent être traitées uniquement depuis votre espace habituel.\n\nSi un code ou une demande de confirmation vous paraît inattendu, interrompez la procédure et rapprochez-vous d'un conseiller via vos canaux habituels.\n\nCordialement,\n{signature}",
+            f"Bonjour,\n\nCe message rappelle les bonnes pratiques de sécurité à suivre pour {focus.lower()}.\n\nAvant toute saisie d'information, contrôlez toujours l'origine de la demande et privilégiez un accès direct à votre espace personnel.\n\nCordialement,\n{signature}",
         )
         return subjects[variant], bodies[variant]
 
@@ -481,6 +579,7 @@ class StageTwoRewriteDraftService:
             fallback="vos documents disponibles",
         )
         variant = cls._variant_index(source_preview, 4)
+        signature = cls._legitimate_signature(source_preview, "document")
         subjects = (
             f"Information utile concernant {focus.lower()}",
             f"Rappel pratique au sujet de {focus.lower()}",
@@ -488,10 +587,10 @@ class StageTwoRewriteDraftService:
             f"Point d'information pour {focus.lower()}",
         )
         bodies = (
-            f"Bonjour,\n\nNous vous informons que les éléments relatifs à {focus.lower()} doivent être consultés depuis vos espaces habituels et sécurisés.\n\nEn cas de doute sur un document reçu ou annoncé, connectez-vous directement à votre espace client avant toute action.\n\nCordialement,\nVotre service client",
-            f"Bonjour,\n\nCe rappel concerne {focus.lower()} et les vérifications utiles avant toute consultation ou téléchargement.\n\nN'utilisez que vos canaux officiels pour accéder à vos documents et contactez votre service client si une demande vous semble inhabituelle.\n\nCordialement,\nVotre service client",
-            f"Bonjour,\n\nPour toute consultation liée à {focus.lower()}, privilégiez un accès direct à votre espace habituel.\n\nSi un message vous demande d'agir en urgence sur un document ou un relevé, vérifiez d'abord sa légitimité.\n\nCordialement,\nVotre service client",
-            f"Bonjour,\n\nNous vous invitons à vérifier avec attention les notifications portant sur {focus.lower()}.\n\nAvant d'ouvrir un document ou de suivre une consigne, assurez-vous que la demande provient bien de vos canaux officiels.\n\nCordialement,\nVotre service client",
+            f"Bonjour,\n\nNous vous informons que les éléments relatifs à {focus.lower()} doivent être consultés depuis vos espaces habituels et sécurisés.\n\nEn cas de doute sur un document reçu ou annoncé, connectez-vous directement à votre espace client avant toute action.\n\nCordialement,\n{signature}",
+            f"Bonjour,\n\nCe rappel concerne {focus.lower()} et les vérifications utiles avant toute consultation ou téléchargement.\n\nN'utilisez que vos canaux officiels pour accéder à vos documents et contactez un conseiller si une demande vous semble inhabituelle.\n\nCordialement,\n{signature}",
+            f"Bonjour,\n\nPour toute consultation liée à {focus.lower()}, privilégiez un accès direct à votre espace habituel.\n\nSi un message vous demande d'agir en urgence sur un document ou un relevé, vérifiez d'abord sa légitimité.\n\nCordialement,\n{signature}",
+            f"Bonjour,\n\nNous vous invitons à vérifier avec attention les notifications portant sur {focus.lower()}.\n\nAvant d'ouvrir un document ou de suivre une consigne, assurez-vous que la demande provient bien de vos canaux officiels.\n\nCordialement,\n{signature}",
         )
         return subjects[variant], bodies[variant]
 
@@ -502,6 +601,7 @@ class StageTwoRewriteDraftService:
             fallback=cls._infer_legitimate_focus(source_preview),
         )
         variant = cls._variant_index(source_preview, 4)
+        signature = cls._legitimate_signature(source_preview, "vigilance")
         subjects = (
             f"Rappel de vigilance concernant {focus}",
             f"Alerte de prudence au sujet de {focus}",
@@ -509,10 +609,10 @@ class StageTwoRewriteDraftService:
             f"Sécurité renforcée pour {focus}",
         )
         bodies = (
-            f"Bonjour,\n\nNous vous rappelons de ne jamais transmettre vos données bancaires, vos codes de validation ou vos informations personnelles lorsqu'un message inattendu évoque {focus.lower()}.\n\nEn cas de message douteux, connectez-vous uniquement à votre espace habituel ou rapprochez-vous de votre service client avant toute action.\n\nCordialement,\nVotre service client",
-            f"Bonjour,\n\nDes sollicitations peuvent utiliser {focus.lower()} pour provoquer une réaction urgente.\n\nAvant toute réponse, vérifiez l'origine du contact via vos canaux habituels et ne communiquez aucune information sensible sans contrôle préalable.\n\nCordialement,\nVotre service client",
-            f"Bonjour,\n\nCe message rappelle les bons réflexes à adopter lorsque {focus.lower()} est mentionné dans un e-mail, un SMS ou un appel inattendu.\n\nEn cas de doute, interrompez l'échange et rapprochez-vous directement de votre service client.\n\nCordialement,\nVotre service client",
-            f"Bonjour,\n\nNous attirons votre attention sur les risques liés à {focus.lower()} lorsqu'une demande inhabituelle cherche à obtenir une action immédiate.\n\nNe cliquez pas sur un lien inattendu et privilégiez toujours un accès direct à votre espace personnel.\n\nCordialement,\nVotre service client",
+            f"Bonjour,\n\nNous vous rappelons de ne jamais transmettre vos données bancaires, vos codes de validation ou vos informations personnelles lorsqu'un message inattendu évoque {focus.lower()}.\n\nEn cas de message douteux, connectez-vous uniquement à votre espace habituel ou rapprochez-vous d'un conseiller via vos canaux officiels avant toute action.\n\nCordialement,\n{signature}",
+            f"Bonjour,\n\nDes sollicitations peuvent utiliser {focus.lower()} pour provoquer une réaction urgente.\n\nAvant toute réponse, vérifiez l'origine du contact via vos canaux habituels et ne communiquez aucune information sensible sans contrôle préalable.\n\nCordialement,\n{signature}",
+            f"Bonjour,\n\nCe message rappelle les bons réflexes à adopter lorsque {focus.lower()} est mentionné dans un e-mail, un SMS ou un appel inattendu.\n\nEn cas de doute, interrompez l'échange et rapprochez-vous directement d'un conseiller via vos canaux officiels.\n\nCordialement,\n{signature}",
+            f"Bonjour,\n\nNous attirons votre attention sur les risques liés à {focus.lower()} lorsqu'une demande inhabituelle cherche à obtenir une action immédiate.\n\nNe cliquez pas sur un lien inattendu et privilégiez toujours un accès direct à votre espace personnel.\n\nCordialement,\n{signature}",
         )
         return subjects[variant], bodies[variant]
 
@@ -525,6 +625,7 @@ class StageTwoRewriteDraftService:
             fallback=cls._infer_legitimate_focus(source_preview),
         )
         variant = cls._variant_index(source_preview, 4)
+        signature = cls._legitimate_signature(source_preview, "general")
         subjects = (
             f"Information utile concernant {focus.lower()}",
             f"Rappel pratique au sujet de {focus.lower()}",
@@ -533,7 +634,7 @@ class StageTwoRewriteDraftService:
         )
         return (
             subjects[variant],
-            f"Bonjour,\n\nNous vous adressons ce rappel afin de vous aider à vérifier les bonnes pratiques liées à {focus.lower()} et à vos échanges en ligne.\n\nPour toute demande sensible, utilisez uniquement les canaux habituels et rapprochez-vous de votre service client si vous avez le moindre doute.\n\nCordialement,\nVotre service client",
+            f"Bonjour,\n\nNous vous adressons ce rappel afin de vous aider à vérifier les bonnes pratiques liées à {focus.lower()} et à vos échanges en ligne.\n\nPour toute demande sensible, utilisez uniquement les canaux habituels et rapprochez-vous d'un conseiller via vos canaux officiels si vous avez le moindre doute.\n\nCordialement,\n{signature}",
         )
 
     @classmethod
@@ -542,6 +643,7 @@ class StageTwoRewriteDraftService:
         channels = cls._describe_risk_channels(source_preview)
         action = cls._extract_warning_action(source_preview)
         variant = cls._variant_index(source_preview, 4)
+        signature = cls._legitimate_signature(source_preview, "vigilance")
         de_focus = cls._prepend_topic_preposition(focus, "de")
         a_focus = cls._prepend_topic_preposition(focus, "à")
         subjects = (
@@ -551,10 +653,10 @@ class StageTwoRewriteDraftService:
             f"Point de vigilance lié {a_focus}",
         )
         bodies = (
-            f"Bonjour,\n\nNous vous invitons à rester vigilant face aux sollicitations reçues {channels} lorsqu'elles évoquent {focus.lower()}.\n\n{action}\n\nEn cas de doute, reconnectez-vous uniquement à votre espace habituel ou contactez directement votre service client.\n\nCordialement,\nVotre service client",
-            f"Bonjour,\n\nCe rappel de prudence concerne les contacts inattendus reçus {channels} et portant sur {focus.lower()}.\n\n{action}\n\nSi une demande vous semble inhabituelle, interrompez l'échange et vérifiez son origine via vos canaux officiels.\n\nCordialement,\nVotre service client",
-            f"Bonjour,\n\nNous attirons votre attention sur les sollicitations {channels} qui tentent de provoquer une réaction rapide en évoquant {focus.lower()}.\n\n{action}\n\nAvant toute validation, assurez-vous que la demande provient bien de vos canaux habituels.\n\nCordialement,\nVotre service client",
-            f"Bonjour,\n\nCe message rappelle les vérifications utiles à effectuer lorsqu'il est question {de_focus} dans un message, un appel ou une notification inattendue.\n\n{action}\n\nPour toute situation ambiguë, privilégiez un accès direct à votre espace personnel ou un appel au service client.\n\nCordialement,\nVotre service client",
+            f"Bonjour,\n\nNous vous invitons à rester vigilant face aux sollicitations reçues {channels} lorsqu'elles évoquent {focus.lower()}.\n\n{action}\n\nEn cas de doute, reconnectez-vous uniquement à votre espace habituel ou contactez directement un conseiller via vos canaux officiels.\n\nCordialement,\n{signature}",
+            f"Bonjour,\n\nCe rappel de prudence concerne les contacts inattendus reçus {channels} et portant sur {focus.lower()}.\n\n{action}\n\nSi une demande vous semble inhabituelle, interrompez l'échange et vérifiez son origine via vos canaux officiels.\n\nCordialement,\n{signature}",
+            f"Bonjour,\n\nNous attirons votre attention sur les sollicitations {channels} qui tentent de provoquer une réaction rapide en évoquant {focus.lower()}.\n\n{action}\n\nAvant toute validation, assurez-vous que la demande provient bien de vos canaux habituels.\n\nCordialement,\n{signature}",
+            f"Bonjour,\n\nCe message rappelle les vérifications utiles à effectuer lorsqu'il est question {de_focus} dans un message, un appel ou une notification inattendue.\n\n{action}\n\nPour toute situation ambiguë, privilégiez un accès direct à votre espace personnel ou un appel à votre centre de relation habituel.\n\nCordialement,\n{signature}",
         )
         return subjects[variant], bodies[variant]
 
@@ -562,6 +664,7 @@ class StageTwoRewriteDraftService:
     def _build_promotional_spam(cls, source_preview: str) -> tuple[str, str]:
         topic = cls._infer_promotional_topic(source_preview)
         variant = cls._variant_index(source_preview, 4)
+        signature = cls._promotional_signature(source_preview)
         subject_templates = (
             f"{topic} : votre offre réservée jusqu'à ce soir",
             f"{topic} : dernières heures pour en profiter",
@@ -586,7 +689,7 @@ class StageTwoRewriteDraftService:
             "Notre offre met en avant un tarif attractif, des conditions simplifiées et une réponse rapide.\n\n"
             f"{cta_templates[variant]}\n\n"
             "À très vite,\n"
-            "Service commercial"
+            f"{signature}"
         )
         return subject_templates[variant], body
 
@@ -1159,6 +1262,11 @@ class StageTwoRewriteDraftService:
         cleaned_candidate = re.sub(r"^\d+\s*[-:]\s*", "", candidate).strip()
         cleaned_candidate = cleaned_candidate.replace("#", " ")
         cleaned_candidate = re.sub(
+            r"(?i)\blecture\s*:\s*",
+            " ",
+            cleaned_candidate,
+        )
+        cleaned_candidate = re.sub(
             r"(?i)^(article|offres? et services|la banque postale|lcl banque privée|lcl banque et|lcl wealth management)\s+",
             "",
             cleaned_candidate,
@@ -1195,6 +1303,8 @@ class StageTwoRewriteDraftService:
         if any(marker in lowered for marker in cls.NOISY_TOPIC_MARKERS):
             return True
         if any(marker in lowered for marker in cls.BAD_TOPIC_SUBSTRINGS):
+            return True
+        if any(re.search(pattern, lowered) for pattern in cls.BAD_TOPIC_PATTERNS):
             return True
         if lowered.count("#") >= 1:
             return True
