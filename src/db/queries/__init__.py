@@ -6,6 +6,8 @@ from db.queries.lineage import (
 )
 from db.queries.records import (
     AnnotationQueries,
+    DatasetBuildEmptyError,
+    DatasetBuildResult,
     DatasetNotFoundError,
     DatasetQueries,
     DuplicateDatasetError,
@@ -22,6 +24,8 @@ __all__ = [
     "SourceSystemNotFoundError",
     "SourceSystemQueries",
     "AnnotationQueries",
+    "DatasetBuildEmptyError",
+    "DatasetBuildResult",
     "DatasetNotFoundError",
     "DatasetQueries",
     "DuplicateDatasetError",

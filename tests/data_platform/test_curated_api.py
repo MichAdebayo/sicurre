@@ -11,6 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from core.database import Base, get_async_session
 from db.models import (
+    DataAnnotation,
     DataDataset,
     DataDatasetItem,
     DataIngestionRun,
@@ -20,6 +21,8 @@ from db.models import (
     DataRawRecord,
     DataSourceSystem,
 )
+from db.queries import DuplicateDatasetError
+from db.services import DatasetService
 from data_platform.api.main import create_app
 
 
@@ -234,7 +237,7 @@ async def test_create_annotation(
         json={
             "normalized_message_id": seeded_ids["message_id"],
             "label": "phishing",
-            "label_source": "manual-review",
+            "label_source": "manual_review",
             "confidence": 0.95,
             "annotated_at": "2026-03-17T10:00:00Z",
         },
@@ -299,3 +302,196 @@ async def test_create_message_redacts_pii(
     assert "[EMAIL]" in payload["normalized_text"]
     assert "[URL]" in payload["normalized_text"]
     assert payload["contains_pii"] is True
+
+
+@pytest.mark.asyncio
+async def test_build_dataset_from_annotated_messages(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async with session_factory() as session:
+        source = DataSourceSystem(name="builder-source", source_type="file")
+        session.add(source)
+        await session.flush()
+
+        ingestion = DataIngestionRun(
+            source_system_id=source.id,
+            started_at=utc_timestamp(),
+            status="completed",
+            trigger_mode="manual",
+        )
+        session.add(ingestion)
+        await session.flush()
+
+        raw_object = DataRawObject(
+            ingestion_run_id=ingestion.id,
+            object_type="file",
+            content_hash="builder-hash",
+            source_metadata={},
+            collected_at=utc_timestamp(),
+        )
+        session.add(raw_object)
+
+        processing_run = DataProcessingRun(
+            pipeline_version="v1",
+            started_at=utc_timestamp(),
+            status="completed",
+        )
+        session.add(processing_run)
+        await session.flush()
+
+        message_counter = 0
+        for label in ["phishing", "spam", "legitimate"]:
+            for _ in range(10):
+                message_counter += 1
+                raw_record = DataRawRecord(
+                    raw_object_id=raw_object.id,
+                    record_key=f"builder-row-{message_counter}",
+                    raw_content=f"Contenu brut {message_counter}",
+                    detected_language="fr",
+                    is_usable=True,
+                    extracted_at=utc_timestamp(),
+                )
+                message = DataNormalizedMessage(
+                    raw_record=raw_record,
+                    processing_run=processing_run,
+                    normalized_text=f"Message normalise {message_counter}",
+                    text_sha256=f"builder-message-hash-{message_counter:03d}",
+                    language="fr",
+                    current_label=label,
+                    text_length=24,
+                    normalized_at=utc_timestamp(),
+                )
+                session.add_all(
+                    [
+                        raw_record,
+                        message,
+                        DataAnnotation(
+                            normalized_message=message,
+                            label=label,
+                            label_source="manual_review",
+                            confidence=1.0,
+                            annotated_at=utc_timestamp(),
+                        ),
+                    ]
+                )
+
+        extra_raw_record = DataRawRecord(
+            raw_object_id=raw_object.id,
+            record_key="builder-row-unannotated",
+            raw_content="Contenu brut sans annotation",
+            detected_language="fr",
+            is_usable=True,
+            extracted_at=utc_timestamp(),
+        )
+        extra_message = DataNormalizedMessage(
+            raw_record=extra_raw_record,
+            processing_run=processing_run,
+            normalized_text="Message sans annotation",
+            text_sha256="builder-message-hash-unannotated",
+            language="fr",
+            current_label="phishing",
+            text_length=24,
+            normalized_at=utc_timestamp(),
+        )
+        session.add_all([extra_raw_record, extra_message])
+        await session.commit()
+
+        service = DatasetService()
+        result = await service.build(
+            session,
+            name="curated-training",
+            version_tag="curated-training-v1",
+            target_usage="training",
+            status="frozen",
+        )
+
+        assert result.dataset.item_count == 30
+        assert result.split_counts == {"train": 24, "val": 3, "test": 3}
+        assert result.dataset.frozen_at is not None
+
+        items, total = await service.list_items(
+            session,
+            result.dataset.id,
+            limit=100,
+            offset=0,
+        )
+        assert total == 30
+        assert [item.row_order for item in items] == list(range(1, 31))
+        assert {item.split_name for item in items} == {"train", "val", "test"}
+
+
+@pytest.mark.asyncio
+async def test_build_dataset_rejects_duplicate_version_tag(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async with session_factory() as session:
+        source = DataSourceSystem(name="duplicate-builder-source", source_type="file")
+        session.add(source)
+        await session.flush()
+
+        ingestion = DataIngestionRun(
+            source_system_id=source.id,
+            started_at=utc_timestamp(),
+            status="completed",
+            trigger_mode="manual",
+        )
+        session.add(ingestion)
+        await session.flush()
+
+        raw_object = DataRawObject(
+            ingestion_run_id=ingestion.id,
+            object_type="file",
+            content_hash="duplicate-builder-hash",
+            source_metadata={},
+            collected_at=utc_timestamp(),
+        )
+        processing_run = DataProcessingRun(
+            pipeline_version="v1",
+            started_at=utc_timestamp(),
+            status="completed",
+        )
+        raw_record = DataRawRecord(
+            raw_object=raw_object,
+            record_key="duplicate-builder-row",
+            raw_content="Contenu brut duplicate",
+            detected_language="fr",
+            is_usable=True,
+            extracted_at=utc_timestamp(),
+        )
+        message = DataNormalizedMessage(
+            raw_record=raw_record,
+            processing_run=processing_run,
+            normalized_text="Message duplicate",
+            text_sha256="duplicate-builder-message-hash",
+            language="fr",
+            current_label="phishing",
+            text_length=17,
+            normalized_at=utc_timestamp(),
+        )
+        annotation = DataAnnotation(
+            normalized_message=message,
+            label="phishing",
+            label_source="manual_review",
+            confidence=1.0,
+            annotated_at=utc_timestamp(),
+        )
+        session.add_all([raw_object, processing_run, raw_record, message, annotation])
+        await session.commit()
+
+        service = DatasetService()
+        await service.build(
+            session,
+            name="duplicate-dataset",
+            version_tag="duplicate-dataset-v1",
+            target_usage="training",
+            status="draft",
+        )
+
+        with pytest.raises(DuplicateDatasetError):
+            await service.build(
+                session,
+                name="duplicate-dataset",
+                version_tag="duplicate-dataset-v1",
+                target_usage="training",
+                status="draft",
+            )

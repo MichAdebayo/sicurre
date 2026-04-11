@@ -82,5 +82,8 @@ class DatasetService:
     async def create(self, session: AsyncSession, payload: DatasetCreate):
         return await self.repository.create(session, payload)
 
+    async def build(self, session: AsyncSession, **payload):
+        return await self.repository.build(session, **payload)
+
     async def list_items(self, session: AsyncSession, dataset_id: UUID, **filters):
         return await self.repository.list_items(session, dataset_id, **filters)

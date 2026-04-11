@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import math
 import hashlib
+from collections import defaultdict
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import Select, func, select
@@ -15,6 +19,8 @@ from db.models import (
     DataProcessingRun,
     DataRawObject,
     DataRawRecord,
+    DatasetStatus,
+    SplitName,
 )
 from data_platform.api.schemas import (
     AnnotationCreate,
@@ -42,6 +48,49 @@ class DuplicateDatasetError(Exception):
 
 class DatasetNotFoundError(Exception):
     """Raised when a dataset does not exist."""
+
+
+class DatasetBuildEmptyError(Exception):
+    """Raised when a dataset build has no eligible annotated messages."""
+
+
+@dataclass(slots=True)
+class DatasetBuildResult:
+    dataset: DataDataset
+    split_counts: dict[str, int]
+
+
+DATASET_BUILD_SEED = "sicurre-dataset-build-v1"
+DEFAULT_DATASET_SPLITS: tuple[tuple[str, float], ...] = (
+    (SplitName.TRAIN.value, 0.8),
+    (SplitName.VAL.value, 0.1),
+    (SplitName.TEST.value, 0.1),
+)
+DEFAULT_DATASET_LABELS: tuple[str, ...] = ("phishing", "spam", "legitimate")
+
+
+def _stable_dataset_rank(text_sha256: str) -> str:
+    return hashlib.sha256(
+        f"{DATASET_BUILD_SEED}:{text_sha256}".encode("utf-8")
+    ).hexdigest()
+
+
+def _compute_split_counts(
+    total: int,
+    splits: tuple[tuple[str, float], ...],
+) -> dict[str, int]:
+    raw_counts = [(split_name, total * ratio) for split_name, ratio in splits]
+    counts = {split_name: math.floor(raw_count) for split_name, raw_count in raw_counts}
+    remainder = total - sum(counts.values())
+    ranked_remainders = sorted(
+        raw_counts,
+        key=lambda item: (-(item[1] - math.floor(item[1])), item[0]),
+    )
+
+    for split_name, _ in ranked_remainders[:remainder]:
+        counts[split_name] += 1
+
+    return counts
 
 
 class RawRecordQueries:
@@ -237,6 +286,121 @@ class DatasetQueries:
 
         await session.refresh(dataset)
         return dataset
+
+    async def build(
+        self,
+        session: AsyncSession,
+        *,
+        name: str,
+        version_tag: str,
+        target_usage: str,
+        status: str,
+        include_labels: tuple[str, ...] = DEFAULT_DATASET_LABELS,
+        splits: tuple[tuple[str, float], ...] = DEFAULT_DATASET_SPLITS,
+        sample_weight: float = 1.0,
+    ) -> DatasetBuildResult:
+        annotation_rank = func.row_number().over(
+            partition_by=DataAnnotation.normalized_message_id,
+            order_by=(
+                DataAnnotation.annotated_at.desc(),
+                DataAnnotation.created_at.desc(),
+                DataAnnotation.id.desc(),
+            ),
+        )
+        latest_annotations = select(
+            DataAnnotation.normalized_message_id.label("normalized_message_id"),
+            DataAnnotation.label.label("annotation_label"),
+            annotation_rank.label("annotation_rank"),
+        ).subquery()
+
+        eligible_result = await session.execute(
+            select(
+                DataNormalizedMessage.id.label("normalized_message_id"),
+                DataNormalizedMessage.text_sha256.label("text_sha256"),
+                latest_annotations.c.annotation_label.label("annotation_label"),
+            )
+            .join(
+                latest_annotations,
+                latest_annotations.c.normalized_message_id == DataNormalizedMessage.id,
+            )
+            .where(latest_annotations.c.annotation_rank == 1)
+            .where(latest_annotations.c.annotation_label.in_(include_labels))
+        )
+        eligible_rows = [dict(row) for row in eligible_result.mappings().all()]
+        if not eligible_rows:
+            raise DatasetBuildEmptyError()
+
+        rows_by_label: dict[str, list[dict[str, object]]] = defaultdict(list)
+        for row in eligible_rows:
+            rows_by_label[str(row["annotation_label"])].append(row)
+
+        dataset = DataDataset(
+            name=name,
+            version_tag=version_tag,
+            target_usage=target_usage,
+            status=status,
+            frozen_at=(
+                datetime.now(timezone.utc)
+                if status == DatasetStatus.FROZEN.value
+                else None
+            ),
+        )
+        session.add(dataset)
+
+        try:
+            await session.flush()
+        except IntegrityError as exc:
+            await session.rollback()
+            raise DuplicateDatasetError(version_tag) from exc
+
+        split_buckets: dict[str, list[tuple[str, UUID]]] = {
+            split_name: [] for split_name, _ in splits
+        }
+        for label in sorted(rows_by_label):
+            ranked_rows = sorted(
+                rows_by_label[label],
+                key=lambda row: _stable_dataset_rank(str(row["text_sha256"])),
+            )
+            label_counts = _compute_split_counts(len(ranked_rows), splits)
+            start_index = 0
+            for split_name, _ in splits:
+                end_index = start_index + label_counts[split_name]
+                for row in ranked_rows[start_index:end_index]:
+                    split_buckets[split_name].append(
+                        (
+                            _stable_dataset_rank(str(row["text_sha256"])),
+                            row["normalized_message_id"],
+                        )
+                    )
+                start_index = end_index
+
+        row_order = 1
+        split_counts: dict[str, int] = {}
+        for split_name, _ in splits:
+            ordered_rows = sorted(split_buckets[split_name], key=lambda item: item[0])
+            split_counts[split_name] = len(ordered_rows)
+            for _, normalized_message_id in ordered_rows:
+                session.add(
+                    DataDatasetItem(
+                        dataset_id=dataset.id,
+                        normalized_message_id=normalized_message_id,
+                        split_name=split_name,
+                        sample_weight=sample_weight,
+                        row_order=row_order,
+                    )
+                )
+                row_order += 1
+
+        dataset.item_count = sum(split_counts.values())
+
+        try:
+            await session.commit()
+        except IntegrityError as exc:
+            await session.rollback()
+            raise DuplicateDatasetError(version_tag) from exc
+
+        await session.refresh(dataset)
+        return DatasetBuildResult(dataset=dataset, split_counts=split_counts)
 
     async def list_items(
         self, session: AsyncSession, dataset_id: UUID, *, limit: int, offset: int
