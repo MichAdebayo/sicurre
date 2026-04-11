@@ -45,6 +45,15 @@ class CommonCrawlPromotionReviewService:
         "*$",
         "« ",
     )
+    MALFORMED_SUBJECT_MARKERS: tuple[str, ...] = (
+        "(pdf",
+        "(doc",
+        "(xls",
+    )
+    MALFORMED_SUBJECT_PATTERNS: tuple[str, ...] = (
+        r"\b(?:cliquez|ouvrez|changez|confirmez|validez|activez|renseignez|consultez)\b",
+        r"\b(?:à|de|du|des|sur|avec|pour)\s*$",
+    )
     REVIEW_NOTE_BLOCKERS: tuple[str, ...] = (
         "duplicate_generated_draft",
         "page_like_legitimate_subject",
@@ -262,6 +271,8 @@ class CommonCrawlPromotionReviewService:
             return "grammar_residue_detected"
         if any(marker in lowered_text for marker in cls.BODY_RESIDUE_MARKERS):
             return "body_residue_detected"
+        if cls._has_malformed_subject_fragment(normalized_text):
+            return "malformed_subject_fragment_detected"
         if rule_key == "promotional_spam" and cls._has_promotional_page_residue(
             normalized_text
         ):
@@ -281,6 +292,22 @@ class CommonCrawlPromotionReviewService:
         if re.search(r"\b\d{2}/\d{2}/\d{4}\b", lowered):
             return True
         if re.search(r"\b\d+\s*min\b", lowered):
+            return True
+        return False
+
+    @classmethod
+    def _has_malformed_subject_fragment(cls, normalized_text: str) -> bool:
+        subject_line = normalized_text.split("\n", 1)[0].lower()
+        if any(marker in subject_line for marker in cls.MALFORMED_SUBJECT_MARKERS):
+            return True
+        if subject_line.count("#") >= 1:
+            return True
+        if subject_line.count("(") != subject_line.count(")"):
+            return True
+        if any(
+            re.search(pattern, subject_line)
+            for pattern in cls.MALFORMED_SUBJECT_PATTERNS
+        ):
             return True
         return False
 

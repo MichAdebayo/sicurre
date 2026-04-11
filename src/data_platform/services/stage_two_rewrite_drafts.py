@@ -56,6 +56,17 @@ class StageTwoRewriteDraftService:
         "selon les conditions générales",
         "en outre",
         "en second lieu",
+        "avec ses",
+        "pour faire",
+        "ce type de",
+        "une recrudescence",
+        "la validation",
+        "découvrez",
+        "decouvrez",
+        "retrouvez",
+        "les essentiels de",
+        "nouveautés",
+        "nouveautes",
         "conformément",
         "télécharger",
         "tous les champs",
@@ -75,6 +86,9 @@ class StageTwoRewriteDraftService:
         "menu principal",
         "contenu éditorial",
         "pied de page",
+        "(pdf",
+        "(doc",
+        "(xls",
         "tous les champs sont obligatoires",
         "notice d'information",
         "l’organisateur se réserve",
@@ -952,6 +966,10 @@ class StageTwoRewriteDraftService:
                 "les demandes de location",
             ),
             (
+                ("certicode", "code à usage unique"),
+                "l'authentification renforcée",
+            ),
+            (
                 (
                     "notification",
                     "notifications",
@@ -977,7 +995,6 @@ class StageTwoRewriteDraftService:
             (("mot de passe", "connexion", "accès"), "votre accès en ligne"),
             (("relevé", "document"), "vos documents mis à disposition"),
             (("paiement", "carte"), "vos paiements par carte"),
-            (("certicode", "code à usage unique"), "l'authentification renforcée"),
         )
         for markers, focus in focus_map:
             if any(marker in lowered for marker in markers):
@@ -1078,7 +1095,7 @@ class StageTwoRewriteDraftService:
         best_phrase: str | None = None
         best_score = -10_000
         for candidate in candidates:
-            candidate = re.sub(r"^\d+\s*[-:]\s*", "", candidate).strip()
+            candidate = cls._clean_topic_candidate(candidate)
             if len(candidate) < 18:
                 continue
             lowered_candidate = candidate.lower()
@@ -1140,8 +1157,14 @@ class StageTwoRewriteDraftService:
     @staticmethod
     def _clean_topic_candidate(candidate: str) -> str:
         cleaned_candidate = re.sub(r"^\d+\s*[-:]\s*", "", candidate).strip()
+        cleaned_candidate = cleaned_candidate.replace("#", " ")
         cleaned_candidate = re.sub(
             r"(?i)^(article|offres? et services|la banque postale|lcl banque privée|lcl banque et|lcl wealth management)\s+",
+            "",
+            cleaned_candidate,
+        )
+        cleaned_candidate = re.sub(
+            r"(?i)^(découvrez|decouvrez|retrouvez|consultez|téléchargez|telechargez|ouvrez|voir aussi|les essentiels de|nouveautés|nouveautes)\s+",
             "",
             cleaned_candidate,
         )
@@ -1151,11 +1174,20 @@ class StageTwoRewriteDraftService:
             maxsplit=1,
         )[0].strip()
         cleaned_candidate = re.sub(
+            r"(?i)\(\s*(?:pdf|docx?|xlsx?)\s*\)?$",
+            "",
+            cleaned_candidate,
+        )
+        cleaned_candidate = re.sub(
+            r"(?i)\b(?:pdf|docx?|xlsx?)\b", "", cleaned_candidate
+        )
+        cleaned_candidate = re.sub(
             r"(?i)\b(?:de la banque postale|chez lcl|chez la banque postale)\b",
             "",
             cleaned_candidate,
         )
-        return cleaned_candidate.strip(" ,;:-")
+        cleaned_candidate = re.sub(r"\s+", " ", cleaned_candidate)
+        return cleaned_candidate.strip(" ,;:-()")
 
     @classmethod
     def _is_noisy_topic_candidate(cls, text: str) -> bool:
@@ -1164,6 +1196,10 @@ class StageTwoRewriteDraftService:
             return True
         if any(marker in lowered for marker in cls.BAD_TOPIC_SUBSTRINGS):
             return True
+        if lowered.count("#") >= 1:
+            return True
+        if re.search(r"\(\s*(?:pdf|docx?|xlsx?)\b", lowered):
+            return True
         if "[phone]" in lowered or "[email]" in lowered or "[url]" in lowered:
             return True
         if re.search(r"\b\d+\s*commentaires?\b", lowered):
@@ -1171,6 +1207,13 @@ class StageTwoRewriteDraftService:
         if re.search(r"\b(?:up vote|down vote)\b", lowered):
             return True
         if re.search(r"\b(?:le|la)\s+\d{2}/\d{2}/\d{4}\b", lowered):
+            return True
+        if re.search(
+            r"\b(?:cliquez|ouvrez|changez|confirmez|validez|activez|renseignez|consultez)\b",
+            lowered,
+        ):
+            return True
+        if re.search(r"\b(?:à|de|du|des|sur|avec|pour)\s*$", lowered):
             return True
         if re.match(
             (

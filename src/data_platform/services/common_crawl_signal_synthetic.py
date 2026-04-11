@@ -32,6 +32,15 @@ class CommonCrawlSignalSyntheticService:
         "maintenir",
     )
 
+    DELIVERY_CTA_TEMPLATES: tuple[str, ...] = (
+        "Veuillez confirmer votre créneau de livraison et vos coordonnées de réception depuis [LIEN_CONFIRMATION_LIVRAISON].",
+        "Pour relancer l'acheminement, ouvrez [LIEN_MISE_A_JOUR_RECEPTION] et validez les informations demandées sans délai.",
+    )
+    ACCOUNT_CTA_TEMPLATES: tuple[str, ...] = (
+        "Veuillez confirmer vos éléments de sécurité depuis [LIEN_VERIFICATION_SECURITE] afin d'éviter la suspension préventive de votre accès.",
+        "Merci d'ouvrir [LIEN_MAINTIEN_ACCES] pour vérifier les informations demandées et conserver l'accès à votre espace.",
+    )
+
     @classmethod
     def build_drafts(
         cls,
@@ -197,6 +206,10 @@ class CommonCrawlSignalSyntheticService:
         variant_index: int,
     ) -> tuple[str, str]:
         if theme == "delivery":
+            signatures = (
+                entity,
+                f"{entity} — Cellule de suivi livraison",
+            )
             subjects = (
                 f"{entity} : confirmation requise pour votre livraison {reference}",
                 f"{entity} : votre colis reste suspendu aujourd'hui",
@@ -204,18 +217,22 @@ class CommonCrawlSignalSyntheticService:
             bodies = (
                 "Bonjour,\n\n"
                 f"Votre colis référencé {reference} ne peut pas être remis tant qu'une vérification de vos coordonnées n'a pas été effectuée.\n\n"
-                "Veuillez confirmer vos informations de réception aujourd'hui afin d'éviter le retour du pli au centre de distribution.\n\n"
-                f"Cordialement,\n{entity}",
+                f"{CommonCrawlSignalSyntheticService.DELIVERY_CTA_TEMPLATES[0]}\n\n"
+                f"Cordialement,\n{signatures[0]}",
                 "Bonjour,\n\n"
                 f"Une nouvelle tentative de livraison liée au dossier {reference} reste suspendue après un échec de remise.\n\n"
-                "Merci de vérifier immédiatement vos informations de livraison pour relancer l'acheminement sans délai.\n\n"
-                f"Cordialement,\n{entity}",
+                f"{CommonCrawlSignalSyntheticService.DELIVERY_CTA_TEMPLATES[1]}\n\n"
+                f"Cordialement,\n{signatures[1]}",
             )
             return (
                 subjects[variant_index % len(subjects)],
                 bodies[variant_index % len(bodies)],
             )
 
+        signatures = (
+            entity,
+            f"{entity} — Support accès",
+        )
         subjects = (
             f"{entity} : confirmation nécessaire pour maintenir votre accès {reference}",
             f"{entity} : vérification de sécurité en attente aujourd'hui",
@@ -223,12 +240,12 @@ class CommonCrawlSignalSyntheticService:
         bodies = (
             "Bonjour,\n\n"
             f"Une activité inhabituelle a été détectée sur le dossier {reference}.\n\n"
-            "Veuillez confirmer vos éléments de sécurité aujourd'hui afin d'éviter la suspension préventive de votre accès.\n\n"
-            f"Cordialement,\n{entity}",
+            f"{CommonCrawlSignalSyntheticService.ACCOUNT_CTA_TEMPLATES[0]}\n\n"
+            f"Cordialement,\n{signatures[0]}",
             "Bonjour,\n\n"
             f"Nous avons besoin d'une confirmation liée au dossier {reference} pour finaliser la vérification de sécurité en cours.\n\n"
-            "Merci de vérifier vos informations sans délai pour conserver l'accès à votre espace.\n\n"
-            f"Cordialement,\n{entity}",
+            f"{CommonCrawlSignalSyntheticService.ACCOUNT_CTA_TEMPLATES[1]}\n\n"
+            f"Cordialement,\n{signatures[1]}",
         )
         return (
             subjects[variant_index % len(subjects)],
