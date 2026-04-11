@@ -5,10 +5,14 @@ description = "Documentation and architecture workspace for Sicurre"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "numpy>=2.4.2",
+    "pandas>=2.3.3",
+    "pydantic>=2.12.5",
     "pydantic-core>=2.41.5",
     "pypdf>=6.7.4",
     "pypdf2>=3.0.1",
     "pytest>=9.0.2",
+    "requests>=2.32.5",
     "virtualenv>=21.1.0",
 ]
 
