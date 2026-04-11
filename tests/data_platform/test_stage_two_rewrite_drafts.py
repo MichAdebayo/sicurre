@@ -234,6 +234,55 @@ def test_stage_two_rewrite_drafts_falls_back_from_page_like_focus_phrase() -> No
     assert draft["review_state"] == "usable"
 
 
+def test_stage_two_rewrite_drafts_rejects_pdf_title_fragment_focus() -> None:
+    drafts = StageTwoRewriteDraftService.build_drafts(
+        {
+            "jobs": [
+                {
+                    "job_id": "job-pdf-fragment",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "instructional_legitimate",
+                    "rewrite_mode": "institutional_page_to_notification",
+                    "target_label": "legitimate",
+                    "raw_record_id": "pdf-fragment-1",
+                    "source_preview": "Découvrez les essentiels de Certicode Plus (pdf) et les notifications associées à votre espace sécurisé.",
+                }
+            ]
+        }
+    )
+
+    draft = drafts["drafts"][0]
+    assert draft["review_state"] == "usable"
+    assert "(pdf" not in draft["subject"].lower()
+    assert (
+        "certicode" in draft["subject"].lower()
+        or "authentification" in draft["subject"].lower()
+    )
+
+
+def test_stage_two_rewrite_drafts_rejects_imperative_fragment_focus() -> None:
+    drafts = StageTwoRewriteDraftService.build_drafts(
+        {
+            "jobs": [
+                {
+                    "job_id": "job-imperative-fragment",
+                    "source_name": "common-crawl-bigdata",
+                    "rule_key": "instructional_legitimate",
+                    "rewrite_mode": "institutional_page_to_notification",
+                    "target_label": "legitimate",
+                    "raw_record_id": "imperative-fragment-1",
+                    "source_preview": "Pour faire un virement, cliquez de la messagerie sécurisée et confirmez votre accès depuis votre espace habituel.",
+                }
+            ]
+        }
+    )
+
+    draft = drafts["drafts"][0]
+    assert draft["review_state"] == "usable"
+    assert "cliquez" not in draft["subject"].lower()
+    assert not draft["subject"].lower().endswith(" de")
+
+
 def test_stage_two_rewrite_drafts_avoids_scam_report_scaffold_in_legitimate_subject() -> (
     None
 ):

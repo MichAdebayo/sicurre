@@ -34,6 +34,11 @@ def test_common_crawl_signal_synthetic_builds_phishing_drafts() -> None:
         draft["nearest_reference_raw_record_id"] == "raw-1"
         for draft in drafts["drafts"]
     )
+    assert all("[LIEN_" in draft["normalized_text"] for draft in drafts["drafts"])
+    assert any(
+        "Cellule de suivi livraison" in draft["normalized_text"]
+        for draft in drafts["drafts"]
+    )
 
 
 def test_common_crawl_signal_synthetic_builds_generation_samples() -> None:

@@ -182,3 +182,67 @@ def test_common_crawl_acceptance_review_rejects_promotional_page_residue() -> No
 
     assert review["accepted_candidate_count"] == 0
     assert review["rejection_summary"]["promotional_page_residue_detected"] == 1
+
+
+def test_common_crawl_acceptance_review_rejects_malformed_subject_fragment() -> None:
+    payload = {
+        "candidates": [
+            {
+                "candidate_id": "cand-malformed-subject",
+                "draft_id": "draft-malformed-subject",
+                "raw_record_id": "raw-malformed-subject",
+                "source_name": "common-crawl-bigdata",
+                "rule_key": "instructional_legitimate",
+                "rewrite_mode": "institutional_page_to_notification",
+                "target_label": "legitimate",
+                "review_state": "usable",
+                "review_notes": [],
+                "quality_signals": {
+                    "french_marker_count": 5,
+                    "target_cue_hits": 2,
+                },
+                "text_length": 390,
+                "text_sha256": "hash-malformed-subject",
+                "normalized_text": "Objet : Point d'information sur découvrez les essentiels de certicode plus (pdf\n\nBonjour, utilisez uniquement vos canaux habituels.",
+                "contains_pii": False,
+                "redaction_status": "not_required",
+            }
+        ]
+    }
+
+    review = CommonCrawlPromotionReviewService.build_acceptance_review(payload)
+
+    assert review["accepted_candidate_count"] == 0
+    assert review["rejection_summary"]["malformed_subject_fragment_detected"] == 1
+
+
+def test_common_crawl_acceptance_review_rejects_imperative_subject_fragment() -> None:
+    payload = {
+        "candidates": [
+            {
+                "candidate_id": "cand-imperative-subject",
+                "draft_id": "draft-imperative-subject",
+                "raw_record_id": "raw-imperative-subject",
+                "source_name": "common-crawl-bigdata",
+                "rule_key": "instructional_legitimate",
+                "rewrite_mode": "institutional_page_to_notification",
+                "target_label": "legitimate",
+                "review_state": "usable",
+                "review_notes": [],
+                "quality_signals": {
+                    "french_marker_count": 5,
+                    "target_cue_hits": 2,
+                },
+                "text_length": 390,
+                "text_sha256": "hash-imperative-subject",
+                "normalized_text": "Objet : Rappel utile concernant pour faire un virement, cliquez de la\n\nBonjour, utilisez uniquement vos canaux habituels.",
+                "contains_pii": False,
+                "redaction_status": "not_required",
+            }
+        ]
+    }
+
+    review = CommonCrawlPromotionReviewService.build_acceptance_review(payload)
+
+    assert review["accepted_candidate_count"] == 0
+    assert review["rejection_summary"]["malformed_subject_fragment_detected"] == 1
