@@ -13,6 +13,7 @@ class GenerationStagingService:
         generator_name: str,
         source_name: str,
         samples: list[dict[str, Any]],
+        generated_at: str | None = None,
         parent_source: str | None = None,
         reference_selection_mode: str | None = None,
         input_artifact_uri: str | None = None,
@@ -21,7 +22,7 @@ class GenerationStagingService:
         monitor_artifact_uri: str | None = None,
         status: str = "completed",
     ) -> dict[str, Any]:
-        generated_at = datetime.now(timezone.utc).isoformat()
+        resolved_generated_at = generated_at or datetime.now(timezone.utc).isoformat()
         review_summary = Counter(
             str(sample.get("review_state") or "unknown") for sample in samples
         )
@@ -40,14 +41,14 @@ class GenerationStagingService:
             "usable_draft_count": review_summary.get("usable", 0),
             "needs_prompt_tuning_count": review_summary.get("needs_prompt_tuning", 0),
             "dropped_draft_count": review_summary.get("drop", 0),
-            "created_at": generated_at,
-            "started_at": generated_at,
-            "finished_at": generated_at,
+            "created_at": resolved_generated_at,
+            "started_at": resolved_generated_at,
+            "finished_at": resolved_generated_at,
         }
 
         return {
             "mode": "no_write_generation_bundle",
-            "generated_at": generated_at,
+            "generated_at": resolved_generated_at,
             "run": run,
             "sample_count": len(samples),
             "samples": samples,
