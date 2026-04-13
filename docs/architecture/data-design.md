@@ -12,13 +12,22 @@ The runtime schema remains necessary, but it is downstream from the data platfor
 
 ## Generation analytics extension
 
-The current no-write generation lanes emit reviewed JSON and Markdown artifacts before any curated-message promotion.
-To preserve lineage for those generation runs without forcing full metric persistence into the curated message schema, the data platform now introduces a thin analytics extension:
+Generation lineage is now a standard DB-backed part of the data platform for persistence-grade generation flows. Local JSON/Markdown artifacts can still exist for debugging or audits, but they are no longer the defining boundary of the model.
+
+The lineage extension is now split across four surfaces:
 
 - `data_generation_run`: one row per generation or evaluation pass, storing source, parent source, artifact URIs, and aggregate review counts
-- `data_generation_sample`: one row per generated draft variant, storing review state, theme, `text_sha256`, and nearest-reference linkage
+- `data_generation_sample`: one row per generated draft variant, storing review state, theme, `text_sha256`, and nearest-reference review linkage
+- `data_generation_sample_source_link`: bridge rows from one generated sample to the raw records that actually fed generation or were sampled as supporting inputs
+- `data_raw_record.generation_sample_id`: nullable promoted-lineage link so curated generated rows can be traced back to the staged generation sample that produced them
 
-Rich monitoring and comparison metrics remain artifact-backed JSON/Markdown outputs and are referenced from the run row through artifact URIs.
+This separates three concepts that were previously blurred together:
+
+- generation input lineage
+- nearest review/reference linkage
+- downstream curated promotion lineage
+
+Rich monitoring and comparison metrics can still remain artifact-backed JSON/Markdown outputs and be referenced from the run row through artifact URIs.
 
 ## Scope of the Bloc 1 data platform
 
@@ -253,7 +262,8 @@ erDiagram
 | `data_dataset` | frozen dataset version | parent of dataset items |
 | `data_dataset_item` | membership of a message in a dataset split | child of dataset and normalized message |
 | `data_generation_run` | lineage row for one generation/evaluation pass | parent of generation samples |
-| `data_generation_sample` | thin per-draft generation trace | child of generation run |
+| `data_generation_sample` | one row per generated draft variant | child of generation run |
+| `data_generation_sample_source_link` | source provenance bridge for generated samples | child of generated sample and raw record |
 
 ### Logical constraints
 
@@ -265,6 +275,9 @@ erDiagram
 - one normalized message can receive many annotations
 - one dataset contains many dataset items
 - one normalized message can belong to several datasets over time
+- one generation run contains many generation samples
+- one generation sample can link to zero, one, or many raw-record inputs through `data_generation_sample_source_link`
+- one promoted generated raw record can point back to the generation sample that produced it
 - structured skipped-corpus review artifacts are outside the relational curated schema until a future reviewed `data_*` staging table is explicitly added
 
 ### Logical enums
