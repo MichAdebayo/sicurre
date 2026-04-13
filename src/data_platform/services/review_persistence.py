@@ -308,6 +308,23 @@ def _hydrate_sample_text(
 
 class ReviewPersistenceService:
     @staticmethod
+    async def _load_generation_sample_index(
+        session: AsyncSession,
+        *,
+        generation_run_id: UUID,
+    ) -> dict[tuple[str, int], UUID]:
+        rows = (
+            await session.execute(
+                select(DataGenerationSample).where(
+                    DataGenerationSample.generation_run_id == generation_run_id
+                )
+            )
+        ).scalars().all()
+        return {
+            (sample.draft_id, int(sample.variant_index)): sample.id for sample in rows
+        }
+
+    @staticmethod
     async def _get_or_create_source_system(
         session: AsyncSession,
         *,
@@ -518,6 +535,7 @@ class ReviewPersistenceService:
                 pipeline_version=pipeline_version,
                 report_uri=report_uri,
                 source_system_name=source_system_name,
+                generation_run_id=generation_run.id,
                 auto_promote_usable=False,
                 annotation_label_source=annotation_label_source,
                 commit=False,
@@ -539,11 +557,15 @@ class ReviewPersistenceService:
         pipeline_version: str,
         report_uri: str | None = None,
         source_system_name: str | None = None,
+        generation_run_id: UUID | str | None = None,
         auto_promote_usable: bool = False,
         annotation_label_source: str = AnnotationLabelSource.GENERATION_GATED_PROMOTION.value,
         commit: bool = True,
     ) -> dict[str, Any]:
         run_payload = dict(payload.get("run") or {})
+        resolved_generation_run_id = _parse_uuid(
+            generation_run_id or payload.get("generation_run_id") or run_payload.get("generation_run_id")
+        )
         promoted_samples, selected_draft_ids = (
             ReviewPersistenceService._select_promoted_samples(
                 payload,
@@ -595,6 +617,29 @@ class ReviewPersistenceService:
                 "Promotion payload contains texts already present in curated storage."
             )
 
+        generation_sample_index: dict[tuple[str, int], UUID] = {}
+        if resolved_generation_run_id is not None:
+            generation_sample_index = await ReviewPersistenceService._load_generation_sample_index(
+                session,
+                generation_run_id=resolved_generation_run_id,
+            )
+            missing_variants = [
+                (
+                    str(sample_payload.get("draft_id") or ""),
+                    int(sample_payload.get("variant_index") or 0),
+                )
+                for sample_payload in promoted_samples
+                if (
+                    str(sample_payload.get("draft_id") or ""),
+                    int(sample_payload.get("variant_index") or 0),
+                )
+                not in generation_sample_index
+            ]
+            if missing_variants:
+                raise ValueError(
+                    "Promotion payload references draft variants that are not staged in the provided generation run."
+                )
+
         started_at = datetime.now(timezone.utc)
         resolved_source_system_name = (
             source_system_name
@@ -640,6 +685,11 @@ class ReviewPersistenceService:
             source_metadata={
                 "generator_name": run_payload.get("generator_name"),
                 "source_name": run_payload.get("source_name"),
+                "generation_run_id": (
+                    str(resolved_generation_run_id)
+                    if resolved_generation_run_id is not None
+                    else None
+                ),
                 "selected_draft_ids": sorted(selected_draft_ids),
                 "promoted_sample_count": len(promoted_samples),
             },
@@ -650,9 +700,14 @@ class ReviewPersistenceService:
 
         raw_records: list[tuple[dict[str, Any], DataRawRecord]] = []
         for sample_payload in promoted_samples:
+            draft_variant = (
+                str(sample_payload.get("draft_id") or ""),
+                int(sample_payload.get("variant_index") or 0),
+            )
             raw_record = DataRawRecord(
                 raw_object_id=raw_object.id,
                 source_system_id=source_system.id,
+                generation_sample_id=generation_sample_index.get(draft_variant),
                 record_key=(
                     f"{sample_payload.get('draft_id') or 'draft'}:"
                     f"{int(sample_payload.get('variant_index') or 0)}"

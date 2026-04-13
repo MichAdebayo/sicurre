@@ -233,6 +233,10 @@ class DataRawRecord(Base):
         sa.ForeignKey("data_source_system.id", ondelete="RESTRICT"),
         nullable=True,
     )
+    generation_sample_id: Mapped[uuid.UUID | None] = mapped_column(
+        sa.ForeignKey("data_generation_sample.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
     record_key: Mapped[str] = mapped_column(sa.Text(), nullable=False)
     raw_content: Mapped[str] = mapped_column(sa.Text(), nullable=False)
     detected_language: Mapped[str | None] = mapped_column(sa.Text())
@@ -247,6 +251,9 @@ class DataRawRecord(Base):
 
     raw_object: Mapped[DataRawObject] = relationship(back_populates="raw_records")
     source_system: Mapped[DataSourceSystem] = relationship()
+    generation_sample: Mapped[DataGenerationSample | None] = relationship(
+        back_populates="promoted_raw_records"
+    )
     normalized_messages: Mapped[list[DataNormalizedMessage]] = relationship(
         back_populates="raw_record"
     )
@@ -556,6 +563,9 @@ class DataGenerationSample(Base):
     source_links: Mapped[list[DataGenerationSampleSourceLink]] = relationship(
         back_populates="generation_sample",
         cascade="all, delete-orphan",
+    )
+    promoted_raw_records: Mapped[list[DataRawRecord]] = relationship(
+        back_populates="generation_sample"
     )
 
 

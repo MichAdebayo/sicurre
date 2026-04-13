@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import random
 import re
+from dataclasses import dataclass
 from datetime import date, timedelta
+from hashlib import sha256
 from pathlib import Path
 
 import pandas as pd
@@ -24,6 +26,14 @@ DEFAULT_TARGETS: dict[str, int] = {
     "spam": 10_000,
     "legitimate": 5_000,
 }
+
+
+@dataclass(frozen=True, slots=True)
+class SyntheticGenerationResult:
+    dataframe: pd.DataFrame
+    class_name: str
+    count: int
+    output_path: Path | None
 
 
 class SyntheticGenerationService:
@@ -202,6 +212,18 @@ class SyntheticGenerationService:
 
         return pd.DataFrame(rows)
 
+    def generate_cleaned_class(self, class_name: str, count: int) -> pd.DataFrame:
+        dataframe = self.generate_class(class_name, count)
+        processing_result = self.preprocessing_service.process_dataframe(dataframe)
+        return processing_result.dataframe.reset_index(drop=True)
+
+    def add_text_hashes(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        output_df = dataframe.copy()
+        output_df["text_hash"] = output_df["text"].astype(str).apply(
+            lambda value: sha256(value.encode("utf-8")).hexdigest()
+        )
+        return output_df
+
     def generate_and_save(self, class_name: str, count: int) -> Path | None:
         if count <= 0:
             print(f"  ⏭️  Skipping {class_name} (count={count})")
@@ -213,7 +235,7 @@ class SyntheticGenerationService:
 
         dataframe = self.generate_class(class_name, count)
         processing_result = self.preprocessing_service.process_dataframe(dataframe)
-        cleaned_df = processing_result.dataframe
+        cleaned_df = self.add_text_hashes(processing_result.dataframe)
         print(
             f"  🧹 After cleaning pipeline: {len(cleaned_df)} rows "
             f"(dropped {processing_result.dropped_short} short, "
@@ -223,6 +245,13 @@ class SyntheticGenerationService:
         if cleaned_df.empty:
             print(f"  ❌ No rows survived cleaning for {class_name}")
             return None
+
+        out_path = self.save_generated_dataframe(class_name, cleaned_df)
+        print(f"  ✅ Saved {out_path} ({len(cleaned_df)} rows, {class_name})")
+        return out_path
+
+    def save_generated_dataframe(self, class_name: str, dataframe: pd.DataFrame) -> Path:
+        cleaned_df = self.add_text_hashes(dataframe)
 
         match class_name:
             case "phishing":
@@ -236,8 +265,33 @@ class SyntheticGenerationService:
 
         out_path = out_dir / f"synth_{class_name}_clean_{len(cleaned_df)}_{TODAY}.csv"
         save_processed_csv(cleaned_df, out_path)
-        print(f"  ✅ Saved {out_path} ({len(cleaned_df)} rows, {class_name})")
         return out_path
+
+    def generate_result(
+        self,
+        class_name: str,
+        count: int,
+        *,
+        export: bool = True,
+    ) -> SyntheticGenerationResult:
+        if count <= 0:
+            return SyntheticGenerationResult(
+                dataframe=pd.DataFrame(),
+                class_name=class_name,
+                count=count,
+                output_path=None,
+            )
+
+        cleaned_df = self.add_text_hashes(self.generate_cleaned_class(class_name, count))
+        output_path = (
+            self.save_generated_dataframe(class_name, cleaned_df) if export else None
+        )
+        return SyntheticGenerationResult(
+            dataframe=cleaned_df,
+            class_name=class_name,
+            count=count,
+            output_path=output_path,
+        )
 
     def print_archetype_report(self, path: Path) -> None:
         if not path.exists():
