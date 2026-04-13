@@ -95,6 +95,12 @@ class GenerationReviewState(StrEnum):
     DROP = "drop"
 
 
+class GenerationSourceLinkRole(StrEnum):
+    GENERATION_SEED = "generation_seed"
+    SAMPLE_INPUT = "sample_input"
+    NEAREST_REFERENCE = "nearest_reference"
+
+
 class DataSourceSystem(Base):
     __tablename__ = "data_source_system"
     __table_args__ = (
@@ -243,6 +249,9 @@ class DataRawRecord(Base):
     source_system: Mapped[DataSourceSystem] = relationship()
     normalized_messages: Mapped[list[DataNormalizedMessage]] = relationship(
         back_populates="raw_record"
+    )
+    generation_sample_source_links: Mapped[list[DataGenerationSampleSourceLink]] = (
+        relationship(back_populates="raw_record")
     )
 
 
@@ -544,3 +553,56 @@ class DataGenerationSample(Base):
     )
 
     generation_run: Mapped[DataGenerationRun] = relationship(back_populates="samples")
+    source_links: Mapped[list[DataGenerationSampleSourceLink]] = relationship(
+        back_populates="generation_sample",
+        cascade="all, delete-orphan",
+    )
+
+
+class DataGenerationSampleSourceLink(Base):
+    __tablename__ = "data_generation_sample_source_link"
+    __table_args__ = (
+        sa.CheckConstraint(
+            f"link_role IN {enum_values(GenerationSourceLinkRole)}",
+            name="link_role_allowed",
+        ),
+        sa.UniqueConstraint(
+            "generation_sample_id",
+            "raw_record_id",
+            "link_role",
+            name="uq_generation_sample_source_link_sample_record_role",
+        ),
+        sa.Index(
+            "idx_generation_sample_source_link_sample_order",
+            "generation_sample_id",
+            "link_order",
+        ),
+        sa.Index(
+            "idx_generation_sample_source_link_raw_record",
+            "raw_record_id",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        sa.Uuid(), primary_key=True, default=uuid.uuid4
+    )
+    generation_sample_id: Mapped[uuid.UUID] = mapped_column(
+        sa.ForeignKey("data_generation_sample.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    raw_record_id: Mapped[uuid.UUID] = mapped_column(
+        sa.ForeignKey("data_raw_record.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    link_role: Mapped[str] = mapped_column(sa.Text(), nullable=False)
+    link_order: Mapped[int] = mapped_column(sa.Integer(), nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+    generation_sample: Mapped[DataGenerationSample] = relationship(
+        back_populates="source_links"
+    )
+    raw_record: Mapped[DataRawRecord] = relationship(
+        back_populates="generation_sample_source_links"
+    )

@@ -16,12 +16,14 @@ from db.models import (
     DataAnnotation,
     DataGenerationRun,
     DataGenerationSample,
+    DataGenerationSampleSourceLink,
     DataIngestionRun,
     DataNormalizedMessage,
     DataProcessingRun,
     DataRawObject,
     DataRawRecord,
     DataSourceSystem,
+    GenerationSourceLinkRole,
     GenerationReviewState,
     IngestionStatus,
     ObjectType,
@@ -44,6 +46,13 @@ def _parse_uuid(value: Any) -> UUID | None:
     if isinstance(value, UUID):
         return value
     return UUID(str(value))
+
+
+def _try_parse_uuid(value: Any) -> UUID | None:
+    try:
+        return _parse_uuid(value)
+    except (TypeError, ValueError, AttributeError):
+        return None
 
 
 def _text_sha256(value: str) -> str:
@@ -69,6 +78,123 @@ def _normalize_annotation_label_source(
         "review": AnnotationLabelSource.MANUAL_REVIEW.value,
     }
     return legacy_aliases.get(resolved_value, resolved_value)
+
+
+def _normalize_generation_source_link_role(
+    value: Any,
+    *,
+    default_value: str,
+) -> str:
+    resolved_value = str(value or default_value)
+    legacy_aliases = {
+        "seed": GenerationSourceLinkRole.GENERATION_SEED.value,
+        "source_seed": GenerationSourceLinkRole.GENERATION_SEED.value,
+        "sample": GenerationSourceLinkRole.SAMPLE_INPUT.value,
+        "sampled_record": GenerationSourceLinkRole.SAMPLE_INPUT.value,
+        "reference": GenerationSourceLinkRole.NEAREST_REFERENCE.value,
+    }
+    normalized_value = legacy_aliases.get(resolved_value, resolved_value)
+    if normalized_value not in {
+        item.value for item in GenerationSourceLinkRole
+    }:
+        raise ValueError(
+            f"Unsupported generation source link role: {resolved_value}"
+        )
+    return normalized_value
+
+
+def _append_generation_source_link(
+    links: list[dict[str, Any]],
+    seen: set[tuple[UUID, str]],
+    *,
+    raw_record_id: Any,
+    link_role: str,
+    link_order: int,
+) -> None:
+    parsed_raw_record_id = _try_parse_uuid(raw_record_id)
+    if parsed_raw_record_id is None:
+        return
+
+    dedupe_key = (parsed_raw_record_id, link_role)
+    if dedupe_key in seen:
+        return
+
+    seen.add(dedupe_key)
+    links.append(
+        {
+            "raw_record_id": parsed_raw_record_id,
+            "link_role": link_role,
+            "link_order": link_order,
+        }
+    )
+
+
+def _collect_generation_source_links(sample_payload: dict[str, Any]) -> list[dict[str, Any]]:
+    links: list[dict[str, Any]] = []
+    seen: set[tuple[UUID, str]] = set()
+    next_order = 0
+
+    explicit_links = sample_payload.get("source_links") or []
+    if isinstance(explicit_links, list):
+        for explicit_link in explicit_links:
+            if not isinstance(explicit_link, dict):
+                continue
+            link_role = _normalize_generation_source_link_role(
+                explicit_link.get("link_role"),
+                default_value=GenerationSourceLinkRole.SAMPLE_INPUT.value,
+            )
+            link_order = int(explicit_link.get("link_order") or next_order)
+            before_count = len(links)
+            _append_generation_source_link(
+                links,
+                seen,
+                raw_record_id=explicit_link.get("raw_record_id"),
+                link_role=link_role,
+                link_order=link_order,
+            )
+            if len(links) > before_count:
+                next_order = max(next_order, link_order + 1)
+
+    for field_name in ("source_raw_record_id", "en_source_raw_record_id", "raw_record_id"):
+        before_count = len(links)
+        _append_generation_source_link(
+            links,
+            seen,
+            raw_record_id=sample_payload.get(field_name),
+            link_role=GenerationSourceLinkRole.GENERATION_SEED.value,
+            link_order=next_order,
+        )
+        if len(links) > before_count:
+            next_order += 1
+
+    for field_name in ("source_raw_record_ids", "sampled_record_ids"):
+        raw_record_ids = sample_payload.get(field_name) or []
+        if not isinstance(raw_record_ids, (list, tuple)):
+            continue
+        for raw_record_id in raw_record_ids:
+            before_count = len(links)
+            _append_generation_source_link(
+                links,
+                seen,
+                raw_record_id=raw_record_id,
+                link_role=GenerationSourceLinkRole.SAMPLE_INPUT.value,
+                link_order=next_order,
+            )
+            if len(links) > before_count:
+                next_order += 1
+
+    before_count = len(links)
+    _append_generation_source_link(
+        links,
+        seen,
+        raw_record_id=sample_payload.get("nearest_reference_raw_record_id"),
+        link_role=GenerationSourceLinkRole.NEAREST_REFERENCE.value,
+        link_order=next_order,
+    )
+    if len(links) > before_count:
+        next_order += 1
+
+    return links
 
 
 def _coalesce_generated_text(payload: dict[str, Any]) -> str:
@@ -264,34 +390,50 @@ class ReviewPersistenceService:
         await session.flush()
 
         samples = list(payload.get("samples") or [])
+        staged_samples: list[tuple[dict[str, Any], DataGenerationSample]] = []
         for sample_payload in samples:
-            session.add(
-                DataGenerationSample(
-                    generation_run_id=generation_run.id,
-                    draft_id=str(sample_payload.get("draft_id") or ""),
-                    scenario_id=sample_payload.get("scenario_id"),
-                    variant_index=int(sample_payload.get("variant_index") or 0),
-                    source_name=str(
-                        sample_payload.get("source_name") or generation_run.source_name
-                    ),
-                    parent_source=sample_payload.get("parent_source"),
-                    target_label=str(sample_payload.get("target_label") or "unknown"),
-                    primary_theme=sample_payload.get("primary_theme"),
-                    review_state=str(sample_payload.get("review_state") or "usable"),
-                    review_notes=list(sample_payload.get("review_notes") or []),
-                    text_sha256=sample_payload.get("text_sha256"),
-                    nearest_reference_raw_record_id=_parse_uuid(
-                        sample_payload.get("nearest_reference_raw_record_id")
-                    ),
-                    nearest_similarity=(
-                        float(sample_payload["nearest_similarity"])
-                        if sample_payload.get("nearest_similarity") is not None
-                        else None
-                    ),
-                    created_at=_parse_datetime(sample_payload.get("created_at"))
-                    or created_at,
-                )
+            generation_sample = DataGenerationSample(
+                generation_run_id=generation_run.id,
+                draft_id=str(sample_payload.get("draft_id") or ""),
+                scenario_id=sample_payload.get("scenario_id"),
+                variant_index=int(sample_payload.get("variant_index") or 0),
+                source_name=str(
+                    sample_payload.get("source_name") or generation_run.source_name
+                ),
+                parent_source=sample_payload.get("parent_source"),
+                target_label=str(sample_payload.get("target_label") or "unknown"),
+                primary_theme=sample_payload.get("primary_theme"),
+                review_state=str(sample_payload.get("review_state") or "usable"),
+                review_notes=list(sample_payload.get("review_notes") or []),
+                text_sha256=sample_payload.get("text_sha256"),
+                nearest_reference_raw_record_id=_parse_uuid(
+                    sample_payload.get("nearest_reference_raw_record_id")
+                ),
+                nearest_similarity=(
+                    float(sample_payload["nearest_similarity"])
+                    if sample_payload.get("nearest_similarity") is not None
+                    else None
+                ),
+                created_at=_parse_datetime(sample_payload.get("created_at"))
+                or created_at,
             )
+            session.add(generation_sample)
+            staged_samples.append((sample_payload, generation_sample))
+
+        await session.flush()
+
+        for sample_payload, generation_sample in staged_samples:
+            for link_payload in _collect_generation_source_links(sample_payload):
+                session.add(
+                    DataGenerationSampleSourceLink(
+                        generation_sample_id=generation_sample.id,
+                        raw_record_id=link_payload["raw_record_id"],
+                        link_role=link_payload["link_role"],
+                        link_order=link_payload["link_order"],
+                        created_at=_parse_datetime(sample_payload.get("created_at"))
+                        or created_at,
+                    )
+                )
 
         await session.flush()
         return generation_run, samples

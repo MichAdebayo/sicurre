@@ -17,12 +17,14 @@ from db.models import (
     AnnotationLabelSource,
     DataGenerationRun,
     DataGenerationSample,
+    DataGenerationSampleSourceLink,
     DataIngestionRun,
     DataNormalizedMessage,
     DataProcessingRun,
     DataRawObject,
     DataRawRecord,
     DataSourceSystem,
+    GenerationSourceLinkRole,
 )
 from data_platform.services.review_persistence import ReviewPersistenceService
 
@@ -89,12 +91,21 @@ async def seeded_raw_records(
             is_usable=True,
             extracted_at=utc_timestamp(),
         )
-        session.add_all([raw_record_one, raw_record_two])
+        raw_record_three = DataRawRecord(
+            raw_object_id=raw_object.id,
+            record_key="row-3",
+            raw_content="Bonsoir",
+            detected_language="fr",
+            is_usable=True,
+            extracted_at=utc_timestamp(),
+        )
+        session.add_all([raw_record_one, raw_record_two, raw_record_three])
         await session.commit()
 
         return {
             "raw_record_one": str(raw_record_one.id),
             "raw_record_two": str(raw_record_two.id),
+            "raw_record_three": str(raw_record_three.id),
         }
 
 
@@ -152,6 +163,96 @@ async def test_persist_generation_bundle_creates_run_and_samples(
         str(samples[0].nearest_reference_raw_record_id)
         == seeded_raw_records["raw_record_one"]
     )
+
+
+@pytest.mark.asyncio
+async def test_persist_generation_bundle_persists_source_links(
+    session_factory: async_sessionmaker[AsyncSession],
+    seeded_raw_records: dict[str, str],
+) -> None:
+    payload = {
+        "run": {
+            "generator_name": "adapted_phishing_generator",
+            "source_name": "adapted_en_fr",
+            "parent_source": "zefang_phishing",
+            "status": "completed",
+            "created_at": utc_timestamp().isoformat(),
+        },
+        "samples": [
+            {
+                "draft_id": "draft-linked",
+                "variant_index": 0,
+                "source_name": "adapted_en_fr",
+                "parent_source": "zefang_phishing",
+                "target_label": "phishing",
+                "review_state": "usable",
+                "review_notes": [],
+                "text_sha256": "linked-hash-1",
+                "source_raw_record_id": seeded_raw_records["raw_record_one"],
+                "sampled_record_ids": [seeded_raw_records["raw_record_two"]],
+                "nearest_reference_raw_record_id": seeded_raw_records[
+                    "raw_record_three"
+                ],
+                "nearest_similarity": 0.93,
+            }
+        ],
+    }
+
+    async with session_factory() as session:
+        await ReviewPersistenceService.persist_generation_bundle(session, payload)
+        source_links = (
+            await session.execute(
+                select(DataGenerationSampleSourceLink).order_by(
+                    DataGenerationSampleSourceLink.link_order
+                )
+            )
+        ).scalars().all()
+
+    assert len(source_links) == 3
+    assert [link.link_role for link in source_links] == [
+        GenerationSourceLinkRole.GENERATION_SEED.value,
+        GenerationSourceLinkRole.SAMPLE_INPUT.value,
+        GenerationSourceLinkRole.NEAREST_REFERENCE.value,
+    ]
+    assert [str(link.raw_record_id) for link in source_links] == [
+        seeded_raw_records["raw_record_one"],
+        seeded_raw_records["raw_record_two"],
+        seeded_raw_records["raw_record_three"],
+    ]
+
+
+@pytest.mark.asyncio
+async def test_persist_generation_bundle_allows_archetype_only_samples_without_source_links(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    payload = {
+        "run": {
+            "generator_name": "synthetic_archetype_generator",
+            "source_name": "synthetic_phishing",
+            "status": "completed",
+            "created_at": utc_timestamp().isoformat(),
+        },
+        "samples": [
+            {
+                "draft_id": "draft-archetype-only",
+                "variant_index": 0,
+                "source_name": "synthetic_phishing",
+                "target_label": "phishing",
+                "review_state": "usable",
+                "review_notes": [],
+                "text_sha256": "archetype-hash-1",
+                "en_source_raw_record_id": "template_only",
+            }
+        ],
+    }
+
+    async with session_factory() as session:
+        await ReviewPersistenceService.persist_generation_bundle(session, payload)
+        source_links = (
+            await session.execute(select(DataGenerationSampleSourceLink))
+        ).scalars().all()
+
+    assert source_links == []
 
 
 @pytest.mark.asyncio
