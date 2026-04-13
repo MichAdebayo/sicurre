@@ -44,6 +44,18 @@ def test_generation_staging_builds_bundle_counts() -> None:
     assert bundle["sample_count"] == 2
 
 
+def test_generation_staging_uses_explicit_generated_at() -> None:
+    bundle = GenerationStagingService.build_bundle(
+        generator_name="synthetic_archetype_generator",
+        source_name="synthetic_phishing_archetype",
+        generated_at="2026-04-13T00:00:00+00:00",
+        samples=[],
+    )
+
+    assert bundle["generated_at"] == "2026-04-13T00:00:00+00:00"
+    assert bundle["run"]["created_at"] == "2026-04-13T00:00:00+00:00"
+
+
 def test_generation_staging_render_markdown() -> None:
     bundle = {
         "run": {

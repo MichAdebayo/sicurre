@@ -404,6 +404,7 @@ async def test_persist_generated_promotion_review_creates_raw_lineage_and_annota
     assert len(raw_records) == 1
     assert raw_records[0].record_key == "draft-2:0"
     assert raw_records[0].source_system_id == source_systems[0].id
+    assert raw_records[0].generation_sample_id is None
     assert len(processing_runs) == 1
     assert len(messages) == 1
     assert messages[0].current_label == "phishing"
@@ -520,6 +521,7 @@ async def test_persist_generation_bundle_with_gated_promotion_stages_all_and_pro
     assert len(ingestion_runs) == 1
     assert len(raw_records) == 1
     assert raw_records[0].record_key == "draft-usable:0"
+    assert raw_records[0].generation_sample_id is not None
     assert len(processing_runs) == 1
     assert len(messages) == 1
     assert messages[0].text_sha256 == "bundle-hash-1"
@@ -528,6 +530,55 @@ async def test_persist_generation_bundle_with_gated_promotion_stages_all_and_pro
         annotations[0].label_source
         == AnnotationLabelSource.GENERATION_GATED_PROMOTION.value
     )
+
+
+@pytest.mark.asyncio
+async def test_persist_generated_promotion_review_links_promoted_raw_record_to_staged_generation_sample(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    payload = {
+        "run": {
+            "generator_name": "adapted_phishing_generator",
+            "source_name": "adapted_en_fr",
+            "generated_artifact_uri": "tasks/generated-adapted.json",
+            "status": "completed",
+            "created_at": utc_timestamp().isoformat(),
+        },
+        "samples": [
+            {
+                "draft_id": "draft-1",
+                "variant_index": 0,
+                "review_state": "usable",
+                "target_label": "phishing",
+                "normalized_text": "Objet : Contrôle\n\nBonjour, merci de vérifier.",
+                "text_sha256": "staged-hash-1",
+                "language": "fr",
+            }
+        ],
+    }
+
+    async with session_factory() as session:
+        stage_result = await ReviewPersistenceService.persist_generation_bundle(
+            session,
+            payload,
+        )
+        promotion_result = await ReviewPersistenceService.persist_generated_promotion_review(
+            session,
+            {
+                "run": payload["run"],
+                "generation_run_id": stage_result["generation_run_id"],
+                "promoted_samples": payload["samples"],
+            },
+            generation_run_id=stage_result["generation_run_id"],
+            pipeline_version="generated_reviewed_promotion_v1",
+        )
+        raw_records = (await session.execute(select(DataRawRecord))).scalars().all()
+        samples = (await session.execute(select(DataGenerationSample))).scalars().all()
+
+    assert promotion_result["raw_record_count"] == 1
+    assert len(samples) == 1
+    assert len(raw_records) == 1
+    assert raw_records[0].generation_sample_id == samples[0].id
 
 
 @pytest.mark.asyncio
