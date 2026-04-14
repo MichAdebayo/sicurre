@@ -57,7 +57,7 @@ These sources are intentionally not part of the direct French normalization pipe
 - `zefang_phishing`
 - `phishtank-online-valid`
 
-The English phishing path is implemented by `src/data_platform/cli/datasets/adapt_phishing.py`, backed by `src/data_platform/services/adaptation.py`.
+The canonical generation path is implemented by `src/data_platform/cli/datasets/generate.py`, backed by `src/data_platform/services/adaptation.py`, `src/data_platform/services/synthetic_generation.py`, and the DB persistence layer.
 
 Processed Export Path
 
@@ -87,8 +87,7 @@ The Makefile now exposes the processing-stage entry points:
 - `make normalize-kaggle-multilingual`
 - `make normalize-sap`
 - `make normalize-certfr`
-- `make adapt-phishing`
-- `make synthetic-data`
+- `make generate-data`
 - `make restructure-processed`
 - `make dataset-splits`
 

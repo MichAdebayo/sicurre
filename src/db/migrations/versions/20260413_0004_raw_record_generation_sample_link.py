@@ -17,7 +17,13 @@ branch_labels = None
 depends_on = None
 
 
+def _is_sqlite() -> bool:
+    return op.get_bind().dialect.name == "sqlite"
+
+
 def upgrade() -> None:
+    if _is_sqlite():
+        op.execute("PRAGMA foreign_keys=OFF")
     with op.batch_alter_table("data_raw_record") as batch_op:
         batch_op.add_column(sa.Column("generation_sample_id", sa.Uuid(), nullable=True))
         batch_op.create_foreign_key(
@@ -32,9 +38,13 @@ def upgrade() -> None:
             ["generation_sample_id"],
             unique=False,
         )
+    if _is_sqlite():
+        op.execute("PRAGMA foreign_keys=ON")
 
 
 def downgrade() -> None:
+    if _is_sqlite():
+        op.execute("PRAGMA foreign_keys=OFF")
     with op.batch_alter_table("data_raw_record") as batch_op:
         batch_op.drop_index("idx_data_raw_record_generation_sample_id")
         batch_op.drop_constraint(
@@ -42,3 +52,5 @@ def downgrade() -> None:
             type_="foreignkey",
         )
         batch_op.drop_column("generation_sample_id")
+    if _is_sqlite():
+        op.execute("PRAGMA foreign_keys=ON")

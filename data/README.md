@@ -54,9 +54,8 @@ notebooks/
 ### Migrated script replacements
 
 - `src/data_platform/cli/bigdata/common_crawl_extract.py` replaces the deleted Common Crawl extraction notebook.
-- `scripts/generate_synthetic_data.py` replaces the deleted synthetic phishing generation notebook.
+- `src/data_platform/cli/datasets/generate.py` is the canonical generation pipeline for adapted and synthetic dataset creation with direct DB persistence.
 - `scripts/process_restructure_data.py` and shared backend preprocessing replace the deleted cleaning notebook.
-- `scripts/generate_adapted_fr_phishing.py` replaces the deleted cultural adaptation notebook.
 - Historical notes for all retired notebooks live in `docs/architecture/notebook-archive.md`.
 
 ## Conventions

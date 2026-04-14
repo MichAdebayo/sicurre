@@ -1,11 +1,11 @@
-.PHONY: help install test dev-api phishtank-ingest phishtank-cron phishtank-csv certfr-ingest certfr-cron sap-scrape csv-ingest db-seed db-ingest bigdata-crawl bigdata-ingest normalize normalize-dry normalize-common-crawl normalize-db-historical normalize-kaggle-fr normalize-kaggle-multilingual normalize-sap normalize-certfr adapt-phishing synthetic-data restructure-processed dataset-splits dataset-build
+.PHONY: help install test dev-api phishtank-ingest phishtank-cron phishtank-csv certfr-ingest certfr-cron sap-scrape csv-ingest db-seed db-ingest bigdata-crawl bigdata-ingest bigdata-reviewed-promote normalize normalize-dry normalize-common-crawl normalize-db-historical normalize-kaggle-fr normalize-kaggle-multilingual normalize-sap normalize-certfr generate-data restructure-processed dataset-splits dataset-build
 
 NORMALIZE_ARGS ?=
-ADAPT_ARGS ?=
-SYNTH_ARGS ?=
+GENERATE_ARGS ?=
 RESTRUCTURE_ARGS ?=
 SPLIT_ARGS ?=
 DATASET_ARGS ?=
+BIGDATA_PROMOTION_ARGS ?=
 
 help:
 	@echo "Sicurre - Available Commands:"
@@ -24,6 +24,7 @@ help:
 	@echo "  make db-ingest          - Run Historical DB Ingestion from an external monolithic DB"
 	@echo "  make bigdata-crawl      - Run Common Crawl extraction to Cloudflare R2"
 	@echo "  make bigdata-ingest     - Manually ingest the latest Common Crawl snapshot into the local DB"
+	@echo "  make bigdata-reviewed-promote - Promote reviewed Common Crawl exports into curated tables"
 	@echo "  make normalize          - Normalize French raw records from the DB"
 	@echo "  make normalize-dry      - Preview normalization output without DB writes"
 	@echo "  make normalize-common-crawl      - Normalize Common Crawl records only"
@@ -32,8 +33,7 @@ help:
 	@echo "  make normalize-kaggle-multilingual - Normalize French multilingual Kaggle records only"
 	@echo "  make normalize-sap      - Normalize SAP Labs FR records only"
 	@echo "  make normalize-certfr   - Normalize CERT-FR records only"
-	@echo "  make adapt-phishing     - Generate culturally adapted French phishing data"
-	@echo "  make synthetic-data     - Generate synthetic data from archetypes"
+	@echo "  make generate-data      - Run the canonical in-memory generation pipeline and persist directly to DB"
 	@echo "  make restructure-processed - Build the processed 3-class export layout"
 	@echo "  make dataset-splits     - Merge processed datasets into train/val/test splits"
 	@echo "  make dataset-build      - Build a DB-backed dataset from annotated normalized messages"
@@ -91,6 +91,10 @@ bigdata-ingest:
 	@echo "Manually ingest the latest Common Crawl snapshot via BigQuery into sqlite"
 	uv run python src/data_platform/cli/bigdata/common_crawl_ingest.py
 
+bigdata-reviewed-promote:
+	@echo "Promoting reviewed Common Crawl exports into curated tables..."
+	uv run python src/data_platform/cli/bigdata/common_crawl_reviewed_promotion.py $(BIGDATA_PROMOTION_ARGS)
+
 normalize:
 	@echo "Running DB-backed French normalization pipeline..."
 	uv run python src/data_platform/cli/normalize/messages.py $(NORMALIZE_ARGS)
@@ -123,13 +127,9 @@ normalize-certfr:
 	@echo "Normalizing CERT-FR records..."
 	uv run python src/data_platform/cli/normalize/messages.py --source cert-fr-cti $(NORMALIZE_ARGS)
 
-adapt-phishing:
-	@echo "Generating culturally adapted French phishing emails..."
-	uv run python src/data_platform/cli/datasets/adapt_phishing.py $(ADAPT_ARGS)
-
-synthetic-data:
-	@echo "Generating synthetic dataset rows from archetypes..."
-	uv run python src/data_platform/cli/datasets/synthetic_data.py $(SYNTH_ARGS)
+generate-data:
+	@echo "Running the canonical in-memory generation pipeline..."
+	uv run python src/data_platform/cli/datasets/generate.py $(GENERATE_ARGS)
 
 restructure-processed:
 	@echo "Building processed 3-class exports from curated sources..."

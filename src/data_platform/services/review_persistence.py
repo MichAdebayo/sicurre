@@ -30,6 +30,9 @@ from db.models import (
     RedactionStatus,
     SourceType,
 )
+from data_platform.services.common_crawl_promotion_review import (
+    CommonCrawlPromotionReviewService,
+)
 
 
 def _parse_datetime(value: Any) -> datetime | None:
@@ -800,6 +803,38 @@ class ReviewPersistenceService:
             "normalized_message_count": len(created_messages),
             "annotation_count": annotation_count,
             "status": processing_run.status,
+        }
+
+    @staticmethod
+    async def persist_common_crawl_reviewed_export(
+        session: AsyncSession,
+        export_payload: dict[str, Any],
+        *,
+        pipeline_version: str,
+        report_uri: str | None = None,
+    ) -> dict[str, Any]:
+        acceptance_review = CommonCrawlPromotionReviewService.build_acceptance_review(
+            export_payload
+        )
+        persistence_result = (
+            await ReviewPersistenceService.persist_common_crawl_acceptance_review(
+                session,
+                acceptance_review,
+                pipeline_version=pipeline_version,
+                report_uri=report_uri,
+            )
+        )
+        return {
+            **persistence_result,
+            "reviewed_candidate_count": int(
+                acceptance_review.get("reviewed_candidate_count") or 0
+            ),
+            "accepted_candidate_count": int(
+                acceptance_review.get("accepted_candidate_count") or 0
+            ),
+            "rejected_candidate_count": int(
+                acceptance_review.get("rejected_candidate_count") or 0
+            ),
         }
 
     @staticmethod

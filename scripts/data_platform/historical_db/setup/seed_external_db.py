@@ -39,6 +39,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
+from data_platform.services.synthetic_generation import SyntheticGenerationService
+
 # ── Path setup ────────────────────────────────────────────────────────────
 ROOT = Path(__file__).resolve().parents[4]
 SRC_ROOT = ROOT / "src"
@@ -170,9 +172,10 @@ def generate_synthetic_emails() -> pd.DataFrame:
 
     Uses the archetype JSON + template engine (ported from Notebook 11).
     """
-    from generate_synthetic_data import generate_class
-
-    df = generate_class("phishing", SYNTHETIC_PHISHING_COUNT)
+    df = SyntheticGenerationService(seed=SEED).generate_class(
+        "phishing",
+        SYNTHETIC_PHISHING_COUNT,
+    )
     logger.info("Synthetic emails: %d generated", len(df))
     return df
 

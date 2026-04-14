@@ -256,6 +256,105 @@ async def test_persist_generation_bundle_allows_archetype_only_samples_without_s
 
 
 @pytest.mark.asyncio
+async def test_persist_common_crawl_reviewed_export_builds_acceptance_and_persists(
+    session_factory: async_sessionmaker[AsyncSession],
+    seeded_raw_records: dict[str, str],
+) -> None:
+    payload = {
+        "mode": "stage_two_reviewed_export",
+        "candidates": [
+            {
+                "candidate_id": "candidate-accepted",
+                "draft_id": "draft-accepted",
+                "raw_record_id": seeded_raw_records["raw_record_one"],
+                "source_name": "common-crawl-bigdata",
+                "rule_key": "instructional_legitimate",
+                "rewrite_mode": "rewrite",
+                "target_label": "legitimate",
+                "review_state": "usable",
+                "review_notes": [],
+                "quality_signals": {
+                    "french_marker_count": 5,
+                    "target_cue_hits": 1,
+                },
+                "normalized_text": (
+                    "Objet : Mise a jour de votre espace client\n\n"
+                    "Bonjour,\n\n"
+                    "Nous confirmons que votre dossier administratif reste accessible "
+                    "depuis votre espace client. Merci de relire les informations de "
+                    "contact et de telecharger l'attestation jointe avant le 18 avril "
+                    "afin d'eviter toute interruption de service.\n\n"
+                    "Cordialement,\nLe service clients"
+                ),
+                "text_length": 288,
+                "text_sha256": "reviewed-export-hash-1",
+                "contains_pii": False,
+                "redaction_status": "not_required",
+            },
+            {
+                "candidate_id": "candidate-rejected",
+                "draft_id": "draft-rejected",
+                "raw_record_id": seeded_raw_records["raw_record_two"],
+                "source_name": "common-crawl-bigdata",
+                "rule_key": "instructional_legitimate",
+                "rewrite_mode": "rewrite",
+                "target_label": "legitimate",
+                "review_state": "needs_prompt_tuning",
+                "review_notes": [],
+                "quality_signals": {
+                    "french_marker_count": 5,
+                    "target_cue_hits": 1,
+                },
+                "normalized_text": (
+                    "Objet : Dossier incomplet\n\n"
+                    "Bonjour,\n\n"
+                    "Ce texte resterait assez long pour passer les filtres de longueur, "
+                    "mais son etat de revue doit empecher toute promotion directe.\n\n"
+                    "Cordialement"
+                ),
+                "text_length": 220,
+                "text_sha256": "reviewed-export-hash-2",
+                "contains_pii": False,
+                "redaction_status": "not_required",
+            },
+        ],
+    }
+
+    async with session_factory() as session:
+        result = await ReviewPersistenceService.persist_common_crawl_reviewed_export(
+            session,
+            payload,
+            pipeline_version="common_crawl_reviewed_promotion_v1",
+            report_uri="tasks/reviewed-export.json",
+        )
+        processing_runs = (
+            (await session.execute(select(DataProcessingRun))).scalars().all()
+        )
+        messages = (
+            (await session.execute(select(DataNormalizedMessage))).scalars().all()
+        )
+        annotations = (await session.execute(select(DataAnnotation))).scalars().all()
+
+    assert result["reviewed_candidate_count"] == 2
+    assert result["accepted_candidate_count"] == 1
+    assert result["rejected_candidate_count"] == 1
+    assert result["normalized_message_count"] == 1
+    assert result["annotation_count"] == 1
+    assert len(processing_runs) == 1
+    assert processing_runs[0].normalized_count == 1
+    assert processing_runs[0].rejected_count == 1
+    assert processing_runs[0].report_uri == "tasks/reviewed-export.json"
+    assert len(messages) == 1
+    assert messages[0].current_label == "legitimate"
+    assert str(messages[0].raw_record_id) == seeded_raw_records["raw_record_one"]
+    assert len(annotations) == 1
+    assert (
+        annotations[0].label_source
+        == AnnotationLabelSource.COMMON_CRAWL_ACCEPTANCE_REVIEW.value
+    )
+
+
+@pytest.mark.asyncio
 async def test_persist_common_crawl_acceptance_review_creates_messages_and_annotations(
     session_factory: async_sessionmaker[AsyncSession],
     seeded_raw_records: dict[str, str],
