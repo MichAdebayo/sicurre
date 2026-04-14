@@ -80,13 +80,13 @@ class CommonCrawlSignalSyntheticService:
     )
     DELIVERY_SIGNATURE_TEMPLATES: tuple[str, ...] = (
         "{entity}",
-        "{entity} — Cellule de suivi",
-        "{entity} — Service distribution",
+        "{entity} - Cellule de suivi",
+        "{entity} - Service distribution",
     )
     ACCOUNT_SIGNATURE_TEMPLATES: tuple[str, ...] = (
         "{entity}",
-        "{entity} — Support accès",
-        "{entity} — Vérification identité",
+        "{entity} - Support accès",
+        "{entity} - Vérification identité",
     )
 
     @classmethod
