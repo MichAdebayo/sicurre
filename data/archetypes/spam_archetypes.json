@@ -2,7 +2,7 @@
   "meta": {
     "class_label": 1,
     "class_name": "spam",
-    "description": "French spam email archetypes for synthetic generation — EN patterns adapted to FR context",
+    "description": "French spam email archetypes for synthetic generation - EN patterns adapted to FR context",
     "tier_distribution": {"simple": 0.30, "medium": 0.40, "hard": 0.30}
   },
   "archetypes": [
@@ -11,10 +11,10 @@
       "tier": "simple",
       "name": "Casino en ligne / jeux d'argent",
       "weight": 1.0,
-      "description": "Online gambling promotions — adapted from EN casino spam in Spam.txt",
+      "description": "Online gambling promotions - adapted from EN casino spam in Spam.txt",
       "templates": [
-        "Objet : 🎰 {prenom}, {bonus} offerts sur {casino} !\n\n{casino} — Le meilleur casino en ligne\n\nBienvenue {prenom} !\n\nInscrivez-vous dès maintenant et recevez {bonus} de bonus sans dépôt !\n\n✅ Plus de {nb_jeux} jeux disponibles\n✅ Retraits en {delai_retrait}\n✅ Licence européenne\n\n→ Réclamez votre bonus : [URL]\n\nOffre valable {delai} heures seulement.\n\n{casino} — Jouez responsable. 18+\nSe désabonner : [URL]",
-        "Objet : Tournoi exclusif ce soir — {gain_max} à gagner !\n\nBonsoir {prenom},\n\n{casino} organise un tournoi exclusif ce soir à {heure} !\n\nMise de départ : {mise}\nGain maximum : {gain_max}\nPlaces limitées : {places}\n\nInscription gratuite pour les nouveaux joueurs :\n→ [URL]\n\n{casino}\nSe désinscrire : [URL]"
+        "Objet : 🎰 {prenom}, {bonus} offerts sur {casino} !\n\n{casino} - Le meilleur casino en ligne\n\nBienvenue {prenom} !\n\nInscrivez-vous dès maintenant et recevez {bonus} de bonus sans dépôt !\n\n✅ Plus de {nb_jeux} jeux disponibles\n✅ Retraits en {delai_retrait}\n✅ Licence européenne\n\n→ Réclamez votre bonus : [URL]\n\nOffre valable {delai} heures seulement.\n\n{casino} - Jouez responsable. 18+\nSe désabonner : [URL]",
+        "Objet : Gagnez jusqu'à {gain_max} au tournoi exclusif de ce soir !\n\nBonsoir {prenom},\n\n{casino} organise un tournoi exclusif ce soir à {heure} !\n\nMise de départ : {mise}\nGain maximum : {gain_max}\nPlaces limitées : {places}\n\nInscription gratuite pour les nouveaux joueurs :\n→ [URL]\n\n{casino}\nSe désinscrire : [URL]"
       ],
       "variables": {
         "casino": ["Royal Vegas FR", "Casino777", "Lucky Star Casino", "JackpotCity France", "EuroBet Casino", "MegaWin"],
@@ -33,10 +33,10 @@
       "tier": "simple",
       "name": "Site de rencontre / adulte",
       "weight": 1.0,
-      "description": "Dating/adult spam — adapted from EN dating spam patterns in Spam.txt",
+      "description": "Dating/adult spam - adapted from EN dating spam patterns in Spam.txt",
       "templates": [
-        "Objet : {prenom}, {nb} personnes veulent vous rencontrer\n\n{site}\n\nBonjour {prenom},\n\nVous avez {nb} nouvelles demandes de contact dans votre ville ({ville}) !\n\n{profil_1} — {age_1} ans — {distance_1} km\n{profil_2} — {age_2} ans — {distance_2} km\n\nVoir les profils : [URL]\n\nInscription gratuite. Des milliers de membres actifs près de chez vous.\n\nSe désinscrire : [URL]",
-        "Objet : {profil_1} vous a envoyé un message\n\n{site} — Nouveau message\n\nSalut {prenom},\n\n{profil_1} ({age_1} ans, {ville}) vous a envoyé un message :\n\n\"{message}\"\n\n→ Répondre à {profil_1} : [URL]\n\nNe manquez pas cette opportunité !\n\n{site}\nPour ne plus recevoir nos notifications : [URL]"
+        "Objet : {prenom}, {nb} personnes veulent vous rencontrer\n\n{site}\n\nBonjour {prenom},\n\nVous avez {nb} nouvelles demandes de contact dans votre ville ({ville}) !\n\n{profil_1} - {age_1} ans - {distance_1} km\n{profil_2} - {age_2} ans - {distance_2} km\n\nVoir les profils : [URL]\n\nInscription gratuite. Des milliers de membres actifs près de chez vous.\n\nSe désinscrire : [URL]",
+        "Objet : {profil_1} vous a envoyé un message\n\n{site} - Nouveau message\n\nSalut {prenom},\n\n{profil_1} ({age_1} ans, {ville}) vous a envoyé un message :\n\n\"{message}\"\n\n→ Répondre à {profil_1} : [URL]\n\nNe manquez pas cette opportunité !\n\n{site}\nPour ne plus recevoir nos notifications : [URL]"
       ],
       "variables": {
         "site": ["MeetLocal.fr", "RencontresPlus", "CœurSolitaire", "Proximeo", "Affinités.fr"],
@@ -57,7 +57,7 @@
       "weight": 0.8,
       "description": "Pharmacy, supplements and miracle products spam",
       "templates": [
-        "Objet : -{reduction}% sur {produit} — Offre flash !\n\n{marque} — Parapharmacie en ligne\n\nBonjour {prenom},\n\n🔥 OFFRE FLASH — {delai} HEURES SEULEMENT 🔥\n\n{produit}\nPrix barré : {prix_barre}\nVotre prix : {prix}\n\n✓ {avantage_1}\n✓ {avantage_2}\n✓ Livraison gratuite dès {seuil} EUR\n\n→ Commander maintenant : [URL]\n\nSatisfait ou remboursé sous 30 jours.\n\n{marque}\nSe désinscrire : [URL]",
+        "Objet : Offre flash : profitez de -{reduction}% sur {produit} !\n\n{marque} - Parapharmacie en ligne\n\nBonjour {prenom},\n\n🔥 OFFRE FLASH - {delai} HEURES SEULEMENT 🔥\n\n{produit}\nPrix barré : {prix_barre}\nVotre prix : {prix}\n\n✓ {avantage_1}\n✓ {avantage_2}\n✓ Livraison gratuite dès {seuil} EUR\n\n→ Commander maintenant : [URL]\n\nSatisfait ou remboursé sous 30 jours.\n\n{marque}\nSe désinscrire : [URL]",
         "Objet : Le secret pour {benefice} enfin révélé !\n\n{prenom}, découvrez {produit}\n\n{testimonial}\n\nFormule 100% naturelle, résultats visibles en {duree}.\n\n→ En savoir plus : [URL]\n\nLivraison offerte. {garantie}.\n\nSe désinscrire : [URL]"
       ],
       "variables": {
@@ -71,7 +71,7 @@
         "seuil": ["29", "39", "49"],
         "delai": ["24", "48", "72", "12"],
         "benefice": ["perdre du poids sans effort", "retrouver une peau jeune", "dormir comme un bébé", "booster votre énergie"],
-        "testimonial": ["\"J'ai perdu 12 kg en 3 semaines !\" — Marie, 45 ans", "\"Ma peau a rajeuni de 10 ans\" — Sophie, 52 ans", "\"Je n'ai jamais aussi bien dormi\" — Pierre, 38 ans"],
+        "testimonial": ["\"J'ai perdu 12 kg en 3 semaines !\" - Marie, 45 ans", "\"Ma peau a rajeuni de 10 ans\" - Sophie, 52 ans", "\"Je n'ai jamais aussi bien dormi\" - Pierre, 38 ans"],
         "duree": ["2 semaines", "7 jours", "3 semaines", "10 jours"],
         "garantie": ["Garantie 90 jours satisfait ou remboursé", "Garantie résultats 60 jours"]
       }
@@ -81,9 +81,9 @@
       "tier": "simple",
       "name": "Loterie publicitaire / bon d'achat",
       "weight": 0.8,
-      "description": "Fake survey/voucher spam — not phishing because no credential theft, just lead gen",
+      "description": "Fake survey/voucher spam - not phishing because no credential theft, just lead gen",
       "templates": [
-        "Objet : {prenom}, vous avez été sélectionné(e) pour un bon d'achat {enseigne} de {montant} !\n\nFélicitations !\n\nVous avez été choisi(e) au hasard pour participer à notre enquête de satisfaction annuelle.\n\nEn remerciement, recevez un bon d'achat {enseigne} de {montant} !\n\nIl ne vous reste que {nb_questions} questions :\n→ Commencer l'enquête : [URL]\n\nOffre limitée — {nb_restants} bons restants.\n\nSe désinscrire : [URL]"
+        "Objet : {prenom}, vous avez été sélectionné(e) pour un bon d'achat {enseigne} de {montant} !\n\nFélicitations !\n\nVous avez été choisi(e) au hasard pour participer à notre enquête de satisfaction annuelle.\n\nEn remerciement, recevez un bon d'achat {enseigne} de {montant} !\n\nIl ne vous reste que {nb_questions} questions :\n→ Commencer l'enquête : [URL]\n\nOffre limitée - {nb_restants} bons restants.\n\nSe désinscrire : [URL]"
       ],
       "variables": {
         "enseigne": ["Carrefour", "Leclerc", "Amazon", "Fnac", "Décathlon", "Ikea", "Lidl"],
@@ -99,8 +99,8 @@
       "weight": 1.0,
       "description": "Aggressive e-commerce promotional emails that are spammy but not phishing",
       "templates": [
-        "Objet : ⚡ VENTE FLASH — -{reduction}% sur TOUT le site !\n\n{boutique}\n\nBonjour {prenom},\n\n🔥 VENTE FLASH EXCEPTIONNELLE 🔥\n\n-{reduction}% sur TOUT le site avec le code {code} !\n\nNos meilleures ventes :\n• {produit_1} — {prix_1} (au lieu de {prix_barre_1})\n• {produit_2} — {prix_2} (au lieu de {prix_barre_2})\n• {produit_3} — {prix_3} (au lieu de {prix_barre_3})\n\nLivraison offerte dès {seuil} EUR d'achat !\n\n→ Profitez-en : [URL]\n\n⏰ Offre valable jusqu'à ce soir minuit !\n\n{boutique}\nVous recevez cet email car vous êtes inscrit(e) à notre newsletter.\nSe désinscrire : [URL]",
-        "Objet : {prenom}, votre panier vous attend ! -{reduction}% avec le code {code}\n\n{boutique}\n\nRebonjour {prenom} !\n\nVous avez laissé des articles dans votre panier. On ne vous juge pas, mais ils ne vont pas rester en stock longtemps !\n\nVotre panier :\n• {produit_1}\n• {produit_2}\n\nBonne nouvelle : utilisez le code {code} pour bénéficier de -{reduction}% !\n\n→ Finaliser ma commande : [URL]\n\nÀ bientôt,\nL'équipe {boutique}"
+        "Objet : ⚡ Vente flash exceptionnelle : -{reduction}% sur tout le site\n\n{boutique}\n\nBonjour {prenom},\n\n🔥 VENTE FLASH EXCEPTIONNELLE 🔥\n\n-{reduction}% sur TOUT le site avec le code {code} !\n\nNos meilleures ventes :\n• {produit_1} - {prix_1} (au lieu de {prix_barre_1})\n• {produit_2} - {prix_2} (au lieu de {prix_barre_2})\n• {produit_3} - {prix_3} (au lieu de {prix_barre_3})\n\nLivraison offerte dès {seuil} EUR d'achat !\n\n→ Profitez-en : [URL]\n\n⏰ Offre valable jusqu'à ce soir minuit !\n\n{boutique}\nVous recevez cet email car vous êtes inscrit(e) à notre newsletter.\nSe désinscrire : [URL]",
+        "Objet : {prenom}, profitez de -{reduction}% sur votre panier avec le code {code}\n\n{boutique}\n\nRebonjour {prenom} !\n\nVous avez laissé des articles dans votre panier. On ne vous juge pas, mais ils ne vont pas rester en stock longtemps !\n\nVotre panier :\n• {produit_1}\n• {produit_2}\n\nBonne nouvelle : utilisez le code {code} pour bénéficier de -{reduction}% !\n\n→ Finaliser ma commande : [URL]\n\nÀ bientôt,\nL'équipe {boutique}"
       ],
       "variables": {
         "boutique": ["TrendyShop", "ModeExpress.fr", "BazarTop", "ShopDeal France", "FlashBoutique", "Le Bon Coin des Affaires"],
@@ -123,10 +123,10 @@
       "tier": "medium",
       "name": "Prospection SEO / webdev / marketing digital",
       "weight": 1.0,
-      "description": "B2B cold outreach spam for SEO/web services — adapted from EN cold outreach in Spam.txt",
+      "description": "B2B cold outreach spam for SEO/web services - adapted from EN cold outreach in Spam.txt",
       "templates": [
-        "Objet : {entreprise_cible} — Votre site perd du trafic (analyse gratuite)\n\nBonjour {prenom},\n\nJe me permets de vous contacter car j'ai analysé le site de {entreprise_cible} et j'ai identifié plusieurs problèmes qui vous font perdre du trafic :\n\n❌ {probleme_1}\n❌ {probleme_2}\n❌ {probleme_3}\n\nNous avons aidé +{nb_clients} entreprises à augmenter leur trafic organique de {pourcentage}% en moyenne.\n\nJe vous propose un audit SEO gratuit et sans engagement :\n→ Réserver mon audit : [URL]\n\nÀ bientôt,\n{agent}\n{agence}\n{phone}",
-        "Objet : Votre site {entreprise_cible} n'est pas optimisé pour Google\n\nBonjour,\n\nJe suis {agent}, consultant SEO chez {agence}.\n\nEn analysant votre positionnement, j'ai remarqué que {entreprise_cible} n'apparaît pas dans le top 10 Google pour les mots-clés suivants :\n• {keyword_1}\n• {keyword_2}\n• {keyword_3}\n\nNos solutions :\n✓ Référencement naturel (SEO) — à partir de {prix}/mois\n✓ Publicité Google Ads — gérée par nos experts\n✓ Refonte de site web optimisé\n\n→ Demander un devis gratuit : [URL]\n\n{agent}\n{agence}"
+        "Objet : Analyse gratuite des pertes de trafic pour la plateforme {entreprise_cible}\n\nBonjour {prenom},\n\nJe me permets de vous contacter car j'ai analysé le site de {entreprise_cible} et j'ai identifié plusieurs problèmes qui vous font perdre du trafic :\n\n❌ {probleme_1}\n❌ {probleme_2}\n❌ {probleme_3}\n\nNous avons aidé +{nb_clients} entreprises à augmenter leur trafic organique de {pourcentage}% en moyenne.\n\nJe vous propose un audit SEO gratuit et sans engagement :\n→ Réserver mon audit : [URL]\n\nÀ bientôt,\n{agent}\n{agence}\n{phone}",
+        "Objet : Votre site {entreprise_cible} n'est pas optimisé pour Google\n\nBonjour,\n\nJe suis {agent}, consultant SEO chez {agence}.\n\nEn analysant votre positionnement, j'ai remarqué que {entreprise_cible} n'apparaît pas dans le top 10 Google pour les mots-clés suivants :\n• {keyword_1}\n• {keyword_2}\n• {keyword_3}\n\nNos solutions :\n✓ Référencement naturel (SEO) - à partir de {prix}/mois\n✓ Publicité Google Ads - gérée par nos experts\n✓ Refonte de site web optimisé\n\n→ Demander un devis gratuit : [URL]\n\n{agent}\n{agence}"
       ],
       "variables": {
         "entreprise_cible": ["votre entreprise", "votre site", "votre boutique en ligne", "votre cabinet"],
@@ -147,10 +147,10 @@
       "tier": "medium",
       "name": "Faux journal académique / conférence prédatrice",
       "weight": 0.6,
-      "description": "Predatory journal/conference spam — based on EN academic spam in Spam.txt",
+      "description": "Predatory journal/conference spam - based on EN academic spam in Spam.txt",
       "templates": [
-        "Objet : Invitation à publier — {journal}\n\nCher(e) {titre_acad} {nom},\n\nNous avons le plaisir de vous inviter à soumettre un article de recherche pour publication dans {journal} ({issn}).\n\nThèmes acceptés :\n• {theme_1}\n• {theme_2}\n• {theme_3}\n\nDate limite de soumission : {date}\nPublication en {delai}\nFrais de publication (APC) : {frais}\n\nSoumettez votre manuscrit :\n→ [URL]\n\n{journal}\nComité éditorial\n{editeur}",
-        "Objet : Conférence internationale {conference} — Appel à communications\n\nCher(e) collègue,\n\nNous vous invitons à participer à {conference} qui se tiendra à {lieu} les {dates}.\n\nInscription : {frais_inscr}\nDélai de soumission des résumés : {date}\n\nAvantages :\n✓ Publication dans les actes indexés {index}\n✓ Networking avec +{nb_chercheurs} chercheurs\n✓ Certification de participation\n\n→ S'inscrire : [URL]\n\nComité d'organisation\n{conference}"
+        "Objet : Invitation à publier dans la revue {journal}\n\nCher(e) {titre_acad} {nom},\n\nNous avons le plaisir de vous inviter à soumettre un article de recherche pour publication dans {journal} ({issn}).\n\nThèmes acceptés :\n• {theme_1}\n• {theme_2}\n• {theme_3}\n\nDate limite de soumission : {date}\nPublication en {delai}\nFrais de publication (APC) : {frais}\n\nSoumettez votre manuscrit :\n→ [URL]\n\n{journal}\nComité éditorial\n{editeur}",
+        "Objet : Appel à communications pour la conférence internationale {conference}\n\nCher(e) collègue,\n\nNous vous invitons à participer à {conference} qui se tiendra à {lieu} les {dates}.\n\nInscription : {frais_inscr}\nDélai de soumission des résumés : {date}\n\nAvantages :\n✓ Publication dans les actes indexés {index}\n✓ Networking avec +{nb_chercheurs} chercheurs\n✓ Certification de participation\n\n→ S'inscrire : [URL]\n\nComité d'organisation\n{conference}"
       ],
       "variables": {
         "journal": ["International Journal of Computing and Management Studies", "European Review of Applied Sciences", "Global Journal of Technology and Innovation", "French Journal of Digital Transformation"],
@@ -175,10 +175,10 @@
       "tier": "medium",
       "name": "Prospection B2B générique",
       "weight": 0.8,
-      "description": "Generic B2B cold outreach — software, services, consulting",
+      "description": "Generic B2B cold outreach - software, services, consulting",
       "templates": [
         "Objet : {prenom}, une solution pour {probleme}\n\nBonjour {prenom},\n\nJe me permets de vous contacter suite à mes recherches sur {entreprise_cible}. En tant que {role_cible}, vous devez certainement faire face à {probleme}.\n\nChez {entreprise}, nous avons développé {solution} qui permet de :\n✓ {avantage_1}\n✓ {avantage_2}\n✓ {avantage_3}\n\nNos clients ({client_ref}) ont constaté {resultat}.\n\nSeriez-vous disponible pour un échange de 15 minutes cette semaine ?\n\n→ Réserver un créneau : [URL]\n\nBien cordialement,\n{agent}\n{titre}\n{entreprise}\n📞 {phone}",
-        "Objet : RE: {probleme} — Une idée pour {entreprise_cible}\n\nBonjour {prenom},\n\nJe reviens vers vous suite à mon précédent email (pas de souci si vous ne l'avez pas vu, nos boîtes de réception sont tous débordées !).\n\nJuste une question rapide : est-ce que {douleur} est un sujet chez {entreprise_cible} en ce moment ?\n\nSi oui, j'aimerais vous montrer comment {solution} en résout la cause en {duree}.\n\nUn rapide appel de 10 min ?\n→ [URL]\n\n{agent}\n{entreprise}"
+        "Objet : Suite à notre échange concernant {probleme} pour {entreprise_cible}\n\nBonjour {prenom},\n\nJe reviens vers vous suite à mon précédent email (pas de souci si vous ne l'avez pas vu, nos boîtes de réception sont tous débordées !).\n\nJuste une question rapide : est-ce que {douleur} est un sujet chez {entreprise_cible} en ce moment ?\n\nSi oui, j'aimerais vous montrer comment {solution} en résout la cause en {duree}.\n\nUn rapide appel de 10 min ?\n→ [URL]\n\n{agent}\n{entreprise}"
       ],
       "variables": {
         "probleme": ["la gestion de votre facturation", "le suivi de vos clients", "la sécurité de vos données", "la productivité de vos équipes"],
@@ -201,10 +201,10 @@
       "tier": "hard",
       "name": "Newsletter tech presque-légitime",
       "weight": 1.2,
-      "description": "Tech newsletter that looks almost legitimate but is unsolicited marketing spam — based on HasData/Litrevu patterns from Spam (1).txt",
+      "description": "Tech newsletter that looks almost legitimate but is unsolicited marketing spam - based on HasData/Litrevu patterns from Spam (1).txt",
       "templates": [
-        "Objet : {sujet} — {newsletter}\n\n{newsletter} — Édition du {date}\n\nBonjour {prenom},\n\n{intro}\n\n📊 {article_1_titre}\n{article_1_resume}\n→ Lire la suite : [URL]\n\n🔧 {article_2_titre}\n{article_2_resume}\n→ Lire la suite : [URL]\n\n💡 {article_3_titre}\n{article_3_resume}\n→ Lire la suite : [URL]\n\n{cta}\n\n{newsletter}\nVous recevez cet email car votre adresse a été ajoutée à notre liste.\nSe désinscrire : [URL]",
-        "Objet : {prenom}, {accroche}\n\n{newsletter}\n\nSalut {prenom} 👋\n\n{intro_personnelle}\n\nCette semaine, on a creusé :\n\n1️⃣ {article_1_titre} — {teaser_1}\n2️⃣ {article_2_titre} — {teaser_2}\n3️⃣ {article_3_titre} — {teaser_3}\n\n→ Lire le numéro complet : [URL]\n\nÀ la semaine prochaine,\n{auteur}\nFondateur de {newsletter}\n\nPS : Si un collègue pourrait être intéressé, faites-lui suivre !\nSe désinscrire : [URL]"
+        "Objet : Votre newsletter {newsletter} : {sujet}\n\n{newsletter} - Édition du {date}\n\nBonjour {prenom},\n\n{intro}\n\n📊 {article_1_titre}\n{article_1_resume}\n→ Lire la suite : [URL]\n\n🔧 {article_2_titre}\n{article_2_resume}\n→ Lire la suite : [URL]\n\n💡 {article_3_titre}\n{article_3_resume}\n→ Lire la suite : [URL]\n\n{cta}\n\n{newsletter}\nVous recevez cet email car votre adresse a été ajoutée à notre liste.\nSe désinscrire : [URL]",
+        "Objet : {prenom}, {accroche}\n\n{newsletter}\n\nSalut {prenom} 👋\n\n{intro_personnelle}\n\nCette semaine, on a creusé :\n\n1️⃣ {article_1_titre} - {teaser_1}\n2️⃣ {article_2_titre} - {teaser_2}\n3️⃣ {article_3_titre} - {teaser_3}\n\n→ Lire le numéro complet : [URL]\n\nÀ la semaine prochaine,\n{auteur}\nFondateur de {newsletter}\n\nPS : Si un collègue pourrait être intéressé, faites-lui suivre !\nSe désinscrire : [URL]"
       ],
       "variables": {
         "newsletter": ["DataPulse Weekly", "Le Flux Dev", "French Tech Digest", "IA Hebdo", "Le Startup Brief", "CyberWatch FR"],
@@ -213,7 +213,7 @@
         "intro": ["Bienvenue dans notre édition hebdomadaire. Voici les 3 articles les plus lus de la semaine.", "Cette semaine, on décrypte les tendances qui vont impacter votre quotidien de développeur."],
         "intro_personnelle": ["J'espère que ta semaine a été productive. Voici ce que j'ai trouvé d'intéressant ces 7 derniers jours.", "Grosse semaine dans le monde de la tech. Voici le résumé."],
         "article_1_titre": ["OpenAI lance GPT-5 : ce que ça change", "Le scraping web en 2026 : guide complet", "RAG vs Fine-tuning : le comparatif définitif", "Sécurité des API : les 10 erreurs les plus courantes"],
-        "article_1_resume": ["Le nouveau modèle promet des performances inédites sur le raisonnement logique.", "Tout ce qu'il faut savoir pour extraire des données de manière éthique et efficace.", "On a testé les deux approches sur un cas concret — les résultats sont surprenants."],
+        "article_1_resume": ["Le nouveau modèle promet des performances inédites sur le raisonnement logique.", "Tout ce qu'il faut savoir pour extraire des données de manière éthique et efficace.", "On a testé les deux approches sur un cas concret - les résultats sont surprenants."],
         "article_2_titre": ["FastAPI 1.0 : enfin stable", "Rust pour les Pythonistes", "Comment j'ai réduit ma facture cloud de 80%", "Les 7 outils no-code qui remplacent un développeur"],
         "article_2_resume": ["Après des années de développement, FastAPI atteint sa version 1.0 avec des changements majeurs.", "Pourquoi de plus en plus de développeurs Python apprennent Rust en 2026."],
         "article_3_titre": ["5 bibliothèques Python à découvrir", "La France attire les talents IA", "PostgreSQL 17 : les nouveautés", "Freelance tech : les tarifs en 2026"],
@@ -230,10 +230,10 @@
       "tier": "hard",
       "name": "Offre d'affiliation / partenariat",
       "weight": 0.8,
-      "description": "Affiliate marketing proposals — based on Litrevu pitch pattern from Spam (1).txt",
+      "description": "Affiliate marketing proposals - based on Litrevu pitch pattern from Spam (1).txt",
       "templates": [
         "Objet : Proposition de partenariat pour {produit_cible}\n\nBonjour {prenom},\n\nJe m'appelle {agent} et je travaille pour {entreprise}.\n\nEn parcourant votre {plateforme}, j'ai été impressionné(e) par {compliment}. Je pense que notre {produit} pourrait intéresser votre audience.\n\nNotre programme d'affiliation :\n• Commission de {commission}% sur chaque vente\n• Matériel marketing fourni (bannières, textes, liens)\n• Tableau de bord en temps réel\n• Paiement mensuel par virement\n\nSeriez-vous intéressé(e) pour en discuter ?\n\n→ Voir notre programme : [URL]\n\nBien cordialement,\n{agent}\nResponsable Partenariats\n{entreprise}",
-        "Objet : {prenom} — Gagnez {commission}% sur chaque vente\n\nSalut {prenom} !\n\nJe suis {agent} de {entreprise}. On a un super programme d'affiliation et votre {plateforme} serait le canal parfait.\n\nConcrètement :\n→ Vous partagez un lien unique\n→ Vos abonnés achètent via ce lien\n→ Vous touchez {commission}% de commission\n\nCertains de nos affiliés gagnent +{revenu} EUR/mois.\n\nIntéressé(e) ? Inscrivez-vous ici : [URL]\n\n{agent}\n{entreprise}"
+        "Objet : Rejoignez-nous et gagnez {commission}% sur chaque vente {prenom}\n\nSalut {prenom} !\n\nJe suis {agent} de {entreprise}. On a un super programme d'affiliation et votre {plateforme} serait le canal parfait.\n\nConcrètement :\n→ Vous partagez un lien unique\n→ Vos abonnés achètent via ce lien\n→ Vous touchez {commission}% de commission\n\nCertains de nos affiliés gagnent +{revenu} EUR/mois.\n\nIntéressé(e) ? Inscrivez-vous ici : [URL]\n\n{agent}\n{entreprise}"
       ],
       "variables": {
         "entreprise": ["FormationPro", "SaaSConnect", "AffiliTech", "DigitalPartners", "LaunchPad.io"],
@@ -250,9 +250,9 @@
       "tier": "hard",
       "name": "Invitation webinaire non sollicité",
       "weight": 1.0,
-      "description": "Unsolicited webinar invitations — based on JV Academy pattern from Spam (1).txt. Very close to legitimate but unsolicited.",
+      "description": "Unsolicited webinar invitations - based on JV Academy pattern from Spam (1).txt. Very close to legitimate but unsolicited.",
       "templates": [
-        "Objet : [Webinaire] {sujet} — {date} à {heure}\n\n{organisateur}\n\nBonjour {prenom},\n\nNous vous invitons à notre prochain webinaire gratuit :\n\n📅 {date} à {heure}\n🎯 {sujet}\n🎤 Intervenant : {intervenant}, {titre_intervenant}\n⏱️ Durée : {duree}\n\nCe que vous apprendrez :\n✓ {point_1}\n✓ {point_2}\n✓ {point_3}\n\nPlaces limitées à {places} participants !\n\n→ Réserver ma place : [URL]\n\nÀ très vite,\nL'équipe {organisateur}\n\nSe désinscrire : [URL]",
+        "Objet : Invitation au webinaire {sujet} le {date} à {heure}\n\n{organisateur}\n\nBonjour {prenom},\n\nNous vous invitons à notre prochain webinaire gratuit :\n\n📅 {date} à {heure}\n🎯 {sujet}\n🎤 Intervenant : {intervenant}, {titre_intervenant}\n⏱️ Durée : {duree}\n\nCe que vous apprendrez :\n✓ {point_1}\n✓ {point_2}\n✓ {point_3}\n\nPlaces limitées à {places} participants !\n\n→ Réserver ma place : [URL]\n\nÀ très vite,\nL'équipe {organisateur}\n\nSe désinscrire : [URL]",
         "Objet : {prenom}, ne manquez pas : {sujet} (replay disponible {delai}h)\n\nBonjour {prenom},\n\nVous n'avez pas pu assister à notre webinaire \"{sujet}\" ?\n\nPas de panique, le replay est disponible pendant {delai} heures :\n→ Voir le replay : [URL]\n\nAu programme :\n• {point_1}\n• {point_2}\n• Bonus : {bonus}\n\n{nb_participants} personnes ont participé. Ne manquez pas les prochaines sessions :\n→ S'inscrire à nos prochains événements : [URL]\n\n{organisateur}"
       ],
       "variables": {
@@ -276,7 +276,7 @@
       "tier": "hard",
       "name": "Renouvellement abonnement non sollicité",
       "weight": 0.8,
-      "description": "Subscription renewal notices for services user may not have — borderline spam/phishing, classified as spam here",
+      "description": "Subscription renewal notices for services user may not have - borderline spam/phishing, classified as spam here",
       "templates": [
         "Objet : Votre abonnement {service} arrive à expiration le {date}\n\n{service}\n\nBonjour {prenom},\n\nVotre abonnement {plan} arrive à expiration le {date}.\n\nPour continuer à bénéficier de :\n✓ {avantage_1}\n✓ {avantage_2}\n✓ {avantage_3}\n\nRenouvelez maintenant et économisez {reduction}% :\n\nPlan annuel : {prix_annuel}/an (au lieu de {prix_normal}/an)\nPlan mensuel : {prix_mensuel}/mois\n\n→ Renouveler mon abonnement : [URL]\n\nSans renouvellement, votre accès sera suspendu le {date}.\n\nL'équipe {service}\nSe désinscrire : [URL]",
         "Objet : {prenom}, votre essai gratuit {service} se termine dans {jours} jours\n\nBonjour {prenom},\n\nVotre essai gratuit de {service} ({plan}) se termine dans {jours} jours.\n\nPendant votre essai, vous avez :\n📊 {stat_1}\n📈 {stat_2}\n\nNe perdez pas votre progression ! Passez au plan payant dès maintenant :\n→ Choisir mon plan : [URL]\n\nOffre spéciale : -{reduction}% sur votre premier {periode} avec le code {code}.\n\n{service}"
