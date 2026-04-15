@@ -2,9 +2,8 @@
 
 NORMALIZE_ARGS ?=
 GENERATE_ARGS ?=
-RESTRUCTURE_ARGS ?=
-SPLIT_ARGS ?=
 DATASET_ARGS ?=
+EXPORT_ARGS ?=
 BIGDATA_PROMOTION_ARGS ?=
 
 help:
@@ -34,9 +33,8 @@ help:
 	@echo "  make normalize-sap      - Normalize SAP Labs FR records only"
 	@echo "  make normalize-certfr   - Normalize CERT-FR records only"
 	@echo "  make generate-data      - Run the canonical in-memory generation pipeline and persist directly to DB"
-	@echo "  make restructure-processed - Build the processed 3-class export layout"
-	@echo "  make dataset-splits     - Merge processed datasets into train/val/test splits"
 	@echo "  make dataset-build      - Build a DB-backed dataset from annotated normalized messages"
+	@echo "  make dataset-export     - Serialize frozen SQL dataset out to CSV/JSONL for PyTorch"
 
 install:
 	uv sync
@@ -131,14 +129,10 @@ generate-data:
 	@echo "Running the canonical in-memory generation pipeline..."
 	uv run python src/data_platform/cli/datasets/generate.py $(GENERATE_ARGS)
 
-restructure-processed:
-	@echo "Building processed 3-class exports from curated sources..."
-	uv run python src/data_platform/cli/datasets/restructure_processed.py $(RESTRUCTURE_ARGS)
-
-dataset-splits:
-	@echo "Building train/val/test splits from processed exports..."
-	uv run python src/data_platform/cli/datasets/split_exports.py $(SPLIT_ARGS)
-
 dataset-build:
-	@echo "Building DB-backed dataset version from curated annotations..."
+	@echo "Build a DB-backed dataset from annotated normalized messages"
 	uv run python src/data_platform/cli/datasets/build.py $(DATASET_ARGS)
+
+dataset-export:
+	@echo "Serialize frozen SQL dataset out to CSV/JSONL for ML training"
+	uv run python src/data_platform/cli/datasets/export.py $(EXPORT_ARGS)
