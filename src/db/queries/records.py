@@ -297,7 +297,7 @@ class DatasetQueries:
         status: str,
         include_labels: tuple[str, ...] = DEFAULT_DATASET_LABELS,
         splits: tuple[tuple[str, float], ...] = DEFAULT_DATASET_SPLITS,
-        sample_weight: float = 1.0,
+        sample_weight: float | None = None,
     ) -> DatasetBuildResult:
         annotation_rank = func.row_number().over(
             partition_by=DataAnnotation.normalized_message_id,
@@ -353,7 +353,14 @@ class DatasetQueries:
             await session.rollback()
             raise DuplicateDatasetError(version_tag) from exc
 
-        split_buckets: dict[str, list[tuple[str, UUID]]] = {
+        total_eligible = len(eligible_rows)
+        num_labels = len(rows_by_label)
+        label_weights: dict[str, float] = {}
+        for label, rows in rows_by_label.items():
+            if rows:
+                label_weights[label] = round(total_eligible / (num_labels * len(rows)), 4)
+
+        split_buckets: dict[str, list[tuple[str, UUID, float]]] = {
             split_name: [] for split_name, _ in splits
         }
         for label in sorted(rows_by_label):
@@ -361,6 +368,7 @@ class DatasetQueries:
                 rows_by_label[label],
                 key=lambda row: _stable_dataset_rank(str(row["text_sha256"])),
             )
+            weight = sample_weight if sample_weight is not None else label_weights.get(label, 1.0)
             label_counts = _compute_split_counts(len(ranked_rows), splits)
             start_index = 0
             for split_name, _ in splits:
@@ -370,6 +378,7 @@ class DatasetQueries:
                         (
                             _stable_dataset_rank(str(row["text_sha256"])),
                             row["normalized_message_id"],
+                            weight,
                         )
                     )
                 start_index = end_index
@@ -379,13 +388,13 @@ class DatasetQueries:
         for split_name, _ in splits:
             ordered_rows = sorted(split_buckets[split_name], key=lambda item: item[0])
             split_counts[split_name] = len(ordered_rows)
-            for _, normalized_message_id in ordered_rows:
+            for _, normalized_message_id, item_weight in ordered_rows:
                 session.add(
                     DataDatasetItem(
                         dataset_id=dataset.id,
                         normalized_message_id=normalized_message_id,
                         split_name=split_name,
-                        sample_weight=sample_weight,
+                        sample_weight=item_weight,
                         row_order=row_order,
                     )
                 )
