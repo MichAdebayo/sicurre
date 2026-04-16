@@ -40,6 +40,7 @@ from data_platform.services.snapshot_storage import (
     SnapshotWriteResult,
     build_snapshot_store,
 )
+from core.trace_logger import SemanticTraceLogger
 
 logger = logging.getLogger(__name__)
 
@@ -235,6 +236,14 @@ class PhishTankIngestionService:
         started_at: datetime | None = None,
     ) -> PhishTankIngestionResult:
         run_started_at = started_at or datetime.now(timezone.utc)
+        
+        trace = SemanticTraceLogger(
+            parent_type="API Source",
+            child_target="PhishTank",
+            domain="data_platform"
+        )
+        trace.trace(stage="orchestration", status="start", message="Initializing PhishTank API synchronization.")
+
         source_system = await self._get_or_create_source_system(session)
         ingestion_run = await self.ingestion_service.create(
             session,
@@ -246,6 +255,15 @@ class PhishTankIngestionService:
                 log_message="PhishTank ingestion started",
             ),
         )
+        
+        trace.set_trace_id(str(ingestion_run.id))
+        trace.trace(
+            stage="ingestion",
+            status="start",
+            entity_type="DataIngestionRun",
+            entity_id=str(ingestion_run.id),
+            message="Connecting to Phishtank feed..."
+        )
 
         try:
             all_entries = await self.fetch_entries()
@@ -254,10 +272,15 @@ class PhishTankIngestionService:
             if not all_entries:
                 ingestion_run.finished_at = datetime.now(timezone.utc)
                 ingestion_run.status = IngestionStatus.COMPLETED
-                ingestion_run.log_message = (
-                    "PhishTank feed returned 0 entries — nothing to ingest"
-                )
+                ingestion_run.log_message = "PhishTank feed returned 0 entries"
                 await session.commit()
+                
+                trace.trace(
+                    stage="ingestion",
+                    status="success",
+                    metrics={"feed_count": 0},
+                    message="PhishTank feed returned 0 entries — nothing to ingest."
+                )
                 return self._empty_result(
                     ingestion_run, source_system,
                     total_feed_count=0,
@@ -300,6 +323,14 @@ class PhishTankIngestionService:
                     f"ingested — nothing new (feed={total_feed_count})"
                 )
                 await session.commit()
+                
+                trace.trace(
+                    stage="ingestion",
+                    status="success",
+                    metrics={"feed": total_feed_count, "filtered": filtered_count, "skipped": skipped_count},
+                    message=f"All {len(entries)} parsed entries already exist in DB — skipped gracefully."
+                )
+                
                 return self._empty_result(
                     ingestion_run, source_system,
                     skipped_count=skipped_count,
@@ -321,9 +352,18 @@ class PhishTankIngestionService:
             )
             session.add(raw_object)
             await session.flush()
+            
+            trace.trace(
+                stage="snapshot",
+                status="success",
+                entity_type="DataRawObject",
+                entity_id=str(raw_object.id),
+                metrics={"size_bytes": snapshot_result.size_bytes},
+                message=f"Saved CSV payload snapshot directly to {snapshot_result.local_path}"
+            )
 
             raw_records = self._build_raw_records(
-                raw_object=raw_object, entries=new_entries,
+                raw_object=raw_object, entries=new_entries, source_system=source_system
             )
             session.add_all(raw_records)
 
@@ -340,6 +380,13 @@ class PhishTankIngestionService:
             ingestion_run.raw_record_count = len(raw_records)
             ingestion_run.log_message = log_message
             await session.commit()
+            
+            trace.trace(
+                stage="extraction",
+                status="success",
+                metrics={"new_records": len(raw_records), "skipped": skipped_count},
+                message="Successfully decoupled PhishTank raw records and generated target DB objects."
+            )
 
             return PhishTankIngestionResult(
                 ingestion_run_id=str(ingestion_run.id),
@@ -358,6 +405,12 @@ class PhishTankIngestionService:
             ingestion_run.status = IngestionStatus.FAILED
             ingestion_run.log_message = f"PhishTank ingestion failed: {exc}"
             await session.commit()
+            
+            trace.trace(
+                stage="ingestion",
+                status="failed",
+                message=f"Catastrophic failure during Phishtank run: {str(exc)}"
+            )
             raise
 
     # ------------------------------------------------------------------
@@ -531,6 +584,7 @@ class PhishTankIngestionService:
         *,
         raw_object: DataRawObject,
         entries: list[dict[str, Any]],
+        source_system: DataSourceSystem,
     ) -> list[DataRawRecord]:
         extracted_at = datetime.now(timezone.utc)
         raw_records: list[DataRawRecord] = []

@@ -50,6 +50,7 @@ from data_platform.services.snapshot_storage import (
     SnapshotWriteResult,
     build_snapshot_store,
 )
+from core.trace_logger import SemanticTraceLogger
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -204,8 +205,6 @@ class CertFRCtiExtractor:
 
     # ------------------------------------------------------------------
     # Public entry point
-    # ------------------------------------------------------------------
-
     async def run(
         self,
         session: AsyncSession,
@@ -215,6 +214,13 @@ class CertFRCtiExtractor:
         fetch_historical: bool = False,
     ) -> CertFRCtiResult:
         run_started_at = started_at or datetime.now(timezone.utc)
+        
+        trace = SemanticTraceLogger(
+            parent_type="Web Scraping",
+            child_target="CERT-FR CTI",
+            domain="data_platform"
+        )
+        trace.trace(stage="orchestration", status="start", message="Initializing CERT-FR CTI Scraper.")
 
         source_system = await self._get_or_create_source(session)
         ingestion_run = await self.ingestion_service.create(
@@ -226,6 +232,15 @@ class CertFRCtiExtractor:
                 trigger_mode=trigger_mode,
                 log_message="CERT-FR CTI extraction started",
             ),
+        )
+        
+        trace.set_trace_id(str(ingestion_run.id))
+        trace.trace(
+            stage="ingestion",
+            status="start",
+            entity_type="DataIngestionRun",
+            entity_id=str(ingestion_run.id),
+            message="Connecting to CERT-FR RSS Feed/Archives..."
         )
 
         result = CertFRCtiResult(
@@ -248,6 +263,12 @@ class CertFRCtiExtractor:
                     ingestion_run, IngestionStatus.COMPLETED, result
                 )
                 await session.commit()
+                trace.trace(
+                    stage="ingestion",
+                    status="success",
+                    metrics={"feed_count": 0},
+                    message="CERT-FR RSS feed returned 0 entries — nothing to parse."
+                )
                 return result
 
             existing_refs = await self._existing_references(session)
@@ -267,18 +288,34 @@ class CertFRCtiExtractor:
                     ingestion_run, IngestionStatus.COMPLETED, result
                 )
                 await session.commit()
+                
+                trace.trace(
+                    stage="ingestion",
+                    status="success",
+                    metrics={"discovered": result.discovered_count, "skipped": result.skipped_count},
+                    message=f"All {result.discovered_count} parsed PDF reports already exist in DB — skipped gracefully."
+                )
                 return result
 
             for entry in new_entries:
                 try:
                     content = await self._extract_report(entry)
-                    await self._persist_content(
+                    raw_object, raw_record = await self._persist_content(
                         session,
                         ingestion_run=ingestion_run,
                         source_system=source_system,
                         content=content,
                         collected_at=run_started_at,
                     )
+                    
+                    trace.trace(
+                        stage="extraction",
+                        status="success",
+                        entity_type="DataRawRecord",
+                        entity_id=str(raw_record.id),
+                        message=f"Successfully extracted CTI text from {content.extraction_method} for {entry.get('reference')}"
+                    )
+                    
                     result.extracted_count += 1
                     result.reports.append(content)
                 except Exception as exc:
@@ -304,6 +341,14 @@ class CertFRCtiExtractor:
             )
             await self._finish_run(ingestion_run, status, result)
             await session.commit()
+            
+            trace.trace(
+                stage="orchestration",
+                status="success",
+                metrics={"new_reports": result.extracted_count, "skipped": result.skipped_count, "failed": result.failed_count},
+                message=f"CERT-FR extraction cycle completed. Processed {result.extracted_count} new reports."
+            )
+            
             return result
 
         except Exception as exc:
@@ -313,6 +358,13 @@ class CertFRCtiExtractor:
                 f"CERT-FR CTI extraction failed: {exc}"
             )
             await session.commit()
+            
+            trace.trace(
+                stage="ingestion",
+                status="failed",
+                message=f"Catastrophic failure during CERT-FR extraction: {str(exc)}"
+            )
+            
             raise
 
     # ------------------------------------------------------------------
@@ -592,7 +644,7 @@ class CertFRCtiExtractor:
         source_system: DataSourceSystem,
         content: ExtractedContent,
         collected_at: datetime,
-    ) -> None:
+    ) -> tuple[DataRawObject, DataRawRecord]:
         # Store the raw content (PDF bytes or HTML) as a snapshot
         snapshot_payload = content.text.encode("utf-8")
         ext = "pdf.txt" if content.extraction_method == "pdfplumber" else "html.txt"
@@ -665,6 +717,9 @@ class CertFRCtiExtractor:
             extracted_at=datetime.now(timezone.utc),
         )
         session.add(raw_record)
+        await session.flush()
+        
+        return raw_object, raw_record
 
     async def _existing_references(
         self, session: AsyncSession,
