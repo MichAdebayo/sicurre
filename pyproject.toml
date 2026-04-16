@@ -11,6 +11,7 @@ dependencies = [
     "cachetools>=7.0.3",
     "deep-translator>=1.11.4",
     "fastapi>=0.135.1",
+    "feedparser>=6.0.12",
     "httpx>=0.28.1",
     "numpy>=2.4.2",
     "pandas>=2.3.3",
