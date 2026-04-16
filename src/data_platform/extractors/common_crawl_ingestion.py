@@ -287,11 +287,6 @@ class CommonCrawlIngestionService:
                 ingestion_run.status = IngestionStatus.COMPLETED
                 ingestion_run.log_message = "BigQuery pipeline returned 0 entries"
                 self.trace.trace(
-                    stage="extraction",
-                    status="skipped",
-                    message="BigQuery pipeline returned 0 entries",
-                )
-                self.trace.trace(
                     stage="orchestration",
                     status="success",
                     message="Common Crawl run complete — nothing extracted",

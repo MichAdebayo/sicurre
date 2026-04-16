@@ -187,11 +187,6 @@ class LegacyDbIngestionService:
                 ingestion_run.status = IngestionStatus.COMPLETED
                 ingestion_run.log_message = "DB extraction returned 0 entries"
                 self.trace.trace(
-                    stage="extraction",
-                    status="skipped",
-                    message="Legacy DB returned 0 entries",
-                )
-                self.trace.trace(
                     stage="orchestration",
                     status="success",
                     message="Historical DB run complete — nothing to ingest",
