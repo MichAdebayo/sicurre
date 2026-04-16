@@ -62,6 +62,11 @@ Thumbs.db
 data/raw/**/*.csv
 data/raw/**/*.json
 data/raw/**/*.pdf
+# Cron run snapshots (local backend) — separate from immutable raw seed data
+data/cron/**/*.csv
+data/cron/**/*.json
+data/cron/**/*.pdf
+data/cron/**/*.txt
 data/processed/**/*.csv
 data/processed/**/*.json
 data/final/**/*.csv
