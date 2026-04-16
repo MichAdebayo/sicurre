@@ -17,6 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import ROOT_DIR, Settings, get_settings
+from core.trace_logger import SemanticTraceLogger
 from data_platform.api.schemas import DataSourceCreate, IngestionRunCreate
 from data_platform.services.snapshot_storage import (
     SnapshotStore,
@@ -229,6 +230,11 @@ class CommonCrawlIngestionService:
         self.source_service = SourceSystemService()
         self.ingestion_service = IngestionRunService()
         self.source_repository = SourceSystemQueries()
+        self.trace = SemanticTraceLogger(
+            parent_type="Big Data",
+            child_target="Common Crawl",
+            domain="data_platform",
+        )
 
     async def run(
         self,
@@ -238,6 +244,11 @@ class CommonCrawlIngestionService:
         started_at: datetime | None = None,
     ) -> CommonCrawlIngestionResult:
         run_started_at = started_at or datetime.now(timezone.utc)
+        self.trace.trace(
+            stage="orchestration",
+            status="start",
+            message="Common Crawl ingestion starting",
+        )
         source_system = await self._get_or_create_source_system(session)
         ingestion_run = await self.ingestion_service.create(
             session,
@@ -249,20 +260,42 @@ class CommonCrawlIngestionService:
                 log_message="Common Crawl BigQuery processing started",
             ),
         )
+        self.trace.set_trace_id(str(ingestion_run.id))
 
         try:
             # 1. Pipeline: R2 -> Pandas -> BigQuery -> Pandas
             # Because bq_client methods are synchronous (boto3, bigquery), we wrap them in a sync def
             # but we can await them by running in a threadpool to remain async-friendly if needed.
             # For simplicity, we just execute them directly since this is a heavy background task.
+            self.trace.trace(
+                stage="extraction",
+                status="start",
+                message="Starting R2 → BigQuery pipeline",
+            )
             df_parquet = self.bq_client.fetch_latest_parquet_from_r2()
             entries = self.bq_client.execute_bigquery_pipeline(df_parquet)
             total_extracted_count = len(entries)
+            self.trace.trace(
+                stage="extraction",
+                status="success",
+                message=f"Pipeline yielded {total_extracted_count} entries",
+                metrics={"total_extracted": total_extracted_count},
+            )
 
             if not entries:
                 ingestion_run.finished_at = datetime.now(timezone.utc)
                 ingestion_run.status = IngestionStatus.COMPLETED
                 ingestion_run.log_message = "BigQuery pipeline returned 0 entries"
+                self.trace.trace(
+                    stage="extraction",
+                    status="skipped",
+                    message="BigQuery pipeline returned 0 entries",
+                )
+                self.trace.trace(
+                    stage="orchestration",
+                    status="success",
+                    message="Common Crawl run complete — nothing extracted",
+                )
                 await session.commit()
                 return self._empty_result(ingestion_run, source_system)
 
@@ -278,6 +311,17 @@ class CommonCrawlIngestionService:
                 ingestion_run.status = IngestionStatus.COMPLETED
                 ingestion_run.log_message = (
                     f"All {len(entries)} Common Crawl entries already processed."
+                )
+                self.trace.trace(
+                    stage="ingestion",
+                    status="skipped",
+                    message=f"All {len(entries)} entries already in DB — delta is zero",
+                    metrics={"skipped": skipped_count},
+                )
+                self.trace.trace(
+                    stage="orchestration",
+                    status="success",
+                    message="Common Crawl run complete — no delta",
                 )
                 await session.commit()
                 return self._empty_result(
@@ -296,6 +340,11 @@ class CommonCrawlIngestionService:
             snapshot_result = await self._write_snapshot(
                 ingestion_run=ingestion_run,
                 payload=snapshot_payload,
+            )
+            self.trace.trace(
+                stage="snapshot",
+                status="success",
+                message=f"Snapshot written: {snapshot_result.storage_uri}",
             )
 
             # 4. DB Entity Creation
@@ -320,6 +369,21 @@ class CommonCrawlIngestionService:
             ingestion_run.raw_object_count = 1
             ingestion_run.raw_record_count = len(raw_records)
             ingestion_run.log_message = log_message
+            self.trace.trace(
+                stage="ingestion",
+                status="success",
+                message=f"Common Crawl ingestion completed: {len(raw_records)} new records",
+                metrics={
+                    "new_records": len(raw_records),
+                    "skipped": skipped_count,
+                    "total_extracted": total_extracted_count,
+                },
+            )
+            self.trace.trace(
+                stage="orchestration",
+                status="success",
+                message="Common Crawl run complete",
+            )
             await session.commit()
 
             return CommonCrawlIngestionResult(
@@ -338,6 +402,11 @@ class CommonCrawlIngestionService:
             ingestion_run.finished_at = datetime.now(timezone.utc)
             ingestion_run.status = IngestionStatus.FAILED
             ingestion_run.log_message = f"Common Crawl ingestion failed: {exc}"
+            self.trace.trace(
+                stage="orchestration",
+                status="failed",
+                message=f"Common Crawl ingestion failed: {exc}",
+            )
             await session.commit()
             raise
 

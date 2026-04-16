@@ -14,6 +14,7 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import ROOT_DIR
+from core.trace_logger import SemanticTraceLogger
 from db.models import (
     DataIngestionRun,
     DataRawObject,
@@ -184,6 +185,11 @@ class CertFRIngestionService:
         self.source_service = SourceSystemService()
         self.ingestion_service = IngestionRunService()
         self.source_repository = SourceSystemQueries()
+        self.trace = SemanticTraceLogger(
+            parent_type="Web Scraping",
+            child_target="CERT-FR",
+            domain="data_platform",
+        )
 
     async def run(
         self,
@@ -193,6 +199,9 @@ class CertFRIngestionService:
         started_at: datetime | None = None,
     ) -> CertFRIngestionResult:
         run_started_at = started_at or datetime.now(timezone.utc)
+        self.trace.trace(
+            stage="orchestration", status="start", message="CERT-FR ingestion starting"
+        )
         source_system = await self._get_or_create_source_system(session)
         ingestion_run = await self.ingestion_service.create(
             session,
@@ -204,13 +213,22 @@ class CertFRIngestionService:
                 log_message="CERT-FR ingestion started",
             ),
         )
+        self.trace.set_trace_id(str(ingestion_run.id))
 
         try:
+            self.trace.trace(
+                stage="ingestion", status="start", message="Fetching CERT-FR RSS feeds"
+            )
             feed_entries = await self.fetch_entries()
             normalized_entries = self._normalize_feed_entries(feed_entries)
             snapshot_result = await self._write_snapshot(
                 ingestion_run=ingestion_run,
                 entries_by_feed=normalized_entries,
+            )
+            self.trace.trace(
+                stage="snapshot",
+                status="success",
+                message=f"Snapshot written: {snapshot_result.storage_uri}",
             )
             raw_object = self._build_raw_object(
                 ingestion_run=ingestion_run,
@@ -225,6 +243,7 @@ class CertFRIngestionService:
             raw_records = self._build_raw_records(
                 raw_object=raw_object,
                 entries_by_feed=normalized_entries,
+                source_system=source_system,
             )
             session.add_all(raw_records)
 
@@ -234,6 +253,18 @@ class CertFRIngestionService:
             ingestion_run.raw_record_count = len(raw_records)
             ingestion_run.log_message = (
                 f"CERT-FR ingestion completed with {len(raw_records)} records"
+            )
+            self.trace.trace(
+                stage="ingestion",
+                status="success",
+                message=f"CERT-FR ingestion completed: {len(raw_records)} new records",
+                metrics={
+                    "new_records": len(raw_records),
+                    "feed_count": len(normalized_entries),
+                },
+            )
+            self.trace.trace(
+                stage="orchestration", status="success", message="CERT-FR run complete"
             )
             await session.commit()
 
@@ -249,6 +280,11 @@ class CertFRIngestionService:
             ingestion_run.finished_at = datetime.now(timezone.utc)
             ingestion_run.status = IngestionStatus.FAILED
             ingestion_run.log_message = f"CERT-FR ingestion failed: {exc}"
+            self.trace.trace(
+                stage="orchestration",
+                status="failed",
+                message=f"CERT-FR ingestion failed: {exc}",
+            )
             await session.commit()
             raise
 
@@ -341,6 +377,7 @@ class CertFRIngestionService:
         *,
         raw_object: DataRawObject,
         entries_by_feed: Mapping[str, list[dict[str, Any]]],
+        source_system: DataSourceSystem,
     ) -> list[DataRawRecord]:
         extracted_at = datetime.now(timezone.utc)
         raw_records: list[DataRawRecord] = []
@@ -364,7 +401,8 @@ class CertFRIngestionService:
 
                 raw_records.append(
                     DataRawRecord(
-                        raw_object_id=raw_object.id, source_system_id=source_system.id,
+                        raw_object_id=raw_object.id,
+                        source_system_id=source_system.id,
                         record_key=record_key,
                         raw_content=raw_content,
                         detected_language=self._detect_language(entry),
