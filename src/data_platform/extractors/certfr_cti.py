@@ -69,60 +69,63 @@ _DOMAIN_RE = re.compile(
     r"\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+"
     r"(?:com|org|net|fr|io|de|ru|cn|uk|info|gov|mil|edu)\b"
 )
-_EMAIL_RE = re.compile(
-    r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}"
-)
+_EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
 _IPV4_RE = re.compile(
-    r"\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}"
-    r"(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b"
+    r"\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}" r"(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b"
 )
 _HASH_RE = re.compile(r"\b[a-fA-F0-9]{32,64}\b")
 
 # French phishing relevance keywords
-_PHISHING_KEYWORDS: frozenset[str] = frozenset((
-    "hameçonnage",
-    "hameconnage",
-    "phishing",
-    "ingénierie sociale",
-    "social engineering",
-    "usurpation",
-    "courriel malveillant",
-    "courriels malveillants",
-    "fraude",
-    "arnaque",
-    "rançongiciel",
-    "ransomware",
-    "campagne",
-    "malveillant",
-    "spam",
-    "spear",
-    "credential",
-    "vol de données",
-    "exfiltration",
-))
+_PHISHING_KEYWORDS: frozenset[str] = frozenset(
+    (
+        "hameçonnage",
+        "hameconnage",
+        "phishing",
+        "ingénierie sociale",
+        "social engineering",
+        "usurpation",
+        "courriel malveillant",
+        "courriels malveillants",
+        "fraude",
+        "arnaque",
+        "rançongiciel",
+        "ransomware",
+        "campagne",
+        "malveillant",
+        "spam",
+        "spear",
+        "credential",
+        "vol de données",
+        "exfiltration",
+    )
+)
 
 # Noise domains to exclude from IOC extraction
-_NOISE_DOMAINS: frozenset[str] = frozenset((
-    "cert.ssi.gouv.fr",
-    "ssi.gouv.fr",
-    "gouv.fr",
-    "anssi.fr",
-    "apple.com",
-    "microsoft.com",
-    "google.com",
-    "github.com",
-    "example.com",
-    "example.org",
-))
+_NOISE_DOMAINS: frozenset[str] = frozenset(
+    (
+        "cert.ssi.gouv.fr",
+        "ssi.gouv.fr",
+        "gouv.fr",
+        "anssi.fr",
+        "apple.com",
+        "microsoft.com",
+        "google.com",
+        "github.com",
+        "example.com",
+        "example.org",
+    )
+)
 
 
 # ---------------------------------------------------------------------------
 # Data classes
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True, slots=True)
 class ExtractedContent:
     """Result of extracting text and IOCs from a single CTI report."""
+
     reference: str
     title: str
     text: str
@@ -139,6 +142,7 @@ class ExtractedContent:
 @dataclass(slots=True)
 class CertFRCtiResult:
     """Summary of one extraction run."""
+
     ingestion_run_id: str
     source_system_id: str
     discovered_count: int
@@ -153,6 +157,7 @@ class CertFRCtiResult:
 # ---------------------------------------------------------------------------
 # Service
 # ---------------------------------------------------------------------------
+
 
 class CertFRCtiExtractor:
     """Single-pass CERT-FR CTI extraction job.
@@ -170,9 +175,7 @@ class CertFRCtiExtractor:
         feed_url: str = CERTFR_CTI_FEED_URL,
         pdf_base_url: str = CERTFR_PDF_BASE,
         fetch_feed: Callable[[], Awaitable[list[dict[str, Any]]]] | None = None,
-        download_url: (
-            Callable[[str], Awaitable[httpx.Response]] | None
-        ) = None,
+        download_url: Callable[[str], Awaitable[httpx.Response]] | None = None,
         snapshot_dir: Path = DEFAULT_SNAPSHOT_DIR,
         snapshot_store: SnapshotStore | None = None,
         snapshot_prefix: str = DEFAULT_SNAPSHOT_PREFIX,
@@ -214,13 +217,17 @@ class CertFRCtiExtractor:
         fetch_historical: bool = False,
     ) -> CertFRCtiResult:
         run_started_at = started_at or datetime.now(timezone.utc)
-        
+
         trace = SemanticTraceLogger(
             parent_type="Web Scraping",
             child_target="CERT-FR CTI",
-            domain="data_platform"
+            domain="data_platform",
         )
-        trace.trace(stage="orchestration", status="start", message="Initializing CERT-FR CTI Scraper.")
+        trace.trace(
+            stage="orchestration",
+            status="start",
+            message="Initializing CERT-FR CTI Scraper.",
+        )
 
         source_system = await self._get_or_create_source(session)
         ingestion_run = await self.ingestion_service.create(
@@ -233,14 +240,14 @@ class CertFRCtiExtractor:
                 log_message="CERT-FR CTI extraction started",
             ),
         )
-        
+
         trace.set_trace_id(str(ingestion_run.id))
         trace.trace(
             stage="ingestion",
             status="start",
             entity_type="DataIngestionRun",
             entity_id=str(ingestion_run.id),
-            message="Connecting to CERT-FR RSS Feed/Archives..."
+            message="Connecting to CERT-FR RSS Feed/Archives...",
         )
 
         result = CertFRCtiResult(
@@ -259,21 +266,20 @@ class CertFRCtiExtractor:
 
             if not entries:
                 result.log_message = "No CTI entries found in RSS feed"
-                await self._finish_run(
-                    ingestion_run, IngestionStatus.COMPLETED, result
-                )
+                await self._finish_run(ingestion_run, IngestionStatus.COMPLETED, result)
                 await session.commit()
                 trace.trace(
                     stage="ingestion",
                     status="success",
                     metrics={"feed_count": 0},
-                    message="CERT-FR RSS feed returned 0 entries — nothing to parse."
+                    message="CERT-FR RSS feed returned 0 entries — nothing to parse.",
                 )
                 return result
 
             existing_refs = await self._existing_references(session)
             new_entries = [
-                e for e in entries
+                e
+                for e in entries
                 if e.get("reference") and e["reference"] not in existing_refs
             ]
             result.new_count = len(new_entries)
@@ -284,16 +290,17 @@ class CertFRCtiExtractor:
                     f"All {result.discovered_count} CTI reports already "
                     f"extracted — nothing new"
                 )
-                await self._finish_run(
-                    ingestion_run, IngestionStatus.COMPLETED, result
-                )
+                await self._finish_run(ingestion_run, IngestionStatus.COMPLETED, result)
                 await session.commit()
-                
+
                 trace.trace(
                     stage="ingestion",
                     status="success",
-                    metrics={"discovered": result.discovered_count, "skipped": result.skipped_count},
-                    message=f"All {result.discovered_count} parsed PDF reports already exist in DB — skipped gracefully."
+                    metrics={
+                        "discovered": result.discovered_count,
+                        "skipped": result.skipped_count,
+                    },
+                    message=f"All {result.discovered_count} parsed PDF reports already exist in DB — skipped gracefully.",
                 )
                 return result
 
@@ -307,30 +314,26 @@ class CertFRCtiExtractor:
                         content=content,
                         collected_at=run_started_at,
                     )
-                    
+
                     trace.trace(
                         stage="extraction",
                         status="success",
                         entity_type="DataRawRecord",
                         entity_id=str(raw_record.id),
-                        message=f"Successfully extracted CTI text from {content.extraction_method} for {entry.get('reference')}"
+                        message=f"Successfully extracted CTI text from {content.extraction_method} for {entry.get('reference')}",
                     )
-                    
+
                     result.extracted_count += 1
                     result.reports.append(content)
                 except Exception as exc:
                     result.failed_count += 1
                     ref = entry.get("reference", "unknown")
-                    result.log_message += (
-                        f"\n⚠ {ref}: extraction failed — {exc}"
-                    )
+                    result.log_message += f"\n⚠ {ref}: extraction failed — {exc}"
 
                 if self.delay_between_requests > 0:
                     await asyncio.sleep(self.delay_between_requests)
 
-            result.skipped_count = (
-                result.discovered_count - result.new_count
-            )
+            result.skipped_count = result.discovered_count - result.new_count
             status = (
                 IngestionStatus.COMPLETED
                 if result.failed_count == 0
@@ -341,37 +344,41 @@ class CertFRCtiExtractor:
             )
             await self._finish_run(ingestion_run, status, result)
             await session.commit()
-            
+
             trace.trace(
                 stage="orchestration",
                 status="success",
-                metrics={"new_reports": result.extracted_count, "skipped": result.skipped_count, "failed": result.failed_count},
-                message=f"CERT-FR extraction cycle completed. Processed {result.extracted_count} new reports."
+                metrics={
+                    "new_reports": result.extracted_count,
+                    "skipped": result.skipped_count,
+                    "failed": result.failed_count,
+                },
+                message=f"CERT-FR extraction cycle completed. Processed {result.extracted_count} new reports.",
             )
-            
+
             return result
 
         except Exception as exc:
             ingestion_run.finished_at = datetime.now(timezone.utc)
             ingestion_run.status = IngestionStatus.FAILED
-            ingestion_run.log_message = (
-                f"CERT-FR CTI extraction failed: {exc}"
-            )
+            ingestion_run.log_message = f"CERT-FR CTI extraction failed: {exc}"
             await session.commit()
-            
+
             trace.trace(
                 stage="ingestion",
                 status="failed",
-                message=f"Catastrophic failure during CERT-FR extraction: {str(exc)}"
+                message=f"Catastrophic failure during CERT-FR extraction: {str(exc)}",
             )
-            
+
             raise
 
     # ------------------------------------------------------------------
     # Discovery
     # ------------------------------------------------------------------
 
-    async def _discover_entries(self, fetch_historical: bool = False) -> list[dict[str, Any]]:
+    async def _discover_entries(
+        self, fetch_historical: bool = False
+    ) -> list[dict[str, Any]]:
         """Fetch the CTI RSS feed and parse entries, or scrape historical pages."""
         if fetch_historical:
             return await self._discover_historical_entries()
@@ -385,7 +392,8 @@ class CertFRCtiExtractor:
             response = await client.get(self.feed_url)
             response.raise_for_status()
             return await asyncio.to_thread(
-                self._parse_feed, response.content,
+                self._parse_feed,
+                response.content,
             )
 
     @staticmethod
@@ -393,22 +401,26 @@ class CertFRCtiExtractor:
         parsed = feedparser.parse(payload)
         entries: list[dict[str, Any]] = []
         for entry in parsed.entries:
-            title = (entry.get("title") or "").strip() or None
-            link = (entry.get("link") or "").strip() or None
-            guid = (entry.get("id") or "").strip() or None
+            title = (str(entry.get("title") or "")).strip() or None
+            link = (str(entry.get("link") or "")).strip() or None
+            guid = (str(entry.get("id") or "")).strip() or None
             reference = CertFRCtiExtractor._extract_reference(
-                guid, link, title,
+                guid,
+                link,
+                title,
             )
             if reference is None:
                 continue  # not a valid CTI entry
-            entries.append({
-                "title": title,
-                "link": link,
-                "guid": guid,
-                "reference": reference,
-                "published": (entry.get("published") or "").strip() or None,
-                "summary": (entry.get("summary") or "").strip() or None,
-            })
+            entries.append(
+                {
+                    "title": title,
+                    "link": link,
+                    "guid": guid,
+                    "reference": reference,
+                    "published": (str(entry.get("published") or "")).strip() or None,
+                    "summary": (str(entry.get("summary") or "")).strip() or None,
+                }
+            )
         return entries
 
     @staticmethod
@@ -425,10 +437,13 @@ class CertFRCtiExtractor:
         """Crawl the paginated /cti/ and /ioc/ indexes to find all historical reports."""
         from bs4 import BeautifulSoup
         from urllib.parse import urljoin
-        
+
         entries: list[dict[str, Any]] = []
-        base_urls = ["https://www.cert.ssi.gouv.fr/cti/", "https://www.cert.ssi.gouv.fr/ioc/"]
-        
+        base_urls = [
+            "https://www.cert.ssi.gouv.fr/cti/",
+            "https://www.cert.ssi.gouv.fr/ioc/",
+        ]
+
         async with httpx.AsyncClient(
             timeout=self.timeout_seconds,
             follow_redirects=True,
@@ -441,46 +456,53 @@ class CertFRCtiExtractor:
                     if response.status_code == 404:
                         break
                     response.raise_for_status()
-                    
+
                     soup = BeautifulSoup(response.text, "html.parser")
                     articles = soup.select("article.cert-alert, article.item")
                     if not articles:
-                        articles = soup.find_all("a", href=re.compile(r"/cti/CERTFR|/ioc/CERTFR"))
-                        
+                        articles = soup.find_all(
+                            "a", href=re.compile(r"/cti/CERTFR|/ioc/CERTFR")
+                        )
+
                     if not articles:
                         break
-                        
+
                     found_any = False
                     for article in articles:
                         link_tag = article if article.name == "a" else article.find("a")
                         if not link_tag or not link_tag.get("href"):
                             continue
-                            
-                        href = urljoin("https://www.cert.ssi.gouv.fr", link_tag["href"])
+
+                        href = urljoin(
+                            "https://www.cert.ssi.gouv.fr",
+                            str(link_tag.get("href", "")),
+                        )
                         title = link_tag.get_text(strip=True)
                         reference = self._extract_reference(href, title)
                         if not reference:
                             continue
-                            
+
                         date_tag = article.find("time") if article.name != "a" else None
                         published = date_tag.get("datetime", "") if date_tag else None
-                        
-                        entries.append({
-                            "title": title,
-                            "link": href,
-                            "reference": reference,
-                            "published": published,
-                            "summary": None,
-                        })
+
+                        entries.append(
+                            {
+                                "title": title,
+                                "link": href,
+                                "reference": reference,
+                                "published": published,
+                                "summary": None,
+                            }
+                        )
                         found_any = True
-                        
+
                     if not found_any:
                         break
-                        
+
                     page += 1
                     if self.delay_between_requests > 0:
                         await asyncio.sleep(self.delay_between_requests)
-                        
+
         return entries
 
     # ------------------------------------------------------------------
@@ -488,7 +510,8 @@ class CertFRCtiExtractor:
     # ------------------------------------------------------------------
 
     async def _extract_report(
-        self, entry: dict[str, Any],
+        self,
+        entry: dict[str, Any],
     ) -> ExtractedContent:
         reference: str = entry["reference"]
         title: str = entry.get("title") or reference
@@ -498,7 +521,8 @@ class CertFRCtiExtractor:
         pdf_bytes = await self._download_pdf(reference)
         if pdf_bytes is not None:
             text = await asyncio.to_thread(
-                self._extract_text_from_pdf, pdf_bytes,
+                self._extract_text_from_pdf,
+                pdf_bytes,
             )
             method = "pdfplumber"
             source_url = f"{self.pdf_base_url}/{reference}.pdf"
@@ -510,9 +534,7 @@ class CertFRCtiExtractor:
             method = "html_scraping"
             source_url = link
         else:
-            raise ValueError(
-                f"{reference}: no PDF available and no page link in feed"
-            )
+            raise ValueError(f"{reference}: no PDF available and no page link in feed")
 
         if not text or len(text.strip()) < 50:
             raise ValueError(
@@ -605,17 +627,21 @@ class CertFRCtiExtractor:
 
     @staticmethod
     def _extract_iocs(text: str) -> dict[str, list[str]]:
-        domains = sorted({
-            m.group(0).lower()
-            for m in _DOMAIN_RE.finditer(text)
-            if m.group(0).lower() not in _NOISE_DOMAINS
-        })
+        domains = sorted(
+            {
+                m.group(0).lower()
+                for m in _DOMAIN_RE.finditer(text)
+                if m.group(0).lower() not in _NOISE_DOMAINS
+            }
+        )
         emails = sorted({m.group(0).lower() for m in _EMAIL_RE.finditer(text)})
-        ips = sorted({
-            m.group(0)
-            for m in _IPV4_RE.finditer(text)
-            if not m.group(0).startswith(("0.", "127.", "10.", "192.168."))
-        })
+        ips = sorted(
+            {
+                m.group(0)
+                for m in _IPV4_RE.finditer(text)
+                if not m.group(0).startswith(("0.", "127.", "10.", "192.168."))
+            }
+        )
         raw_hashes = sorted({m.group(0).lower() for m in _HASH_RE.finditer(text)})
         # Only keep hashes that are exactly 32, 40, or 64 hex chars
         hashes = [h for h in raw_hashes if len(h) in (32, 40, 64)]
@@ -708,7 +734,8 @@ class CertFRCtiExtractor:
             sort_keys=True,
         )
         raw_record = DataRawRecord(
-            raw_object_id=raw_object.id, source_system_id=source_system.id,
+            raw_object_id=raw_object.id,
+            source_system_id=source_system.id,
             record_key=content.reference,
             raw_content=enriched_content,
             detected_language="fr",
@@ -718,18 +745,16 @@ class CertFRCtiExtractor:
         )
         session.add(raw_record)
         await session.flush()
-        
+
         return raw_object, raw_record
 
     async def _existing_references(
-        self, session: AsyncSession,
+        self,
+        session: AsyncSession,
     ) -> set[str]:
         """Return references already content-extracted."""
-        stmt = (
-            select(DataRawObject.external_ref)
-            .where(
-                DataRawObject.external_ref.like("cert-fr#content#%"),
-            )
+        stmt = select(DataRawObject.external_ref).where(
+            DataRawObject.external_ref.like("cert-fr#content#%"),
         )
         rows = await session.scalars(stmt)
         refs: set[str] = set()
@@ -739,10 +764,12 @@ class CertFRCtiExtractor:
         return refs
 
     async def _get_or_create_source(
-        self, session: AsyncSession,
+        self,
+        session: AsyncSession,
     ) -> DataSourceSystem:
         source = await self.source_repository.get_by_name(
-            session, self.source_name,
+            session,
+            self.source_name,
         )
         if source is not None:
             return source
@@ -751,9 +778,7 @@ class CertFRCtiExtractor:
             DataSourceCreate(
                 name=self.source_name,
                 source_type=SourceType.SCRAPING,
-                description=(
-                    "CERT-FR CTI reports — bi-weekly PDF extraction"
-                ),
+                description=("CERT-FR CTI reports — bi-weekly PDF extraction"),
                 owner_name="ANSSI",
                 legal_basis="public_threat_intel",
                 contains_personal_data=False,
