@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from sqlalchemy import select, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from core.config import ROOT_DIR
@@ -69,12 +70,23 @@ class LegacyDbConnector:
     def __init__(self, db_url: str = DEFAULT_LEGACY_DB_URL) -> None:
         self.db_url = db_url
 
+    def _resolved_db_path(self) -> Path | None:
+        url = make_url(self.db_url)
+        if not url.drivername.startswith("sqlite"):
+            return None
+
+        database = str(url.database or "").strip()
+        if not database or database == ":memory:":
+            return None
+
+        return Path(database)
+
     async def fetch_threats(self) -> list[dict[str, Any]]:
         """Extract threat logs from the monolithic legacy database."""
-        if not DEFAULT_LEGACY_DB_PATH.exists():
+        db_path = self._resolved_db_path()
+        if db_path is not None and not db_path.exists():
             raise FileNotFoundError(
-                f"External DB not found at {DEFAULT_LEGACY_DB_PATH}. "
-                "Run `make db-seed` first!"
+                f"External DB not found at {db_path}. " "Run `make db-seed` first!"
             )
 
         engine = create_async_engine(self.db_url, echo=False)

@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     environment: str = "dev"
     database_url: str = _DEFAULT_DB_URL
     database_echo: bool = False
+    database_historical_cron_total_count: int = 72
+    database_historical_cron_max_total_count: int = 1000
     gcp_project: str = "sicurre"
     gcp_region: str = "europe-west1"
     bigquery_dataset_id: str = Field(
