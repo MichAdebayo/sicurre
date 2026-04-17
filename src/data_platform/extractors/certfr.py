@@ -11,6 +11,7 @@ from typing import Any
 
 import feedparser
 import httpx
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import ROOT_DIR
@@ -67,6 +68,7 @@ class CertFRIngestionResult:
     snapshot_storage_uri: str
     raw_object_count: int
     raw_record_count: int
+    skipped_count: int = 0
 
 
 class CertFRFeedClient:
@@ -191,6 +193,17 @@ class CertFRIngestionService:
             domain="data_platform",
         )
 
+    async def _existing_record_keys(self, session: AsyncSession) -> set[str]:
+        stmt = (
+            select(DataRawRecord.record_key)
+            .join(DataRawObject)
+            .join(DataIngestionRun)
+            .join(DataSourceSystem)
+            .where(DataSourceSystem.name == self.source_name)
+        )
+        rows = await session.scalars(stmt)
+        return set(rows)
+
     async def run(
         self,
         session: AsyncSession,
@@ -245,21 +258,25 @@ class CertFRIngestionService:
                 entries_by_feed=normalized_entries,
                 source_system=source_system,
             )
-            session.add_all(raw_records)
+            existing_keys = await self._existing_record_keys(session)
+            new_records = [r for r in raw_records if r.record_key not in existing_keys]
+            skipped_count = len(raw_records) - len(new_records)
+            session.add_all(new_records)
 
             ingestion_run.finished_at = datetime.now(timezone.utc)
             ingestion_run.status = IngestionStatus.COMPLETED
             ingestion_run.raw_object_count = 1
-            ingestion_run.raw_record_count = len(raw_records)
+            ingestion_run.raw_record_count = len(new_records)
             ingestion_run.log_message = (
-                f"CERT-FR ingestion completed with {len(raw_records)} records"
+                f"CERT-FR ingestion completed with {len(new_records)} records"
             )
             self.trace.trace(
                 stage="ingestion",
                 status="success",
-                message=f"CERT-FR ingestion completed: {len(raw_records)} new records",
+                message=f"CERT-FR ingestion completed: {len(new_records)} new records",
                 metrics={
-                    "new_records": len(raw_records),
+                    "new_records": len(new_records),
+                    "skipped": skipped_count,
                     "feed_count": len(normalized_entries),
                 },
             )
@@ -274,7 +291,8 @@ class CertFRIngestionService:
                 snapshot_path=snapshot_result.local_path,
                 snapshot_storage_uri=snapshot_result.storage_uri,
                 raw_object_count=1,
-                raw_record_count=len(raw_records),
+                raw_record_count=len(new_records),
+                skipped_count=skipped_count,
             )
         except Exception as exc:
             ingestion_run.finished_at = datetime.now(timezone.utc)

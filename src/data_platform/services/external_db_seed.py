@@ -381,3 +381,135 @@ def seed_external_database(seed: int = SEED) -> None:
     logger.info("  Crowdsourced: %d", len(df_crowdsourced))
     logger.info("  Feedback entries: %d", len(feedback_threats))
     logger.info("  Database size: %.1f KB", DB_PATH.stat().st_size / 1024)
+
+
+def append_to_database(
+    n: int,
+    *,
+    db_url: str | None = None,
+    seed: int | None = None,
+) -> int:
+    """Append *n* new synthetic phishing entries to an existing external DB.
+
+    Unlike :func:`seed_external_database`, this function does **not** delete
+    existing rows.  It reads the existing users and model version tags from the
+    target DB, then generates *n* new :class:`ExternalThreatLog` rows using
+    :class:`~data_platform.services.synthetic_generation.SyntheticGenerationService`.
+
+    Designed for incremental cron validation: run ``append_to_database(100)``
+    between two ingestion runs to confirm exactly 100 new rows are picked up.
+
+    Args:
+        n: Number of new threat log entries to insert (must be > 0).
+        db_url: SQLAlchemy sync URL for the target DB.  Defaults to the
+            module-level ``DB_URL`` (``data/raw/db/external_threats.db``).
+        seed: Random seed for reproducibility.  Defaults to a fresh random
+            value so successive calls produce distinct rows.
+
+    Returns:
+        Number of rows inserted.
+    """
+    if n <= 0:
+        raise ValueError(f"n must be positive, got {n}")
+
+    effective_url = db_url or DB_URL
+    effective_seed = seed if seed is not None else random.randint(0, 2**31 - 1)
+    rng = random.Random(effective_seed)
+    fake = Faker("fr_FR")
+    Faker.seed(effective_seed)
+
+    phishing_signals = [
+        ["DMARC fail", "Suspicious URL"],
+        ["SPF fail", "Urgency language"],
+        ["Homograph domain", "Credential request"],
+        ["URL mismatch", "DKIM fail"],
+        ["New sender", "Attachment suspicious"],
+        ["Reply-to mismatch", "French impersonation"],
+        ["Lookalike domain", "PII request"],
+    ]
+
+    engine = create_engine(effective_url, echo=False)
+    Base.metadata.create_all(engine)  # no-op if tables already exist
+    session_local = sessionmaker(bind=engine)
+
+    with session_local() as session:
+        user_ids = [str(u.id) for u in session.query(ExternalUser).all()]
+
+        if not user_ids:
+            # Target DB has no users yet — seed a minimal set before inserting threats
+            plans = ["free", "pro", "pro"]
+            for plan in plans:
+                first = fake.first_name()
+                last = fake.last_name()
+                domain = rng.choice(
+                    ["gmail.com", "outlook.fr", "yahoo.fr", "orange.fr"]
+                )
+                user = ExternalUser(
+                    email=f"{first.lower()}.{last.lower()}@{domain}",
+                    display_name=f"{first} {last}",
+                    plan=plan,
+                )
+                session.add(user)
+                session.flush()
+                user_ids.append(str(user.id))
+
+        model_tags = [
+            str(m.version_tag) for m in session.query(ExternalModelVersion).all()
+        ]
+        if not model_tags:
+            model_tags = ["v0.1.0"]
+
+        svc = SyntheticGenerationService(seed=effective_seed)
+        df = svc.generate_class("phishing", n)
+
+        now = datetime.now(timezone.utc)
+        inserted = 0
+        for _, row in df.iterrows():
+            text_content = str(row.get("text", ""))
+            subject = ""
+            body_preview = text_content[:200]
+            if "\n\n" in text_content:
+                parts = text_content.split("\n\n", 1)
+                subject = parts[0][:200]
+                body_preview = parts[1][:200] if len(parts) > 1 else text_content[:200]
+            body_preview = redact_pii(body_preview)
+
+            confidence = round(rng.uniform(0.80, 0.99), 3)
+            received_at = now - timedelta(
+                days=rng.randint(0, 30),
+                hours=rng.randint(0, 23),
+                minutes=rng.randint(0, 59),
+            )
+            action_taken = "trashed" if confidence > 0.85 else "none"
+            action_at = (
+                received_at + timedelta(seconds=rng.uniform(0.5, 2.0))
+                if action_taken == "trashed"
+                else None
+            )
+            session.add(
+                ExternalThreatLog(
+                    user_id=rng.choice(user_ids),
+                    message_id=f"msg_{uuid.uuid4().hex[:12]}",
+                    subject=subject,
+                    body_preview=body_preview,
+                    received_at=received_at,
+                    verdict="phishing",
+                    confidence=confidence,
+                    signals=json.dumps(rng.choice(phishing_signals)),
+                    archetype=str(row.get("archetype", "")),
+                    source_dataset="synthetic_append",
+                    model_version=rng.choice(model_tags),
+                    action_taken=action_taken,
+                    action_at=action_at,
+                )
+            )
+            inserted += 1
+
+        session.commit()
+
+    logger.info(
+        "append_to_database: inserted %d new synthetic phishing entries into %s",
+        inserted,
+        effective_url,
+    )
+    return inserted

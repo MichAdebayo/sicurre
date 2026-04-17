@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import boto3
+import hashlib
 import pandas as pd
 from google.cloud import bigquery
 from sqlalchemy import select
@@ -85,6 +86,85 @@ class CommonCrawlIngestionResult:
     skipped_count: int
     total_extracted_count: int
     log_message: str
+
+
+# ---------------------------------------------------------------------------
+# Local (no-cloud) client — used when CC_INPUT_BACKEND=local
+# ---------------------------------------------------------------------------
+
+
+class LocalCommonCrawlClient:
+    """Pandas-only Common Crawl client for local/cron mode.
+
+    Reads the most recent ``.parquet`` file from a local directory and
+    performs in-process deduplication via SHA-256 text fingerprints,
+    replacing the R2 + BigQuery pipeline used in production.
+    """
+
+    def __init__(
+        self,
+        *,
+        local_parquet_dir: Path | None = None,
+        settings: Settings | None = None,
+    ) -> None:
+        _settings = settings or get_settings()
+        self.local_parquet_dir: Path = local_parquet_dir or (
+            _settings.raw_snapshot_local_dir / "bigdata" / "common_crawl" / "fr_usable"
+        )
+        # Mirrors the attribute used in _build_raw_object external_ref
+        self.full_table_id = f"local://{self.local_parquet_dir}"
+
+    def fetch_latest_parquet_from_r2(self) -> pd.DataFrame:
+        """Read the most recently modified ``.parquet`` in the local cron dir."""
+        parquet_files = sorted(
+            self.local_parquet_dir.glob("*.parquet"),
+            key=lambda p: p.stat().st_mtime,
+        )
+        if not parquet_files:
+            raise FileNotFoundError(
+                f"No .parquet files found in {self.local_parquet_dir}"
+            )
+        latest = parquet_files[-1]
+        logger.info("LocalCommonCrawlClient: reading %s", latest)
+        df = pd.read_parquet(latest)
+        logger.info("Parsed DataFrame with %d rows.", len(df))
+        return df
+
+    def execute_bigquery_pipeline(self, df: pd.DataFrame) -> list[dict[str, Any]]:
+        """Pandas dedup equivalent of the BigQuery FARM_FINGERPRINT pipeline."""
+        if df.empty:
+            return []
+        if "text" not in df.columns:
+            logger.warning(
+                "LocalCommonCrawlClient: DataFrame has no 'text' column — 0 records"
+            )
+            return []
+
+        # Deterministic fingerprint: sha256 hex of text (same text = same key across runs)
+        df = df.copy()
+        df["record_key"] = df["text"].apply(
+            lambda t: hashlib.sha256(str(t).encode("utf-8")).hexdigest()
+        )
+
+        # Dedup within this batch (keep first occurrence)
+        df = df.drop_duplicates(subset=["record_key"])
+
+        # Apply same text length filter as BigQuery pipeline
+        if "text_length" in df.columns:
+            df = df[df["text_length"].between(100, 10000)]
+        elif "text" in df.columns:
+            df = df[df["text"].str.len().between(100, 10000)]
+
+        logger.info(
+            "LocalCommonCrawlClient: %d deduplicated records after pandas pipeline",
+            len(df),
+        )
+        return df.to_dict(orient="records")
+
+
+# ---------------------------------------------------------------------------
+# Production BigQuery client
+# ---------------------------------------------------------------------------
 
 
 class CommonCrawlBigQueryClient:
@@ -202,17 +282,34 @@ class CommonCrawlBigQueryClient:
         return results_df.to_dict(orient="records")
 
 
+# ---------------------------------------------------------------------------
+# Factory — select client based on CC_INPUT_BACKEND env var
+# ---------------------------------------------------------------------------
+
+
+def _build_cc_client(
+    settings: Settings | None = None,
+) -> CommonCrawlBigQueryClient | LocalCommonCrawlClient:
+    """Return the correct CC client based on ``CC_INPUT_BACKEND``."""
+    _settings = settings or get_settings()
+    if _settings.cc_input_backend.lower() == "local":
+        return LocalCommonCrawlClient(settings=_settings)
+    return CommonCrawlBigQueryClient(
+        settings=CommonCrawlIngestionSettings.from_app_settings(_settings)
+    )
+
+
 class CommonCrawlIngestionService:
     def __init__(
         self,
         *,
-        bq_client: CommonCrawlBigQueryClient | None = None,
+        bq_client: "CommonCrawlBigQueryClient | LocalCommonCrawlClient | None" = None,
         snapshot_dir: Path = DEFAULT_CC_SNAPSHOT_DIR,
         snapshot_store: SnapshotStore | None = None,
         snapshot_prefix: str = DEFAULT_CC_SNAPSHOT_PREFIX,
         source_name: str = DEFAULT_CC_SOURCE_NAME,
     ) -> None:
-        self.bq_client = bq_client or CommonCrawlBigQueryClient()
+        self.bq_client = bq_client or _build_cc_client()
         self.snapshot_dir = snapshot_dir
         self.snapshot_prefix = snapshot_prefix
 

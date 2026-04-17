@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     raw_snapshot_r2_region: str = "auto"
     phishtank_api_key: str | None = None
     phishtank_user_agent: str = "phishtank/sicurre-research"
+    cc_input_backend: str = Field(
+        default="prod",
+        validation_alias="CC_INPUT_BACKEND",
+    )
 
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),

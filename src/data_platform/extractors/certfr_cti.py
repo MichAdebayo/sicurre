@@ -182,6 +182,7 @@ class CertFRCtiExtractor:
         source_name: str = DEFAULT_SOURCE_NAME,
         timeout_seconds: float = 30.0,
         delay_between_requests: float = 2.0,
+        max_discovery_pages: int | None = 3,
     ) -> None:
         self.feed_url = feed_url
         self.pdf_base_url = pdf_base_url.rstrip("/")
@@ -192,6 +193,7 @@ class CertFRCtiExtractor:
         self.source_name = source_name
         self.timeout_seconds = timeout_seconds
         self.delay_between_requests = delay_between_requests
+        self.max_discovery_pages = max_discovery_pages
 
         local_root = (
             snapshot_dir.parent
@@ -379,22 +381,19 @@ class CertFRCtiExtractor:
     async def _discover_entries(
         self, fetch_historical: bool = False
     ) -> list[dict[str, Any]]:
-        """Fetch the CTI RSS feed and parse entries, or scrape historical pages."""
-        if fetch_historical:
-            return await self._discover_historical_entries()
+        """Discover CTI entries via the paginated advisory index.
 
+        Uses ``_discover_historical_entries`` for all modes.
+        - Cron (``fetch_historical=False``): caps at ``self.max_discovery_pages``
+          (default 3) to limit network calls.
+        - Full backfill (``fetch_historical=True``): unlimited pages.
+        """
         if self._fetch_feed is not None:
+            # Test injection: use the injected feed callable directly.
             return await self._fetch_feed()
 
-        async with httpx.AsyncClient(
-            timeout=self.timeout_seconds,
-        ) as client:
-            response = await client.get(self.feed_url)
-            response.raise_for_status()
-            return await asyncio.to_thread(
-                self._parse_feed,
-                response.content,
-            )
+        max_pages = None if fetch_historical else self.max_discovery_pages
+        return await self._discover_historical_entries(max_pages=max_pages)
 
     @staticmethod
     def _parse_feed(payload: bytes) -> list[dict[str, Any]]:
@@ -433,8 +432,17 @@ class CertFRCtiExtractor:
                 return match.group(1).upper()
         return None
 
-    async def _discover_historical_entries(self) -> list[dict[str, Any]]:
-        """Crawl the paginated /cti/ and /ioc/ indexes to find all historical reports."""
+    async def _discover_historical_entries(
+        self,
+        max_pages: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Crawl the paginated /cti/ and /ioc/ indexes to find reports.
+
+        Args:
+            max_pages: Maximum pages to crawl per base URL.  ``None`` means
+                unlimited (full backfill).  Default ``None`` (set by caller
+                via ``max_discovery_pages``).
+        """
         from bs4 import BeautifulSoup
         from urllib.parse import urljoin
 
@@ -500,6 +508,8 @@ class CertFRCtiExtractor:
                         break
 
                     page += 1
+                    if max_pages is not None and page > max_pages:
+                        break
                     if self.delay_between_requests > 0:
                         await asyncio.sleep(self.delay_between_requests)
 

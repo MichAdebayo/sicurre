@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from core.config import ROOT_DIR
@@ -141,6 +141,17 @@ class LegacyDbIngestionService:
             domain="data_platform",
         )
 
+    async def _existing_record_keys(self, session: AsyncSession) -> set[str]:
+        stmt = (
+            select(DataRawRecord.record_key)
+            .join(DataRawObject)
+            .join(DataIngestionRun)
+            .join(DataSourceSystem)
+            .where(DataSourceSystem.name == self.source_name)
+        )
+        rows = await session.scalars(stmt)
+        return set(rows)
+
     async def run(
         self,
         session: AsyncSession,
@@ -194,12 +205,36 @@ class LegacyDbIngestionService:
                 await session.commit()
                 return self._empty_result(ingestion_run, source_system)
 
-            new_entries = entries  # Since we do full snapshot extractions
-            skipped_count = 0
+            existing_keys = await self._existing_record_keys(session)
+            new_entries = [
+                e for e in entries if self._entry_key(e) not in existing_keys
+            ]
+            skipped_count = len(entries) - len(new_entries)
+
+            if not new_entries:
+                ingestion_run.finished_at = datetime.now(timezone.utc)
+                ingestion_run.status = IngestionStatus.COMPLETED
+                ingestion_run.log_message = (
+                    f"No new entries — all {skipped_count} already ingested"
+                )
+                self.trace.trace(
+                    stage="orchestration",
+                    status="success",
+                    message="Historical DB run complete — nothing new to ingest",
+                    metrics={"skipped": skipped_count},
+                )
+                await session.commit()
+                return self._empty_result(
+                    ingestion_run,
+                    source_system,
+                    skipped_count=skipped_count,
+                    total_extracted_count=total_extracted_count,
+                )
+
             self.trace.trace(
                 stage="ingestion",
                 status="start",
-                message=f"Writing {len(new_entries)} entries to Sicurre DB",
+                message=f"Writing {len(new_entries)} entries to Sicurre DB ({skipped_count} skipped)",
             )
 
             # Write trace to Snapshot Store
@@ -257,6 +292,7 @@ class LegacyDbIngestionService:
                 message=f"Historical DB ingestion completed: {len(raw_records)} records",
                 metrics={
                     "new_records": len(raw_records),
+                    "skipped": skipped_count,
                     "total_extracted": total_extracted_count,
                 },
             )
