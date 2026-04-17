@@ -148,3 +148,42 @@ def test_stage_two_rewrite_jobs_assigns_common_crawl_phishing_mode_and_hints() -
         in job["prompt_hints"]
     )
     assert "shape the output as a realistic phishing email" in job["prompt_hints"]
+
+
+def test_stage_two_rewrite_jobs_canonicalize_database_child_sources() -> None:
+    jobs = StageTwoRewriteJobService.build_jobs(
+        {
+            "sources": [
+                {
+                    "source_name": "database/faker/synthetic_phishing_medium",
+                    "rules": [
+                        {
+                            "key": "historical_repair_needed",
+                            "adaptation_fit": "medium",
+                            "rationale": "repair before rewrite",
+                            "label_summary": {"phishing": 1},
+                            "sampled_records": [
+                                {
+                                    "raw_record_id": "db-1",
+                                    "extracted_label": "phishing",
+                                    "normalized_preview": "Votre compte nécessite une confirmation immédiate.",
+                                    "normalized_length": 110,
+                                    "similarity_score": 0.4,
+                                    "trace_summary": "trace",
+                                    "derived_payload": {},
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+
+    job = jobs["jobs"][0]
+    assert job["rewrite_mode"] == "repair_then_rewrite"
+    assert (
+        "repair encoding and formatting corruption before rewriting"
+        in job["constraints"]
+    )
+    assert "repair mojibake and strip residual HTML" in job["prompt_hints"]

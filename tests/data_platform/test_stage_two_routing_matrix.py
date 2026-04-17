@@ -136,3 +136,33 @@ def test_stage_two_routing_matrix_renders_markdown() -> None:
     assert "# Stage-Two Routing Matrix" in markdown
     assert "common-crawl-bigdata" in markdown
     assert "transactional_legitimate" in markdown
+
+
+def test_stage_two_routing_matrix_canonicalizes_database_child_sources() -> None:
+    matrix = StageTwoRoutingMatrixService.build_matrix(
+        [
+            {
+                "source_name": "database/faker/synthetic_phishing_medium",
+                "result": {
+                    "parent_sources": {
+                        "sql": [
+                            {
+                                "route_summary": {"specialized_processing": 1},
+                                "subtype_summary": {},
+                                "rejection_summary": {
+                                    "historical_repair_needed": 1,
+                                },
+                            }
+                        ]
+                    }
+                },
+            }
+        ]
+    )
+
+    sources = {source["source_name"]: source for source in matrix["sources"]}
+    assert "database-historical" in sources
+    historical_rows = {
+        row["key"]: row for row in sources["database-historical"]["rows"]
+    }
+    assert historical_rows["historical_repair_needed"]["current_count"] == 1

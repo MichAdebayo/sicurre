@@ -14,10 +14,12 @@ from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
 from core.database import Base
+from db.models import DataRawObject, DataRawRecord, DataSourceSystem
 from data_platform.extractors.legacy_db import (
     LegacyDbConnector,
     LegacyDbIngestionService,
@@ -193,6 +195,62 @@ async def test_legacy_db_trace_id_updated_after_run_created(
     assert real_id != "run-pending"
     for t in traces[1:]:
         assert t["trace_id"] == real_id
+
+
+@pytest.mark.asyncio
+async def test_legacy_db_assigns_child_source_systems_and_snapshot_counts(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    service = _make_service(
+        [
+            {
+                **_SAMPLE_ENTRIES[0],
+                "message_id": "msg-child-1",
+                "source_dataset": "synthetic_phishing_medium",
+            },
+            {
+                **_SAMPLE_ENTRIES[1],
+                "message_id": "msg-child-2",
+                "source_dataset": "adapted_en_fr",
+            },
+        ]
+    )
+
+    async with session_factory() as session:
+        await service.run(session)
+
+        source_systems = {
+            source.name: source
+            for source in (await session.scalars(select(DataSourceSystem))).all()
+        }
+        raw_object = await session.scalar(select(DataRawObject))
+        raw_records = list((await session.scalars(select(DataRawRecord))).all())
+
+    assert raw_object is not None
+    assert raw_object.source_metadata["child_source_counts"] == {
+        "database/adapted/adapted_en_fr": 1,
+        "database/faker/synthetic_phishing_medium": 1,
+    }
+    assert "database-historical" in source_systems
+    assert "database/adapted/adapted_en_fr" in source_systems
+    assert "database/faker/synthetic_phishing_medium" in source_systems
+
+    source_names_by_id = {source.id: source.name for source in source_systems.values()}
+    raw_sources = {
+        record.record_key: source_names_by_id[record.source_system_id]
+        for record in raw_records
+    }
+    raw_contents = {
+        record.record_key: json.loads(record.raw_content) for record in raw_records
+    }
+
+    assert raw_sources["msg-child-1"] == "database/faker/synthetic_phishing_medium"
+    assert raw_sources["msg-child-2"] == "database/adapted/adapted_en_fr"
+    assert (
+        raw_contents["msg-child-1"]["source"]
+        == "database/faker/synthetic_phishing_medium"
+    )
+    assert raw_contents["msg-child-2"]["source"] == "database/adapted/adapted_en_fr"
 
 
 @pytest.mark.asyncio

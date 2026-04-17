@@ -25,3 +25,21 @@ def test_historical_stage_two_routes_thin_spam_to_specialized_processing() -> No
     assert result.route_reason == "historical_content_too_thin"
     assert result.derived_payload is not None
     assert result.derived_payload["quality_gate_passed"] is False
+
+
+def test_historical_stage_two_preserves_database_path_provenance() -> None:
+    raw_content = {"source": "database/faker/synthetic_phishing_medium", "label": 0}
+
+    assert HistoricalStageTwoService.map_label(raw_content) is NormalizedLabel.PHISHING
+
+    result = HistoricalStageTwoService.review(
+        "Bonjour, veuillez confirmer votre compte immédiatement.",
+        raw_content,
+    )
+
+    assert result.derived_payload is not None
+    assert result.derived_payload["historical_source_path"] == (
+        "database/faker/synthetic_phishing_medium"
+    )
+    assert result.derived_payload["historical_source_family"] == "faker"
+    assert result.derived_payload["historical_subsource"] == "synthetic_phishing_medium"

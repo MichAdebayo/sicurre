@@ -20,6 +20,20 @@ def test_source_policy_marks_enron_as_adaptation_only() -> None:
     assert policy.reason == "english_adaptation_source"
 
 
+def test_database_historical_filter_includes_database_child_sources() -> None:
+    sources = {
+        "parent": "database-historical",
+        "faker": "database/faker/synthetic_phishing_medium",
+        "adapted": "database/adapted/adapted_en_fr",
+        "other": "common-crawl-bigdata",
+    }
+
+    assert NormalizationPipeline._resolve_target_source_ids(
+        sources,
+        "database-historical",
+    ) == {"parent", "faker", "adapted"}
+
+
 def test_extract_payload_maps_sap_labs_registered_source_name() -> None:
     pipeline = NormalizationPipeline(session=None)  # type: ignore[arg-type]
 
@@ -357,6 +371,24 @@ def test_database_historical_maps_subsource_labels() -> None:
 
     assert phishing_payload.label is NormalizedLabel.PHISHING
     assert spam_payload.label is NormalizedLabel.SPAM
+
+
+def test_database_child_source_path_uses_historical_policy() -> None:
+    pipeline = NormalizationPipeline(session=None)  # type: ignore[arg-type]
+
+    payload = pipeline.extract_payload(
+        "database/faker/synthetic_phishing_medium",
+        {
+            "source": "database/faker/synthetic_phishing_medium",
+            "subject": "Votre compte a ete bloque",
+            "body": "Bonjour, veuillez confirmer votre compte immediatement.",
+            "label": 0,
+        },
+    )
+
+    assert payload.label is NormalizedLabel.PHISHING
+    assert payload.route_outcome == "accepted"
+    assert "historical_subsource:synthetic_phishing_medium" in payload.trace_steps
 
 
 def test_database_historical_routes_corrupted_text_to_specialized_processing() -> None:

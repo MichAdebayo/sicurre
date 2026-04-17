@@ -127,6 +127,17 @@ _SAMPLE_ENTRIES = [
     },
 ]
 
+_LOCAL_BACKEND_KEYS_SAME_CONTENT = [
+    {
+        **_SAMPLE_ENTRIES[0],
+        "record_key": "local-sha-111",
+    },
+    {
+        **_SAMPLE_ENTRIES[1],
+        "record_key": "local-sha-222",
+    },
+]
+
 
 def _make_bq_client(entries: list[dict[str, Any]]) -> CommonCrawlBigQueryClient:
     client = CommonCrawlBigQueryClient.__new__(CommonCrawlBigQueryClient)
@@ -272,6 +283,34 @@ async def test_common_crawl_trace_zero_delta_skipped(
     stages = [(t["stage"], t["status"]) for t in traces]
     assert ("ingestion", "skipped") in stages
     assert ("orchestration", "success") in stages
+
+
+@pytest.mark.asyncio
+async def test_common_crawl_trace_zero_delta_skipped_when_backend_keys_change(
+    session_factory: async_sessionmaker[AsyncSession],
+    capsys,
+) -> None:
+    """Dedup stays stable when the backend changes record_key but content_hash matches."""
+    first_service = CommonCrawlIngestionService(
+        bq_client=_make_bq_client(_SAMPLE_ENTRIES),
+        snapshot_store=_RecordingStore(),
+    )
+    second_service = CommonCrawlIngestionService(
+        bq_client=_make_bq_client(_LOCAL_BACKEND_KEYS_SAME_CONTENT),
+        snapshot_store=_RecordingStore(),
+    )
+
+    async with session_factory() as session:
+        await first_service.run(session)
+        capsys.readouterr()
+
+        result = await second_service.run(session)
+
+    traces = parse_traces(capsys.readouterr().out)
+    stages = [(t["stage"], t["status"]) for t in traces]
+    assert result.raw_record_count == 0
+    assert result.skipped_count == 2
+    assert ("ingestion", "skipped") in stages
 
 
 @pytest.mark.asyncio
