@@ -79,6 +79,7 @@ data/models/**/*.safetensors
 !data/README.md
 !data/**/.gitkeep
 data/raw/
+data/raw/cron/
 
 # Private-by-default documentation (internal only)
 docs/ops/
