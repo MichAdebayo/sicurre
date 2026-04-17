@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from core.config import ROOT_DIR
 from core.trace_logger import SemanticTraceLogger
+from data_platform.services.database_source_naming import build_database_source_path
 from db.models import (
     DataIngestionRun,
     DataRawObject,
@@ -141,6 +142,10 @@ class LegacyDbIngestionService:
             domain="data_platform",
         )
 
+    @staticmethod
+    def _resolved_child_source_name(entry: dict[str, Any]) -> str:
+        return build_database_source_path(str(entry.get("source_dataset") or ""))
+
     async def _existing_record_keys(self, session: AsyncSession) -> set[str]:
         stmt = (
             select(DataRawRecord.record_key)
@@ -265,15 +270,22 @@ class LegacyDbIngestionService:
                 source_system=source_system,
                 snapshot_result=snapshot_result,
                 collected_at=run_started_at,
-                entry_count=len(new_entries),
+                entries=new_entries,
             )
             session.add(raw_object)
             await session.flush()
 
+            source_systems_by_name = await self._get_or_create_child_source_systems(
+                session,
+                source_names={
+                    self._resolved_child_source_name(entry) for entry in new_entries
+                },
+            )
+
             raw_records = self._build_raw_records(
                 raw_object=raw_object,
                 entries=new_entries,
-                source_system=source_system,
+                source_systems_by_name=source_systems_by_name,
             )
             session.add_all(raw_records)
 
@@ -378,6 +390,36 @@ class LegacyDbIngestionService:
             ),
         )
 
+    async def _get_or_create_child_source_systems(
+        self,
+        session: AsyncSession,
+        *,
+        source_names: set[str],
+    ) -> dict[str, DataSourceSystem]:
+        source_systems: dict[str, DataSourceSystem] = {}
+        for source_name in sorted(source_names):
+            source_system = await self.source_repository.get_by_name(
+                session, source_name
+            )
+            if source_system is None:
+                source_system = await self.source_service.create(
+                    session,
+                    DataSourceCreate(
+                        name=source_name,
+                        source_type=SourceType.SQL,
+                        description=(
+                            "Historical extraction child source derived from the external "
+                            "database source_dataset lineage"
+                        ),
+                        owner_name="Internal SecOps DB",
+                        legal_basis="historical_threat_intel",
+                        contains_personal_data=False,
+                        retention_days=365,
+                    ),
+                )
+            source_systems[source_name] = source_system
+        return source_systems
+
     async def _write_snapshot(
         self,
         *,
@@ -410,8 +452,18 @@ class LegacyDbIngestionService:
         source_system: DataSourceSystem,
         snapshot_result: SnapshotWriteResult,
         collected_at: datetime,
-        entry_count: int,
+        entries: list[dict[str, Any]],
     ) -> DataRawObject:
+        child_source_counts = {
+            source_name: sum(
+                1
+                for entry in entries
+                if self._resolved_child_source_name(entry) == source_name
+            )
+            for source_name in sorted(
+                {self._resolved_child_source_name(entry) for entry in entries}
+            )
+        }
         return DataRawObject(
             ingestion_run_id=ingestion_run.id,
             external_ref=f"sqlite://external_threats.db#run:{ingestion_run.id}",
@@ -422,7 +474,8 @@ class LegacyDbIngestionService:
             size_bytes=snapshot_result.size_bytes,
             source_metadata={
                 "source_name": source_system.name,
-                "entry_count": entry_count,
+                "entry_count": len(entries),
+                "child_source_counts": child_source_counts,
             },
             collected_at=collected_at,
         )
@@ -432,13 +485,15 @@ class LegacyDbIngestionService:
         *,
         raw_object: DataRawObject,
         entries: list[dict[str, Any]],
-        source_system: DataSourceSystem,
+        source_systems_by_name: dict[str, DataSourceSystem],
     ) -> list[DataRawRecord]:
         extracted_at = datetime.now(timezone.utc)
         raw_records: list[DataRawRecord] = []
 
         for index, entry in enumerate(entries, start=1):
             record_key = self._entry_key(entry)
+            child_source_name = self._resolved_child_source_name(entry)
+            child_source_system = source_systems_by_name[child_source_name]
 
             # Map external schema to sicurre standard raw text
             subject = entry.get("subject", "")
@@ -453,7 +508,7 @@ class LegacyDbIngestionService:
                 "text": full_text,
                 "label": label,
                 "confidence": entry.get("confidence"),
-                "source": entry.get("source_dataset"),
+                "source": child_source_name,
                 "archetype": entry.get("archetype"),
                 "signals": entry.get("signals"),
             }
@@ -469,7 +524,7 @@ class LegacyDbIngestionService:
             raw_records.append(
                 DataRawRecord(
                     raw_object_id=raw_object.id,
-                    source_system_id=source_system.id,
+                    source_system_id=child_source_system.id,
                     record_key=record_key,
                     raw_content=raw_content,
                     detected_language="fr",

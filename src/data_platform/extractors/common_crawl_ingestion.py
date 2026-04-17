@@ -531,18 +531,38 @@ class CommonCrawlIngestionService:
         session: AsyncSession,
     ) -> set[str]:
         stmt = (
-            select(DataRawRecord.record_key)
+            select(DataRawRecord.record_key, DataRawRecord.raw_content)
             .join(DataRawObject)
             .join(DataIngestionRun)
             .join(DataSourceSystem)
             .where(DataSourceSystem.name == self.source_name)
         )
-        rows = await session.scalars(stmt)
-        return set(rows)
+        rows = await session.execute(stmt)
+        existing_keys: set[str] = set()
+
+        for record_key, raw_content in rows:
+            if record_key:
+                existing_keys.add(str(record_key).strip())
+
+            if not raw_content:
+                continue
+
+            try:
+                payload = json.loads(raw_content)
+            except (TypeError, json.JSONDecodeError):
+                continue
+
+            if content_hash := str(payload.get("content_hash") or "").strip():
+                existing_keys.add(content_hash)
+
+        return existing_keys
 
     @staticmethod
     def _entry_key(entry: dict[str, Any]) -> str:
-        # We rely on BigQuery FARM_FINGERPRINT
+        content_hash = str(entry.get("content_hash") or "").strip()
+        if content_hash:
+            return content_hash
+
         return str(entry.get("record_key", "")).strip()
 
     async def _get_or_create_source_system(

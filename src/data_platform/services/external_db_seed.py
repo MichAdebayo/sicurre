@@ -24,6 +24,7 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from core.config import ROOT_DIR
 from data_platform.services.adaptation import FrenchCulturalAdaptationService
+from data_platform.services.database_source_naming import build_database_source_path
 from data_platform.services.synthetic_generation import SyntheticGenerationService
 
 
@@ -126,6 +127,10 @@ def generate_synthetic_emails(seed: int = SEED) -> pd.DataFrame:
     dataframe = service.generate_class("phishing", SYNTHETIC_PHISHING_COUNT)
     logger.info("Synthetic emails: %d generated", len(dataframe))
     return dataframe
+
+
+def _resolved_source_dataset(source_value: object) -> str:
+    return build_database_source_path(str(source_value or ""))
 
 
 def parse_crowdsourced_spam() -> pd.DataFrame:
@@ -333,7 +338,7 @@ def seed_external_database(seed: int = SEED) -> None:
                     random.choice(phishing_signals) if is_phishing else []
                 ),
                 archetype=str(row.get("archetype", "")),
-                source_dataset=str(row.get("source", "")),
+                source_dataset=_resolved_source_dataset(row.get("source", "")),
                 model_version=random.choice(model_tags),
                 action_taken=action_taken,
                 action_at=action_at,
@@ -497,7 +502,7 @@ def append_to_database(
                     confidence=confidence,
                     signals=json.dumps(rng.choice(phishing_signals)),
                     archetype=str(row.get("archetype", "")),
-                    source_dataset="synthetic_append",
+                    source_dataset=_resolved_source_dataset(row.get("source", "")),
                     model_version=rng.choice(model_tags),
                     action_taken=action_taken,
                     action_at=action_at,

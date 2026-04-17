@@ -5,6 +5,8 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Literal
 
+from data_platform.services.database_source_naming import canonical_database_source
+
 RoutingAction = Literal[
     "promote",
     "adapt",
@@ -288,7 +290,9 @@ class StageTwoRoutingMatrixService:
         summaries: dict[str, dict[str, Counter[str]]] = {}
 
         for payload in review_payloads:
-            source_name = str(payload.get("source_name") or "unknown")
+            source_name = canonical_database_source(
+                str(payload.get("source_name") or "unknown")
+            )
             source_entry = summaries.setdefault(
                 source_name,
                 {

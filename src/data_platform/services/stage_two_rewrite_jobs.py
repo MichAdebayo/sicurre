@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from data_platform.services.database_source_naming import canonical_database_source
+
 
 class StageTwoRewriteJobService:
     @classmethod
@@ -121,6 +123,7 @@ class StageTwoRewriteJobService:
     def _build_constraints(
         *, source_name: str, rule_key: str, target_label: str
     ) -> list[str]:
+        resolved_source_name = canonical_database_source(source_name)
         constraints = [
             "keep the text in French",
             "preserve the original intent and tone",
@@ -137,7 +140,7 @@ class StageTwoRewriteJobService:
                 constraints.append(
                     "preserve deceptive urgency without adding IOCs verbatim"
                 )
-        if source_name == "database-historical":
+        if resolved_source_name == "database-historical":
             constraints.append(
                 "repair encoding and formatting corruption before rewriting"
             )
@@ -160,11 +163,12 @@ class StageTwoRewriteJobService:
     def _build_prompt_hints(
         *, source_name: str, rule_key: str, sample: dict[str, Any]
     ) -> list[str]:
+        resolved_source_name = canonical_database_source(source_name)
         hints: list[str] = []
         derived_payload = sample.get("derived_payload") or {}
         marker_evidence = derived_payload.get("marker_evidence") or {}
 
-        match source_name:
+        match resolved_source_name:
             case "common-crawl-bigdata":
                 if int(marker_evidence.get("delivery_hits", 0)) > 0:
                     hints.append("retain service-notification delivery wording")

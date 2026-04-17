@@ -14,6 +14,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from data_platform.cleaning.normalization import TextNormalizationService
+from data_platform.services.database_source_naming import (
+    DATABASE_PARENT_SOURCE,
+    canonical_database_source,
+)
 from data_platform.services.certfr_stage_two import CertFRStageTwoService
 from data_platform.services.common_crawl_content import CommonCrawlContentService
 from data_platform.services.common_crawl_stage_two import CommonCrawlStageTwoService
@@ -220,7 +224,24 @@ class NormalizationPipeline:
 
     @classmethod
     def get_source_policy(cls, source_name: str) -> SourceNormalizationPolicy | None:
-        return cls.SOURCE_POLICIES.get(source_name)
+        return cls.SOURCE_POLICIES.get(canonical_database_source(source_name))
+
+    @staticmethod
+    def _resolve_target_source_ids(
+        sources: dict[str, str],
+        source_system_name: str,
+    ) -> set[str]:
+        if source_system_name == DATABASE_PARENT_SOURCE:
+            return {
+                source_id
+                for source_id, source_name in sources.items()
+                if canonical_database_source(source_name) == DATABASE_PARENT_SOURCE
+            }
+        return {
+            source_id
+            for source_id, source_name in sources.items()
+            if source_name == source_system_name
+        }
 
     @classmethod
     def get_normalizable_source_names(cls) -> set[str]:
@@ -264,7 +285,7 @@ class NormalizationPipeline:
 
     @classmethod
     def _extract_review_text(cls, source_name: str, raw_content: dict[str, Any]) -> str:
-        match source_name:
+        match canonical_database_source(source_name):
             case "sap-labs-blog" | "database-historical":
                 review_text = cls._join_subject_and_body(raw_content)
             case "common-crawl-bigdata" | "cert-fr-cti":
@@ -384,8 +405,12 @@ class NormalizationPipeline:
         total_sampled = 0
 
         for source in source_systems:
-            if source_system_name and source.name != source_system_name:
-                continue
+            if source_system_name:
+                if source_system_name == DATABASE_PARENT_SOURCE:
+                    if canonical_database_source(source.name) != DATABASE_PARENT_SOURCE:
+                        continue
+                elif source.name != source_system_name:
+                    continue
             if source_type and source.source_type != source_type:
                 continue
 
@@ -575,7 +600,7 @@ class NormalizationPipeline:
         source_name: str,
         raw_content: dict[str, Any],
     ) -> tuple[str | None, bool, RedactionStatus, str | None]:
-        match source_name:
+        match canonical_database_source(source_name):
             case "sap-labs-blog":
                 candidate_text = self._join_subject_and_body(raw_content)
             case "common-crawl-bigdata":
@@ -625,6 +650,7 @@ class NormalizationPipeline:
     def extract_payload(
         self, source_name: str, raw_content: dict[str, Any]
     ) -> ExtractedPayload:
+        resolved_source_name = canonical_database_source(source_name)
         policy = self.get_source_policy(source_name)
         if policy is None or not policy.normalize_messages:
             return ExtractedPayload(
@@ -646,7 +672,7 @@ class NormalizationPipeline:
         )
 
         label: NormalizedLabel | None
-        match source_name:
+        match resolved_source_name:
             case "sap-labs-blog":
                 raw_label = str(raw_content.get("label", "")).lower()
                 match raw_label:
@@ -694,7 +720,7 @@ class NormalizationPipeline:
         route_trace: tuple[str, ...]
         derived_payload: dict[str, Any] | None = None
         extracted_text = cleaned_text
-        match source_name:
+        match resolved_source_name:
             case "common-crawl-bigdata":
                 stage_two_result = self.common_crawl_stage_two.review(
                     cleaned_text,
@@ -741,7 +767,7 @@ class NormalizationPipeline:
                 route_subtype = None
                 route_trace = trace_steps
 
-        if source_name in {
+        if resolved_source_name in {
             "common-crawl-bigdata",
             "cert-fr-cti",
             "database-historical",
@@ -776,15 +802,18 @@ class NormalizationPipeline:
         sources = {s.id: s.name for s in sources_result.scalars().all()}
 
         target_source_id = None
+        target_source_ids: set[str] | None = None
         target_source_policy: SourceNormalizationPolicy | None = None
         if source_system_name:
-            for sid, sname in sources.items():
-                if sname == source_system_name:
-                    target_source_id = sid
-                    target_source_policy = self.get_source_policy(sname)
-                    break
+            target_source_ids = self._resolve_target_source_ids(
+                sources,
+                source_system_name,
+            )
+            if target_source_ids:
+                target_source_id = next(iter(target_source_ids))
+                target_source_policy = self.get_source_policy(source_system_name)
 
-            if not target_source_id:
+            if not target_source_ids:
                 logger.error(f"Source system {source_system_name} not found.")
                 return {
                     "status": "error",
@@ -806,11 +835,13 @@ class NormalizationPipeline:
                     ),
                 }
 
-        normalizable_source_names = self.get_normalizable_source_names()
         normalizable_source_ids = {
             source_id
             for source_id, source_name in sources.items()
-            if source_name in normalizable_source_names
+            if (
+                (policy := self.get_source_policy(source_name)) is not None
+                and policy.normalize_messages
+            )
         }
 
         # 2. Find Raw Records that have NOT been normalized AND are natively French
@@ -824,8 +855,8 @@ class NormalizationPipeline:
             )
             .limit(batch_size)
         )
-        if target_source_id:
-            query = query.where(DataRawRecord.source_system_id == target_source_id)
+        if target_source_ids:
+            query = query.where(DataRawRecord.source_system_id.in_(target_source_ids))
 
         result = await self.session.execute(query)
         records = result.scalars().all()

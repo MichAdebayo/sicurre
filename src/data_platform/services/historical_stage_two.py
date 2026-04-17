@@ -4,6 +4,10 @@ import re
 from typing import Any
 
 from db.models.lineage import NormalizedLabel
+from data_platform.services.database_source_naming import (
+    database_source_family,
+    database_source_leaf,
+)
 from data_platform.services.stage_two_models import StageTwoReviewResult
 
 
@@ -74,8 +78,12 @@ class HistoricalStageTwoService:
         return len([marker for marker in markers if marker in lowered_text])
 
     @staticmethod
-    def get_subsource(raw_content: dict[str, Any]) -> str:
+    def get_source_path(raw_content: dict[str, Any]) -> str:
         return str(raw_content.get("source", "")).strip().lower()
+
+    @classmethod
+    def get_subsource(cls, raw_content: dict[str, Any]) -> str:
+        return database_source_leaf(cls.get_source_path(raw_content))
 
     @classmethod
     def map_label(cls, raw_content: dict[str, Any]) -> NormalizedLabel | None:
@@ -114,6 +122,10 @@ class HistoricalStageTwoService:
             route_trace=route_trace,
             derived_payload={
                 "derived_type": "historical_stage_two_candidate",
+                "historical_source_path": cls.get_source_path(raw_content) or None,
+                "historical_source_family": database_source_family(
+                    cls.get_source_path(raw_content)
+                ),
                 "historical_subsource": cls.get_subsource(raw_content) or None,
                 "quality_gate_passed": route_outcome == "accepted",
                 "route_reason": route_reason,

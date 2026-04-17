@@ -15,7 +15,7 @@ SRC_ROOT = ROOT_DIR / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-load_dotenv(ROOT_DIR / ".env")
+load_dotenv(ROOT_DIR / ".env", override=True)
 
 from core.config import get_settings  # noqa: E402
 from core.database import Base  # noqa: E402
