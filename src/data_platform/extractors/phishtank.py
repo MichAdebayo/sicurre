@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import csv
+import io
 import json
 import logging
 import re
@@ -49,11 +50,22 @@ DEFAULT_PHISHTANK_FEED_URL = "https://data.phishtank.com/data/online-valid.csv"
 DEFAULT_PHISHTANK_SOURCE_NAME = "phishtank-online-valid"
 DEFAULT_PHISHTANK_SNAPSHOT_DIR = REPO_ROOT / "data" / "raw" / "api" / "phishtank"
 DEFAULT_PHISHTANK_SNAPSHOT_PREFIX = "phishtank"
+PHISHTANK_CSV_FIELDS: tuple[str, ...] = (
+    "phish_id",
+    "url",
+    "phish_detail_url",
+    "submission_time",
+    "verified",
+    "verification_time",
+    "online",
+    "target",
+)
 
 # Retry config for PhishTank 509 (rate limit) responses
 MAX_RETRIES = 3
 RETRY_BACKOFF_BASE_SECONDS = 30.0
 RETRY_STATUS_CODES: frozenset[int] = frozenset((429, 503, 509))
+REDIRECT_STATUS_CODES: frozenset[int] = frozenset((301, 302, 303, 307, 308))
 
 # ── French filtering (from notebook 05_phishtank_extraction) ─────────
 FR_TLD_PATTERN: re.Pattern[str] = re.compile(r"\.fr(/|$|:)", re.IGNORECASE)
@@ -115,6 +127,15 @@ class PhishTankIngestionResult:
     log_message: str
 
 
+@dataclass(slots=True)
+class PhishTankFetchedPayload:
+    entries: list[dict[str, Any]]
+    snapshot_bytes: bytes
+    content_type: str = "text/csv"
+    source_format: str = "csv"
+    source_url: str | None = None
+
+
 class PhishTankFeedClient:
     def __init__(
         self,
@@ -149,7 +170,7 @@ class PhishTankFeedClient:
             return f"{parts[0]}/{api_key}/{parts[1]}"
         return base_url
 
-    async def fetch_entries(self) -> list[dict[str, Any]]:
+    async def fetch_entries(self) -> PhishTankFetchedPayload:
         """Fetch feed with retry logic for rate-limit errors."""
         last_error: Exception | None = None
         settings = get_settings()
@@ -165,12 +186,12 @@ class PhishTankFeedClient:
                         headers={"User-Agent": settings.phishtank_user_agent},
                     )
 
-                    if response.status_code in RETRY_STATUS_CODES:
+                    if self._should_retry_response(response):
                         wait = self.retry_backoff_seconds * (2**attempt)
+                        retry_reason = self._retry_reason(response)
                         logger.warning(
-                            "PhishTank returned %d (attempt %d/%d), "
-                            "retrying in %.0fs",
-                            response.status_code,
+                            "PhishTank %s (attempt %d/%d), " "retrying in %.0fs",
+                            retry_reason,
                             attempt + 1,
                             self.max_retries + 1,
                             wait,
@@ -184,19 +205,25 @@ class PhishTankFeedClient:
                     # Parse CSV payload
                     text = response.text
                     reader = csv.DictReader(text.splitlines())
-                    return [
-                        {
-                            "phish_id": row.get("phish_id", ""),
-                            "url": row.get("url", ""),
-                            "phish_detail_url": row.get("phish_detail_url", ""),
-                            "submission_time": row.get("submission_time", ""),
-                            "verified": row.get("verified", ""),
-                            "verification_time": row.get("verification_time", ""),
-                            "online": row.get("online", ""),
-                            "target": row.get("target", ""),
-                        }
-                        for row in reader
-                    ]
+                    return PhishTankFetchedPayload(
+                        entries=[
+                            {
+                                "phish_id": row.get("phish_id", ""),
+                                "url": row.get("url", ""),
+                                "phish_detail_url": row.get("phish_detail_url", ""),
+                                "submission_time": row.get("submission_time", ""),
+                                "verified": row.get("verified", ""),
+                                "verification_time": row.get("verification_time", ""),
+                                "online": row.get("online", ""),
+                                "target": row.get("target", ""),
+                            }
+                            for row in reader
+                        ],
+                        snapshot_bytes=response.content,
+                        content_type=response.headers.get("content-type", "text/csv"),
+                        source_format="csv",
+                        source_url=str(response.url),
+                    )
 
             except httpx.RequestError as exc:
                 last_error = exc
@@ -215,16 +242,42 @@ class PhishTankFeedClient:
 
         raise last_error or RuntimeError("PhishTank fetch failed after retries")
 
+    def _should_retry_response(self, response: httpx.Response) -> bool:
+        if response.status_code in RETRY_STATUS_CODES:
+            return True
+        return self._is_transient_cdn_404(response)
+
+    @staticmethod
+    def _is_transient_cdn_404(response: httpx.Response) -> bool:
+        return (
+            response.status_code == 404
+            and response.url.host == "cdn.phishtank.com"
+            and any(
+                history_item.status_code in REDIRECT_STATUS_CODES
+                and history_item.url.host == "data.phishtank.com"
+                for history_item in response.history
+            )
+        )
+
+    @staticmethod
+    def _retry_reason(response: httpx.Response) -> str:
+        if PhishTankFeedClient._is_transient_cdn_404(response):
+            return "redirected to a CDN URL that returned 404"
+        return f"returned {response.status_code}"
+
 
 class PhishTankIngestionService:
     def __init__(
         self,
         *,
         feed_client: PhishTankFeedClient | None = None,
-        fetch_entries: Callable[[], Awaitable[list[dict[str, Any]]]] | None = None,
-        snapshot_dir: Path = DEFAULT_PHISHTANK_SNAPSHOT_DIR,
+        fetch_entries: (
+            Callable[[], Awaitable[PhishTankFetchedPayload | list[dict[str, Any]]]]
+            | None
+        ) = None,
+        snapshot_dir: Path | None = None,
         snapshot_store: SnapshotStore | None = None,
-        snapshot_prefix: str = DEFAULT_PHISHTANK_SNAPSHOT_PREFIX,
+        snapshot_prefix: str | None = None,
         source_name: str = DEFAULT_PHISHTANK_SOURCE_NAME,
     ) -> None:
         settings = get_settings()
@@ -235,12 +288,12 @@ class PhishTankIngestionService:
             api_key=api_key,
         )
         self.fetch_entries = fetch_entries or self.feed_client.fetch_entries
-        self.snapshot_dir = snapshot_dir
-        self.snapshot_prefix = snapshot_prefix
+        self.snapshot_dir = snapshot_dir or settings.phishtank_snapshot_local_dir
+        self.snapshot_prefix = snapshot_prefix or settings.phishtank_snapshot_prefix
         local_snapshot_root = (
-            snapshot_dir.parent
-            if snapshot_dir.name == snapshot_prefix
-            else snapshot_dir
+            self.snapshot_dir.parent
+            if self.snapshot_dir.name == self.snapshot_prefix
+            else self.snapshot_dir
         )
         self.snapshot_store = snapshot_store or build_snapshot_store(
             local_root_dir=local_snapshot_root,
@@ -291,7 +344,10 @@ class PhishTankIngestionService:
         )
 
         try:
-            all_entries = await self.fetch_entries()
+            fetched_payload = await self._coerce_fetched_payload(
+                await self.fetch_entries()
+            )
+            all_entries = fetched_payload.entries
             total_feed_count = len(all_entries)
 
             if not all_entries:
@@ -371,14 +427,18 @@ class PhishTankIngestionService:
             # ---- Step 3: Snapshot + DB write ----
             snapshot_result = await self._write_snapshot(
                 ingestion_run=ingestion_run,
-                entries=new_entries,
+                payload=fetched_payload,
             )
             raw_object = self._build_raw_object(
                 ingestion_run=ingestion_run,
                 source_system=source_system,
                 snapshot_result=snapshot_result,
                 collected_at=run_started_at,
-                entry_count=len(new_entries),
+                feed_entry_count=total_feed_count,
+                french_entry_count=len(entries),
+                new_entry_count=len(new_entries),
+                source_url=fetched_payload.source_url,
+                source_format=fetched_payload.source_format,
             )
             session.add(raw_object)
             await session.flush()
@@ -566,19 +626,16 @@ class PhishTankIngestionService:
         self,
         *,
         ingestion_run: DataIngestionRun,
-        entries: list[dict[str, Any]],
+        payload: PhishTankFetchedPayload,
     ) -> SnapshotWriteResult:
-        snapshot_bytes = json.dumps(
-            entries,
-            ensure_ascii=False,
-            indent=2,
-            sort_keys=True,
-        ).encode("utf-8")
-        object_key = self._build_snapshot_object_key(ingestion_run)
+        object_key = self._build_snapshot_object_key(
+            ingestion_run,
+            source_format=payload.source_format,
+        )
         return await self.snapshot_store.write_snapshot(
             object_key=object_key,
-            payload=snapshot_bytes,
-            content_type="application/json",
+            payload=payload.snapshot_bytes,
+            content_type=payload.content_type,
         )
 
     def _build_raw_object(
@@ -588,20 +645,30 @@ class PhishTankIngestionService:
         source_system: DataSourceSystem,
         snapshot_result: SnapshotWriteResult,
         collected_at: datetime,
-        entry_count: int,
+        feed_entry_count: int,
+        french_entry_count: int,
+        new_entry_count: int,
+        source_url: str | None,
+        source_format: str,
     ) -> DataRawObject:
         return DataRawObject(
             ingestion_run_id=ingestion_run.id,
-            external_ref=(f"{self.feed_client._base_feed_url}#run:{ingestion_run.id}"),
+            external_ref=(
+                source_url
+                or f"{self.feed_client._base_feed_url}#run:{ingestion_run.id}"
+            ),
             object_type=ObjectType.API_PAYLOAD,
             storage_uri=snapshot_result.storage_uri,
-            source_format="json",
+            source_format=source_format,
             content_hash=snapshot_result.content_hash,
             size_bytes=snapshot_result.size_bytes,
             source_metadata={
                 "feed_url": self.feed_client.feed_url,
+                "resolved_feed_url": source_url,
                 "source_name": source_system.name,
-                "entry_count": entry_count,
+                "feed_entry_count": feed_entry_count,
+                "french_entry_count": french_entry_count,
+                "new_entry_count": new_entry_count,
             },
             collected_at=collected_at,
         )
@@ -662,10 +729,44 @@ class PhishTankIngestionService:
     def _build_snapshot_object_key(
         self,
         ingestion_run: DataIngestionRun,
+        *,
+        source_format: str,
     ) -> str:
         date_str = ingestion_run.started_at.strftime("%Y%m%d")
-        filename = f"phishtank_{date_str}_{ingestion_run.id}.csv"
+        normalized_extension = source_format.strip(".").lower() or "csv"
+        filename = f"phishtank_{date_str}_{ingestion_run.id}.{normalized_extension}"
         return self.snapshot_store.build_object_key(
             source_prefix=self.snapshot_prefix,
             filename=filename,
         )
+
+    async def _coerce_fetched_payload(
+        self,
+        fetched: PhishTankFetchedPayload | list[dict[str, Any]],
+    ) -> PhishTankFetchedPayload:
+        if isinstance(fetched, PhishTankFetchedPayload):
+            return fetched
+        return PhishTankFetchedPayload(
+            entries=fetched,
+            snapshot_bytes=self._serialize_entries_as_csv_bytes(fetched),
+        )
+
+    @staticmethod
+    def _serialize_entries_as_csv_bytes(entries: list[dict[str, Any]]) -> bytes:
+        fieldnames = [
+            *PHISHTANK_CSV_FIELDS,
+            *sorted(
+                {
+                    key
+                    for entry in entries
+                    for key in entry
+                    if key not in PHISHTANK_CSV_FIELDS
+                }
+            ),
+        ]
+        buffer = io.StringIO(newline="")
+        writer = csv.DictWriter(buffer, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        for entry in entries:
+            writer.writerow({field: entry.get(field, "") for field in fieldnames})
+        return buffer.getvalue().encode("utf-8")

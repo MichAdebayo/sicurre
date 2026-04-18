@@ -18,7 +18,10 @@ if str(SRC_ROOT) not in sys.path:
 
 from core.config import get_settings  # noqa: E402
 from core.database import Base  # noqa: E402
-from data_platform.extractors.phishtank import PhishTankIngestionService  # noqa: E402
+from data_platform.extractors.phishtank import (  # noqa: E402
+    PhishTankFetchedPayload,
+    PhishTankIngestionService,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -27,7 +30,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def _load_csv_entries(csv_path: Path) -> list[dict[str, Any]]:
+def _load_csv_payload(csv_path: Path) -> PhishTankFetchedPayload:
     entries: list[dict[str, Any]] = []
     with csv_path.open(encoding="utf-8") as file_handle:
         reader = csv.DictReader(file_handle)
@@ -44,7 +47,11 @@ def _load_csv_entries(csv_path: Path) -> list[dict[str, Any]]:
                     "target": row.get("target", ""),
                 }
             )
-    return entries
+    return PhishTankFetchedPayload(
+        entries=entries,
+        snapshot_bytes=csv_path.read_bytes(),
+        source_url=str(csv_path),
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -90,11 +97,15 @@ async def run_ingestion(
             logger.error("CSV file not found: %s", csv_file)
             raise SystemExit(1)
 
-        csv_entries = _load_csv_entries(csv_file)
-        logger.info("Loaded %d entries from CSV: %s", len(csv_entries), csv_file.name)
+        csv_payload = _load_csv_payload(csv_file)
+        logger.info(
+            "Loaded %d entries from CSV: %s",
+            len(csv_payload.entries),
+            csv_file.name,
+        )
 
-        async def fetch_from_csv() -> list[dict[str, Any]]:
-            return csv_entries
+        async def fetch_from_csv() -> PhishTankFetchedPayload:
+            return csv_payload
 
         service = PhishTankIngestionService(fetch_entries=fetch_from_csv)
     else:

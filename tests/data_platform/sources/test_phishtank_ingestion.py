@@ -25,6 +25,7 @@ from db.models import (
     DataRawRecord,
 )
 from data_platform.extractors.phishtank import (
+    PhishTankFetchedPayload,
     PhishTankFeedClient,
     PhishTankIngestionService,
 )
@@ -107,6 +108,41 @@ def test_feed_url_custom_base_with_key() -> None:
         api_key="abc123",
     )
     assert client.feed_url == "https://example.com/abc123/feed.csv"
+
+
+def test_retryable_response_detects_transient_cdn_404() -> None:
+    client = PhishTankFeedClient()
+    redirect_request = httpx.Request(
+        "GET", "https://data.phishtank.com/data/online-valid.csv"
+    )
+    redirect_response = httpx.Response(
+        302,
+        request=redirect_request,
+        headers={"location": "https://cdn.phishtank.com/datadumps/verified_online.csv"},
+    )
+    final_request = httpx.Request(
+        "GET",
+        "https://cdn.phishtank.com/datadumps/verified_online.csv",
+    )
+    final_response = httpx.Response(
+        404,
+        request=final_request,
+        history=[redirect_response],
+    )
+
+    assert client._should_retry_response(final_response) is True
+
+
+def test_retryable_response_does_not_retry_plain_404() -> None:
+    client = PhishTankFeedClient()
+    response = httpx.Response(
+        404,
+        request=httpx.Request(
+            "GET", "https://data.phishtank.com/data/online-valid.csv"
+        ),
+    )
+
+    assert client._should_retry_response(response) is False
 
 
 # ---------------------------------------------------------------------------
@@ -244,7 +280,50 @@ async def test_phishtank_ingestion_persists_lineage(
     assert ingestion_run.raw_record_count == 2
     assert raw_object is not None
     assert raw_object.object_type == "api_payload"
+    assert raw_object.source_format == "csv"
     assert len(raw_records) == 2
+    assert (
+        result.snapshot_path.read_text(encoding="utf-8")
+        .splitlines()[0]
+        .startswith("phish_id,url,phish_detail_url")
+    )
+
+
+@pytest.mark.asyncio
+async def test_phishtank_ingestion_preserves_fetched_csv_payload(
+    session_factory: async_sessionmaker[AsyncSession],
+    tmp_path: Path,
+) -> None:
+    raw_csv = (
+        "phish_id,url,phish_detail_url,submission_time,verified,verification_time,online,target\n"
+        "7001,https://secure-urssaf.example.fr/login,,,yes,,yes,URSSAF\n"
+    ).encode("utf-8")
+
+    async def fetch_entries() -> PhishTankFetchedPayload:
+        return PhishTankFetchedPayload(
+            entries=[
+                {
+                    "phish_id": "7001",
+                    "url": "https://secure-urssaf.example.fr/login",
+                    "target": "URSSAF",
+                }
+            ],
+            snapshot_bytes=raw_csv,
+            source_url="https://cdn.phishtank.example/verified_online.csv",
+        )
+
+    local_store = LocalSnapshotStore(root_dir=tmp_path, repo_root=tmp_path)
+    service = PhishTankIngestionService(
+        fetch_entries=fetch_entries,
+        snapshot_dir=tmp_path,
+        snapshot_store=local_store,
+    )
+
+    async with session_factory() as session:
+        result = await service.run(session, trigger_mode="manual")
+
+    assert result.snapshot_path is not None
+    assert result.snapshot_path.read_bytes() == raw_csv
 
 
 @pytest.mark.asyncio
