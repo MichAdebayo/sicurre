@@ -8,7 +8,7 @@ from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-ROOT_DIR = Path(__file__).resolve().parents[4]
+ROOT_DIR = Path(__file__).resolve().parents[5]
 SRC_ROOT = ROOT_DIR / "src"
 
 if str(SRC_ROOT) not in sys.path:
@@ -16,7 +16,7 @@ if str(SRC_ROOT) not in sys.path:
 
 from core.config import get_settings  # noqa: E402
 from core.database import Base  # noqa: E402
-from data_platform.extractors.sap_labs import SapLabsIngestionService  # noqa: E402
+from data_platform.extractors.legacy_db import LegacyDbIngestionService  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -28,13 +28,13 @@ logger = logging.getLogger(__name__)
 async def main() -> None:
     settings = get_settings()
     db_url = settings.database_url
-    logger.info("Using database: %s", db_url)
+    logger.info("Using Sicurre main database: %s", db_url)
 
     engine = create_async_engine(db_url, echo=False)
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        logger.info("Tables ensured")
+        logger.info("Tables ensured on Sicurre DB")
 
     session_factory = async_sessionmaker(
         engine,
@@ -42,16 +42,16 @@ async def main() -> None:
         class_=AsyncSession,
     )
 
-    service = SapLabsIngestionService()
+    service = LegacyDbIngestionService()
 
     async with session_factory() as session:
         result = await service.run(session, trigger_mode="manual")
 
-    print(result.log_message or "SAP Labs ingestion completed")
+    print(result.log_message or "DB ingestion completed")
     print(
         f"  new={result.raw_record_count}"
         f"  skipped={result.skipped_count}"
-        f"  scraped={result.total_scraped_count}"
+        f"  extracted={result.total_extracted_count}"
         f"  objects={result.raw_object_count}"
     )
     if result.snapshot_storage_uri:
@@ -61,8 +61,6 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="SAP Labs Web Scraper ingestion (fallback resilient)"
-    )
+    parser = argparse.ArgumentParser(description="External Legacy Database Ingestion")
     parser.parse_args()
     asyncio.run(main())

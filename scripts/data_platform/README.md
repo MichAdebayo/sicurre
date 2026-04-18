@@ -44,8 +44,8 @@ This folder is organized by source and by pipeline phase so source-specific reco
 
 ## Naming split
 
-- In `src/data_platform/cli/`, use task-oriented entrypoint names grouped by domain, for example `cli/ingest/phishtank.py` or `cli/datasets/build.py`.
-- In `src/data_platform/cron_schedulers/`, reserve `run_<source>_<stage>.py` for scheduler-triggered entrypoints only.
+- In `src/data_platform/cli/`, use task-oriented entrypoint names grouped by domain, then by parent source family where helpful, for example `cli/ingest/api/phishtank.py` or `cli/datasets/build.py`.
+- In `src/data_platform/cron_schedulers/`, reserve `run_<source>_<stage>.py` for scheduler-triggered entrypoints only, grouped by parent source family such as `cron_schedulers/scraping/run_certfr_cti.py`.
 - In `scripts/`, reserve verb-first names such as `extract_*`, `inspect_*`, `reset_*`, and `evaluate_*` for manual probes, recovery tools, and no-write workflows.
 - If a command belongs in Make or in normal operator usage, promote it to `src/data_platform/cli/` instead of adding another script launcher here.
 

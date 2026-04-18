@@ -16,7 +16,7 @@ help:
 	@echo "  make phishtank-cron     - Run recurring PhishTank ingestion (Cron target, HTTP feed)"
 	@echo "  make phishtank-csv      - Run PhishTank ingestion from local CSV file (Fallback)"
 	@echo "  make certfr-ingest      - Run one-off CERT-FR CTI ingestion (Historical full backfill)"
-	@echo "  make certfr-cron        - Run recurring CERT-FR CTI ingestion (Cron target, RSS feed)"
+	@echo "  make certfr-cron        - Run recurring CERT-FR CTI ingestion (Cron target, capped index scan)"
 	@echo "  make sap-scrape         - Run one-off SAP Labs Blog scraping ingestion"
 	@echo "  make csv-ingest         - Run Universal CSV Dataset Ingestion (Machine Learning Sources)"
 	@echo "  make db-seed            - Seed the standalone historical external database with CSV data"
@@ -47,31 +47,31 @@ dev-api:
 
 phishtank-ingest:
 	@echo "Starting one-off live ingestion..."
-	uv run python src/data_platform/cli/ingest/phishtank.py --trigger manual
+	uv run python src/data_platform/cli/ingest/api/phishtank.py --trigger manual
 
 phishtank-cron:
 	@echo "Starting scheduled live ingestion..."
-	uv run python src/data_platform/cli/ingest/phishtank.py --trigger scheduled
+	uv run python src/data_platform/cli/ingest/api/phishtank.py --trigger scheduled
 
 phishtank-csv:
 	@echo "Starting local CSV fallback ingestion..."
-	uv run python src/data_platform/cli/ingest/phishtank.py --trigger manual --csv data/raw/api/phishtank/phishing-tank.csv
+	uv run python src/data_platform/cli/ingest/api/phishtank.py --trigger manual --csv data/raw/api/phishtank/phishing-tank.csv
 
 certfr-ingest:
 	@echo "Starting full historical CERT-FR CTI backfill (HTML pagination)..."
-	uv run python src/data_platform/cli/ingest/certfr.py --trigger manual --historical
+	uv run python src/data_platform/cli/ingest/scraping/certfr.py --trigger manual --historical
 
 certfr-cron:
-	@echo "Starting scheduled CERT-FR CTI ingestion (RSS feed)..."
-	uv run python src/data_platform/cli/ingest/certfr.py --trigger scheduled
+	@echo "Starting scheduled CERT-FR CTI ingestion (capped paginated index scan)..."
+	uv run python src/data_platform/cli/ingest/scraping/certfr.py --trigger scheduled
 
 csv-ingest:
 	@echo "Starting Universal CSV dataset ingestion..."
-	uv run python src/data_platform/cli/ingest/csv_ingestion.py --dir data/raw/csv
+	uv run python src/data_platform/cli/ingest/file/csv_ingestion.py --dir data/raw/csv
 
 sap-scrape:
 	@echo "Starting SAP Labs Blog web scraping ingestion..."
-	uv run python src/data_platform/cli/ingest/sap_labs.py
+	uv run python src/data_platform/cli/ingest/scraping/sap_labs.py
 
 db-seed:
 	@echo "Seeding the isolated historical external DB..."
@@ -79,7 +79,7 @@ db-seed:
 
 db-ingest:
 	@echo "Starting Database Ingestion from external monolithic DB..."
-	uv run python src/data_platform/cli/ingest/legacy_db.py
+	uv run python src/data_platform/cli/ingest/database/legacy_db.py
 
 bigdata-crawl:
 	@echo "Run the massive Common Crawl async extraction job to Cloudflare R2"

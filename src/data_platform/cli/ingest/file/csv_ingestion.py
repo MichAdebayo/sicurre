@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-ROOT_DIR = Path(__file__).resolve().parents[4]
+ROOT_DIR = Path(__file__).resolve().parents[5]
 SRC_ROOT = ROOT_DIR / "src"
 
 if str(SRC_ROOT) not in sys.path:

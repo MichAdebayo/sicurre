@@ -13,7 +13,7 @@ from sqlalchemy.pool import StaticPool
 from core.database import Base
 from db.models import DataIngestionRun, DataRawRecord, DataSourceSystem
 from db.queries import IngestionRunQueries, SourceSystemQueries
-from data_platform.cli.ingest.csv_ingestion import ingest_csv_file
+from data_platform.cli.ingest.file.csv_ingestion import ingest_csv_file
 
 
 @pytest_asyncio.fixture

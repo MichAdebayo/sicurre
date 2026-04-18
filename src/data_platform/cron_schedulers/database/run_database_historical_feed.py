@@ -16,7 +16,7 @@ import logging
 import sys
 from pathlib import Path
 
-ROOT_DIR = Path(__file__).resolve().parents[3]
+ROOT_DIR = Path(__file__).resolve().parents[4]
 SRC_ROOT = ROOT_DIR / "src"
 
 if str(SRC_ROOT) not in sys.path:
