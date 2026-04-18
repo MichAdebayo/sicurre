@@ -19,7 +19,7 @@ from dotenv import load_dotenv
 load_dotenv(ROOT_DIR / ".env")
 
 from core.config import get_settings
-from data_platform.services.review_persistence import ReviewPersistenceService
+from data_platform.services.shared.review_persistence import ReviewPersistenceService
 
 
 async def main() -> None:

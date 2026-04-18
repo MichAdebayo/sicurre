@@ -9,7 +9,7 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 # noqa: E402
-from data_platform.services.dataset_export import DatasetExportService
+from data_platform.services.shared.dataset_export import DatasetExportService
 
 
 if __name__ == "__main__":

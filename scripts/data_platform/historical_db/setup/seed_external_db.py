@@ -39,7 +39,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-from data_platform.services.synthetic_generation import SyntheticGenerationService
+from data_platform.services.shared.synthetic_generation import (
+    SyntheticGenerationService,
+)
 
 # ── Path setup ────────────────────────────────────────────────────────────
 ROOT = Path(__file__).resolve().parents[4]
@@ -142,7 +144,7 @@ def generate_adapted_emails() -> pd.DataFrame:
 
     Uses FrenchCulturalAdaptationService (ported from Notebook 10).
     """
-    from data_platform.services.adaptation import FrenchCulturalAdaptationService
+    from data_platform.services.shared.adaptation import FrenchCulturalAdaptationService
 
     if not CORPUS_PATH.exists():
         logger.warning(

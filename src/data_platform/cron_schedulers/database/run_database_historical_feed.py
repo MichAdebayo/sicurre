@@ -34,7 +34,7 @@ from data_platform.extractors.legacy_db import (
     LegacyDbConnector,
     LegacyDbIngestionService,
 )  # noqa: E402
-from data_platform.services.external_db_cron_feed import (  # noqa: E402
+from data_platform.services.database.cron_feed import (  # noqa: E402
     DEFAULT_CLASS_COUNTS,
     DEFAULT_CRON_FEED_DB_URL,
     append_cron_generation_batch,

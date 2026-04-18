@@ -33,7 +33,7 @@ from langdetect import detect, detect_langs, LangDetectException
 # Add src to path for shared preprocessing imports
 BASE = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(BASE / "src"))
-from data_platform.services.preprocessing import (
+from data_platform.services.shared.preprocessing import (
     DataFramePreprocessingService,
     OUTPUT_COLS,
     save_processed_csv,

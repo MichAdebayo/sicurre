@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.config import ROOT_DIR, Settings, get_settings
 from core.trace_logger import SemanticTraceLogger
 from data_platform.api.schemas import DataSourceCreate, IngestionRunCreate
-from data_platform.services.snapshot_storage import (
+from data_platform.services.shared.snapshot_storage import (
     SnapshotStore,
     SnapshotWriteResult,
     build_snapshot_store,

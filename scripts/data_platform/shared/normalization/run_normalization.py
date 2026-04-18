@@ -17,8 +17,8 @@ load_dotenv(ROOT_DIR / ".env")
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from core.config import get_settings
-from data_platform.services.normalization_pipeline import NormalizationPipeline
-from data_platform.services.structured_review_artifact import (
+from data_platform.services.shared.normalization_pipeline import NormalizationPipeline
+from data_platform.services.shared.structured_review_artifact import (
     StructuredReviewArtifactService,
 )
 

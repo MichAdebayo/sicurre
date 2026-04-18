@@ -22,30 +22,30 @@ load_dotenv(ROOT_DIR / ".env")
 
 from core.config import get_settings  # noqa: E402
 from db.models.lineage import DataRawRecord, DataSourceSystem  # noqa: E402
-from data_platform.services.adaptation import (  # noqa: E402
+from data_platform.services.shared.adaptation import (  # noqa: E402
     DEFAULT_TARGET_PER_ARCHETYPE,
     FrenchCulturalAdaptationService,
 )
-from data_platform.services.common_crawl_promotion_review import (  # noqa: E402
+from data_platform.services.common_crawl.promotion_review import (  # noqa: E402
     CommonCrawlPromotionReviewService,
 )
-from data_platform.services.common_crawl_signal_synthetic import (  # noqa: E402
+from data_platform.services.common_crawl.signal_synthetic import (  # noqa: E402
     CommonCrawlSignalSyntheticService,
 )
-from data_platform.services.generation_lineage import (  # noqa: E402
+from data_platform.services.shared.generation_lineage import (  # noqa: E402
     build_adapted_generation_bundle,
     build_synthetic_generation_bundle,
 )
-from data_platform.services.generation_staging import (
+from data_platform.services.shared.generation_staging import (
     GenerationStagingService,
 )  # noqa: E402
-from data_platform.services.review_persistence import (
+from data_platform.services.shared.review_persistence import (
     ReviewPersistenceService,
 )  # noqa: E402
-from data_platform.services.structured_review_artifact import (  # noqa: E402
+from data_platform.services.shared.structured_review_artifact import (  # noqa: E402
     StructuredReviewArtifactService,
 )
-from data_platform.services.synthetic_generation import (  # noqa: E402
+from data_platform.services.shared.synthetic_generation import (  # noqa: E402
     DEFAULT_TARGETS,
     SyntheticGenerationService,
 )

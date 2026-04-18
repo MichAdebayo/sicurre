@@ -44,7 +44,7 @@ from db.services.lineage import (
     IngestionRunService,
     SourceSystemService,
 )
-from data_platform.services.snapshot_storage import (
+from data_platform.services.shared.snapshot_storage import (
     SnapshotStore,
     SnapshotWriteResult,
     build_snapshot_store,

@@ -18,11 +18,13 @@ if str(SRC_ROOT) not in sys.path:
 load_dotenv(ROOT_DIR / ".env")
 
 from core.config import get_settings  # noqa: E402
-from data_platform.services.common_crawl_promotion_review import (  # noqa: E402
+from data_platform.services.common_crawl.promotion_review import (  # noqa: E402
     CommonCrawlPromotionReviewService,
 )
-from data_platform.services.review_persistence import ReviewPersistenceService  # noqa: E402
-from data_platform.services.structured_review_artifact import (  # noqa: E402
+from data_platform.services.shared.review_persistence import (
+    ReviewPersistenceService,
+)  # noqa: E402
+from data_platform.services.shared.structured_review_artifact import (  # noqa: E402
     StructuredReviewArtifactService,
 )
 
@@ -51,7 +53,9 @@ def parse_args() -> argparse.Namespace:
 
 async def main() -> None:
     args = parse_args()
-    export_payload = StructuredReviewArtifactService.read_json(args.reviewed_export_json)
+    export_payload = StructuredReviewArtifactService.read_json(
+        args.reviewed_export_json
+    )
     acceptance_preview = CommonCrawlPromotionReviewService.build_acceptance_review(
         export_payload
     )
@@ -74,11 +78,13 @@ async def main() -> None:
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     try:
         async with session_factory() as session:
-            result = await ReviewPersistenceService.persist_common_crawl_reviewed_export(
-                session,
-                export_payload,
-                pipeline_version=args.pipeline_version,
-                report_uri=args.report_uri or str(args.reviewed_export_json),
+            result = (
+                await ReviewPersistenceService.persist_common_crawl_reviewed_export(
+                    session,
+                    export_payload,
+                    pipeline_version=args.pipeline_version,
+                    report_uri=args.report_uri or str(args.reviewed_export_json),
+                )
             )
     finally:
         await engine.dispose()

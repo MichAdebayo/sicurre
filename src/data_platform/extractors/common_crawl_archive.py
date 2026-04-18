@@ -18,8 +18,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from warcio.archiveiterator import ArchiveIterator
 
 from core.config import ENV_FILE, ROOT_DIR, get_settings
-from data_platform.services.common_crawl_content import CommonCrawlContentService
-from data_platform.services.snapshot_storage import (
+from data_platform.services.common_crawl.content import CommonCrawlContentService
+from data_platform.services.shared.snapshot_storage import (
     SnapshotStore,
     SnapshotWriteResult,
     build_snapshot_store,

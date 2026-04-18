@@ -11,7 +11,7 @@ SRC_ROOT = ROOT_DIR / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from data_platform.services.external_db_seed import (  # noqa: E402
+from data_platform.services.database.seed import (  # noqa: E402
     append_to_database,
     seed_external_database,
 )

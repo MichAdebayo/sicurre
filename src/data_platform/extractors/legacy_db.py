@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from core.config import ROOT_DIR
 from core.trace_logger import SemanticTraceLogger
-from data_platform.services.database_source_naming import build_database_source_path
+from data_platform.services.database.source_naming import build_database_source_path
 from db.models import (
     DataIngestionRun,
     DataRawObject,
@@ -34,7 +34,7 @@ from db.services.lineage import (
     IngestionRunService,
     SourceSystemService,
 )
-from data_platform.services.snapshot_storage import (
+from data_platform.services.shared.snapshot_storage import (
     SnapshotStore,
     SnapshotWriteResult,
     build_snapshot_store,

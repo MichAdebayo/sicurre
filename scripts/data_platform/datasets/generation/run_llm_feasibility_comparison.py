@@ -24,21 +24,21 @@ from dotenv import load_dotenv
 load_dotenv(ROOT_DIR / ".env", override=True)
 
 from core.config import get_settings
-from data_platform.services.adaptation import (
+from data_platform.services.shared.adaptation import (
     ARCHETYPES,
     FrenchCulturalAdaptationService,
 )
-from data_platform.services.certfr_generated_drafts import CertFRGeneratedDraftService
-from data_platform.services.common_crawl_signal_synthetic import (
+from data_platform.services.certfr.generated_drafts import CertFRGeneratedDraftService
+from data_platform.services.common_crawl.signal_synthetic import (
     CommonCrawlSignalSyntheticService,
 )
-from data_platform.services.llm_generation_feasibility import (
+from data_platform.services.shared.llm_generation_feasibility import (
     LLMGenerationFeasibilityService,
     OpenAICompatibleInferenceClient,
     ProviderConfig,
     get_llm_generation_feasibility_settings,
 )
-from data_platform.services.structured_review_artifact import (
+from data_platform.services.shared.structured_review_artifact import (
     StructuredReviewArtifactService,
 )
 from db.models import DataNormalizedMessage, DataRawRecord, DataSourceSystem

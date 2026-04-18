@@ -17,7 +17,7 @@ if str(SRC_ROOT) not in sys.path:
 
 from core.config import get_settings  # noqa: E402
 from db.models import AnnotationLabelSource  # noqa: E402
-from data_platform.services.review_persistence import (  # noqa: E402
+from data_platform.services.shared.review_persistence import (  # noqa: E402
     ReviewPersistenceService,
 )
 

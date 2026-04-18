@@ -19,10 +19,10 @@ if str(SRC_ROOT) not in sys.path:
 load_dotenv(ROOT_DIR / ".env")
 
 from core.config import get_settings  # noqa: E402
-from data_platform.services.normalization_pipeline import (
+from data_platform.services.shared.normalization_pipeline import (
     NormalizationPipeline,
 )  # noqa: E402
-from data_platform.services.structured_review_artifact import (  # noqa: E402
+from data_platform.services.shared.structured_review_artifact import (  # noqa: E402
     StructuredReviewArtifactService,
 )
 

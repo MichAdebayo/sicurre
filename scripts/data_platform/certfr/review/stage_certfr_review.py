@@ -9,8 +9,8 @@ SRC_ROOT = ROOT_DIR / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from data_platform.services.certfr_review_staging import CertFRReviewStagingService
-from data_platform.services.structured_review_artifact import (
+from data_platform.services.certfr.review_staging import CertFRReviewStagingService
+from data_platform.services.shared.structured_review_artifact import (
     StructuredReviewArtifactService,
 )
 

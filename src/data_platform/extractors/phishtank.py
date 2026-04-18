@@ -35,7 +35,7 @@ from db.services.lineage import (
     IngestionRunService,
     SourceSystemService,
 )
-from data_platform.services.snapshot_storage import (
+from data_platform.services.shared.snapshot_storage import (
     SnapshotStore,
     SnapshotWriteResult,
     build_snapshot_store,
@@ -60,19 +60,44 @@ FR_TLD_PATTERN: re.Pattern[str] = re.compile(r"\.fr(/|$|:)", re.IGNORECASE)
 
 FR_BRAND_KEYWORDS: tuple[str, ...] = (
     # Government / health
-    "urssaf", "ameli", "impots", "dgfip", "caf", "cpam",
-    "securite-sociale", "france-connect", "franceconnect",
-    "service-public", "gouv",
+    "urssaf",
+    "ameli",
+    "impots",
+    "dgfip",
+    "caf",
+    "cpam",
+    "securite-sociale",
+    "france-connect",
+    "franceconnect",
+    "service-public",
+    "gouv",
     # Postal / delivery
-    "laposte", "la-poste", "colissimo", "chronopost", "mondial-relay",
+    "laposte",
+    "la-poste",
+    "colissimo",
+    "chronopost",
+    "mondial-relay",
     # Banking
-    "credit-agricole", "creditagricole", "bnp", "bnpparibas",
-    "banque-postale", "banquepostale", "societe-generale",
-    "societegenerale", "lcl", "caisse-epargne", "credit-mutuel",
+    "credit-agricole",
+    "creditagricole",
+    "bnp",
+    "bnpparibas",
+    "banque-postale",
+    "banquepostale",
+    "societe-generale",
+    "societegenerale",
+    "lcl",
+    "caisse-epargne",
+    "credit-mutuel",
     # Telecom
-    "orange", "sfr", "bouygues", "free",
+    "orange",
+    "sfr",
+    "bouygues",
+    "free",
     # E-commerce
-    "leboncoin", "cdiscount", "fnac",
+    "leboncoin",
+    "cdiscount",
+    "fnac",
 )
 
 
@@ -141,7 +166,7 @@ class PhishTankFeedClient:
                     )
 
                     if response.status_code in RETRY_STATUS_CODES:
-                        wait = self.retry_backoff_seconds * (2 ** attempt)
+                        wait = self.retry_backoff_seconds * (2**attempt)
                         logger.warning(
                             "PhishTank returned %d (attempt %d/%d), "
                             "retrying in %.0fs",
@@ -176,7 +201,7 @@ class PhishTankFeedClient:
             except httpx.RequestError as exc:
                 last_error = exc
                 if attempt < self.max_retries:
-                    wait = self.retry_backoff_seconds * (2 ** attempt)
+                    wait = self.retry_backoff_seconds * (2**attempt)
                     logger.warning(
                         "PhishTank request failed (attempt %d/%d): %s, "
                         "retrying in %.0fs",
@@ -196,9 +221,7 @@ class PhishTankIngestionService:
         self,
         *,
         feed_client: PhishTankFeedClient | None = None,
-        fetch_entries: (
-            Callable[[], Awaitable[list[dict[str, Any]]]] | None
-        ) = None,
+        fetch_entries: Callable[[], Awaitable[list[dict[str, Any]]]] | None = None,
         snapshot_dir: Path = DEFAULT_PHISHTANK_SNAPSHOT_DIR,
         snapshot_store: SnapshotStore | None = None,
         snapshot_prefix: str = DEFAULT_PHISHTANK_SNAPSHOT_PREFIX,
@@ -236,13 +259,15 @@ class PhishTankIngestionService:
         started_at: datetime | None = None,
     ) -> PhishTankIngestionResult:
         run_started_at = started_at or datetime.now(timezone.utc)
-        
+
         trace = SemanticTraceLogger(
-            parent_type="API Source",
-            child_target="PhishTank",
-            domain="data_platform"
+            parent_type="API Source", child_target="PhishTank", domain="data_platform"
         )
-        trace.trace(stage="orchestration", status="start", message="Initializing PhishTank API synchronization.")
+        trace.trace(
+            stage="orchestration",
+            status="start",
+            message="Initializing PhishTank API synchronization.",
+        )
 
         source_system = await self._get_or_create_source_system(session)
         ingestion_run = await self.ingestion_service.create(
@@ -255,14 +280,14 @@ class PhishTankIngestionService:
                 log_message="PhishTank ingestion started",
             ),
         )
-        
+
         trace.set_trace_id(str(ingestion_run.id))
         trace.trace(
             stage="ingestion",
             status="start",
             entity_type="DataIngestionRun",
             entity_id=str(ingestion_run.id),
-            message="Connecting to Phishtank feed..."
+            message="Connecting to Phishtank feed...",
         )
 
         try:
@@ -274,22 +299,22 @@ class PhishTankIngestionService:
                 ingestion_run.status = IngestionStatus.COMPLETED
                 ingestion_run.log_message = "PhishTank feed returned 0 entries"
                 await session.commit()
-                
+
                 trace.trace(
                     stage="ingestion",
                     status="success",
                     metrics={"feed_count": 0},
-                    message="PhishTank feed returned 0 entries — nothing to ingest."
+                    message="PhishTank feed returned 0 entries — nothing to ingest.",
                 )
                 return self._empty_result(
-                    ingestion_run, source_system,
+                    ingestion_run,
+                    source_system,
                     total_feed_count=0,
                 )
 
             # ---- Step 1: French-targeted filter ----
             entries = [
-                e for e in all_entries
-                if self._is_french_target(e.get("url", ""))
+                e for e in all_entries if self._is_french_target(e.get("url", ""))
             ]
             filtered_count = total_feed_count - len(entries)
 
@@ -302,7 +327,8 @@ class PhishTankIngestionService:
                 )
                 await session.commit()
                 return self._empty_result(
-                    ingestion_run, source_system,
+                    ingestion_run,
+                    source_system,
                     filtered_count=filtered_count,
                     total_feed_count=total_feed_count,
                 )
@@ -310,8 +336,7 @@ class PhishTankIngestionService:
             # ---- Step 2: Dedup against existing DB records ----
             existing_keys = await self._existing_record_keys(session)
             new_entries = [
-                e for e in entries
-                if self._entry_key(e) not in existing_keys
+                e for e in entries if self._entry_key(e) not in existing_keys
             ]
             skipped_count = len(entries) - len(new_entries)
 
@@ -323,16 +348,21 @@ class PhishTankIngestionService:
                     f"ingested — nothing new (feed={total_feed_count})"
                 )
                 await session.commit()
-                
+
                 trace.trace(
                     stage="ingestion",
                     status="success",
-                    metrics={"feed": total_feed_count, "filtered": filtered_count, "skipped": skipped_count},
-                    message=f"All {len(entries)} parsed entries already exist in DB — skipped gracefully."
+                    metrics={
+                        "feed": total_feed_count,
+                        "filtered": filtered_count,
+                        "skipped": skipped_count,
+                    },
+                    message=f"All {len(entries)} parsed entries already exist in DB — skipped gracefully.",
                 )
-                
+
                 return self._empty_result(
-                    ingestion_run, source_system,
+                    ingestion_run,
+                    source_system,
                     skipped_count=skipped_count,
                     filtered_count=filtered_count,
                     total_feed_count=total_feed_count,
@@ -352,14 +382,14 @@ class PhishTankIngestionService:
             )
             session.add(raw_object)
             await session.flush()
-            
+
             trace.trace(
                 stage="snapshot",
                 status="success",
                 entity_type="DataRawObject",
                 entity_id=str(raw_object.id),
                 metrics={"size_bytes": snapshot_result.size_bytes},
-                message=f"Saved CSV payload snapshot directly to {snapshot_result.local_path}"
+                message=f"Saved CSV payload snapshot directly to {snapshot_result.local_path}",
             )
 
             raw_records = self._build_raw_records(
@@ -380,12 +410,12 @@ class PhishTankIngestionService:
             ingestion_run.raw_record_count = len(raw_records)
             ingestion_run.log_message = log_message
             await session.commit()
-            
+
             trace.trace(
                 stage="extraction",
                 status="success",
                 metrics={"new_records": len(raw_records), "skipped": skipped_count},
-                message="Successfully decoupled PhishTank raw records and generated target DB objects."
+                message="Successfully decoupled PhishTank raw records and generated target DB objects.",
             )
 
             return PhishTankIngestionResult(
@@ -405,11 +435,11 @@ class PhishTankIngestionService:
             ingestion_run.status = IngestionStatus.FAILED
             ingestion_run.log_message = f"PhishTank ingestion failed: {exc}"
             await session.commit()
-            
+
             trace.trace(
                 stage="ingestion",
                 status="failed",
-                message=f"Catastrophic failure during Phishtank run: {str(exc)}"
+                message=f"Catastrophic failure during Phishtank run: {str(exc)}",
             )
             raise
 
@@ -478,7 +508,8 @@ class PhishTankIngestionService:
     # ------------------------------------------------------------------
 
     async def _existing_record_keys(
-        self, session: AsyncSession,
+        self,
+        session: AsyncSession,
     ) -> set[str]:
         """Return record keys already stored from PhishTank ingestion runs."""
         stmt = (
@@ -519,9 +550,7 @@ class PhishTankIngestionService:
             DataSourceCreate(
                 name=self.source_name,
                 source_type=SourceType.API,
-                description=(
-                    "Scheduled ingestion of the PhishTank online-valid feed"
-                ),
+                description=("Scheduled ingestion of the PhishTank online-valid feed"),
                 owner_name="PhishTank",
                 legal_basis="public_threat_intel",
                 contains_personal_data=False,
@@ -563,9 +592,7 @@ class PhishTankIngestionService:
     ) -> DataRawObject:
         return DataRawObject(
             ingestion_run_id=ingestion_run.id,
-            external_ref=(
-                f"{self.feed_client._base_feed_url}#run:{ingestion_run.id}"
-            ),
+            external_ref=(f"{self.feed_client._base_feed_url}#run:{ingestion_run.id}"),
             object_type=ObjectType.API_PAYLOAD,
             storage_uri=snapshot_result.storage_uri,
             source_format="json",
@@ -603,14 +630,17 @@ class PhishTankIngestionService:
             enriched["source"] = "phishtank_api"
 
             raw_content = json.dumps(
-                enriched, ensure_ascii=False, sort_keys=True,
+                enriched,
+                ensure_ascii=False,
+                sort_keys=True,
             )
             is_usable = bool(url)
             rejection_reason = None if is_usable else "missing_url"
 
             raw_records.append(
                 DataRawRecord(
-                    raw_object_id=raw_object.id, source_system_id=source_system.id,
+                    raw_object_id=raw_object.id,
+                    source_system_id=source_system.id,
                     record_key=record_key,
                     raw_content=raw_content,
                     detected_language=None,
@@ -630,7 +660,8 @@ class PhishTankIngestionService:
         return text or None
 
     def _build_snapshot_object_key(
-        self, ingestion_run: DataIngestionRun,
+        self,
+        ingestion_run: DataIngestionRun,
     ) -> str:
         date_str = ingestion_run.started_at.strftime("%Y%m%d")
         filename = f"phishtank_{date_str}_{ingestion_run.id}.csv"
