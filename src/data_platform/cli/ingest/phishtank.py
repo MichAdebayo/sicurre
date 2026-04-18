@@ -63,58 +63,64 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-if __name__ == "__main__":
+async def run_ingestion(
+    *,
+    trigger_mode: str = "scheduled",
+    csv_path: str | None = None,
+) -> None:
+    settings = get_settings()
+    db_url = settings.database_url
+    logger.info("Using database: %s", db_url)
+
+    engine = create_async_engine(db_url, echo=False)
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+        logger.info("Tables ensured")
+
+    session_factory = async_sessionmaker(
+        engine,
+        expire_on_commit=False,
+        class_=AsyncSession,
+    )
+
+    if csv_path:
+        csv_file = Path(csv_path)
+        if not csv_file.exists():
+            logger.error("CSV file not found: %s", csv_file)
+            raise SystemExit(1)
+
+        csv_entries = _load_csv_entries(csv_file)
+        logger.info("Loaded %d entries from CSV: %s", len(csv_entries), csv_file.name)
+
+        async def fetch_from_csv() -> list[dict[str, Any]]:
+            return csv_entries
+
+        service = PhishTankIngestionService(fetch_entries=fetch_from_csv)
+    else:
+        service = PhishTankIngestionService()
+
+    async with session_factory() as session:
+        result = await service.run(session, trigger_mode=trigger_mode)
+
+    print(result.log_message or "PhishTank ingestion completed")
+    print(
+        f"  new={result.raw_record_count}"
+        f"  skipped={result.skipped_count}"
+        f"  filtered={result.filtered_count}"
+        f"  feed={result.total_feed_count}"
+        f"  objects={result.raw_object_count}"
+    )
+    if result.snapshot_storage_uri:
+        print(f"  snapshot={result.snapshot_storage_uri}")
+
+    await engine.dispose()
+
+
+async def main() -> None:
     args = parse_args()
+    await run_ingestion(trigger_mode=args.trigger, csv_path=args.csv)
 
-    async def _run() -> None:
-        settings = get_settings()
-        db_url = settings.database_url
-        logger.info("Using database: %s", db_url)
 
-        engine = create_async_engine(db_url, echo=False)
-
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-            logger.info("Tables ensured")
-
-        session_factory = async_sessionmaker(
-            engine,
-            expire_on_commit=False,
-            class_=AsyncSession,
-        )
-
-        if args.csv:
-            csv_file = Path(args.csv)
-            if not csv_file.exists():
-                logger.error("CSV file not found: %s", csv_file)
-                raise SystemExit(1)
-
-            csv_entries = _load_csv_entries(csv_file)
-            logger.info(
-                "Loaded %d entries from CSV: %s", len(csv_entries), csv_file.name
-            )
-
-            async def fetch_from_csv() -> list[dict[str, Any]]:
-                return csv_entries
-
-            service = PhishTankIngestionService(fetch_entries=fetch_from_csv)
-        else:
-            service = PhishTankIngestionService()
-
-        async with session_factory() as session:
-            result = await service.run(session, trigger_mode=args.trigger)
-
-        print(result.log_message or "PhishTank ingestion completed")
-        print(
-            f"  new={result.raw_record_count}"
-            f"  skipped={result.skipped_count}"
-            f"  filtered={result.filtered_count}"
-            f"  feed={result.total_feed_count}"
-            f"  objects={result.raw_object_count}"
-        )
-        if result.snapshot_storage_uri:
-            print(f"  snapshot={result.snapshot_storage_uri}")
-
-        await engine.dispose()
-
-    asyncio.run(_run())
+if __name__ == "__main__":
+    asyncio.run(main())

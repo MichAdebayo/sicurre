@@ -15,7 +15,7 @@ from core.database import AsyncSessionFactory  # noqa: E402
 from data_platform.extractors.certfr_cti import CertFRCtiExtractor  # noqa: E402
 
 
-async def main() -> None:
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run CERT-FR CTI ingestion.")
     parser.add_argument(
         "--trigger",
@@ -29,18 +29,24 @@ async def main() -> None:
         action="store_true",
         help="Crawl the full paginated CTI/IOC indexes instead of the capped scheduled scan.",
     )
-    args = parser.parse_args()
+    return parser.parse_args()
 
+
+async def run_ingestion(
+    *,
+    trigger_mode: str = "scheduled",
+    fetch_historical: bool = False,
+) -> None:
     service = CertFRCtiExtractor()
 
     async with AsyncSessionFactory() as session:
         result = await service.run(
             session,
-            trigger_mode=args.trigger,
-            fetch_historical=args.historical,
+            trigger_mode=trigger_mode,
+            fetch_historical=fetch_historical,
         )
 
-    print(f"CERT-FR CTI ingestion completed (Historical={args.historical}):")
+    print(f"CERT-FR CTI ingestion completed (Historical={fetch_historical}):")
     print(f"  Run ID           : {result.ingestion_run_id}")
     print(f"  Source System ID : {result.source_system_id}")
     print(f"  Discovered       : {result.discovered_count}")
@@ -48,6 +54,14 @@ async def main() -> None:
     print(f"  Extracted        : {result.extracted_count}")
     print(f"  Skipped          : {result.skipped_count}")
     print(f"  Failed           : {result.failed_count}")
+
+
+async def main() -> None:
+    args = parse_args()
+    await run_ingestion(
+        trigger_mode=args.trigger,
+        fetch_historical=args.historical,
+    )
 
 
 if __name__ == "__main__":
