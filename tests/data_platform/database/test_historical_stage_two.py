@@ -12,7 +12,22 @@ def test_historical_stage_two_maps_labels() -> None:
         is NormalizedLabel.PHISHING
     )
     assert (
+        HistoricalStageTwoService.map_label(
+            {"source": "database/faker/synthetic_spam_medium", "label": 0}
+        )
+        is NormalizedLabel.SPAM
+    )
+    assert (
         HistoricalStageTwoService.map_label({"source": "crowdsourced_spam_spam_3"})
+        is NormalizedLabel.SPAM
+    )
+
+
+def test_historical_stage_two_maps_raw_spam_label() -> None:
+    assert (
+        HistoricalStageTwoService.map_label(
+            {"source": "database/custom/manual_review", "label": "spam"}
+        )
         is NormalizedLabel.SPAM
     )
 

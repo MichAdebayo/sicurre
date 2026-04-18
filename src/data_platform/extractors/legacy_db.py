@@ -513,7 +513,8 @@ class LegacyDbIngestionService:
             body = entry.get("body_preview", "")
             full_text = f"{subject}\n\n{body}" if subject else body
 
-            label = 1 if entry.get("verdict") == "phishing" else 0
+            verdict = str(entry.get("verdict") or "").strip().lower()
+            label = verdict or None
 
             enriched = {
                 "subject": subject,

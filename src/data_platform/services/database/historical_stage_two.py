@@ -90,15 +90,26 @@ class HistoricalStageTwoService:
         historical_source = cls.get_subsource(raw_content)
         if historical_source.startswith("synthetic_phishing"):
             return NormalizedLabel.PHISHING
+        if historical_source.startswith("synthetic_spam"):
+            return NormalizedLabel.SPAM
         if historical_source == "adapted_en_fr":
             return NormalizedLabel.PHISHING
         if historical_source.startswith("crowdsourced_spam"):
             return NormalizedLabel.SPAM
 
         raw_label = raw_content.get("label")
-        if raw_label in {1, "1", True, "phishing"}:
+        normalized_raw_label = (
+            str(raw_label).strip().lower() if raw_label is not None else None
+        )
+        if raw_label in {1, True} or normalized_raw_label in {"1", "phishing"}:
             return NormalizedLabel.PHISHING
-        if raw_label in {0, "0", False, "legitimate", "ham"}:
+        if normalized_raw_label == "spam":
+            return NormalizedLabel.SPAM
+        if raw_label in {0, False} or normalized_raw_label in {
+            "0",
+            "legitimate",
+            "ham",
+        }:
             return NormalizedLabel.LEGITIMATE
         return None
 
