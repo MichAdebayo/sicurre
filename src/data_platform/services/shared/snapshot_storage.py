@@ -134,11 +134,21 @@ class R2SnapshotStore:
         return normalized
 
 
-def build_snapshot_store(*, local_root_dir: Path, repo_root: Path) -> SnapshotStore:
+def build_snapshot_store(
+    *,
+    local_root_dir: Path,
+    repo_root: Path,
+    source_key: str | None = None,
+    backend: str | None = None,
+) -> SnapshotStore:
     settings = get_settings()
-    backend = settings.raw_snapshot_storage_backend.strip().lower()
+    resolved_backend = (
+        backend.strip().lower()
+        if backend is not None
+        else settings.resolve_snapshot_storage_backend(source_key=source_key)
+    )
 
-    if backend == "r2":
+    if resolved_backend == "r2":
         required_settings = {
             "raw_snapshot_r2_bucket_name": settings.raw_snapshot_r2_bucket_name,
             "raw_snapshot_r2_endpoint_url": settings.raw_snapshot_r2_endpoint_url,

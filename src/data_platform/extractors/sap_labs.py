@@ -140,6 +140,7 @@ class SapLabsIngestionService:
         self.snapshot_store = snapshot_store or build_snapshot_store(
             local_root_dir=local_snapshot_root,
             repo_root=REPO_ROOT,
+            source_key="sap_labs",
         )
 
         self.source_name = source_name

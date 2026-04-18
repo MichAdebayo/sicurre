@@ -258,12 +258,17 @@ class CommonCrawlArchiveStore:
         backend: str | None = None,
     ) -> None:
         self.repo_root = repo_root
+        settings = get_settings()
         self.backend = (
-            (backend or get_settings().raw_snapshot_storage_backend).strip().lower()
+            backend.strip().lower()
+            if backend is not None
+            else settings.resolve_snapshot_storage_backend(source_key="common_crawl")
         )
         self.snapshot_store = snapshot_store or build_snapshot_store(
             local_root_dir=repo_root / "data",
             repo_root=repo_root,
+            source_key="common_crawl",
+            backend=self.backend,
         )
 
     def build_object_key(self, *, subfolder: str, filename: str) -> str:

@@ -45,8 +45,13 @@ class Settings(BaseSettings):
     raw_snapshot_r2_region: str = "auto"
     phishtank_api_key: str | None = None
     phishtank_user_agent: str = "phishtank/sicurre-research"
+    phishtank_snapshot_storage_backend: str | None = None
     phishtank_snapshot_local_dir: Path = ROOT_DIR / "data" / "raw" / "api" / "phishtank"
     phishtank_snapshot_prefix: str = "phishtank"
+    certfr_snapshot_storage_backend: str | None = None
+    sap_labs_snapshot_storage_backend: str | None = None
+    common_crawl_snapshot_storage_backend: str | None = None
+    database_historical_snapshot_storage_backend: str | None = None
     cc_input_backend: str = Field(
         default="prod",
         validation_alias="CC_INPUT_BACKEND",
@@ -70,6 +75,29 @@ class Settings(BaseSettings):
                 )
             case _:
                 return self.database_url
+
+    def resolve_snapshot_storage_backend(self, *, source_key: str | None = None) -> str:
+        override = self._resolve_source_snapshot_override(
+            source_key=source_key,
+            setting_name="storage_backend",
+        )
+        backend = override or self.raw_snapshot_storage_backend
+        return backend.strip().lower()
+
+    def _resolve_source_snapshot_override(
+        self,
+        *,
+        source_key: str | None,
+        setting_name: str,
+    ) -> str | Path | None:
+        if not source_key:
+            return None
+
+        normalized_source_key = (
+            source_key.strip().lower().replace("-", "_").replace(" ", "_")
+        )
+        attribute_name = f"{normalized_source_key}_snapshot_{setting_name}"
+        return getattr(self, attribute_name, None)
 
     @property
     def dev_bearer_tokens(self) -> frozenset[str]:
