@@ -81,7 +81,7 @@ Status: done
 - `src/db/migrations/versions/20260306_0001_bloc1_baseline.py`
 - `alembic.ini`
 - `src/db/sql/sicurre.sql`
-- `tests/data_platform/test_bloc1_schema.py`
+- `tests/data_platform/api/test_bloc1_schema.py`
 
 ## Issue — Traceability persistence for source systems and ingestion runs
 
@@ -100,7 +100,7 @@ Status: done
 - `src/data_platform/api/routers/source_systems.py`
 - `src/data_platform/api/routers/ingestion_runs.py`
 - `src/db/migrations/versions/20260306_0001_bloc1_baseline.py`
-- `tests/data_platform/test_lineage_api.py`
+- `tests/data_platform/api/test_lineage_api.py`
 
 ## Issue #13 — Bloc 0 notebook classification
 
@@ -134,7 +134,7 @@ Status: done
 - `src/db/sql/sicurre.sql`
 - `alembic.ini`
 - `src/db/migrations/versions/20260306_0001_bloc1_baseline.py`
-- `tests/data_platform/test_bloc1_schema.py`
+- `tests/data_platform/api/test_bloc1_schema.py`
 
 ## Issue #38 — Clarify recurring ingestion architecture and source cadence
 
