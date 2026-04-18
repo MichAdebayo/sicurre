@@ -4,12 +4,14 @@ from pathlib import Path
 
 import pandas as pd
 
-from data_platform.services.adaptation import (
+from data_platform.services.shared.adaptation import (
     DEFAULT_TARGET_PER_ARCHETYPE,
     EXPORT_COLUMNS,
     FrenchCulturalAdaptationService,
 )
-from data_platform.services.generation_lineage import build_adapted_generation_bundle
+from data_platform.services.shared.generation_lineage import (
+    build_adapted_generation_bundle,
+)
 
 
 def test_attach_archetype_matches_detects_expected_patterns() -> None:
@@ -97,5 +99,8 @@ def test_build_adapted_generation_bundle_preserves_source_linkage() -> None:
 
     assert bundle["run"]["source_name"] == "adapted_en_fr"
     assert bundle["run"]["parent_source"] == "seed-source"
-    assert bundle["samples"][0]["en_source_raw_record_id"] == "11111111-1111-1111-1111-111111111111"
+    assert (
+        bundle["samples"][0]["en_source_raw_record_id"]
+        == "11111111-1111-1111-1111-111111111111"
+    )
     assert bundle["samples"][0]["text_sha256"] == "hash-1"

@@ -20,7 +20,7 @@ from db.models import (
     DataRawRecord,
     DataSourceSystem,
 )
-from data_platform.services.annotation_backfill import AnnotationBackfillService
+from data_platform.services.shared.annotation_backfill import AnnotationBackfillService
 
 
 def utc_timestamp() -> datetime:
