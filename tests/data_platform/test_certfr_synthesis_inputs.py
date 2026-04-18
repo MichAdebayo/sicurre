@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from data_platform.services.certfr_synthesis_inputs import (
+from data_platform.services.certfr.synthesis_inputs import (
     CertFRSynthesisInputService,
 )
 

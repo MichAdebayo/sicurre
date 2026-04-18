@@ -8,11 +8,11 @@ import pytest
 from data_platform.cron_schedulers.database.run_database_historical_feed import (
     _resolve_class_counts,
 )
-from data_platform.services.external_db_cron_scenarios import (
+from data_platform.services.database.cron_scenarios import (
     CRON_ARCHETYPE_SCENARIOS,
     CRON_ARCHETYPE_SCENARIOS_BY_CLASS,
 )
-from data_platform.services.external_db_cron_feed import append_cron_generation_batch
+from data_platform.services.database.cron_feed import append_cron_generation_batch
 
 
 def _read_verdict_counts(db_path: Path) -> dict[str, int]:

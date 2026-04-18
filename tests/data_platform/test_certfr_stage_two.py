@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from data_platform.services.certfr_stage_two import CertFRStageTwoService
+from data_platform.services.certfr.stage_two import CertFRStageTwoService
 
 
 def test_certfr_stage_two_marks_threat_intel_and_extracts_ioc_counts() -> None:

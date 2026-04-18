@@ -26,7 +26,7 @@ from db.models import (
     DataSourceSystem,
     GenerationSourceLinkRole,
 )
-from data_platform.services.review_persistence import ReviewPersistenceService
+from data_platform.services.shared.review_persistence import ReviewPersistenceService
 
 
 def utc_timestamp() -> datetime:
@@ -201,12 +201,16 @@ async def test_persist_generation_bundle_persists_source_links(
     async with session_factory() as session:
         await ReviewPersistenceService.persist_generation_bundle(session, payload)
         source_links = (
-            await session.execute(
-                select(DataGenerationSampleSourceLink).order_by(
-                    DataGenerationSampleSourceLink.link_order
+            (
+                await session.execute(
+                    select(DataGenerationSampleSourceLink).order_by(
+                        DataGenerationSampleSourceLink.link_order
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
     assert len(source_links) == 3
     assert [link.link_role for link in source_links] == [
@@ -249,8 +253,10 @@ async def test_persist_generation_bundle_allows_archetype_only_samples_without_s
     async with session_factory() as session:
         await ReviewPersistenceService.persist_generation_bundle(session, payload)
         source_links = (
-            await session.execute(select(DataGenerationSampleSourceLink))
-        ).scalars().all()
+            (await session.execute(select(DataGenerationSampleSourceLink)))
+            .scalars()
+            .all()
+        )
 
     assert source_links == []
 
@@ -661,15 +667,17 @@ async def test_persist_generated_promotion_review_links_promoted_raw_record_to_s
             session,
             payload,
         )
-        promotion_result = await ReviewPersistenceService.persist_generated_promotion_review(
-            session,
-            {
-                "run": payload["run"],
-                "generation_run_id": stage_result["generation_run_id"],
-                "promoted_samples": payload["samples"],
-            },
-            generation_run_id=stage_result["generation_run_id"],
-            pipeline_version="generated_reviewed_promotion_v1",
+        promotion_result = (
+            await ReviewPersistenceService.persist_generated_promotion_review(
+                session,
+                {
+                    "run": payload["run"],
+                    "generation_run_id": stage_result["generation_run_id"],
+                    "promoted_samples": payload["samples"],
+                },
+                generation_run_id=stage_result["generation_run_id"],
+                pipeline_version="generated_reviewed_promotion_v1",
+            )
         )
         raw_records = (await session.execute(select(DataRawRecord))).scalars().all()
         samples = (await session.execute(select(DataGenerationSample))).scalars().all()

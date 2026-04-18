@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from data_platform.services.stage_two_rewrite_jobs import StageTwoRewriteJobService
+from data_platform.services.shared.stage_two_rewrite_jobs import (
+    StageTwoRewriteJobService,
+)
 
 
 def test_stage_two_rewrite_jobs_builds_prompt_ready_jobs() -> None:

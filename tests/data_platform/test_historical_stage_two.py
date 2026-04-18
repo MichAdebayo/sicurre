@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from db.models.lineage import NormalizedLabel
-from data_platform.services.historical_stage_two import HistoricalStageTwoService
+from data_platform.services.database.historical_stage_two import (
+    HistoricalStageTwoService,
+)
 
 
 def test_historical_stage_two_maps_labels() -> None:

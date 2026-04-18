@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from data_platform.services.stage_two_action_artifacts import (
+from data_platform.services.shared.stage_two_action_artifacts import (
     StageTwoActionArtifactsService,
 )
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from data_platform.services.preprocessing import (
+from data_platform.services.shared.preprocessing import (
     DataFramePreprocessingService,
 )
 

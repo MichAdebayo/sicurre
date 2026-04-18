@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from data_platform.services.structured_review_artifact import (
+from data_platform.services.shared.structured_review_artifact import (
     StructuredReviewArtifactService,
 )
 

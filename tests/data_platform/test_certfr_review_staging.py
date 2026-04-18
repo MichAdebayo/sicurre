@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from data_platform.services.certfr_review_staging import CertFRReviewStagingService
+from data_platform.services.certfr.review_staging import CertFRReviewStagingService
 
 
 def test_certfr_review_staging_groups_samples() -> None:

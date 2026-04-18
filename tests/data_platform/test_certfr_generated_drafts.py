@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from data_platform.services.certfr_generated_drafts import CertFRGeneratedDraftService
+from data_platform.services.certfr.generated_drafts import CertFRGeneratedDraftService
 
 
 def test_certfr_generated_drafts_builds_banking_phishing_email() -> None:

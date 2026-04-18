@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from data_platform.services.common_crawl_signal_synthetic import (
+from data_platform.services.common_crawl.signal_synthetic import (
     CommonCrawlSignalSyntheticService,
 )
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from data_platform.services.generation_staging import GenerationStagingService
+from data_platform.services.shared.generation_staging import GenerationStagingService
 
 
 def test_generation_staging_builds_bundle_counts() -> None:

@@ -28,7 +28,7 @@ from data_platform.extractors.phishtank import (
     PhishTankFeedClient,
     PhishTankIngestionService,
 )
-from data_platform.services.snapshot_storage import (
+from data_platform.services.shared.snapshot_storage import (
     LocalSnapshotStore,
     SnapshotWriteResult,
 )
@@ -73,7 +73,9 @@ async def session_factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
         await conn.run_sync(Base.metadata.create_all)
 
     factory = async_sessionmaker(
-        engine, expire_on_commit=False, class_=AsyncSession,
+        engine,
+        expire_on_commit=False,
+        class_=AsyncSession,
     )
 
     try:
@@ -89,9 +91,7 @@ async def session_factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
 
 def test_feed_url_without_api_key() -> None:
     client = PhishTankFeedClient()
-    assert client.feed_url == (
-        "https://data.phishtank.com/data/online-valid.csv"
-    )
+    assert client.feed_url == ("https://data.phishtank.com/data/online-valid.csv")
 
 
 def test_feed_url_with_api_key() -> None:
@@ -175,9 +175,7 @@ async def test_phishtank_ingestion_filters_french_only(
 
     async with session_factory() as session:
         result = await service.run(session, trigger_mode="manual")
-        records = list(
-            (await session.scalars(select(DataRawRecord))).all()
-        )
+        records = list((await session.scalars(select(DataRawRecord))).all())
 
     assert result.total_feed_count == 4
     assert result.filtered_count == 2  # paypal + wellsfargo
@@ -232,9 +230,7 @@ async def test_phishtank_ingestion_persists_lineage(
 
         ingestion_run = await session.scalar(select(DataIngestionRun))
         raw_object = await session.scalar(select(DataRawObject))
-        raw_records = list(
-            (await session.scalars(select(DataRawRecord))).all()
-        )
+        raw_records = list((await session.scalars(select(DataRawRecord))).all())
 
     assert result.raw_object_count == 1
     assert result.raw_record_count == 2
@@ -332,7 +328,8 @@ async def test_phishtank_dedup_ingests_only_new_entries(
         return first_batch
 
     service1 = PhishTankIngestionService(
-        fetch_entries=fetch_first, snapshot_store=store,
+        fetch_entries=fetch_first,
+        snapshot_store=store,
     )
     async with session_factory() as session:
         result1 = await service1.run(session, trigger_mode="manual")
@@ -342,7 +339,8 @@ async def test_phishtank_dedup_ingests_only_new_entries(
         return second_batch
 
     service2 = PhishTankIngestionService(
-        fetch_entries=fetch_second, snapshot_store=store,
+        fetch_entries=fetch_second,
+        snapshot_store=store,
     )
     async with session_factory() as session:
         result2 = await service2.run(session, trigger_mode="scheduled")
@@ -365,7 +363,8 @@ async def test_phishtank_empty_feed(
 
     store = RecordingSnapshotStore()
     service = PhishTankIngestionService(
-        fetch_entries=fetch_entries, snapshot_store=store,
+        fetch_entries=fetch_entries,
+        snapshot_store=store,
     )
 
     async with session_factory() as session:
@@ -394,7 +393,8 @@ async def test_phishtank_no_french_entries(
 
     store = RecordingSnapshotStore()
     service = PhishTankIngestionService(
-        fetch_entries=fetch_entries, snapshot_store=store,
+        fetch_entries=fetch_entries,
+        snapshot_store=store,
     )
 
     async with session_factory() as session:
@@ -420,14 +420,13 @@ async def test_phishtank_entry_without_url_marked_unusable(
 
     store = RecordingSnapshotStore()
     service = PhishTankIngestionService(
-        fetch_entries=fetch_entries, snapshot_store=store,
+        fetch_entries=fetch_entries,
+        snapshot_store=store,
     )
 
     async with session_factory() as session:
         result = await service.run(session, trigger_mode="scheduled")
-        records = list(
-            (await session.scalars(select(DataRawRecord))).all()
-        )
+        records = list((await session.scalars(select(DataRawRecord))).all())
 
     # Entry without URL has empty string → _is_french_target("") → False
     # So only the .fr entry passes the French filter

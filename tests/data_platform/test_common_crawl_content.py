@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from data_platform.services.common_crawl_content import CommonCrawlContentService
+from data_platform.services.common_crawl.content import CommonCrawlContentService
 
 
 def test_common_crawl_content_service_extracts_message_from_noisy_text() -> None:

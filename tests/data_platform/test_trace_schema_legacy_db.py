@@ -24,7 +24,7 @@ from data_platform.extractors.legacy_db import (
     LegacyDbConnector,
     LegacyDbIngestionService,
 )
-from data_platform.services.snapshot_storage import SnapshotWriteResult
+from data_platform.services.shared.snapshot_storage import SnapshotWriteResult
 
 
 # ---------------------------------------------------------------------------

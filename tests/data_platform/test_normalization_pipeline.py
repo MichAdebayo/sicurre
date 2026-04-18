@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from data_platform.services.normalization_pipeline import NormalizationPipeline
+from data_platform.services.shared.normalization_pipeline import NormalizationPipeline
 from db.models.lineage import NormalizedLabel, RedactionStatus
 
 

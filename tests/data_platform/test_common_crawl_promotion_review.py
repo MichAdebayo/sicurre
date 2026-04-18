@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from data_platform.services.common_crawl_promotion_review import (
+from data_platform.services.common_crawl.promotion_review import (
     CommonCrawlPromotionReviewService,
 )
 

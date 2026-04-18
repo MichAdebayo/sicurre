@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from data_platform.services.certfr_signal_summary import CertFRSignalSummaryService
+from data_platform.services.certfr.signal_summary import CertFRSignalSummaryService
 
 
 def test_certfr_signal_summary_aggregates_themes_and_iocs() -> None:

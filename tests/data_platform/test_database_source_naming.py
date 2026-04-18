@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from data_platform.services.database_source_naming import (
+from data_platform.services.database.source_naming import (
     build_database_source_path,
     canonical_database_source,
     database_source_family,

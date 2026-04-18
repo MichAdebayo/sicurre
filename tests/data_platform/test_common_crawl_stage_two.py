@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from data_platform.services.common_crawl_stage_two import CommonCrawlStageTwoService
+from data_platform.services.common_crawl.stage_two import CommonCrawlStageTwoService
 
 
 def test_common_crawl_stage_two_accepts_transactional_legitimate() -> None:

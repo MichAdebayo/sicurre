@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from data_platform.services.llm_generation_feasibility import (
+from data_platform.services.shared.llm_generation_feasibility import (
     LLMGenerationFeasibilityService,
     OpenAICompatibleInferenceClient,
 )

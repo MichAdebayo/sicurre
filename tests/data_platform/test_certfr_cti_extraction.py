@@ -27,7 +27,7 @@ from data_platform.extractors.certfr_cti import (
     CertFRCtiExtractor,
     ExtractedContent,
 )
-from data_platform.services.snapshot_storage import (
+from data_platform.services.shared.snapshot_storage import (
     LocalSnapshotStore,
     SnapshotWriteResult,
 )

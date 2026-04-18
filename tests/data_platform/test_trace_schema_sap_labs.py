@@ -23,7 +23,7 @@ from data_platform.extractors.sap_labs import (
     SapLabsIngestionService,
     SapLabsScraperClient,
 )
-from data_platform.services.snapshot_storage import SnapshotWriteResult
+from data_platform.services.shared.snapshot_storage import SnapshotWriteResult
 
 
 # ---------------------------------------------------------------------------
