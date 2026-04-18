@@ -27,7 +27,7 @@ async def main() -> None:
     parser.add_argument(
         "--historical",
         action="store_true",
-        help="Scrape the paginated HTML indexes to discover all historical CTI/IOC reports instead of using the RSS feed.",
+        help="Crawl the full paginated CTI/IOC indexes instead of the capped scheduled scan.",
     )
     args = parser.parse_args()
 

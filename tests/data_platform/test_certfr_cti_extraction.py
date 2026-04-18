@@ -149,6 +149,14 @@ class RecordingSnapshotStore:
         )
 
 
+def _static_discover_entries(entries: list[dict[str, object]]):
+    async def discover_entries(fetch_historical: bool) -> list[dict[str, object]]:
+        del fetch_historical
+        return entries
+
+    return discover_entries
+
+
 @pytest_asyncio.fixture
 async def session_factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     engine = create_async_engine(
@@ -159,7 +167,9 @@ async def session_factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
         await conn.run_sync(Base.metadata.create_all)
 
     factory = async_sessionmaker(
-        engine, expire_on_commit=False, class_=AsyncSession,
+        engine,
+        expire_on_commit=False,
+        class_=AsyncSession,
     )
     try:
         yield factory
@@ -274,39 +284,6 @@ def test_classify_phishing_via_ransomware_keyword() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Unit tests — RSS feed parsing
-# ---------------------------------------------------------------------------
-
-
-def test_parse_feed_extracts_cti_references() -> None:
-    payload = b"""<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0">
-  <channel>
-    <title>CERT-FR CTI</title>
-    <item>
-      <title>Panorama de la cybermenace 2024</title>
-      <link>https://www.cert.ssi.gouv.fr/cti/CERTFR-2025-CTI-003/</link>
-      <guid>https://www.cert.ssi.gouv.fr/cti/CERTFR-2025-CTI-003/</guid>
-      <pubDate>Tue, 11 Mar 2025 00:00:00 +0000</pubDate>
-      <description>Panorama annuel.</description>
-    </item>
-    <item>
-      <title>Not a CTI entry</title>
-      <link>https://www.cert.ssi.gouv.fr/avis/CERTFR-2025-AVI-001/</link>
-      <guid>https://www.cert.ssi.gouv.fr/avis/CERTFR-2025-AVI-001/</guid>
-    </item>
-  </channel>
-</rss>
-"""
-    entries = CertFRCtiExtractor._parse_feed(payload)
-
-    # Only the CTI entry should be returned (AVI is filtered by regex)
-    assert len(entries) == 1
-    assert entries[0]["reference"] == "CERTFR-2025-CTI-003"
-    assert entries[0]["title"] == "Panorama de la cybermenace 2024"
-
-
-# ---------------------------------------------------------------------------
 # Integration tests — full extraction flow
 # ---------------------------------------------------------------------------
 
@@ -316,9 +293,6 @@ async def test_extraction_with_pdf_creates_lineage(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     """PDF available → pdfplumber extraction → persists full lineage."""
-
-    async def fetch_feed() -> list[dict[str, object]]:
-        return [SAMPLE_CTI_ENTRIES[0]]
 
     async def download_url(url: str) -> httpx.Response:
         # Simulate PDF endpoint returning text (pdfplumber needs real
@@ -333,7 +307,7 @@ async def test_extraction_with_pdf_creates_lineage(
 
     store = RecordingSnapshotStore()
     extractor = CertFRCtiExtractor(
-        fetch_feed=fetch_feed,
+        discover_entries=_static_discover_entries([SAMPLE_CTI_ENTRIES[0]]),
         download_url=download_url,
         snapshot_store=store,
         delay_between_requests=0,
@@ -358,9 +332,7 @@ async def test_extraction_with_pdf_creates_lineage(
 
             ingestion_run = await session.scalar(select(DataIngestionRun))
             raw_object = await session.scalar(select(DataRawObject))
-            raw_records = list(
-                (await session.scalars(select(DataRawRecord))).all()
-            )
+            raw_records = list((await session.scalars(select(DataRawRecord))).all())
     finally:
         CertFRCtiExtractor._extract_text_from_pdf = original_extract  # type: ignore[assignment]
 
@@ -402,9 +374,6 @@ async def test_extraction_html_fallback_when_no_pdf(
 ) -> None:
     """No PDF (404) → HTML scraping fallback → not treated as error."""
 
-    async def fetch_feed() -> list[dict[str, object]]:
-        return [SAMPLE_CTI_ENTRIES[1]]
-
     async def download_url(url: str) -> httpx.Response:
         if url.endswith(".pdf"):
             return _mock_response(404)  # no PDF — expected
@@ -414,7 +383,7 @@ async def test_extraction_html_fallback_when_no_pdf(
 
     store = RecordingSnapshotStore()
     extractor = CertFRCtiExtractor(
-        fetch_feed=fetch_feed,
+        discover_entries=_static_discover_entries([SAMPLE_CTI_ENTRIES[1]]),
         download_url=download_url,
         snapshot_store=store,
         delay_between_requests=0,
@@ -424,9 +393,7 @@ async def test_extraction_html_fallback_when_no_pdf(
         result = await extractor.run(session, trigger_mode="scheduled")
 
         raw_object = await session.scalar(select(DataRawObject))
-        raw_records = list(
-            (await session.scalars(select(DataRawRecord))).all()
-        )
+        raw_records = list((await session.scalars(select(DataRawRecord))).all())
 
     # Should succeed without any failures
     assert result.extracted_count == 1
@@ -450,9 +417,6 @@ async def test_extraction_skips_already_extracted(
     """Reports already extracted are skipped — no duplicate processing."""
     call_count = 0
 
-    async def fetch_feed() -> list[dict[str, object]]:
-        return [SAMPLE_CTI_ENTRIES[0]]
-
     async def download_url(url: str) -> httpx.Response:
         nonlocal call_count
         if url.endswith(".pdf"):
@@ -466,7 +430,7 @@ async def test_extraction_skips_already_extracted(
 
     store = RecordingSnapshotStore()
     extractor = CertFRCtiExtractor(
-        fetch_feed=fetch_feed,
+        discover_entries=_static_discover_entries([SAMPLE_CTI_ENTRIES[0]]),
         download_url=download_url,
         snapshot_store=store,
         delay_between_requests=0,
@@ -504,14 +468,11 @@ async def test_extraction_skips_already_extracted(
 async def test_extraction_no_entries_in_feed(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    """Empty feed → completed with zero counts, not an error."""
-
-    async def fetch_feed() -> list[dict[str, object]]:
-        return []
+    """Empty index crawl → completed with zero counts, not an error."""
 
     store = RecordingSnapshotStore()
     extractor = CertFRCtiExtractor(
-        fetch_feed=fetch_feed,
+        discover_entries=_static_discover_entries([]),
         snapshot_store=store,
         delay_between_requests=0,
     )
@@ -523,7 +484,7 @@ async def test_extraction_no_entries_in_feed(
     assert result.discovered_count == 0
     assert result.extracted_count == 0
     assert result.failed_count == 0
-    assert "No CTI entries found" in result.log_message
+    assert "paginated indexes" in result.log_message
     assert ingestion_run is not None
     assert ingestion_run.status == "completed"
 
@@ -533,9 +494,6 @@ async def test_extraction_partial_failure(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     """One report succeeds, one fails → status is 'partial'."""
-
-    async def fetch_feed() -> list[dict[str, object]]:
-        return list(SAMPLE_CTI_ENTRIES)
 
     async def download_url(url: str) -> httpx.Response:
         if "CERTFR-2025-CTI-011" in url and url.endswith(".pdf"):
@@ -549,7 +507,7 @@ async def test_extraction_partial_failure(
 
     store = RecordingSnapshotStore()
     extractor = CertFRCtiExtractor(
-        fetch_feed=fetch_feed,
+        discover_entries=_static_discover_entries(list(SAMPLE_CTI_ENTRIES)),
         download_url=download_url,
         snapshot_store=store,
         delay_between_requests=0,
@@ -572,9 +530,6 @@ async def test_extraction_with_local_snapshot_store(
 ) -> None:
     """Verify PDF text is stored as a local file snapshot."""
 
-    async def fetch_feed() -> list[dict[str, object]]:
-        return [SAMPLE_CTI_ENTRIES[0]]
-
     async def download_url(url: str) -> httpx.Response:
         if url.endswith(".pdf"):
             return _mock_response(
@@ -586,7 +541,7 @@ async def test_extraction_with_local_snapshot_store(
 
     local_store = LocalSnapshotStore(root_dir=tmp_path, repo_root=tmp_path)
     extractor = CertFRCtiExtractor(
-        fetch_feed=fetch_feed,
+        discover_entries=_static_discover_entries([SAMPLE_CTI_ENTRIES[0]]),
         download_url=download_url,
         snapshot_dir=tmp_path,
         snapshot_store=local_store,

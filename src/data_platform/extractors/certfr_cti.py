@@ -1,8 +1,8 @@
 """CERT-FR CTI content extraction — single-pass automated job.
 
-Discovers new CTI reports via the RSS feed, downloads the PDF (or scrapes
-the web page when no PDF exists), extracts text and IOCs, and stores
-everything in a single ``DataIngestionRun``.
+Discovers new CTI and IOC reports via the paginated CERT-FR indexes,
+downloads the PDF (or scrapes the web page when no PDF exists), extracts
+text and IOCs, and stores everything in a single ``DataIngestionRun``.
 
 Designed to run **bi-weekly** via an external scheduler (cron / Cloud
 Scheduler).  Most runs will find zero new reports and exit cheaply.
@@ -21,7 +21,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import feedparser
 import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -57,7 +56,6 @@ from core.trace_logger import SemanticTraceLogger
 # ---------------------------------------------------------------------------
 
 REPO_ROOT = ROOT_DIR
-CERTFR_CTI_FEED_URL = "https://www.cert.ssi.gouv.fr/cti/feed/"
 CERTFR_PDF_BASE = "https://www.cert.ssi.gouv.fr/uploads"
 CERTFR_REFERENCE_RE = re.compile(r"(CERTFR-\d{4}-(?:CTI|IOC)-\d+)", re.IGNORECASE)
 DEFAULT_SOURCE_NAME = "cert-fr-cti"
@@ -162,7 +160,7 @@ class CertFRCtiResult:
 class CertFRCtiExtractor:
     """Single-pass CERT-FR CTI extraction job.
 
-    1. Fetch the CTI RSS feed to discover available reports.
+    1. Crawl the CERT-FR CTI/IOC indexes to discover available reports.
     2. Skip reports already stored (dedup by ``external_ref``).
     3. For each new report, try downloading the PDF; fall back to HTML.
     4. Extract text, IOCs, and phishing relevance.
@@ -172,9 +170,10 @@ class CertFRCtiExtractor:
     def __init__(
         self,
         *,
-        feed_url: str = CERTFR_CTI_FEED_URL,
         pdf_base_url: str = CERTFR_PDF_BASE,
-        fetch_feed: Callable[[], Awaitable[list[dict[str, Any]]]] | None = None,
+        discover_entries: (
+            Callable[[bool], Awaitable[list[dict[str, Any]]]] | None
+        ) = None,
         download_url: Callable[[str], Awaitable[httpx.Response]] | None = None,
         snapshot_dir: Path = DEFAULT_SNAPSHOT_DIR,
         snapshot_store: SnapshotStore | None = None,
@@ -184,9 +183,8 @@ class CertFRCtiExtractor:
         delay_between_requests: float = 2.0,
         max_discovery_pages: int | None = 3,
     ) -> None:
-        self.feed_url = feed_url
         self.pdf_base_url = pdf_base_url.rstrip("/")
-        self._fetch_feed = fetch_feed
+        self._discover_entries_override = discover_entries
         self._download_url = download_url
         self.snapshot_dir = snapshot_dir
         self.snapshot_prefix = snapshot_prefix
@@ -249,7 +247,7 @@ class CertFRCtiExtractor:
             status="start",
             entity_type="DataIngestionRun",
             entity_id=str(ingestion_run.id),
-            message="Connecting to CERT-FR RSS Feed/Archives...",
+            message="Discovering CERT-FR CTI and IOC entries from paginated indexes...",
         )
 
         result = CertFRCtiResult(
@@ -267,14 +265,16 @@ class CertFRCtiExtractor:
             result.discovered_count = len(entries)
 
             if not entries:
-                result.log_message = "No CTI entries found in RSS feed"
+                result.log_message = (
+                    "No CERT-FR CTI or IOC entries found in paginated indexes"
+                )
                 await self._finish_run(ingestion_run, IngestionStatus.COMPLETED, result)
                 await session.commit()
                 trace.trace(
                     stage="ingestion",
                     status="success",
-                    metrics={"feed_count": 0},
-                    message="CERT-FR RSS feed returned 0 entries — nothing to parse.",
+                    metrics={"discovered_count": 0},
+                    message="CERT-FR paginated indexes returned 0 entries — nothing to parse.",
                 )
                 return result
 
@@ -381,46 +381,17 @@ class CertFRCtiExtractor:
     async def _discover_entries(
         self, fetch_historical: bool = False
     ) -> list[dict[str, Any]]:
-        """Discover CTI entries via the paginated advisory index.
+        """Discover CTI and IOC entries from the paginated CERT-FR indexes.
 
-        Uses ``_discover_historical_entries`` for all modes.
-        - Cron (``fetch_historical=False``): caps at ``self.max_discovery_pages``
-          (default 3) to limit network calls.
-        - Full backfill (``fetch_historical=True``): unlimited pages.
+        - Scheduled/manual incremental runs cap discovery to
+          ``self.max_discovery_pages`` pages per base URL.
+        - Historical runs crawl all available pages.
         """
-        if self._fetch_feed is not None:
-            # Test injection: use the injected feed callable directly.
-            return await self._fetch_feed()
+        if self._discover_entries_override is not None:
+            return await self._discover_entries_override(fetch_historical)
 
         max_pages = None if fetch_historical else self.max_discovery_pages
-        return await self._discover_historical_entries(max_pages=max_pages)
-
-    @staticmethod
-    def _parse_feed(payload: bytes) -> list[dict[str, Any]]:
-        parsed = feedparser.parse(payload)
-        entries: list[dict[str, Any]] = []
-        for entry in parsed.entries:
-            title = (str(entry.get("title") or "")).strip() or None
-            link = (str(entry.get("link") or "")).strip() or None
-            guid = (str(entry.get("id") or "")).strip() or None
-            reference = CertFRCtiExtractor._extract_reference(
-                guid,
-                link,
-                title,
-            )
-            if reference is None:
-                continue  # not a valid CTI entry
-            entries.append(
-                {
-                    "title": title,
-                    "link": link,
-                    "guid": guid,
-                    "reference": reference,
-                    "published": (str(entry.get("published") or "")).strip() or None,
-                    "summary": (str(entry.get("summary") or "")).strip() or None,
-                }
-            )
-        return entries
+        return await self._discover_index_entries(max_pages=max_pages)
 
     @staticmethod
     def _extract_reference(*candidates: str | None) -> str | None:
@@ -432,7 +403,7 @@ class CertFRCtiExtractor:
                 return match.group(1).upper()
         return None
 
-    async def _discover_historical_entries(
+    async def _discover_index_entries(
         self,
         max_pages: int | None = None,
     ) -> list[dict[str, Any]]:
