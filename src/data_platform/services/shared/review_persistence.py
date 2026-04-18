@@ -30,7 +30,7 @@ from db.models import (
     RedactionStatus,
     SourceType,
 )
-from data_platform.services.common_crawl_promotion_review import (
+from data_platform.services.common_crawl.promotion_review import (
     CommonCrawlPromotionReviewService,
 )
 
@@ -97,12 +97,8 @@ def _normalize_generation_source_link_role(
         "reference": GenerationSourceLinkRole.NEAREST_REFERENCE.value,
     }
     normalized_value = legacy_aliases.get(resolved_value, resolved_value)
-    if normalized_value not in {
-        item.value for item in GenerationSourceLinkRole
-    }:
-        raise ValueError(
-            f"Unsupported generation source link role: {resolved_value}"
-        )
+    if normalized_value not in {item.value for item in GenerationSourceLinkRole}:
+        raise ValueError(f"Unsupported generation source link role: {resolved_value}")
     return normalized_value
 
 
@@ -132,7 +128,9 @@ def _append_generation_source_link(
     )
 
 
-def _collect_generation_source_links(sample_payload: dict[str, Any]) -> list[dict[str, Any]]:
+def _collect_generation_source_links(
+    sample_payload: dict[str, Any],
+) -> list[dict[str, Any]]:
     links: list[dict[str, Any]] = []
     seen: set[tuple[UUID, str]] = set()
     next_order = 0
@@ -158,7 +156,11 @@ def _collect_generation_source_links(sample_payload: dict[str, Any]) -> list[dic
             if len(links) > before_count:
                 next_order = max(next_order, link_order + 1)
 
-    for field_name in ("source_raw_record_id", "en_source_raw_record_id", "raw_record_id"):
+    for field_name in (
+        "source_raw_record_id",
+        "en_source_raw_record_id",
+        "raw_record_id",
+    ):
         before_count = len(links)
         _append_generation_source_link(
             links,
@@ -317,12 +319,16 @@ class ReviewPersistenceService:
         generation_run_id: UUID,
     ) -> dict[tuple[str, int], UUID]:
         rows = (
-            await session.execute(
-                select(DataGenerationSample).where(
-                    DataGenerationSample.generation_run_id == generation_run_id
+            (
+                await session.execute(
+                    select(DataGenerationSample).where(
+                        DataGenerationSample.generation_run_id == generation_run_id
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         return {
             (sample.draft_id, int(sample.variant_index)): sample.id for sample in rows
         }
@@ -567,7 +573,9 @@ class ReviewPersistenceService:
     ) -> dict[str, Any]:
         run_payload = dict(payload.get("run") or {})
         resolved_generation_run_id = _parse_uuid(
-            generation_run_id or payload.get("generation_run_id") or run_payload.get("generation_run_id")
+            generation_run_id
+            or payload.get("generation_run_id")
+            or run_payload.get("generation_run_id")
         )
         promoted_samples, selected_draft_ids = (
             ReviewPersistenceService._select_promoted_samples(
@@ -622,9 +630,11 @@ class ReviewPersistenceService:
 
         generation_sample_index: dict[tuple[str, int], UUID] = {}
         if resolved_generation_run_id is not None:
-            generation_sample_index = await ReviewPersistenceService._load_generation_sample_index(
-                session,
-                generation_run_id=resolved_generation_run_id,
+            generation_sample_index = (
+                await ReviewPersistenceService._load_generation_sample_index(
+                    session,
+                    generation_run_id=resolved_generation_run_id,
+                )
             )
             missing_variants = [
                 (

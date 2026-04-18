@@ -14,14 +14,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from data_platform.cleaning.normalization import TextNormalizationService
-from data_platform.services.database_source_naming import (
+from data_platform.services.database.source_naming import (
     DATABASE_PARENT_SOURCE,
     canonical_database_source,
 )
-from data_platform.services.certfr_stage_two import CertFRStageTwoService
-from data_platform.services.common_crawl_content import CommonCrawlContentService
-from data_platform.services.common_crawl_stage_two import CommonCrawlStageTwoService
-from data_platform.services.historical_stage_two import HistoricalStageTwoService
+from data_platform.services.certfr.stage_two import CertFRStageTwoService
+from data_platform.services.common_crawl.content import CommonCrawlContentService
+from data_platform.services.common_crawl.stage_two import CommonCrawlStageTwoService
+from data_platform.services.database.historical_stage_two import (
+    HistoricalStageTwoService,
+)
 from db.models.lineage import (
     DataRawRecord,
     DataNormalizedMessage,

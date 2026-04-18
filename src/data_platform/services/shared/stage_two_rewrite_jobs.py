@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from data_platform.services.database_source_naming import canonical_database_source
+from data_platform.services.database.source_naming import canonical_database_source
 
 
 class StageTwoRewriteJobService:

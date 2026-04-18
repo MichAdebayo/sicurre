@@ -12,13 +12,12 @@ from faker import Faker
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from data_platform.services.external_db_cron_scenarios import (
+from data_platform.services.database.cron_scenarios import (
     CRON_ARCHETYPE_SCENARIOS,
     CRON_ARCHETYPE_SCENARIOS_BY_CLASS,
     CronArchetypeScenario,
 )
-from data_platform.services.database_source_naming import build_database_source_path
-from data_platform.services.external_db_seed import (
+from data_platform.services.database.seed import (
     Base,
     DB_DIR,
     ExternalModelVersion,
@@ -26,7 +25,10 @@ from data_platform.services.external_db_seed import (
     ExternalUser,
     redact_pii,
 )
-from data_platform.services.synthetic_generation import SyntheticGenerationService
+from data_platform.services.database.source_naming import build_database_source_path
+from data_platform.services.shared.synthetic_generation import (
+    SyntheticGenerationService,
+)
 
 
 DEFAULT_CRON_FEED_DB_PATH = DB_DIR / "external_threats_cron_test.db"

@@ -4,11 +4,11 @@ import re
 from typing import Any
 
 from db.models.lineage import NormalizedLabel
-from data_platform.services.database_source_naming import (
+from data_platform.services.database.source_naming import (
     database_source_family,
     database_source_leaf,
 )
-from data_platform.services.stage_two_models import StageTwoReviewResult
+from data_platform.services.shared.stage_two_models import StageTwoReviewResult
 
 
 class HistoricalStageTwoService:

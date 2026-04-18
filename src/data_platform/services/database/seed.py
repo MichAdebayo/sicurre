@@ -23,9 +23,11 @@ from sqlalchemy import (
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from core.config import ROOT_DIR
-from data_platform.services.adaptation import FrenchCulturalAdaptationService
-from data_platform.services.database_source_naming import build_database_source_path
-from data_platform.services.synthetic_generation import SyntheticGenerationService
+from data_platform.services.database.source_naming import build_database_source_path
+from data_platform.services.shared.adaptation import FrenchCulturalAdaptationService
+from data_platform.services.shared.synthetic_generation import (
+    SyntheticGenerationService,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -33,8 +35,10 @@ DB_DIR = ROOT_DIR / "data" / "raw" / "db"
 DB_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DB_DIR / "external_threats.db"
 DB_URL = f"sqlite:///{DB_PATH}"
-CORPUS_PATH = ROOT_DIR / "data" / "raw" / "csv" / "en" / "combined_final_clean.csv"
-TXT_DIR = ROOT_DIR / "data" / "raw" / "txt"
+CORPUS_PATH = (
+    ROOT_DIR / "data" / "raw" / "file" / "csv" / "en" / "combined_final_clean.csv"
+)
+TXT_DIR = ROOT_DIR / "data" / "raw" / "file" / "txt"
 SEED = 42
 SYNTHETIC_PHISHING_COUNT = 2863
 
@@ -399,7 +403,7 @@ def append_to_database(
     Unlike :func:`seed_external_database`, this function does **not** delete
     existing rows.  It reads the existing users and model version tags from the
     target DB, then generates *n* new :class:`ExternalThreatLog` rows using
-    :class:`~data_platform.services.synthetic_generation.SyntheticGenerationService`.
+    :class:`~data_platform.services.shared.synthetic_generation.SyntheticGenerationService`.
 
     Designed for incremental cron validation: run ``append_to_database(100)``
     between two ingestion runs to confirm exactly 100 new rows are picked up.

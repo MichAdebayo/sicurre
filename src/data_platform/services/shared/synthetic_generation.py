@@ -12,7 +12,7 @@ import pandas as pd
 from faker import Faker
 
 from core.config import ROOT_DIR
-from data_platform.services.preprocessing import (
+from data_platform.services.shared.preprocessing import (
     DataFramePreprocessingService,
     save_processed_csv,
 )
@@ -219,8 +219,10 @@ class SyntheticGenerationService:
 
     def add_text_hashes(self, dataframe: pd.DataFrame) -> pd.DataFrame:
         output_df = dataframe.copy()
-        output_df["text_hash"] = output_df["text"].astype(str).apply(
-            lambda value: sha256(value.encode("utf-8")).hexdigest()
+        output_df["text_hash"] = (
+            output_df["text"]
+            .astype(str)
+            .apply(lambda value: sha256(value.encode("utf-8")).hexdigest())
         )
         return output_df
 
@@ -250,7 +252,9 @@ class SyntheticGenerationService:
         print(f"  ✅ Saved {out_path} ({len(cleaned_df)} rows, {class_name})")
         return out_path
 
-    def save_generated_dataframe(self, class_name: str, dataframe: pd.DataFrame) -> Path:
+    def save_generated_dataframe(
+        self, class_name: str, dataframe: pd.DataFrame
+    ) -> Path:
         cleaned_df = self.add_text_hashes(dataframe)
 
         match class_name:
@@ -282,7 +286,9 @@ class SyntheticGenerationService:
                 output_path=None,
             )
 
-        cleaned_df = self.add_text_hashes(self.generate_cleaned_class(class_name, count))
+        cleaned_df = self.add_text_hashes(
+            self.generate_cleaned_class(class_name, count)
+        )
         output_path = (
             self.save_generated_dataframe(class_name, cleaned_df) if export else None
         )

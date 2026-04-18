@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from data_platform.services.stage_two_models import StageTwoReviewResult
+from data_platform.services.shared.stage_two_models import StageTwoReviewResult
 
 
 class CommonCrawlStageTwoService:

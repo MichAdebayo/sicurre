@@ -4,7 +4,7 @@ import re
 from typing import Any
 
 from data_platform.extractors.certfr_cti import CertFRCtiExtractor
-from data_platform.services.stage_two_models import StageTwoReviewResult
+from data_platform.services.shared.stage_two_models import StageTwoReviewResult
 
 
 class CertFRStageTwoService:

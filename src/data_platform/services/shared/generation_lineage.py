@@ -9,8 +9,8 @@ import pandas as pd
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from core.config import get_settings
-from data_platform.services.generation_staging import GenerationStagingService
-from data_platform.services.review_persistence import ReviewPersistenceService
+from data_platform.services.shared.generation_staging import GenerationStagingService
+from data_platform.services.shared.review_persistence import ReviewPersistenceService
 
 
 def _resolved_run_timestamp(run_timestamp: str | None) -> str:
@@ -18,7 +18,9 @@ def _resolved_run_timestamp(run_timestamp: str | None) -> str:
 
 
 def _coerce_source_parent(values: list[str]) -> str | None:
-    normalized_values = sorted({value for value in values if value and value != "unknown"})
+    normalized_values = sorted(
+        {value for value in values if value and value != "unknown"}
+    )
     if not normalized_values:
         return None
     return ",".join(normalized_values)
@@ -93,7 +95,9 @@ def build_synthetic_generation_bundle(
             "primary_theme": str(row.get("archetype") or ""),
             "review_state": "usable",
             "review_notes": [],
-            "text_sha256": sha256(str(row.get("text") or "").encode("utf-8")).hexdigest(),
+            "text_sha256": sha256(
+                str(row.get("text") or "").encode("utf-8")
+            ).hexdigest(),
             "normalized_text": str(row.get("text") or ""),
             "language": str(row.get("language") or "fr"),
         }
