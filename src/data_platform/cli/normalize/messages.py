@@ -19,6 +19,7 @@ if str(SRC_ROOT) not in sys.path:
 load_dotenv(ROOT_DIR / ".env")
 
 from core.config import get_settings  # noqa: E402
+from core.trace_logger import SemanticTraceLogger  # noqa: E402
 from data_platform.services.shared.normalization_pipeline import (
     NormalizationPipeline,
 )  # noqa: E402
@@ -225,120 +226,170 @@ if __name__ == "__main__":
             class_=AsyncSession,
         )
         logger.info("Connecting to database: %s", settings.database_url)
+        trace = SemanticTraceLogger(
+            parent_type="Normalization",
+            child_target="Message Normalization",
+            domain="data_platform",
+        )
+        trace.trace(
+            stage="orchestration",
+            status="start",
+            message="Normalization CLI starting",
+            metrics={
+                "dry_run": int(args.dry_run),
+                "review_live_sources": int(args.review_live_sources),
+                "batch_size": args.batch_size,
+            },
+        )
 
-        async with session_maker() as session:
-            pipeline = NormalizationPipeline(session)
-            if args.review_live_sources:
-                result = await pipeline.review_live_sources(
-                    samples_per_source=args.samples_per_source,
-                    source_system_name=args.source,
-                    source_type=args.source_type,
-                    route_outcome_filter=args.route_filter,
-                    route_subtype_filter=args.subtype_filter,
-                    max_kept_samples_per_source=args.max_review_samples,
-                )
-            else:
-                result = await pipeline.run_batch(
-                    batch_size=args.batch_size,
-                    source_system_name=args.source,
-                    dry_run=args.dry_run,
-                )
+        try:
+            async with session_maker() as session:
+                pipeline = NormalizationPipeline(session)
+                if args.review_live_sources:
+                    result = await pipeline.review_live_sources(
+                        samples_per_source=args.samples_per_source,
+                        source_system_name=args.source,
+                        source_type=args.source_type,
+                        route_outcome_filter=args.route_filter,
+                        route_subtype_filter=args.subtype_filter,
+                        max_kept_samples_per_source=args.max_review_samples,
+                    )
+                else:
+                    result = await pipeline.run_batch(
+                        batch_size=args.batch_size,
+                        source_system_name=args.source,
+                        dry_run=args.dry_run,
+                    )
 
-            status = result.get("status")
-            if status in {"error", "skipped"}:
-                logger.info(
-                    result.get(
+                status = result.get("status")
+                if status in {"error", "skipped"}:
+                    message = result.get(
                         "message",
                         "Normalization run exited without processing records.",
                     )
-                )
-                await engine.dispose()
-                return
+                    logger.info(message)
+                    trace.trace(
+                        stage="normalization",
+                        status="skipped",
+                        message=message,
+                    )
+                    return
 
-            if args.review_live_sources:
-                logger.info("--- LIVE SOURCE ROUTE REVIEW ---")
-                for parent_source, source_groups in result.get(
-                    "parent_sources", {}
-                ).items():
-                    logger.info("Parent source: %s", parent_source)
-                    for source_group in source_groups:
-                        logger.info(
-                            "Source %s | lane=%s | routes=%s",
-                            source_group["source"],
-                            source_group["lane"],
-                            source_group["route_summary"],
+                if args.review_live_sources:
+                    logger.info("--- LIVE SOURCE ROUTE REVIEW ---")
+                    for parent_source, source_groups in result.get(
+                        "parent_sources", {}
+                    ).items():
+                        logger.info("Parent source: %s", parent_source)
+                        for source_group in source_groups:
+                            logger.info(
+                                "Source %s | lane=%s | routes=%s",
+                                source_group["source"],
+                                source_group["lane"],
+                                source_group["route_summary"],
+                            )
+                    if args.review_output:
+                        args.review_output.parent.mkdir(parents=True, exist_ok=True)
+                        args.review_output.write_text(
+                            _render_review_markdown(
+                                result,
+                                args.source,
+                                args.source_type,
+                                args.subtype_filter,
+                            ),
+                            encoding="utf-8",
                         )
-                if args.review_output:
-                    args.review_output.parent.mkdir(parents=True, exist_ok=True)
-                    args.review_output.write_text(
-                        _render_review_markdown(
-                            result,
-                            args.source,
-                            args.source_type,
-                            args.subtype_filter,
-                        ),
-                        encoding="utf-8",
-                    )
-                    logger.info("Review output written to %s", args.review_output)
-                if args.structured_review_output:
-                    StructuredReviewArtifactService.write_json(
-                        args.structured_review_output,
-                        StructuredReviewArtifactService.build_payload(
-                            result=result,
-                            source_name=args.source,
-                            source_type=args.source_type,
-                            route_outcome_filter=args.route_filter,
-                            route_subtype_filter=args.subtype_filter,
-                        ),
-                    )
+                        logger.info("Review output written to %s", args.review_output)
+                    if args.structured_review_output:
+                        StructuredReviewArtifactService.write_json(
+                            args.structured_review_output,
+                            StructuredReviewArtifactService.build_payload(
+                                result=result,
+                                source_name=args.source,
+                                source_type=args.source_type,
+                                route_outcome_filter=args.route_filter,
+                                route_subtype_filter=args.subtype_filter,
+                            ),
+                        )
+                        logger.info(
+                            "Structured review output written to %s",
+                            args.structured_review_output,
+                        )
                     logger.info(
-                        "Structured review output written to %s",
-                        args.structured_review_output,
+                        "Total reviewed samples: %s", result.get("total_sampled")
                     )
-                logger.info("Total reviewed samples: %s", result.get("total_sampled"))
-            elif args.dry_run:
-                logger.info("--- DRY RUN SAMPLES ---")
-                for sample in result.get("samples", []):
-                    logger.info("Source: %s", sample["source"])
-                    logger.info("Lane: %s", sample["lane"])
-                    logger.info("Label: %s", sample["extracted_label"])
-                    logger.info("Before: %s", sample["raw_preview"])
-                    logger.info("After: %s", sample["normalized_preview"])
-                    logger.info("-" * 40)
-                for sample in result.get("rejections", []):
-                    logger.info("Rejected Source: %s", sample["source"])
-                    logger.info("Lane: %s", sample["lane"])
-                    logger.info("Reason: %s", sample["rejection_reason"])
-                    logger.info("Before: %s", sample["raw_preview"])
-                    logger.info("-" * 40)
-                if skipped_reasons := result.get("skipped_reasons", {}):
-                    logger.info("Skipped during dry run: %s", skipped_reasons)
-                if args.review_output:
-                    args.review_output.parent.mkdir(parents=True, exist_ok=True)
-                    args.review_output.write_text(
-                        _render_dry_run_markdown(result, args.source, args.batch_size),
-                        encoding="utf-8",
+                    trace.trace(
+                        stage="normalization",
+                        status="success",
+                        message="Live source route review completed",
+                        metrics={"total_sampled": result.get("total_sampled", 0)},
                     )
-                    logger.info("Review output written to %s", args.review_output)
-                if args.structured_review_output:
-                    StructuredReviewArtifactService.write_json(
-                        args.structured_review_output,
-                        StructuredReviewArtifactService.build_payload(
-                            result=result,
-                            source_name=args.source,
-                            source_type=None,
-                            route_outcome_filter=None,
-                            route_subtype_filter=None,
-                        ),
-                    )
+                elif args.dry_run:
+                    logger.info("--- DRY RUN SAMPLES ---")
+                    for sample in result.get("samples", []):
+                        logger.info("Source: %s", sample["source"])
+                        logger.info("Lane: %s", sample["lane"])
+                        logger.info("Label: %s", sample["extracted_label"])
+                        logger.info("Before: %s", sample["raw_preview"])
+                        logger.info("After: %s", sample["normalized_preview"])
+                        logger.info("-" * 40)
+                    for sample in result.get("rejections", []):
+                        logger.info("Rejected Source: %s", sample["source"])
+                        logger.info("Lane: %s", sample["lane"])
+                        logger.info("Reason: %s", sample["rejection_reason"])
+                        logger.info("Before: %s", sample["raw_preview"])
+                        logger.info("-" * 40)
+                    if skipped_reasons := result.get("skipped_reasons", {}):
+                        logger.info("Skipped during dry run: %s", skipped_reasons)
+                    if args.review_output:
+                        args.review_output.parent.mkdir(parents=True, exist_ok=True)
+                        args.review_output.write_text(
+                            _render_dry_run_markdown(
+                                result, args.source, args.batch_size
+                            ),
+                            encoding="utf-8",
+                        )
+                        logger.info("Review output written to %s", args.review_output)
+                    if args.structured_review_output:
+                        StructuredReviewArtifactService.write_json(
+                            args.structured_review_output,
+                            StructuredReviewArtifactService.build_payload(
+                                result=result,
+                                source_name=args.source,
+                                source_type=None,
+                                route_outcome_filter=None,
+                                route_subtype_filter=None,
+                            ),
+                        )
+                        logger.info(
+                            "Structured review output written to %s",
+                            args.structured_review_output,
+                        )
                     logger.info(
-                        "Structured review output written to %s",
-                        args.structured_review_output,
+                        "Total processed in dry run: %s", result.get("processed")
                     )
-                logger.info("Total processed in dry run: %s", result.get("processed"))
-            else:
-                logger.info("Execution complete: %s", result)
-
-        await engine.dispose()
+                    trace.trace(
+                        stage="normalization",
+                        status="success",
+                        message="Normalization dry run completed",
+                        metrics={"processed": result.get("processed", 0)},
+                    )
+                else:
+                    logger.info("Execution complete: %s", result)
+                    trace.trace(
+                        stage="normalization",
+                        status="success",
+                        message="Normalization batch completed",
+                        metrics={"processed": result.get("processed", 0)},
+                    )
+        except Exception as exc:
+            trace.trace(
+                stage="orchestration",
+                status="failed",
+                message=f"Normalization CLI failed: {exc}",
+            )
+            raise
+        finally:
+            await engine.dispose()
 
     asyncio.run(_main())

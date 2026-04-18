@@ -25,4 +25,4 @@ if __name__ == "__main__":
         help="Directory to recursively search for CSV files.",
     )
     args = parser.parse_args()
-    asyncio.run(run_ingestion(args.dir))
+    asyncio.run(run_ingestion(args.dir, trigger_mode="scheduled"))

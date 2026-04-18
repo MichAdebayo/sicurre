@@ -4,6 +4,10 @@ import json
 
 import pandas as pd
 
+from data_platform.cli.bigdata.common_crawl_extract import (
+    resolve_crawl_indices,
+    resolve_queries,
+)
 from data_platform.extractors.common_crawl_archive import (
     CommonCrawlArchiveExtractor,
     CommonCrawlArchiveSettings,
@@ -85,6 +89,32 @@ def test_build_usable_frame_keeps_only_french_rows_above_length_threshold() -> N
     usable = extractor._build_usable_frame(dataframe)
 
     assert list(usable["url"]) == ["https://a.example"]
+
+
+def test_resolve_queries_phishing_refresh_excludes_legitimate_queries() -> None:
+    queries = resolve_queries("phishing-refresh")
+
+    assert queries is not None
+    assert {query.category for query in queries} == {"phishing_related", "spam_like"}
+    assert {query.pattern for query in queries} == {
+        "signal-arnaques.com/*",
+        "cybermalveillance.gouv.fr/*",
+        "urlscan.io/result/*",
+        "signal-spam.fr/*",
+        "openphish.com/*",
+        "abuse.ch/*",
+        "*.cdiscount.com/newsletter*",
+    }
+
+
+def test_resolve_crawl_indices_phishing_refresh_uses_bounded_recent_indices() -> None:
+    indices = resolve_crawl_indices("phishing-refresh")
+
+    assert indices == (
+        "CC-MAIN-2025-08",
+        "CC-MAIN-2024-51",
+        "CC-MAIN-2024-42",
+    )
 
 
 def test_prepare_download_frame_balances_categories_and_query_labels() -> None:

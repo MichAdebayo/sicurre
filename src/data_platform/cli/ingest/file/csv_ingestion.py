@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import (  # noqa: E402
 
 from core.config import get_settings  # noqa: E402
 from core.database import Base  # noqa: E402
+from core.trace_logger import SemanticTraceLogger  # noqa: E402
 from db.models import (  # noqa: E402
     DataRawObject,
     DataRawRecord,
@@ -146,8 +147,19 @@ async def ingest_csv_file(
     session: AsyncSession,
     source_repo: SourceSystemQueries,
     run_repo: IngestionRunQueries,
+    *,
+    trigger_mode: str = "manual",
+    trace: SemanticTraceLogger | None = None,
 ) -> CsvIngestionResult:
     logger.info("Processing file: %s", file_path)
+    if trace is not None:
+        trace.trace(
+            stage="ingestion",
+            status="start",
+            message=f"CSV ingestion starting for {file_path.name}",
+            entity_type="csv_file",
+            entity_id=file_path.name,
+        )
 
     try:
         with file_path.open(encoding="utf-8") as file_handle:
@@ -156,12 +168,28 @@ async def ingest_csv_file(
             rows = list(reader)
     except Exception as exc:
         logger.error("Failed to read %s: %s", file_path, exc)
+        if trace is not None:
+            trace.trace(
+                stage="ingestion",
+                status="failed",
+                message=f"CSV read failed for {file_path.name}: {exc}",
+                entity_type="csv_file",
+                entity_id=file_path.name,
+            )
         return CsvIngestionResult(
             file_path=file_path, inserted_count=0, status="read_error"
         )
 
     if not rows:
         logger.warning("File is empty or has no rows. Skipping.")
+        if trace is not None:
+            trace.trace(
+                stage="ingestion",
+                status="skipped",
+                message=f"CSV file {file_path.name} is empty",
+                entity_type="csv_file",
+                entity_id=file_path.name,
+            )
         return CsvIngestionResult(file_path=file_path, inserted_count=0, status="empty")
 
     file_stat = file_path.stat()
@@ -177,16 +205,40 @@ async def ingest_csv_file(
         logger.info(
             "File %s is already ingested (hash matches). Skipping.", file_path.name
         )
+        if trace is not None:
+            trace.trace(
+                stage="ingestion",
+                status="skipped",
+                message=f"CSV file {file_path.name} unchanged; skipping",
+                entity_type="csv_file",
+                entity_id=file_path.name,
+            )
         return CsvIngestionResult(
             file_path=file_path, inserted_count=0, status="skipped_unchanged"
         )
 
     if not _validate_csv_schema(file_path, fieldnames):
+        if trace is not None:
+            trace.trace(
+                stage="ingestion",
+                status="skipped",
+                message=f"CSV file {file_path.name} has invalid schema",
+                entity_type="csv_file",
+                entity_id=file_path.name,
+            )
         return CsvIngestionResult(
             file_path=file_path, inserted_count=0, status="skipped_invalid_schema"
         )
 
     if not _validate_csv_rows(file_path, rows):
+        if trace is not None:
+            trace.trace(
+                stage="ingestion",
+                status="skipped",
+                message=f"CSV file {file_path.name} has invalid rows",
+                entity_type="csv_file",
+                entity_id=file_path.name,
+            )
         return CsvIngestionResult(
             file_path=file_path, inserted_count=0, status="skipped_invalid_rows"
         )
@@ -203,7 +255,7 @@ async def ingest_csv_file(
         session,
         payload=IngestionRunCreate(
             source_system_id=source_sys.id,
-            trigger_mode="manual",
+            trigger_mode=trigger_mode,
             status="pending",
             started_at=started_at,
         ),
@@ -282,6 +334,15 @@ async def ingest_csv_file(
             len(records_to_add),
             file_path.name,
         )
+        if trace is not None:
+            trace.trace(
+                stage="ingestion",
+                status="success",
+                message=f"CSV file {file_path.name} ingested",
+                entity_type="csv_file",
+                entity_id=file_path.name,
+                metrics={"inserted": len(records_to_add)},
+            )
         return CsvIngestionResult(
             file_path=file_path, inserted_count=len(records_to_add), status="ingested"
         )
@@ -308,6 +369,15 @@ async def ingest_csv_file(
             inserted_count,
             file_path.name,
         )
+        if trace is not None:
+            trace.trace(
+                stage="ingestion",
+                status="success",
+                message=f"CSV file {file_path.name} ingested with merge fallback",
+                entity_type="csv_file",
+                entity_id=file_path.name,
+                metrics={"inserted": inserted_count},
+            )
         return CsvIngestionResult(
             file_path=file_path,
             inserted_count=inserted_count,
@@ -315,66 +385,115 @@ async def ingest_csv_file(
         )
 
 
-async def run_ingestion(base_dir: str) -> None:
+async def run_ingestion(base_dir: str, *, trigger_mode: str = "manual") -> None:
     settings = get_settings()
     db_url = settings.database_url
     logger.info("Using database: %s", db_url)
+    trace = SemanticTraceLogger(
+        parent_type="File",
+        child_target="CSV Ingestion",
+        domain="data_platform",
+    )
+    trace.trace(
+        stage="orchestration",
+        status="start",
+        message="CSV ingestion run starting",
+        metrics={"trigger_mode": trigger_mode},
+    )
 
     engine = create_async_engine(db_url, echo=False)
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        session_factory = async_sessionmaker(
+            engine,
+            expire_on_commit=False,
+            class_=AsyncSession,
+        )
 
-    session_factory = async_sessionmaker(
-        engine,
-        expire_on_commit=False,
-        class_=AsyncSession,
-    )
+        source_repo = SourceSystemQueries()
+        run_repo = IngestionRunQueries()
 
-    source_repo = SourceSystemQueries()
-    run_repo = IngestionRunQueries()
+        search_dir = Path(base_dir).resolve()
+        if not search_dir.exists() or not search_dir.is_dir():
+            logger.error("Directory not found: %s", search_dir)
+            trace.trace(
+                stage="orchestration",
+                status="failed",
+                message=f"CSV source directory not found: {search_dir}",
+            )
+            raise SystemExit(1)
 
-    search_dir = Path(base_dir).resolve()
-    if not search_dir.exists() or not search_dir.is_dir():
-        logger.error("Directory not found: %s", search_dir)
-        raise SystemExit(1)
+        csv_files = list(search_dir.rglob("*.csv"))
+        if not csv_files:
+            logger.warning("No .csv files found in %s", search_dir)
+            trace.trace(
+                stage="orchestration",
+                status="skipped",
+                message=f"No CSV files found in {search_dir}",
+            )
+            return
 
-    csv_files = list(search_dir.rglob("*.csv"))
-    if not csv_files:
-        logger.warning("No .csv files found in %s", search_dir)
-        return
+        logger.info("Found %d CSV files to process.", len(csv_files))
 
-    logger.info("Found %d CSV files to process.", len(csv_files))
+        total_inserted = 0
+        status_counts: dict[str, int] = {
+            "ingested": 0,
+            "ingested_merged": 0,
+            "skipped_unchanged": 0,
+            "skipped_invalid_schema": 0,
+            "skipped_invalid_rows": 0,
+            "empty": 0,
+            "read_error": 0,
+        }
+        for csv_file in csv_files:
+            async with session_factory() as session:
+                result = await ingest_csv_file(
+                    csv_file,
+                    session,
+                    source_repo,
+                    run_repo,
+                    trigger_mode=trigger_mode,
+                    trace=trace,
+                )
+                total_inserted += result.inserted_count
+                status_counts[result.status] = status_counts.get(result.status, 0) + 1
 
-    total_inserted = 0
-    status_counts: dict[str, int] = {
-        "ingested": 0,
-        "ingested_merged": 0,
-        "skipped_unchanged": 0,
-        "skipped_invalid_schema": 0,
-        "skipped_invalid_rows": 0,
-        "empty": 0,
-        "read_error": 0,
-    }
-    for csv_file in csv_files:
-        async with session_factory() as session:
-            result = await ingest_csv_file(csv_file, session, source_repo, run_repo)
-            total_inserted += result.inserted_count
-            status_counts[result.status] = status_counts.get(result.status, 0) + 1
-
-    logger.info(
-        "All CSV files processed. Total new records inserted: %d", total_inserted
-    )
-    logger.info(
-        "CSV ingestion summary: ingested=%d, ingested_merged=%d, skipped_unchanged=%d, skipped_invalid_schema=%d, skipped_invalid_rows=%d, empty=%d, read_error=%d",
-        status_counts["ingested"],
-        status_counts["ingested_merged"],
-        status_counts["skipped_unchanged"],
-        status_counts["skipped_invalid_schema"],
-        status_counts["skipped_invalid_rows"],
-        status_counts["empty"],
-        status_counts["read_error"],
-    )
+        logger.info(
+            "All CSV files processed. Total new records inserted: %d", total_inserted
+        )
+        logger.info(
+            "CSV ingestion summary: ingested=%d, ingested_merged=%d, skipped_unchanged=%d, skipped_invalid_schema=%d, skipped_invalid_rows=%d, empty=%d, read_error=%d",
+            status_counts["ingested"],
+            status_counts["ingested_merged"],
+            status_counts["skipped_unchanged"],
+            status_counts["skipped_invalid_schema"],
+            status_counts["skipped_invalid_rows"],
+            status_counts["empty"],
+            status_counts["read_error"],
+        )
+        trace.trace(
+            stage="orchestration",
+            status="success",
+            message="CSV ingestion run completed",
+            metrics={
+                "files": len(csv_files),
+                "inserted": total_inserted,
+                "skipped_unchanged": status_counts["skipped_unchanged"],
+                "invalid_schema": status_counts["skipped_invalid_schema"],
+                "invalid_rows": status_counts["skipped_invalid_rows"],
+            },
+        )
+    except Exception as exc:
+        trace.trace(
+            stage="orchestration",
+            status="failed",
+            message=f"CSV ingestion run failed: {exc}",
+        )
+        raise
+    finally:
+        await engine.dispose()
 
 
 def parse_args() -> argparse.Namespace:
@@ -385,12 +504,18 @@ def parse_args() -> argparse.Namespace:
         default="data/raw/file/csv",
         help="Directory to recursively search for CSV files.",
     )
+    parser.add_argument(
+        "--trigger",
+        default="manual",
+        choices=["manual", "scheduled"],
+        help="Trigger mode written to created ingestion runs.",
+    )
     return parser.parse_args()
 
 
 async def main() -> None:
     args = parse_args()
-    await run_ingestion(args.dir)
+    await run_ingestion(args.dir, trigger_mode=args.trigger)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 """
 Semantic Trace Logger natively handling the Strict JSON Trace Schema for Sicurre.
 """
+
 from __future__ import annotations
 
 import json
@@ -68,10 +69,20 @@ class SemanticTraceLogger:
 
         json_output = json.dumps(payload, ensure_ascii=False)
 
-        # Output directly to stdout sequence so Streamlit subprocess interceptors 
+        # Output directly to stdout sequence so Streamlit subprocess interceptors
         # can safely JSON parse the distinct traces row by row.
         print(json_output, flush=True)
 
         # Mirror cleanly to traditional internal logs for redundancy context
         log_level = logging.ERROR if status == "failed" else logging.INFO
-        self.logger.log(log_level, f"[{status.upper()}] {message}")
+        stage_token = f"{stage}/{status}"
+        context_parts = [self.child_target, stage_token, message]
+        if entity_type or entity_id:
+            entity_bits = [part for part in (entity_type, entity_id) if part]
+            context_parts.append(f"entity={'/'.join(entity_bits)}")
+        if metrics:
+            rendered_metrics = ", ".join(
+                f"{key}={value}" for key, value in sorted(metrics.items())
+            )
+            context_parts.append(f"metrics[{rendered_metrics}]")
+        self.logger.log(log_level, " | ".join(context_parts))

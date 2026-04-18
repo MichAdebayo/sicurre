@@ -88,6 +88,14 @@ class CommonCrawlIngestionResult:
     log_message: str
 
 
+@dataclass(frozen=True, slots=True)
+class CommonCrawlRecoverySnapshotArtifact:
+    local_parquet_path: Path
+    manifest_path: Path
+    selected_object_keys: tuple[str, ...]
+    row_count: int
+
+
 # ---------------------------------------------------------------------------
 # Local (no-cloud) client — used when CC_INPUT_BACKEND=local
 # ---------------------------------------------------------------------------
@@ -107,9 +115,9 @@ class LocalCommonCrawlClient:
         local_parquet_dir: Path | None = None,
         settings: Settings | None = None,
     ) -> None:
-        _settings = settings or get_settings()
-        self.local_parquet_dir: Path = local_parquet_dir or (
-            _settings.raw_snapshot_local_dir / "bigdata" / "common_crawl" / "fr_usable"
+        settings or get_settings()
+        self.local_parquet_dir: Path = (
+            local_parquet_dir or DEFAULT_CC_SNAPSHOT_DIR / "fr_usable"
         )
         # Mirrors the attribute used in _build_raw_object external_ref
         self.full_table_id = f"local://{self.local_parquet_dir}"
@@ -160,6 +168,118 @@ class LocalCommonCrawlClient:
             len(df),
         )
         return df.to_dict(orient="records")
+
+
+class CommonCrawlRecoverySnapshotBuilder:
+    """Materialize the latest successful Common Crawl R2 snapshots into local cron storage."""
+
+    def __init__(
+        self,
+        *,
+        settings: CommonCrawlIngestionSettings | None = None,
+        snapshot_dir: Path = DEFAULT_CC_SNAPSHOT_DIR,
+    ) -> None:
+        self.settings = settings or CommonCrawlIngestionSettings.from_app_settings()
+        self.snapshot_dir = snapshot_dir
+        self.fr_usable_dir = snapshot_dir / "fr_usable"
+        self.quality_dir = snapshot_dir / "quality"
+        self.r2_bucket = self.settings.raw_snapshot_r2_bucket_name
+        if not all(
+            [
+                self.settings.raw_snapshot_r2_endpoint_url,
+                self.settings.raw_snapshot_r2_access_key_id,
+                self.settings.raw_snapshot_r2_secret_access_key,
+            ]
+        ):
+            raise RuntimeError("Missing Common Crawl R2 credentials for recovery.")
+        self.s3_client = boto3.client(
+            "s3",
+            endpoint_url=self.settings.raw_snapshot_r2_endpoint_url,
+            aws_access_key_id=self.settings.raw_snapshot_r2_access_key_id,
+            aws_secret_access_key=self.settings.raw_snapshot_r2_secret_access_key,
+            region_name=self.settings.raw_snapshot_r2_region,
+        )
+
+    def materialize_local_snapshot(
+        self,
+        *,
+        parquet_count: int = 2,
+    ) -> CommonCrawlRecoverySnapshotArtifact:
+        if parquet_count < 1:
+            raise ValueError("parquet_count must be at least 1")
+
+        prefix = "raw-snapshots/bigdata/common_crawl/fr_usable/"
+        response = self.s3_client.list_objects_v2(Bucket=self.r2_bucket, Prefix=prefix)
+        objects = [
+            obj
+            for obj in response.get("Contents", [])
+            if obj["Key"].endswith(".parquet")
+        ]
+        if len(objects) < parquet_count:
+            raise FileNotFoundError(
+                f"Expected at least {parquet_count} parquet files in r2://{self.r2_bucket}/{prefix}, found {len(objects)}"
+            )
+
+        selected = sorted(
+            objects,
+            key=lambda item: item["LastModified"],
+            reverse=True,
+        )[:parquet_count]
+        selected = list(reversed(selected))
+
+        frames: list[pd.DataFrame] = []
+        for obj in selected:
+            buf = io.BytesIO()
+            self.s3_client.download_fileobj(self.r2_bucket, obj["Key"], buf)
+            buf.seek(0)
+            frames.append(pd.read_parquet(buf, engine="pyarrow"))
+
+        merged = pd.concat(frames, ignore_index=True)
+        merged = self._deduplicate_frame(merged)
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+
+        self.fr_usable_dir.mkdir(parents=True, exist_ok=True)
+        self.quality_dir.mkdir(parents=True, exist_ok=True)
+
+        local_parquet_path = self.fr_usable_dir / (
+            f"common_crawl_fr_usable_recovery_{len(merged)}_{timestamp}.parquet"
+        )
+        merged.to_parquet(local_parquet_path, index=False, engine="pyarrow")
+
+        manifest = {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "mode": "local_recovery",
+            "row_count": len(merged),
+            "bucket": self.r2_bucket,
+            "selected_object_keys": [obj["Key"] for obj in selected],
+            "local_parquet_path": str(local_parquet_path),
+        }
+        manifest_path = self.quality_dir / (
+            f"common_crawl_recovery_manifest_{timestamp}.json"
+        )
+        manifest_path.write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+        return CommonCrawlRecoverySnapshotArtifact(
+            local_parquet_path=local_parquet_path,
+            manifest_path=manifest_path,
+            selected_object_keys=tuple(obj["Key"] for obj in selected),
+            row_count=len(merged),
+        )
+
+    @staticmethod
+    def _deduplicate_frame(dataframe: pd.DataFrame) -> pd.DataFrame:
+        if dataframe.empty:
+            return dataframe
+        if "content_hash" in dataframe.columns:
+            return dataframe.drop_duplicates(subset=["content_hash"]).reset_index(
+                drop=True
+            )
+        if "text" in dataframe.columns:
+            return dataframe.drop_duplicates(subset=["text"]).reset_index(drop=True)
+        return dataframe.drop_duplicates().reset_index(drop=True)
 
 
 # ---------------------------------------------------------------------------

@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import (
 
 from core.config import get_settings  # noqa: E402
 from core.database import Base  # noqa: E402
+from core.trace_logger import SemanticTraceLogger  # noqa: E402
 from data_platform.extractors.legacy_db import (
     LegacyDbConnector,
     LegacyDbIngestionService,
@@ -125,28 +126,60 @@ async def main(
     settings = get_settings()
     logger.info("Using receiving Sicurre DB: %s", settings.database_url)
     logger.info("Using external feeder DB: %s", external_db_url)
-
-    feed_result = append_cron_generation_batch(
-        db_url=external_db_url,
-        class_counts=class_counts,
-        seed=seed,
+    trace = SemanticTraceLogger(
+        parent_type="Database",
+        child_target="Historical DB Cron Feed",
+        domain="data_platform",
+    )
+    trace.trace(
+        stage="orchestration",
+        status="start",
+        message="Database historical cron feed starting",
+        metrics={
+            "trigger_mode": trigger_mode,
+            "requested_total": sum(class_counts.values()),
+        },
     )
 
     engine = create_async_engine(settings.database_url, echo=False)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        feed_result = append_cron_generation_batch(
+            db_url=external_db_url,
+            class_counts=class_counts,
+            seed=seed,
+        )
+        trace.trace(
+            stage="ingestion",
+            status="success",
+            message="Synthetic cron batch appended to feeder database",
+            metrics={
+                "inserted_total": feed_result.inserted_total,
+                "scenario_count": feed_result.used_scenario_count,
+            },
+        )
 
-    session_factory = async_sessionmaker(
-        engine,
-        expire_on_commit=False,
-        class_=AsyncSession,
-    )
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
-    service = LegacyDbIngestionService(
-        connector=LegacyDbConnector(db_url=_to_async_sqlite_url(external_db_url))
-    )
-    async with session_factory() as session:
-        ingest_result = await service.run(session, trigger_mode=trigger_mode)
+        session_factory = async_sessionmaker(
+            engine,
+            expire_on_commit=False,
+            class_=AsyncSession,
+        )
+
+        service = LegacyDbIngestionService(
+            connector=LegacyDbConnector(db_url=_to_async_sqlite_url(external_db_url))
+        )
+        async with session_factory() as session:
+            ingest_result = await service.run(session, trigger_mode=trigger_mode)
+    except Exception as exc:
+        trace.trace(
+            stage="orchestration",
+            status="failed",
+            message=f"Database historical cron feed failed: {exc}",
+        )
+        await engine.dispose()
+        raise
 
     print(
         "database-historical cron feed completed",
@@ -166,6 +199,16 @@ async def main(
     if ingest_result.snapshot_storage_uri:
         print(f"  snapshot={ingest_result.snapshot_storage_uri}")
 
+    trace.trace(
+        stage="orchestration",
+        status="success",
+        message="Database historical cron feed completed",
+        metrics={
+            "new_records": ingest_result.raw_record_count,
+            "skipped": ingest_result.skipped_count,
+            "extracted": ingest_result.total_extracted_count,
+        },
+    )
     await engine.dispose()
 
 

@@ -107,6 +107,32 @@ async def test_ingest_csv_file_accepts_missing_optional_columns_with_warning(
 
 
 @pytest.mark.asyncio
+async def test_ingest_csv_file_respects_trigger_mode(
+    session_factory: async_sessionmaker[AsyncSession],
+    tmp_path: Path,
+) -> None:
+    file_path = tmp_path / "scheduled.csv"
+    file_path.write_text(
+        "text,label,source,language\nBonjour,spam,csv_trigger_mode,fr\n",
+        encoding="utf-8",
+    )
+
+    async with session_factory() as session:
+        result = await ingest_csv_file(
+            file_path,
+            session,
+            SourceSystemQueries(),
+            IngestionRunQueries(),
+            trigger_mode="scheduled",
+        )
+        ingestion_run = await session.scalar(select(DataIngestionRun))
+
+    assert result.status == "ingested"
+    assert ingestion_run is not None
+    assert ingestion_run.trigger_mode == "scheduled"
+
+
+@pytest.mark.asyncio
 async def test_ingest_csv_file_skips_blank_label_rows_with_error_log(
     session_factory: async_sessionmaker[AsyncSession],
     tmp_path: Path,

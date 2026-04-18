@@ -15,6 +15,7 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from core.config import get_settings  # noqa: E402
+from core.trace_logger import SemanticTraceLogger  # noqa: E402
 from db.models import DatasetStatus  # noqa: E402
 from db.queries import DatasetBuildEmptyError, DuplicateDatasetError  # noqa: E402
 from db.services import DatasetService  # noqa: E402
@@ -41,6 +42,17 @@ async def main() -> None:
         help="Persist the dataset build. Without this flag, the runner only prints the requested configuration.",
     )
     args = parser.parse_args()
+    trace = SemanticTraceLogger(
+        parent_type="Dataset",
+        child_target="Dataset Build",
+        domain="data_platform",
+    )
+    trace.trace(
+        stage="orchestration",
+        status="start",
+        message="Dataset build CLI starting",
+        metrics={"write": int(args.write)},
+    )
 
     preview = {
         "mode": "preview",
@@ -50,6 +62,12 @@ async def main() -> None:
         "status": args.status,
     }
     if not args.write:
+        trace.trace(
+            stage="dataset_freeze",
+            status="success",
+            message="Dataset build preview generated",
+            metrics={"version_tag": args.version_tag},
+        )
         print(json.dumps(preview, ensure_ascii=False, indent=2))
         return
 
@@ -67,6 +85,11 @@ async def main() -> None:
                     status=args.status,
                 )
             except DatasetBuildEmptyError:
+                trace.trace(
+                    stage="dataset_freeze",
+                    status="failed",
+                    message="Dataset build failed: no eligible annotated normalized messages found",
+                )
                 print(
                     json.dumps(
                         {
@@ -80,6 +103,11 @@ async def main() -> None:
                 )
                 raise SystemExit(1)
             except DuplicateDatasetError:
+                trace.trace(
+                    stage="dataset_freeze",
+                    status="failed",
+                    message="Dataset build failed: dataset version already exists",
+                )
                 print(
                     json.dumps(
                         {
@@ -94,6 +122,13 @@ async def main() -> None:
                 raise SystemExit(1)
     finally:
         await engine.dispose()
+
+    trace.trace(
+        stage="dataset_freeze",
+        status="success",
+        message="Dataset build completed",
+        metrics={"item_count": result.dataset.item_count},
+    )
 
     print(
         json.dumps(

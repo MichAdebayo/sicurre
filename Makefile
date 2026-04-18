@@ -1,10 +1,11 @@
-.PHONY: help install test dev-api phishtank-ingest phishtank-cron phishtank-csv certfr-ingest certfr-cron sap-scrape csv-ingest db-seed db-ingest bigdata-crawl bigdata-ingest bigdata-reviewed-promote normalize normalize-dry normalize-common-crawl normalize-db-historical normalize-kaggle-fr normalize-kaggle-multilingual normalize-sap normalize-certfr generate-data restructure-processed dataset-splits dataset-build
+.PHONY: help install test dev-api phishtank-ingest phishtank-cron phishtank-csv certfr-ingest certfr-cron sap-scrape csv-ingest db-seed db-ingest bigdata-crawl bigdata-ingest bigdata-cron bigdata-reviewed-promote cron-orchestrate normalize normalize-dry normalize-common-crawl normalize-db-historical normalize-kaggle-fr normalize-kaggle-multilingual normalize-sap normalize-certfr generate-data restructure-processed dataset-splits dataset-build
 
 NORMALIZE_ARGS ?=
 GENERATE_ARGS ?=
 DATASET_ARGS ?=
 EXPORT_ARGS ?=
 BIGDATA_PROMOTION_ARGS ?=
+CRON_ARGS ?=
 
 help:
 	@echo "Sicurre - Available Commands:"
@@ -23,7 +24,9 @@ help:
 	@echo "  make db-ingest          - Run Historical DB Ingestion from an external monolithic DB"
 	@echo "  make bigdata-crawl      - Run Common Crawl extraction to Cloudflare R2"
 	@echo "  make bigdata-ingest     - Manually ingest the latest Common Crawl snapshot into the local DB"
+	@echo "  make bigdata-cron       - Run the scheduled Common Crawl extract→ingest pipeline"
 	@echo "  make bigdata-reviewed-promote - Promote reviewed Common Crawl exports into curated tables"
+	@echo "  make cron-orchestrate   - Run the scheduled cron suite manually with DB contribution summaries"
 	@echo "  make normalize          - Normalize French raw records from the DB"
 	@echo "  make normalize-dry      - Preview normalization output without DB writes"
 	@echo "  make normalize-common-crawl      - Normalize Common Crawl records only"
@@ -89,9 +92,17 @@ bigdata-ingest:
 	@echo "Manually ingest the latest Common Crawl snapshot via BigQuery into sqlite"
 	uv run python src/data_platform/cli/bigdata/common_crawl_ingest.py
 
+bigdata-cron:
+	@echo "Run the scheduled Common Crawl extract→ingest pipeline"
+	uv run python src/data_platform/cron_schedulers/bigdata/run_common_crawl_pipeline.py
+
 bigdata-reviewed-promote:
 	@echo "Promoting reviewed Common Crawl exports into curated tables..."
 	uv run python src/data_platform/cli/bigdata/common_crawl_reviewed_promotion.py $(BIGDATA_PROMOTION_ARGS)
+
+cron-orchestrate:
+	@echo "Running the scheduled cron suite manually..."
+	uv run python src/data_platform/cli/maintenance/cron_orchestrator.py $(CRON_ARGS)
 
 normalize:
 	@echo "Running DB-backed French normalization pipeline..."
