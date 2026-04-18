@@ -67,7 +67,7 @@ certfr-cron:
 
 csv-ingest:
 	@echo "Starting Universal CSV dataset ingestion..."
-	uv run python src/data_platform/cli/ingest/file/csv_ingestion.py --dir data/raw/csv
+	uv run python src/data_platform/cli/ingest/file/csv_ingestion.py --dir data/raw/file/csv
 
 sap-scrape:
 	@echo "Starting SAP Labs Blog web scraping ingestion..."
