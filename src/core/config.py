@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     raw_snapshot_r2_region: str = "auto"
     phishtank_api_key: str | None = None
     phishtank_user_agent: str = "phishtank/sicurre-research"
+    phishtank_snapshot_local_dir: Path = ROOT_DIR / "data" / "raw" / "api" / "phishtank"
+    phishtank_snapshot_prefix: str = "phishtank"
     cc_input_backend: str = Field(
         default="prod",
         validation_alias="CC_INPUT_BACKEND",
