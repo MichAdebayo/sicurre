@@ -17,7 +17,7 @@ api.authenticate()
 print("Kaggle auth OK")
 
 # Target directory
-out_dir = Path("data/raw/csv")
+out_dir = Path("data/raw/file/csv")
 out_dir.mkdir(parents=True, exist_ok=True)
 
 # Download datasets

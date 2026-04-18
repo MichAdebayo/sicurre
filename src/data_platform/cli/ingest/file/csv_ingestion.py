@@ -382,7 +382,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dir",
         type=str,
-        default="data/raw/csv",
+        default="data/raw/file/csv",
         help="Directory to recursively search for CSV files.",
     )
     return parser.parse_args()

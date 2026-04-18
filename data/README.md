@@ -18,8 +18,9 @@ data/
 │   ├── scraping/                       # C1: Scraping
 │   │   └── certfr/                     #   CERT-FR — CTI advisories, PDFs, extracted IOCs
 │   │
-│   ├── csv/                            # C1: Fichier (CSV/JSON datasets)
-│   │                                   #   Kinoux FR Spam/Ham 2K, Kaggle Multilingual, etc.
+│   ├── file/                           # C1: Fichier (file-based datasets)
+│   │   ├── csv/                        #   CSV/JSON-style tabular datasets
+│   │   └── txt/                        #   Plain-text exports and crowdsourced spam corpora
 │   │
 │   └── db/                             # C1: Base de données
 │       ├── adapted_fr_phishing.csv     #   EN→FR cultural adaptation (script-based workflow)

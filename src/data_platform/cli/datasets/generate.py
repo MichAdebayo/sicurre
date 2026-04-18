@@ -36,8 +36,12 @@ from data_platform.services.generation_lineage import (  # noqa: E402
     build_adapted_generation_bundle,
     build_synthetic_generation_bundle,
 )
-from data_platform.services.generation_staging import GenerationStagingService  # noqa: E402
-from data_platform.services.review_persistence import ReviewPersistenceService  # noqa: E402
+from data_platform.services.generation_staging import (
+    GenerationStagingService,
+)  # noqa: E402
+from data_platform.services.review_persistence import (
+    ReviewPersistenceService,
+)  # noqa: E402
 from data_platform.services.structured_review_artifact import (  # noqa: E402
     StructuredReviewArtifactService,
 )
@@ -77,7 +81,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--corpus-path",
         type=Path,
-        default=Path("data/raw/csv/en/combined_final_clean.csv"),
+        default=Path("data/raw/file/csv/en/combined_final_clean.csv"),
         help="English phishing corpus used for the adapted generation lane.",
     )
     parser.add_argument(
@@ -203,10 +207,12 @@ async def _persist_bundle(
             session,
             payload,
         )
-    return await ReviewPersistenceService.persist_generation_bundle_with_gated_promotion(
-        session,
-        payload,
-        pipeline_version=pipeline_version,
+    return (
+        await ReviewPersistenceService.persist_generation_bundle_with_gated_promotion(
+            session,
+            payload,
+            pipeline_version=pipeline_version,
+        )
     )
 
 
@@ -291,9 +297,7 @@ async def _run_synthetic_generation(
             if args.synthetic_count > 0
             else DEFAULT_TARGETS.get(class_name, 0)
         )
-        result = service.generate_result(
-            class_name, count, export=not args.skip_export
-        )
+        result = service.generate_result(class_name, count, export=not args.skip_export)
         persistence: dict[str, object] | None = None
         if not result.dataframe.empty:
             bundle = build_synthetic_generation_bundle(

@@ -4,7 +4,7 @@ Seed the standalone "external_threats.db" to simulate an enterprise legacy datab
 Data sources (all generated/parsed in-memory — no intermediate CSV dependency):
   1. Culturally adapted FR phishing — via FrenchCulturalAdaptationService
   2. Synthetic FR phishing           — via archetype template generator
-  3. Crowdsourced spam txt files      — parsed from data/raw/txt/Spam_*.txt
+    3. Crowdsourced spam txt files      — parsed from data/raw/file/txt/Spam_*.txt
 
 Usage::
 
@@ -59,8 +59,8 @@ DB_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DB_DIR / "external_threats.db"
 DB_URL = f"sqlite:///{DB_PATH}"
 
-CORPUS_PATH = ROOT / "data" / "raw" / "csv" / "en" / "combined_final_clean.csv"
-TXT_DIR = ROOT / "data" / "raw" / "txt"
+CORPUS_PATH = ROOT / "data" / "raw" / "file" / "csv" / "en" / "combined_final_clean.csv"
+TXT_DIR = ROOT / "data" / "raw" / "file" / "txt"
 
 SEED = 42
 random.seed(SEED)
@@ -181,7 +181,7 @@ def generate_synthetic_emails() -> pd.DataFrame:
 
 
 def parse_crowdsourced_spam() -> pd.DataFrame:
-    """Parse crowdsourced spam from Spam_*.txt files in data/raw/txt/.
+    """Parse crowdsourced spam from Spam_*.txt files in data/raw/file/txt/.
 
     Each file contains multiple emails separated by '   From:' headers
     with Subject/Date/To metadata followed by a dashed separator line.

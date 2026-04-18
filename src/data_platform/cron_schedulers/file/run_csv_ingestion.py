@@ -21,7 +21,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dir",
         type=str,
-        default="data/raw/csv",
+        default="data/raw/file/csv",
         help="Directory to recursively search for CSV files.",
     )
     args = parser.parse_args()
