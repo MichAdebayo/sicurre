@@ -9,10 +9,10 @@ SRC_ROOT = ROOT_DIR / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from data_platform.services.common_crawl_promotion_review import (
+from data_platform.services.common_crawl.promotion_review import (
     CommonCrawlPromotionReviewService,
 )
-from data_platform.services.structured_review_artifact import (
+from data_platform.services.shared.structured_review_artifact import (
     StructuredReviewArtifactService,
 )
 

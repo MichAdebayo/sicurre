@@ -9,8 +9,10 @@ SRC_ROOT = ROOT_DIR / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from data_platform.services.stage_two_rewrite_jobs import StageTwoRewriteJobService
-from data_platform.services.structured_review_artifact import (
+from data_platform.services.shared.stage_two_rewrite_jobs import (
+    StageTwoRewriteJobService,
+)
+from data_platform.services.shared.structured_review_artifact import (
     StructuredReviewArtifactService,
 )
 

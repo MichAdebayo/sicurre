@@ -11,11 +11,11 @@ SRC_ROOT = ROOT_DIR / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from data_platform.services.common_crawl_signal_synthetic import (
+from data_platform.services.common_crawl.signal_synthetic import (
     CommonCrawlSignalSyntheticService,
 )
-from data_platform.services.generation_staging import GenerationStagingService
-from data_platform.services.structured_review_artifact import (
+from data_platform.services.shared.generation_staging import GenerationStagingService
+from data_platform.services.shared.structured_review_artifact import (
     StructuredReviewArtifactService,
 )
 
