@@ -80,6 +80,7 @@ data/models/**/*.safetensors
 !data/**/.gitkeep
 data/raw/
 data/cron/
+data/local/
 
 # Private-by-default documentation (internal only)
 docs/ops/
