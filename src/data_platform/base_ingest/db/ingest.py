@@ -190,8 +190,12 @@ def run_base_ingestion() -> None:
         result.total_extracted_count,
     )
 
-    # 3. Save manifest
-    _save_manifest(result, feeder_db_sha256)
+    # 3. Save manifest — only when new records were actually inserted so that
+    #    idempotent re-runs don't overwrite a valid manifest with a 0-count entry.
+    if result.raw_record_count > 0:
+        _save_manifest(result, feeder_db_sha256)
+    else:
+        logger.info("No new records inserted — manifest left unchanged")
 
     # 4. Print summary
     _print_report(result, PRIOR_RECORD_COUNT)
