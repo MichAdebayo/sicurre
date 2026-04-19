@@ -58,6 +58,52 @@ def _try_parse_uuid(value: Any) -> UUID | None:
         return None
 
 
+async def _validate_existing_raw_record_ids(
+    session: AsyncSession,
+    *,
+    raw_record_ids: list[Any],
+    context: str,
+) -> None:
+    parsed_ids: list[UUID] = []
+    invalid_count = 0
+    for raw_record_id in raw_record_ids:
+        parsed = _try_parse_uuid(raw_record_id)
+        if parsed is None:
+            invalid_count += 1
+            continue
+        parsed_ids.append(parsed)
+
+    if invalid_count:
+        raise ValueError(
+            f"{context} contains {invalid_count} invalid raw_record_id value(s)"
+        )
+
+    if not parsed_ids:
+        return
+
+    existing_ids = set(
+        (
+            await session.execute(
+                select(DataRawRecord.id).where(DataRawRecord.id.in_(set(parsed_ids)))
+            )
+        )
+        .scalars()
+        .all()
+    )
+    missing_ids = sorted(
+        {
+            raw_record_id
+            for raw_record_id in parsed_ids
+            if raw_record_id not in existing_ids
+        }
+    )
+    if missing_ids:
+        sample_ids = ", ".join(str(raw_record_id) for raw_record_id in missing_ids[:3])
+        raise ValueError(
+            f"{context} references {len(missing_ids)} raw_record_id value(s) not present in the current DB: {sample_ids}"
+        )
+
+
 def _text_sha256(value: str) -> str:
     return sha256(value.encode("utf-8")).hexdigest()
 
@@ -859,6 +905,14 @@ class ReviewPersistenceService:
         proposed_messages = list(payload.get("proposed_normalized_messages") or [])
         proposed_annotations = list(payload.get("proposed_annotations") or [])
         started_at = datetime.now(timezone.utc)
+
+        await _validate_existing_raw_record_ids(
+            session,
+            raw_record_ids=[
+                message.get("raw_record_id") for message in proposed_messages
+            ],
+            context="Common Crawl acceptance review",
+        )
 
         processing_run = DataProcessingRun(
             pipeline_version=pipeline_version,

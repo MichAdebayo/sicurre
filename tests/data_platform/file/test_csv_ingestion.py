@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -72,6 +73,61 @@ async def test_ingest_csv_file_skips_invalid_schema_with_error_log(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("file_name", "expected_source_name"),
+    [
+        ("data-en-hi-de-fr.csv", "data-en-hi-de-fr"),
+        ("kaggle_multilingual_spam.csv", "kaggle_multilingual_spam"),
+    ],
+)
+async def test_ingest_csv_file_accepts_historical_multilingual_schema(
+    session_factory: async_sessionmaker[AsyncSession],
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+    file_name: str,
+    expected_source_name: str,
+) -> None:
+    file_path = tmp_path / file_name
+    file_path.write_text(
+        (
+            "labels,text,text_hi,text_de,text_fr\n"
+            "ham,Hello world,Bonjour monde hi,Hallo Welt,Bonjour le monde\n"
+            "spam,Hello world,Bonjour monde hi,Hallo Welt,Bonjour le monde\n"
+        ),
+        encoding="utf-8",
+    )
+
+    caplog.set_level(logging.WARNING)
+
+    async with session_factory() as session:
+        result = await ingest_csv_file(
+            file_path,
+            session,
+            SourceSystemQueries(),
+            IngestionRunQueries(),
+        )
+        source_systems = list((await session.scalars(select(DataSourceSystem))).all())
+        ingestion_runs = list((await session.scalars(select(DataIngestionRun))).all())
+        raw_records = list((await session.scalars(select(DataRawRecord))).all())
+
+    assert result.inserted_count == 1
+    assert result.status == "ingested"
+    assert [source_system.name for source_system in source_systems] == [
+        expected_source_name
+    ]
+    assert len(ingestion_runs) == 1
+    assert len(raw_records) == 1
+    payload = json.loads(raw_records[0].raw_content)
+    assert payload["text"] == "Hello world"
+    assert payload["label"] == ""
+    assert payload["source"] == expected_source_name
+    assert payload["language"] is None
+    assert raw_records[0].detected_language is None
+    assert raw_records[0].source_system_id == source_systems[0].id
+    assert "historical multilingual schema" in caplog.text
+
+
+@pytest.mark.asyncio
 async def test_ingest_csv_file_accepts_missing_optional_columns_with_warning(
     session_factory: async_sessionmaker[AsyncSession],
     tmp_path: Path,
@@ -103,6 +159,7 @@ async def test_ingest_csv_file_accepts_missing_optional_columns_with_warning(
     ]
     assert len(ingestion_runs) == 1
     assert len(raw_records) == 1
+    assert raw_records[0].source_system_id == source_systems[0].id
     assert "missing optional columns: language" in caplog.text
 
 

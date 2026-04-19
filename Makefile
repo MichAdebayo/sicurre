@@ -1,4 +1,4 @@
-.PHONY: help install test dev-api phishtank-ingest phishtank-cron phishtank-csv certfr-ingest certfr-cron sap-scrape csv-ingest db-seed db-ingest bigdata-crawl bigdata-ingest bigdata-cron bigdata-reviewed-promote cron-orchestrate normalize normalize-dry normalize-common-crawl normalize-db-historical normalize-kaggle-fr normalize-kaggle-multilingual normalize-sap normalize-certfr generate-data restructure-processed dataset-splits dataset-build
+.PHONY: help install test dev-api phishtank-ingest phishtank-cron phishtank-csv phishtank-ingest-base file-ingest-base certfr-ingest certfr-cron sap-scrape csv-ingest db-seed db-ingest bigdata-crawl bigdata-ingest bigdata-cron bigdata-reviewed-promote cron-orchestrate normalize normalize-dry normalize-common-crawl normalize-db-historical normalize-kaggle-fr normalize-kaggle-multilingual normalize-sap normalize-certfr generate-data restructure-processed dataset-splits dataset-build
 
 NORMALIZE_ARGS ?=
 GENERATE_ARGS ?=
@@ -16,6 +16,8 @@ help:
 	@echo "  make phishtank-ingest   - Run one-off PhishTank ingestion (Live CSV feed)"
 	@echo "  make phishtank-cron     - Run recurring PhishTank ingestion (Cron target, HTTP feed)"
 	@echo "  make phishtank-csv      - Run PhishTank ingestion from local CSV file (Fallback)"
+	@echo "  make phishtank-ingest-base - Reset DB and ingest all frozen R2+local snapshots (deterministic)"
+	@echo "  make file-ingest-base   - Ingest all local CSV datasets (deterministic, no DB reset)"
 	@echo "  make certfr-ingest      - Run one-off CERT-FR CTI ingestion (Historical full backfill)"
 	@echo "  make certfr-cron        - Run recurring CERT-FR CTI ingestion (Cron target, capped index scan)"
 	@echo "  make sap-scrape         - Run one-off SAP Labs Blog scraping ingestion"
@@ -59,6 +61,16 @@ phishtank-cron:
 phishtank-csv:
 	@echo "Starting local CSV fallback ingestion..."
 	uv run python src/data_platform/cli/ingest/api/phishtank.py --trigger manual --csv data/raw/api/phishtank/phishing-tank.csv
+
+phishtank-ingest-base:
+	@echo "Resetting sicurre.db and running deterministic PhishTank base ingestion (R2 + local, read-only)..."
+	rm -f data/local/sicurre.db
+	uv run alembic upgrade head
+	uv run python src/data_platform/base_ingest/api/phishtank/ingest.py
+
+file-ingest-base:
+	@echo "Running deterministic CSV file base ingestion (local-only, no DB reset)..."
+	uv run python src/data_platform/base_ingest/file/csv/ingest.py
 
 certfr-ingest:
 	@echo "Starting full historical CERT-FR CTI backfill (HTML pagination)..."

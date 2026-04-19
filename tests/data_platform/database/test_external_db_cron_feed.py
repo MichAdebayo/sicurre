@@ -38,7 +38,7 @@ def _read_source_datasets(db_path: Path) -> set[str]:
 def test_append_cron_generation_batch_generates_all_three_classes(
     tmp_path: Path,
 ) -> None:
-    db_path = tmp_path / "external_threats_cron_test.db"
+    db_path = tmp_path / "test_external_threats.db"
 
     result = append_cron_generation_batch(
         db_url=f"sqlite:///{db_path}",
@@ -79,7 +79,7 @@ def test_append_cron_generation_batch_generates_all_three_classes(
 def test_append_cron_generation_batch_appends_without_replacing_existing_rows(
     tmp_path: Path,
 ) -> None:
-    db_path = tmp_path / "external_threats_cron_test.db"
+    db_path = tmp_path / "test_external_threats.db"
 
     append_cron_generation_batch(
         db_url=f"sqlite:///{db_path}",
@@ -116,7 +116,7 @@ def test_cron_reference_scenarios_target_thirty_balanced_coverages() -> None:
 def test_append_cron_generation_batch_can_cover_all_reference_scenarios(
     tmp_path: Path,
 ) -> None:
-    db_path = tmp_path / "external_threats_cron_test.db"
+    db_path = tmp_path / "test_external_threats.db"
 
     result = append_cron_generation_batch(
         db_url=f"sqlite:///{db_path}",

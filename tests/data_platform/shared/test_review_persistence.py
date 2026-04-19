@@ -430,6 +430,69 @@ async def test_persist_common_crawl_acceptance_review_creates_messages_and_annot
 
 
 @pytest.mark.asyncio
+async def test_persist_common_crawl_reviewed_export_rejects_missing_raw_record_ids(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    payload = {
+        "mode": "stage_two_reviewed_export",
+        "candidates": [
+            {
+                "candidate_id": "candidate-missing-raw",
+                "draft_id": "draft-missing-raw",
+                "raw_record_id": "00000000-0000-0000-0000-000000000001",
+                "source_name": "common-crawl-bigdata",
+                "rule_key": "instructional_legitimate",
+                "rewrite_mode": "rewrite",
+                "target_label": "legitimate",
+                "review_state": "usable",
+                "review_notes": [],
+                "quality_signals": {
+                    "french_marker_count": 5,
+                    "target_cue_hits": 1,
+                },
+                "normalized_text": (
+                    "Objet : Mise a jour de votre espace client\n\n"
+                    "Bonjour,\n\n"
+                    "Nous confirmons que votre dossier administratif reste accessible "
+                    "depuis votre espace client. Merci de relire les informations de "
+                    "contact et de telecharger l'attestation jointe avant le 18 avril "
+                    "afin d'eviter toute interruption de service.\n\n"
+                    "Cordialement,\nLe service clients"
+                ),
+                "text_length": 288,
+                "text_sha256": "reviewed-export-missing-raw",
+                "contains_pii": False,
+                "redaction_status": "not_required",
+            }
+        ],
+    }
+
+    async with session_factory() as session:
+        with pytest.raises(
+            ValueError,
+            match=r"Common Crawl acceptance review references 1 raw_record_id value\(s\) not present in the current DB",
+        ):
+            await ReviewPersistenceService.persist_common_crawl_reviewed_export(
+                session,
+                payload,
+                pipeline_version="common_crawl_reviewed_promotion_v1",
+                report_uri="tasks/reviewed-export.json",
+            )
+
+        processing_runs = (
+            (await session.execute(select(DataProcessingRun))).scalars().all()
+        )
+        messages = (
+            (await session.execute(select(DataNormalizedMessage))).scalars().all()
+        )
+        annotations = (await session.execute(select(DataAnnotation))).scalars().all()
+
+    assert processing_runs == []
+    assert messages == []
+    assert annotations == []
+
+
+@pytest.mark.asyncio
 async def test_persist_generated_promotion_review_creates_raw_lineage_and_annotations(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:

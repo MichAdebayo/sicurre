@@ -213,3 +213,89 @@ async def test_annotation_backfill_skips_messages_that_already_have_annotations(
 
     assert result["annotation_count"] == 0
     assert len(annotations) == 1
+
+
+@pytest.mark.asyncio
+async def test_annotation_backfill_database_parent_filter_matches_child_sources(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async with session_factory() as session:
+        source = DataSourceSystem(
+            name="database/adapted/adapted_en_fr",
+            source_type="sql",
+        )
+        session.add(source)
+        await session.flush()
+
+        ingestion = DataIngestionRun(
+            source_system_id=source.id,
+            started_at=utc_timestamp(),
+            status="completed",
+            trigger_mode="manual",
+        )
+        session.add(ingestion)
+        await session.flush()
+
+        raw_object = DataRawObject(
+            ingestion_run_id=ingestion.id,
+            object_type="sql_export",
+            content_hash="database-child-hash",
+            source_metadata={},
+            collected_at=utc_timestamp(),
+        )
+        session.add(raw_object)
+        await session.flush()
+
+        raw_record = DataRawRecord(
+            raw_object_id=raw_object.id,
+            source_system_id=source.id,
+            record_key="database-child-row-1",
+            raw_content="Bonjour",
+            detected_language="fr",
+            is_usable=True,
+            extracted_at=utc_timestamp(),
+        )
+        session.add(raw_record)
+        await session.flush()
+
+        processing_run = DataProcessingRun(
+            pipeline_version="direct_normalization_v1",
+            started_at=utc_timestamp(),
+            finished_at=utc_timestamp(),
+            status="completed",
+            normalized_count=1,
+            rejected_count=0,
+        )
+        session.add(processing_run)
+        await session.flush()
+
+        session.add(
+            DataNormalizedMessage(
+                raw_record_id=raw_record.id,
+                processing_run_id=processing_run.id,
+                normalized_text="Objet : Test\n\nBonjour",
+                text_sha256="normalized-hash-database-child",
+                language="fr",
+                current_label="phishing",
+                contains_pii=False,
+                redaction_status="not_required",
+                text_length=22,
+                normalized_at=utc_timestamp(),
+            )
+        )
+        await session.commit()
+
+        result = await AnnotationBackfillService.backfill_missing_annotations(
+            session,
+            source_names=("database-historical",),
+            dry_run=False,
+        )
+        annotations = (await session.execute(select(DataAnnotation))).scalars().all()
+
+    assert result["annotation_count"] == 1
+    assert len(annotations) == 1
+    assert annotations[0].label == "phishing"
+    assert (
+        annotations[0].label_source
+        == AnnotationLabelSource.NORMALIZED_MESSAGE_BACKFILL.value
+    )

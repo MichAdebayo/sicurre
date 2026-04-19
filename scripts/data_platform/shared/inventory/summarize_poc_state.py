@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT_DIR = Path(__file__).resolve().parents[4]
-DEFAULT_DB_PATH = ROOT_DIR / "data/local/poc_test.db"
+DEFAULT_DB_PATH = ROOT_DIR / "data/local/sicurre.db"
 MANUAL_SOURCE_NAMES = (
     "cert-fr-cti",
     "phishtank-online-valid",
@@ -141,7 +141,7 @@ def build_summary(db_path: Path) -> dict[str, Any]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Summarize poc_test.db validation state"
+        description="Summarize sicurre.db production state"
     )
     parser.add_argument("--db-path", type=Path, default=DEFAULT_DB_PATH)
     parser.add_argument("--output-json", type=Path, default=None)

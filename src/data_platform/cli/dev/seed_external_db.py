@@ -41,7 +41,7 @@ if __name__ == "__main__":
         metavar="URL",
         help=(
             "SQLAlchemy sync URL for the target DB when using --append-n "
-            "(e.g. sqlite:////absolute/path/to/external_threats_cron_test.db). "
+            "(e.g. sqlite:////absolute/path/to/external_threats.db). "
             "Defaults to the module-level DB_URL (data/raw/db/external_threats.db)."
         ),
     )

@@ -4,7 +4,7 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import (
@@ -14,6 +14,10 @@ from db.models import (
     DataProcessingRun,
     DataRawRecord,
     DataSourceSystem,
+)
+from data_platform.services.database.source_naming import (
+    DATABASE_PARENT_SOURCE,
+    DATABASE_SOURCE_PREFIX,
 )
 
 
@@ -26,6 +30,44 @@ class MissingAnnotationRow:
 
 
 class AnnotationBackfillService:
+    @staticmethod
+    def _build_source_name_filter(
+        source_names: tuple[str, ...] | None,
+    ) -> object | None:
+        if not source_names:
+            return None
+
+        normalized_source_names = {
+            str(source_name).strip()
+            for source_name in source_names
+            if str(source_name).strip()
+        }
+        if not normalized_source_names:
+            return None
+
+        conditions: list[object] = []
+        exact_source_names = sorted(
+            source_name
+            for source_name in normalized_source_names
+            if source_name != DATABASE_PARENT_SOURCE
+        )
+        if exact_source_names:
+            conditions.append(DataSourceSystem.name.in_(exact_source_names))
+
+        if DATABASE_PARENT_SOURCE in normalized_source_names:
+            conditions.extend(
+                [
+                    DataSourceSystem.name == DATABASE_PARENT_SOURCE,
+                    DataSourceSystem.name.like(f"{DATABASE_SOURCE_PREFIX}%"),
+                ]
+            )
+
+        if not conditions:
+            return None
+        if len(conditions) == 1:
+            return conditions[0]
+        return or_(*conditions)
+
     @staticmethod
     def _build_missing_annotations_query(
         *,
@@ -56,8 +98,11 @@ class AnnotationBackfillService:
             .where(DataAnnotation.id.is_(None))
             .order_by(DataSourceSystem.name, DataNormalizedMessage.id)
         )
-        if source_names:
-            query = query.where(DataSourceSystem.name.in_(source_names))
+        source_filter = AnnotationBackfillService._build_source_name_filter(
+            source_names
+        )
+        if source_filter is not None:
+            query = query.where(source_filter)
         return query
 
     @staticmethod

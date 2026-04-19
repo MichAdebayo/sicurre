@@ -74,7 +74,7 @@ def _prepare_external_db(db_path: Path) -> None:
 async def test_legacy_db_connector_uses_configured_sqlite_path(
     tmp_path: Path,
 ) -> None:
-    db_path = tmp_path / "external_threats_cron_test.db"
+    db_path = tmp_path / "test_external_threats.db"
     _prepare_external_db(db_path)
 
     connector = LegacyDbConnector(db_url=f"sqlite+aiosqlite:///{db_path}")

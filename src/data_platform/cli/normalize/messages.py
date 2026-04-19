@@ -20,6 +20,9 @@ load_dotenv(ROOT_DIR / ".env")
 
 from core.config import get_settings  # noqa: E402
 from core.trace_logger import SemanticTraceLogger  # noqa: E402
+from data_platform.services.shared.annotation_backfill import (  # noqa: E402
+    AnnotationBackfillService,
+)
 from data_platform.services.shared.normalization_pipeline import (
     NormalizationPipeline,
 )  # noqa: E402
@@ -375,6 +378,15 @@ if __name__ == "__main__":
                         metrics={"processed": result.get("processed", 0)},
                     )
                 else:
+                    if result.get("normalized", 0) > 0:
+                        backfill_result = await AnnotationBackfillService.backfill_missing_annotations(
+                            session,
+                            source_names=((args.source,) if args.source else None),
+                            dry_run=False,
+                        )
+                        result["annotation_backfilled"] = backfill_result.get(
+                            "annotation_count", 0
+                        )
                     logger.info("Execution complete: %s", result)
                     trace.trace(
                         stage="normalization",

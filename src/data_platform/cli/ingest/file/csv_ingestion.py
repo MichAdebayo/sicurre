@@ -53,6 +53,9 @@ logger = logging.getLogger(__name__)
 
 CSV_REQUIRED_COLUMNS: frozenset[str] = frozenset({"text", "label"})
 CSV_OPTIONAL_COLUMNS: frozenset[str] = frozenset({"source", "language"})
+CSV_TEXT_ONLY_HISTORICAL_FILES: frozenset[str] = frozenset(
+    {"data-en-hi-de-fr.csv", "kaggle_multilingual_spam.csv"}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,7 +77,24 @@ def _normalize_csv_fieldnames(fieldnames: list[str] | None) -> tuple[str, ...]:
     )
 
 
+def _uses_text_only_historical_schema(
+    file_path: Path, fieldnames: tuple[str, ...]
+) -> bool:
+    return (
+        file_path.name in CSV_TEXT_ONLY_HISTORICAL_FILES
+        and "text" in fieldnames
+        and "labels" in fieldnames
+    )
+
+
 def _validate_csv_schema(file_path: Path, fieldnames: tuple[str, ...]) -> bool:
+    if _uses_text_only_historical_schema(file_path, fieldnames):
+        logger.warning(
+            "CSV file %s uses the historical multilingual schema. Ingesting text-only rows with blank labels.",
+            file_path.name,
+        )
+        return True
+
     missing_required = sorted(CSV_REQUIRED_COLUMNS.difference(fieldnames))
     if missing_required:
         logger.error(
@@ -97,7 +117,15 @@ def _validate_csv_schema(file_path: Path, fieldnames: tuple[str, ...]) -> bool:
     return True
 
 
-def _validate_csv_rows(file_path: Path, rows: list[dict[str, Any]]) -> bool:
+def _validate_csv_rows(
+    file_path: Path,
+    rows: list[dict[str, Any]],
+    *,
+    allow_blank_labels: bool = False,
+) -> bool:
+    if allow_blank_labels:
+        return True
+
     blank_label_rows = [
         index
         for index, row in enumerate(rows, start=1)
@@ -230,7 +258,15 @@ async def ingest_csv_file(
             file_path=file_path, inserted_count=0, status="skipped_invalid_schema"
         )
 
-    if not _validate_csv_rows(file_path, rows):
+    uses_text_only_historical_schema = _uses_text_only_historical_schema(
+        file_path, fieldnames
+    )
+
+    if not _validate_csv_rows(
+        file_path,
+        rows,
+        allow_blank_labels=uses_text_only_historical_schema,
+    ):
         if trace is not None:
             trace.trace(
                 stage="ingestion",
@@ -284,8 +320,12 @@ async def ingest_csv_file(
 
     for idx, row in enumerate(rows, start=1):
         text = str(row.get("text", "")).strip()
-        label = str(row.get("label", "")).strip()
-        lang = str(row.get("language", "")).strip() or None
+        if uses_text_only_historical_schema:
+            label = ""
+            lang = None
+        else:
+            label = str(row.get("label", "")).strip()
+            lang = str(row.get("language", "")).strip() or None
         record_key = hash_text_for_dedup(text) if text else f"empty-text-{idx}"
 
         if record_key in raw_keys_seen:
@@ -309,6 +349,7 @@ async def ingest_csv_file(
         records_to_add.append(
             DataRawRecord(
                 raw_object_id=raw_object.id,
+                source_system_id=source_sys.id,
                 record_key=record_key,
                 raw_content=raw_content,
                 detected_language=lang,

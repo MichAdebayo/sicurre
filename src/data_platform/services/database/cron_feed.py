@@ -31,7 +31,7 @@ from data_platform.services.shared.synthetic_generation import (
 )
 
 
-DEFAULT_CRON_FEED_DB_PATH = DB_DIR / "external_threats_cron_test.db"
+DEFAULT_CRON_FEED_DB_PATH = DB_DIR / "external_threats.db"
 DEFAULT_CRON_FEED_DB_URL = f"sqlite:///{DEFAULT_CRON_FEED_DB_PATH}"
 DEFAULT_CRON_FEED_DB_ASYNC_URL = f"sqlite+aiosqlite:///{DEFAULT_CRON_FEED_DB_PATH}"
 
