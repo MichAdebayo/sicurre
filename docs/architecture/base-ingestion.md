@@ -171,20 +171,130 @@ emails in these files are spam by definition).
 
 ---
 
-## Source 3 — CERT-FR (scraping) 🔜 Planned
+## Source 3 — CERT-FR (scraping) ✅ Complete
 
-**Make target** (to be added): `certfr-ingest-base`  
-**Input**: R2 `raw-snapshots/cert-fr/` + local `data/raw/scraping/cert_fr/`  
-**R2 inventory**: 92 objects (matches local — verify at plan time)  
-**Script location**: `src/data_platform/base_ingest/scraping/certfr/ingest.py`
+**Make target**: `certfr-ingest-base`  
+**Script location**: `src/data_platform/base_ingest/scraping/certfr/ingest.py`  
+**Manifest**: `data/local/certfr_base_ingest_manifest.json` ✅ written
+
+### Input inventory (verified)
+
+| Storage | Path / prefix | Objects | Format |
+|---------|---------------|---------|--------|
+| R2 | `raw-snapshots/cert-fr/` | **92** `.txt` | PDF-extracted or HTML-extracted text, one file per report |
+| Local | `data/raw/scraping/cert_fr/cert-fr/` | **92** `.txt` | Identical to R2 (verified: sha-256 matches 100 %) |
+| Local CSV | `data/raw/scraping/certfr/certfr_cti_reports_91_20260301.csv` | 91 rows | Structured metadata: `certfr_id, title, url, pub_date, text, is_phishing_related, …` |
+| Local CSV | `data/raw/scraping/certfr/certfr_phishing_37_20260301.csv` | 37 rows | Phishing-relevant subset of the 91-row CSV (same schema) |
+
+R2 filename pattern: `CERTFR-YYYY-{CTI|IOC}-NNN.{pdf|html}.txt`  
+Split: 77 CTI reports + 15 IOC reports = 92 total.  
+The 91-row CSV covers 91 of the 92 TXT files; `CERTFR-2026-CTI-002` is in R2/local only (newer, post-CSV).
+
+### Deduplication strategy
+
+1. Enumerate R2 sorted by key (canonical).  
+2. Enumerate local sorted by filename.  
+3. SHA-256 dedup — R2 wins on collision. Since all 92 files match byte-for-byte, all 92 are selected from R2; local provides 0 new files.  
+4. DB idempotency guard: `external_ref = certfr_id` (e.g., `CERTFR-2019-CTI-001`) on `DataRawObject`.
+
+### Label mapping
+
+Load `certfr_cti_reports_91_20260301.csv` into a dict `{certfr_id → row}` before processing.
+
+| Condition | Label |
+|-----------|-------|
+| `csv_meta["is_phishing_related"] == "True"` | `"phishing"` |
+| `csv_meta["is_phishing_related"] == "False"` | `"legitimate"` |
+| `certfr_id` not in CSV (e.g. `CERTFR-2026-CTI-002`) | `"legitimate"` (default) |
+
+### Per-file record structure
+
+Each TXT file → 1 `DataRawObject` + 1 `DataRawRecord`.
+
+```
+DataRawObject
+  external_ref  = certfr_id          # "CERTFR-2019-CTI-001"
+  source_format = "txt"
+  content_hash  = sha256(file bytes)
+  storage_uri   = r2://<bucket>/raw-snapshots/cert-fr/<filename>
+
+DataRawRecord
+  record_key    = sha256(text[:300])
+  raw_content   = JSON {"text": ..., "label": ..., "source": "certfr",
+                        "certfr_id": ..., "title": ..., "url": ...}
+  detected_language = "fr"
+```
+
+### Expected output
+
+| Metric | Value |
+|--------|-------|
+| Unique TXT files processed | 92 ✅ actual |
+| New `data_raw_record` rows inserted | **92** |
+| Cumulative `data_raw_record` after this source | **163,459** |
 
 ---
 
-## Source 4 — SAP Labs Blog (scraping) 🔜 Planned
+## Source 4 — SAP Labs Blog (scraping) ✅ Complete
 
-**Make target** (to be added): `sap-ingest-base`  
-**Input**: R2 `raw-snapshots/sap_labs/` + local `data/raw/scraping/sap_labs/`  
-**Script location**: `src/data_platform/base_ingest/scraping/sap_labs/ingest.py`
+**Make target**: `sap-ingest-base`  
+**Script location**: `src/data_platform/base_ingest/scraping/sap_labs/ingest.py`  
+**Manifest**: `data/local/sap_labs_base_ingest_manifest.json` ✅ written
+
+### Input inventory (verified)
+
+| Storage | Path / prefix | Objects | Emails per object | Unique IDs |
+|---------|---------------|---------|-------------------|------------|
+| R2 | `raw-snapshots/sap_labs/` | 3 JSON snapshots | 18 each | 18 total |
+| Local | `data/raw/scraping/sap_labs/` | 4 JSON snapshots | 18 each | 18 total |
+| Local fallback | `data/raw/scraping/sap_labs_fr_emails_18.json` | 1 JSON | 18 | 18 total |
+
+All 8 files (3 R2 + 4 local + 1 fallback) contain **identical email IDs** (`sap-chatgpt-01…04`, `sap-train-01…14`) — confirmed by cross-inventory check.
+
+R2 snapshot filenames: `sap_labs_scrape_YYYYMMDD_<uuid>.json`  
+Local snapshot filenames: `sap_labs_scrape_20260418_<uuid>.json` (different UUIDs from R2)  
+Fallback JSON: outer dict with keys `source, url, author, date, description, license, extracted, stats, emails`.
+
+### Deduplication strategy
+
+The `SapLabsIngestionService` (existing extractor) already handles all deduplication:
+- `fetch_entries()` falls back to `sap_labs_fr_emails_18.json` (blog is blocked; scraper returns fallback).
+- Record-level dedup via `_existing_record_keys()` (queries `data_raw_record` for previously seen keys).
+
+**No R2 enumeration is needed at base-ingest time**: the canonical data comes from the fallback JSON, which contains the full de-duplicated set of 18 emails.
+
+### Per-email record structure
+
+Each email → 1 `DataRawRecord` (created by existing `SapLabsIngestionService._build_raw_records()`).
+
+```
+DataRawRecord
+  record_key    = str(hash(subject))     # NOTE: Python hash — not cross-process stable;
+                                         # acceptable for base-ingest since DB is fresh
+  raw_content   = JSON {"subject": ..., "body": ..., "text": ..., "label": ...,
+                        "source": "sap_labs_scrape", "brand_impersonated": ...,
+                        "techniques": [...]}
+  detected_language = "fr"
+```
+
+Labels in the dataset: `phishing` (12 emails) and `legitimate` (6 emails).
+
+### Implementation pattern
+
+Identical to PhishTank base ingest: inject `NoOpSnapshotStore` to suppress R2 writes, call `SapLabsIngestionService.run()` directly.
+
+```python
+service = SapLabsIngestionService(snapshot_store=NoOpSnapshotStore())
+result = await service.run(session, trigger_mode="manual")
+```
+
+### Expected output
+
+| Metric | Value |
+|--------|-------|
+| Emails in fallback JSON | 18 ✅ actual |
+| New `data_raw_record` rows inserted | **18** |
+| Cumulative `data_raw_record` after this source | **163,477** |
 
 ---
 
@@ -210,7 +320,7 @@ emails in these files are spam by definition).
 |---|---|
 | PhishTank ✅ | 829 |
 | File (CSV + TXT) ✅ | **163,367** |
-| CERT-FR (est.) | TBD |
-| SAP Labs (est.) | TBD |
+| CERT-FR ✅ | 163,459 |
+| SAP Labs ✅ | **163,477** |
 | External DB (est.) | TBD |
 | Common Crawl (est.) | TBD |
