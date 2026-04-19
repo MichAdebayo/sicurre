@@ -19,6 +19,8 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     create_engine,
+    func,
+    select,
 )
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -38,9 +40,10 @@ DB_URL = f"sqlite:///{DB_PATH}"
 CORPUS_PATH = (
     ROOT_DIR / "data" / "raw" / "file" / "csv" / "en" / "combined_final_clean.csv"
 )
-TXT_DIR = ROOT_DIR / "data" / "raw" / "file" / "txt"
 SEED = 42
-SYNTHETIC_PHISHING_COUNT = 2863
+SYNTHETIC_PHISHING_COUNT = 7_500
+SYNTHETIC_SPAM_COUNT = 10_000
+SYNTHETIC_LEGITIMATE_COUNT = 5_000
 
 
 class Base(DeclarativeBase):
@@ -129,64 +132,26 @@ def generate_adapted_emails(seed: int = SEED) -> pd.DataFrame:
 def generate_synthetic_emails(seed: int = SEED) -> pd.DataFrame:
     service = SyntheticGenerationService(seed=seed)
     dataframe = service.generate_class("phishing", SYNTHETIC_PHISHING_COUNT)
-    logger.info("Synthetic emails: %d generated", len(dataframe))
+    logger.info("Synthetic phishing emails: %d generated", len(dataframe))
+    return dataframe
+
+
+def generate_synthetic_spam_emails(seed: int = SEED) -> pd.DataFrame:
+    service = SyntheticGenerationService(seed=seed)
+    dataframe = service.generate_class("spam", SYNTHETIC_SPAM_COUNT)
+    logger.info("Synthetic spam emails: %d generated", len(dataframe))
+    return dataframe
+
+
+def generate_synthetic_legitimate_emails(seed: int = SEED) -> pd.DataFrame:
+    service = SyntheticGenerationService(seed=seed)
+    dataframe = service.generate_class("legitimate", SYNTHETIC_LEGITIMATE_COUNT)
+    logger.info("Synthetic legitimate emails: %d generated", len(dataframe))
     return dataframe
 
 
 def _resolved_source_dataset(source_value: object) -> str:
     return build_database_source_path(str(source_value or ""))
-
-
-def parse_crowdsourced_spam() -> pd.DataFrame:
-    txt_files = sorted(TXT_DIR.glob("Spam_*.txt"))
-    if not txt_files:
-        logger.warning(
-            "No Spam_*.txt files found in %s — skipping crowdsourced spam", TXT_DIR
-        )
-        return pd.DataFrame()
-
-    rows: list[dict[str, object]] = []
-    for txt_path in txt_files:
-        raw = txt_path.read_text(encoding="utf-8", errors="replace")
-        chunks = re.split(r"(?=^\s{2,}From:\s)", raw, flags=re.MULTILINE)
-
-        for chunk in chunks:
-            chunk = chunk.strip()
-            if not chunk or not re.match(r"\s*From:", chunk):
-                continue
-            subject = ""
-            date_str = ""
-            subject_match = re.search(r"^Subject:\s*(.+)$", chunk, re.MULTILINE)
-            date_match = re.search(r"^   Date:\s*(.+)$", chunk, re.MULTILINE)
-            if subject_match:
-                subject = subject_match.group(1).strip()
-            if date_match:
-                date_str = date_match.group(1).strip()
-            body = ""
-            dash_match = re.search(r"^-{3,}.*$", chunk, re.MULTILINE)
-            if dash_match:
-                body = chunk[dash_match.end() :].strip()
-            if not body and not subject:
-                continue
-            full_text = f"{subject}\n\n{body}" if subject else body
-            rows.append(
-                {
-                    "text": full_text,
-                    "label": 0,
-                    "source": f"crowdsourced_spam_{txt_path.stem.lower()}",
-                    "language": "mixed",
-                    "archetype": "",
-                    "text_len": len(full_text),
-                }
-            )
-
-    dataframe = pd.DataFrame(rows)
-    logger.info(
-        "Crowdsourced spam: %d emails parsed from %d files",
-        len(dataframe),
-        len(txt_files),
-    )
-    return dataframe
 
 
 def redact_pii(text: str) -> str:
@@ -210,25 +175,51 @@ def seed_external_database(seed: int = SEED) -> None:
     df_synthetic = generate_synthetic_emails(seed=seed)
     if not df_synthetic.empty:
         dataframes.append(df_synthetic)
-    df_crowdsourced = parse_crowdsourced_spam()
-    if not df_crowdsourced.empty:
-        dataframes.append(df_crowdsourced)
+    df_spam = generate_synthetic_spam_emails(seed=seed)
+    if not df_spam.empty:
+        dataframes.append(df_spam)
+    df_legitimate = generate_synthetic_legitimate_emails(seed=seed)
+    if not df_legitimate.empty:
+        dataframes.append(df_legitimate)
     if not dataframes:
         logger.error("No data generated. Cannot seed external database.")
         return
 
     df_emails = pd.concat(dataframes, ignore_index=True)
     logger.info(
-        "Combined: %d emails (adapted=%d, synthetic=%d, crowdsourced=%d)",
+        "Combined: %d emails (adapted=%d, synthetic_phishing=%d, synthetic_spam=%d, synthetic_legitimate=%d)",
         len(df_emails),
         len(df_adapted),
         len(df_synthetic),
-        len(df_crowdsourced),
+        len(df_spam),
+        len(df_legitimate),
     )
 
+    expected_count = len(df_emails)
     if DB_PATH.exists():
+        _engine = create_engine(DB_URL, echo=False)
+        try:
+            with _engine.connect() as _conn:
+                existing_count = _conn.execute(
+                    select(func.count()).select_from(ExternalThreatLog)
+                ).scalar_one()
+        except Exception:
+            existing_count = 0
+        finally:
+            _engine.dispose()
+        if existing_count >= expected_count:
+            logger.info(
+                "external_threats.db has %d rows (seed baseline %d) — skipping re-seed (idempotent)",
+                existing_count,
+                expected_count,
+            )
+            return
+        logger.info(
+            "external_threats.db exists but has only %d rows (expected >= %d) — re-seeding",
+            existing_count,
+            expected_count,
+        )
         DB_PATH.unlink()
-        logger.info("Removed old external database: %s", DB_PATH)
 
     engine = create_engine(DB_URL, echo=False)
     Base.metadata.create_all(engine)
@@ -298,21 +289,25 @@ def seed_external_database(seed: int = SEED) -> None:
         model_tags = [item["version_tag"] for item in models_data]
         for _, row in df_emails.iterrows():
             user_id = random.choice(user_ids)
-            is_phishing = int(row.get("label", 0)) == 1
-            confidence = round(
-                (
-                    random.uniform(0.80, 0.99)
-                    if is_phishing
-                    else random.uniform(0.50, 0.80)
-                ),
-                3,
-            )
+            label_int = int(row.get("label", 2))
+            match label_int:
+                case 0:
+                    verdict = "phishing"
+                    confidence = round(random.uniform(0.80, 0.99), 3)
+                    action_taken = "trashed" if confidence > 0.85 else "none"
+                case 1:
+                    verdict = "spam"
+                    confidence = round(random.uniform(0.65, 0.90), 3)
+                    action_taken = "none"
+                case _:
+                    verdict = "legitimate"
+                    confidence = round(random.uniform(0.70, 0.95), 3)
+                    action_taken = "none"
             received_at = now - timedelta(
                 days=random.randint(0, 90),
                 hours=random.randint(0, 23),
                 minutes=random.randint(0, 59),
             )
-            action_taken = "trashed" if is_phishing and confidence > 0.85 else "none"
             action_at = (
                 received_at + timedelta(seconds=random.uniform(0.5, 2.0))
                 if action_taken == "trashed"
@@ -336,10 +331,10 @@ def seed_external_database(seed: int = SEED) -> None:
                 subject=subject,
                 body_preview=body_preview,
                 received_at=received_at,
-                verdict="phishing" if is_phishing else "legitimate",
+                verdict=verdict,
                 confidence=confidence,
                 signals=json.dumps(
-                    random.choice(phishing_signals) if is_phishing else []
+                    random.choice(phishing_signals) if verdict == "phishing" else []
                 ),
                 archetype=str(row.get("archetype", "")),
                 source_dataset=_resolved_source_dataset(row.get("source", "")),
@@ -385,9 +380,10 @@ def seed_external_database(seed: int = SEED) -> None:
         session.commit()
 
     logger.info("Seeded %d threat log entries into %s", len(threat_ids), DB_PATH)
-    logger.info("  Adapted: %d", len(df_adapted))
-    logger.info("  Synthetic: %d", len(df_synthetic))
-    logger.info("  Crowdsourced: %d", len(df_crowdsourced))
+    logger.info("  Adapted phishing: %d", len(df_adapted))
+    logger.info("  Synthetic phishing: %d", len(df_synthetic))
+    logger.info("  Synthetic spam: %d", len(df_spam))
+    logger.info("  Synthetic legitimate: %d", len(df_legitimate))
     logger.info("  Feedback entries: %d", len(feedback_threats))
     logger.info("  Database size: %.1f KB", DB_PATH.stat().st_size / 1024)
 

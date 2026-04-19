@@ -32,10 +32,11 @@ make file-ingest-base        # ingests source 2  (adds to existing DB)
 |---|---|---|---|
 | `phishtank-ingest-base` | **YES** (rm + alembic upgrade head) | `src/data_platform/base_ingest/api/phishtank/ingest.py` | ✅ Done |
 | `file-ingest-base` | No | `src/data_platform/base_ingest/file/csv/ingest.py` | ✅ Done |
-| `certfr-ingest-base` | No | `src/data_platform/base_ingest/scraping/certfr/ingest.py` | 🔜 Planned |
-| `sap-ingest-base` | No | `src/data_platform/base_ingest/scraping/sap_labs/ingest.py` | 🔜 Planned |
-| `db-ingest-base` | No | `src/data_platform/base_ingest/db/ingest.py` | 🔜 Planned |
-| `bigdata-ingest-base` | No | `src/data_platform/base_ingest/bigdata/common_crawl/ingest.py` | 🔜 Planned |
+| `certfr-ingest-base` | No | `src/data_platform/base_ingest/scraping/certfr/ingest.py` | ✅ Done |
+| `sap-ingest-base` | No | `src/data_platform/base_ingest/scraping/sap_labs/ingest.py` | ✅ Done |
+| `db-ingest-base` | No | `src/data_platform/base_ingest/db/ingest.py` | ✅ Done |
+
+> Common Crawl (`bigdata-*`) uses a separate cron + R2 pipeline and is **not** part of base ingestion.
 
 > `phishtank-ingest-base` is the only target that resets the DB.
 > All other targets assume an already-migrated `sicurre.db`.

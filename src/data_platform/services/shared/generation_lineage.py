@@ -75,46 +75,6 @@ def build_adapted_generation_bundle(
     )
 
 
-def build_synthetic_generation_bundle(
-    dataframe: pd.DataFrame,
-    *,
-    class_name: str,
-    run_timestamp: str | None = None,
-    generated_artifact_uri: str | None = None,
-    generator_name: str = "synthetic_archetype_generator",
-) -> dict[str, Any]:
-    source_name = f"synthetic_{class_name}_archetype"
-    samples = [
-        {
-            "draft_id": f"synthetic:{class_name}:{index}",
-            "scenario_id": str(row.get("archetype") or class_name),
-            "variant_index": 0,
-            "source_name": source_name,
-            "parent_source": "archetype_library",
-            "target_label": class_name,
-            "primary_theme": str(row.get("archetype") or ""),
-            "review_state": "usable",
-            "review_notes": [],
-            "text_sha256": sha256(
-                str(row.get("text") or "").encode("utf-8")
-            ).hexdigest(),
-            "normalized_text": str(row.get("text") or ""),
-            "language": str(row.get("language") or "fr"),
-        }
-        for index, row in dataframe.reset_index(drop=True).iterrows()
-    ]
-
-    return GenerationStagingService.build_bundle(
-        generator_name=generator_name,
-        source_name=source_name,
-        parent_source="archetype_library",
-        reference_selection_mode="archetype_template_generation",
-        generated_artifact_uri=generated_artifact_uri,
-        generated_at=_resolved_run_timestamp(run_timestamp),
-        samples=samples,
-    )
-
-
 async def persist_generation_bundle_payload(
     payload: dict[str, Any],
     *,

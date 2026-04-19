@@ -34,7 +34,6 @@ from data_platform.services.common_crawl.signal_synthetic import (  # noqa: E402
 )
 from data_platform.services.shared.generation_lineage import (  # noqa: E402
     build_adapted_generation_bundle,
-    build_synthetic_generation_bundle,
 )
 from data_platform.services.shared.generation_staging import (
     GenerationStagingService,
@@ -44,10 +43,6 @@ from data_platform.services.shared.review_persistence import (
 )  # noqa: E402
 from data_platform.services.shared.structured_review_artifact import (  # noqa: E402
     StructuredReviewArtifactService,
-)
-from data_platform.services.shared.synthetic_generation import (  # noqa: E402
-    DEFAULT_TARGETS,
-    SyntheticGenerationService,
 )
 
 logging.basicConfig(
@@ -63,7 +58,6 @@ def parse_args() -> argparse.Namespace:
             "generation lineage and curated promotion directly to the database.\n\n"
             "Modes:\n"
             "  adapted       — French cultural adaptation from EN phishing seeds\n"
-            "  synthetic     — Pure archetype-based synthetic generation\n"
             "  cc-signal     — Common Crawl phishing signal synthetic drafts\n"
             "  cc-acceptance — Common Crawl legit/spam acceptance review\n"
             "  all           — Run adapted + cc-signal + cc-acceptance\n"
@@ -72,7 +66,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--mode",
-        choices=["adapted", "synthetic", "cc-signal", "cc-acceptance", "all"],
+        choices=["adapted", "cc-signal", "cc-acceptance", "all"],
         default="all",
         help="Which generation lane to run.",
     )
@@ -95,20 +89,6 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=DEFAULT_TARGET_PER_ARCHETYPE,
         help="Number of adapted phishing rows to generate per archetype.",
-    )
-
-    # ── Synthetic lane ──
-    parser.add_argument(
-        "--synthetic-class",
-        choices=["phishing", "spam", "legitimate", "all"],
-        default="all",
-        help="Synthetic class scope when the synthetic lane runs.",
-    )
-    parser.add_argument(
-        "--synthetic-count",
-        type=int,
-        default=0,
-        help="Rows to generate per selected synthetic class (0 uses per-class defaults).",
     )
 
     # ── CC lanes ──
@@ -189,10 +169,6 @@ async def _load_db_seed_dataframe(
             }
         )
     return pd.DataFrame(rows)
-
-
-def _resolve_synthetic_classes(selection: str) -> list[str]:
-    return ["phishing", "spam", "legitimate"] if selection == "all" else [selection]
 
 
 async def _persist_bundle(
@@ -279,52 +255,6 @@ async def _run_adapted_generation(
         "parent_sources": source_names,
         "persistence": persistence,
     }
-
-
-# ── Synthetic lane ────────────────────────────────────────────
-
-
-async def _run_synthetic_generation(
-    session: AsyncSession,
-    args: argparse.Namespace,
-) -> list[dict[str, object]]:
-    logger.info("Starting synthetic archetype generation lane")
-    service = SyntheticGenerationService(seed=args.seed)
-    output: list[dict[str, object]] = []
-    for class_name in _resolve_synthetic_classes(args.synthetic_class):
-        count = (
-            args.synthetic_count
-            if args.synthetic_count > 0
-            else DEFAULT_TARGETS.get(class_name, 0)
-        )
-        result = service.generate_result(class_name, count, export=not args.skip_export)
-        persistence: dict[str, object] | None = None
-        if not result.dataframe.empty:
-            bundle = build_synthetic_generation_bundle(
-                result.dataframe,
-                class_name=class_name,
-                run_timestamp=args.run_timestamp,
-            )
-            logger.info(
-                "Persisting synthetic %s bundle: %d samples",
-                class_name,
-                len(bundle.get("samples", [])),
-            )
-            persistence = await _persist_bundle(
-                session,
-                payload=bundle,
-                pipeline_version=args.pipeline_version,
-                lineage_only=args.persist_lineage,
-            )
-        output.append(
-            {
-                "class_name": class_name,
-                "requested_count": count,
-                "generated_count": int(len(result.dataframe)),
-                "persistence": persistence,
-            }
-        )
-    return output
 
 
 # ── CC Signal lane ────────────────────────────────────────────
@@ -464,9 +394,6 @@ async def main() -> None:
 
             if args.mode in {"adapted", "all"}:
                 output["adapted"] = await _run_adapted_generation(session, args)
-
-            if args.mode == "synthetic":
-                output["synthetic"] = await _run_synthetic_generation(session, args)
 
             if args.mode in {"cc-signal", "all"}:
                 assert cc_export is not None

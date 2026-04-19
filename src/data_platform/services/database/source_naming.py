@@ -45,6 +45,4 @@ def build_database_source_path(source_dataset: str | None) -> str:
         return f"database/adapted/{normalized}"
     if normalized.startswith("synthetic_") or normalized == "synthetic_append":
         return f"database/faker/{normalized}"
-    if normalized.startswith("crowdsourced_spam"):
-        return f"database/crowdsourced/{normalized}"
     return f"database/external/{normalized}"

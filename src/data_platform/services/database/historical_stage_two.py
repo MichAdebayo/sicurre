@@ -92,10 +92,10 @@ class HistoricalStageTwoService:
             return NormalizedLabel.PHISHING
         if historical_source.startswith("synthetic_spam"):
             return NormalizedLabel.SPAM
+        if historical_source.startswith("synthetic_legitimate"):
+            return NormalizedLabel.LEGITIMATE
         if historical_source == "adapted_en_fr":
             return NormalizedLabel.PHISHING
-        if historical_source.startswith("crowdsourced_spam"):
-            return NormalizedLabel.SPAM
 
         raw_label = raw_content.get("label")
         normalized_raw_label = (
@@ -208,25 +208,6 @@ class HistoricalStageTwoService:
         if needs_repair:
             trace_steps.append("historical_quality_gate_failed")
             return "specialized_processing", route_reason, tuple(trace_steps)
-
-        if (
-            historical_source.startswith("crowdsourced_spam")
-            and cls._count_markers(text, cls.FRENCH_HINTS) == 0
-        ):
-            trace_steps.append("historical_quality_gate_failed")
-            return (
-                "specialized_processing",
-                "historical_language_recheck_required",
-                tuple(trace_steps),
-            )
-
-        if historical_source.startswith("crowdsourced_spam") and len(text) < 80:
-            trace_steps.append("historical_quality_gate_failed")
-            return (
-                "specialized_processing",
-                "historical_content_too_thin",
-                tuple(trace_steps),
-            )
 
         if cls._count_markers(text, cls.HTML_RESIDUE_MARKERS) > 0:
             trace_steps.append("historical_quality_gate_failed")
