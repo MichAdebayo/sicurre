@@ -3,6 +3,7 @@
         file-ingest-base file-ingest file-cron \
         scraping-ingest-base scraping-ingest scraping-cron \
         db-ingest-base db-ingest db-cron db-seed \
+        bigdata-ingest-base \
         bigdata-crawl bigdata-ingest bigdata-cron bigdata-reviewed-promote \
         cron-orchestrate \
         normalize normalize-dry \
@@ -28,6 +29,7 @@ help:
 	@echo "  make file-ingest-base          - Ingest all local CSV datasets (no DB reset)"
 	@echo "  make scraping-ingest-base      - Ingest frozen CERT-FR + SAP Labs snapshots (no DB reset)"
 	@echo "  make db-ingest-base            - Seed external_threats.db (3-class, seed=42) + ingest into sicurre.db"
+	@echo "  make bigdata-ingest-base       - Merge R2 + local CC CSVs into base parquet, then ingest into sicurre.db"
 	@echo ""
 	@echo "  Live Ingestion  (one-off manual backfill against live sources)"
 	@echo "  make phishtank-ingest          - Live PhishTank ingestion (HTTP feed)"
@@ -131,6 +133,12 @@ scraping-cron:
 db-cron:
 	@echo "Running scheduled DB feed: append new rows to feeder DB + ingest delta into sicurre.db..."
 	uv run python src/data_platform/cron_schedulers/database/run_database_historical_feed.py
+
+bigdata-ingest-base:
+	@echo "Step 1/2 — Building merged Common Crawl base parquet (R2 + legacy CSVs, dedup by content_hash)..."
+	unset SICURRE_DATABASE_URL && uv run python scripts/data_platform/common_crawl/ingestion/build_base_merged_snapshot.py
+	@echo "Step 2/2 — Ingesting base parquet into sicurre.db via LocalCommonCrawlClient..."
+	unset SICURRE_DATABASE_URL && uv run python src/data_platform/base_ingest/bigdata/common_crawl/ingest.py
 
 bigdata-crawl:
 	@echo "Running Common Crawl extraction to Cloudflare R2..."
