@@ -7,7 +7,8 @@
         bigdata-crawl bigdata-ingest bigdata-cron bigdata-reviewed-promote \
         cron-orchestrate \
         normalize normalize-dry \
-        generate-data dataset-build dataset-export
+        generate-data dataset-build dataset-export \
+        r2-freeze-proof
 
 NORMALIZE_ARGS ?=
 GENERATE_ARGS ?=
@@ -50,6 +51,9 @@ help:
 	@echo "  make bigdata-crawl             - Run Common Crawl extraction to Cloudflare R2"
 	@echo "  make bigdata-ingest            - Manually ingest latest Common Crawl snapshot"
 	@echo "  make bigdata-reviewed-promote  - Promote reviewed Common Crawl exports into curated tables"
+	@echo ""
+	@echo "  R2 Freeze Proof  (upload all source files to R2 base/ and verify counts)"
+	@echo "  make r2-freeze-proof           - Upload all sources to R2 base/, prove deterministic reproduction"
 	@echo ""
 	@echo "  Normalization"
 	@echo "  make normalize                 - Normalize all raw records in sicurre.db"
@@ -189,3 +193,10 @@ dataset-export:
 db-seed:
 	@echo "Manually seeding external_threats.db (dev utility)..."
 	uv run python src/data_platform/cli/dev/seed_external_db.py
+
+# ── R2 Freeze Proof ───────────────────────────────────────────────────────────
+
+r2-freeze-proof:
+	@echo "Uploading all source files to R2 base/ prefixes and verifying counts..."
+	@echo "sicurre.db BEFORE: $$(sqlite3 data/local/sicurre.db 'SELECT COUNT(*) FROM data_raw_record') rows"
+	unset SICURRE_DATABASE_URL && uv run python scripts/data_platform/shared/r2_freeze_proof/run_all.py
