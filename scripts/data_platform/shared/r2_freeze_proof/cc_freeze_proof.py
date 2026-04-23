@@ -174,6 +174,9 @@ def build_base(
     combined = combined.drop_duplicates(subset=["content_hash"]).reset_index(drop=True)
     after_dedup = len(combined)
 
+    if "language" in combined.columns:
+        combined = combined[combined["language"] == "fr"]
+
     if "text_length" in combined.columns:
         combined = combined[
             combined["text_length"].between(TEXT_LENGTH_MIN, TEXT_LENGTH_MAX)
