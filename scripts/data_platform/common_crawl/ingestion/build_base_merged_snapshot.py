@@ -75,9 +75,9 @@ def _load_latest_recovery_parquet() -> tuple[pd.DataFrame, Path]:
 
 
 def _load_legacy_csvs() -> pd.DataFrame:
-    csv_files = sorted(CC_DIR.glob("*.csv"))
+    csv_files = sorted(CC_DIR.glob("*fr_usable*.csv"))
     if not csv_files:
-        logger.info("No legacy CSVs found in %s — skipping", CC_DIR)
+        logger.info("No legacy fr_usable CSVs found in %s — skipping", CC_DIR)
         return pd.DataFrame()
     frames: list[pd.DataFrame] = []
     for path in csv_files:
