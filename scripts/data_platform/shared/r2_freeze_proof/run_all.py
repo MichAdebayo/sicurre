@@ -17,14 +17,14 @@ AFTER running successfully:
   - All source files exist in R2 under raw-snapshots/base/
   - Proof outputs exist in R2 (fr_usable/proof and quality/proof keys for CC)
   - You can safely wipe sicurre.db and re-run make *-ingest-base to verify
-    deterministic reproduction of the same 192,526 rows
+    deterministic reproduction of the same 191,983 rows
 
 Sources processed (in order):
   1. file         — CSV + TXT files  (~162,538 rows)
   2. database     — external_threats.db  (24,900 rows)
   3. scraping     — CERT-FR + SAP Labs  (110 rows)
   4. phishtank    — dated canonical CSVs  (829 rows)
-  5. common-crawl — R2-native base parquet  (4,149 rows)
+  5. common-crawl — R2-native base parquet  (3,606 rows)
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ import scraping_freeze_proof  # noqa: E402
 ENV_FILE = ROOT_DIR / ".env"
 DB_PATH = ROOT_DIR / "data" / "local" / "sicurre.db"
 
-DB_TOTAL_TARGET = 192_526
+DB_TOTAL_TARGET = 191_983
 
 
 def _yesno(v: bool | None) -> str:
@@ -132,7 +132,7 @@ def print_summary(
     print(f"  Elapsed                        : {elapsed:.1f}s")
     print()
     print("  Next step: wipe sicurre.db and run make *-ingest-base to confirm")
-    print("  deterministic reproduction of 192,526 rows from R2 base/ alone.")
+    print("  deterministic reproduction of 191,983 rows from R2 base/ alone.")
     print(sep)
 
 

@@ -115,7 +115,7 @@ def _save_manifest(result: CommonCrawlIngestionResult) -> None:
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "description": (
             "Common Crawl base ingestion — merged R2 + legacy local CSVs "
-            "(4149 unique rows by content_hash) ingested via LocalCommonCrawlClient. "
+            "(3606 unique fr rows by content_hash) ingested via LocalCommonCrawlClient. "
             "Replay with 'make bigdata-ingest-base'."
         ),
         "ingestion_run_id": result.ingestion_run_id,
