@@ -114,7 +114,7 @@ def run(s3: Any, bucket: str) -> dict[str, Any]:
     for table, cnt in sorted(table_counts.items()):
         logger.info("  %s: %d rows", table, cnt)
 
-    r2_total = sum(table_counts.values())
+    r2_total = table_counts.get("threat_log", sum(table_counts.values()))
 
     db_counts = get_db_source_counts(DB_PATH)
     db_database_total = sum(db_counts.get(name, 0) for name in DB_DATABASE_SOURCES)

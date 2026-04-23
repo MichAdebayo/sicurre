@@ -63,6 +63,28 @@ DB_TARGET = 829
 
 _DATE_RE = re.compile(r"phishtank_(\d{8})_")
 
+# ── French filtering (aligned with ingestion) ──────────────────────────────────
+
+FR_TLD_PATTERN = re.compile(r"\.fr(/|$|:)", re.IGNORECASE)
+FR_BRAND_KEYWORDS = (
+    "urssaf", "ameli", "impots", "dgfip", "caf", "cpam", "securite-sociale",
+    "france-connect", "franceconnect", "service-public", "gouv",
+    "laposte", "la-poste", "colissimo", "chronopost", "mondial-relay",
+    "credit-agricole", "creditagricole", "bnp", "bnpparibas",
+    "banque-postale", "banquepostale", "societe-generale", "societegenerale",
+    "lcl", "caisse-epargne", "credit-mutuel",
+    "orange", "sfr", "bouygues", "free",
+    "leboncoin", "cdiscount", "fnac",
+)
+
+def _is_french_target(url: Any) -> bool:
+    if not isinstance(url, str):
+        return False
+    url_lower = url.lower()
+    if FR_TLD_PATTERN.search(url_lower):
+        return True
+    return any(kw in url_lower for kw in FR_BRAND_KEYWORDS)
+
 
 # ── Date helpers ───────────────────────────────────────────────────────────────
 
@@ -90,17 +112,19 @@ def _date_from_r2_key(key: str) -> str | None:
 
 
 def collect_local_buckets() -> dict[str, list[Path]]:
-    """Group local CSV files by date. Skip the .json file."""
+    """Group local CSV and JSON files by date."""
     buckets: dict[str, list[Path]] = {}
-    for path in sorted(LOCAL_PHISHTANK_DIR.glob("*.csv")):
+    for path in sorted(LOCAL_PHISHTANK_DIR.glob("*.*")):
+        if path.suffix not in (".csv", ".json"):
+            continue
         date = _date_from_filename(path)
         buckets.setdefault(date, []).append(path)
     return buckets
 
 
 def collect_r2_buckets(s3: Any, bucket: str) -> dict[str, list[str]]:
-    """Group existing R2 phishtank CSV keys by date."""
-    keys = [k for k in list_keys(s3, bucket, R2_EXISTING_PREFIX) if k.endswith(".csv")]
+    """Group existing R2 phishtank CSV and JSON keys by date."""
+    keys = [k for k in list_keys(s3, bucket, R2_EXISTING_PREFIX) if k.endswith(".csv") or k.endswith(".json")]
     buckets: dict[str, list[str]] = {}
     for key in keys:
         date = _date_from_r2_key(key)
@@ -115,7 +139,7 @@ def collect_r2_buckets(s3: Any, bucket: str) -> dict[str, list[str]]:
 
 
 def _load_local_csv_unique(paths: list[Path]) -> pd.DataFrame:
-    """Load all CSVs for a date, dedup files by sha256, concat rows."""
+    """Load all files for a date, dedup files by sha256, concat rows."""
     seen_sha: set[str] = set()
     frames: list[pd.DataFrame] = []
     for path in paths:
@@ -124,14 +148,17 @@ def _load_local_csv_unique(paths: list[Path]) -> pd.DataFrame:
             logger.info("  SKIP dup file (sha256): %s", path.name)
             continue
         seen_sha.add(h)
-        df = pd.read_csv(path)
+        try:
+            df = pd.read_json(path)
+        except Exception:
+            df = pd.read_csv(path)
         logger.info("  LOCAL %s: %d rows (sha256 %s)", path.name, len(df), h[:8])
         frames.append(df)
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
 
 def _load_r2_csv_unique(s3: Any, bucket: str, keys: list[str]) -> pd.DataFrame:
-    """Load R2 CSVs for a date, dedup by sha256, concat rows."""
+    """Load R2 files for a date, dedup by sha256, concat rows."""
     seen_sha: set[str] = set()
     frames: list[pd.DataFrame] = []
     for key in keys:
@@ -141,7 +168,10 @@ def _load_r2_csv_unique(s3: Any, bucket: str, keys: list[str]) -> pd.DataFrame:
             logger.info("  SKIP dup R2 file (sha256): %s", key.split("/")[-1])
             continue
         seen_sha.add(h)
-        df = pd.read_csv(io.BytesIO(payload))
+        try:
+            df = pd.read_json(io.BytesIO(payload))
+        except Exception:
+            df = pd.read_csv(io.BytesIO(payload))
         logger.info("  R2 %s: %d rows (sha256 %s)", key.split("/")[-1], len(df), h[:8])
         frames.append(df)
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
@@ -169,12 +199,15 @@ def build_canonical_csv(
         return pd.DataFrame()
 
     combined = pd.concat(frames, ignore_index=True)
-    before = len(combined)
+    before_filter = len(combined)
+    combined = combined[combined["url"].apply(_is_french_target)]
+    after_filter = len(combined)
     combined = combined.drop_duplicates(subset=["phish_id"]).reset_index(drop=True)
     logger.info(
-        "  Date %s: %d rows → dedup by phish_id → %d unique",
+        "  Date %s: %d rows → %d French targets → %d unique",
         date,
-        before,
+        before_filter,
+        after_filter,
         len(combined),
     )
     return combined

@@ -151,8 +151,8 @@ def _enumerate_r2_snapshots(s3_client: Any, bucket: str) -> list[_SnapshotEntry]
     entries: list[_SnapshotEntry] = []
     for obj in objects:
         key: str = obj["Key"]
-        if not key.lower().endswith(".csv"):
-            logger.debug("Skipping non-CSV R2 object: %s", key)
+        if not key.lower().endswith(".csv") and not key.lower().endswith(".json"):
+            logger.debug("Skipping non-CSV/JSON R2 object: %s", key)
             continue
         filename = key.split("/")[-1]
         logger.info("Downloading R2: %s (%d bytes)", key, obj["Size"])
@@ -180,9 +180,13 @@ def _enumerate_local_snapshots() -> list[_SnapshotEntry]:
         logger.warning("Local phishtank dir not found: %s", LOCAL_PHISHTANK_DIR)
         return []
 
-    csv_files = sorted(LOCAL_PHISHTANK_DIR.glob("*.csv"), key=lambda p: p.name)
+    files = []
+    for ext in ("*.csv", "*.json"):
+        files.extend(LOCAL_PHISHTANK_DIR.glob(ext))
+    files.sort(key=lambda p: p.name)
+
     entries: list[_SnapshotEntry] = []
-    for path in csv_files:
+    for path in files:
         data = path.read_bytes()
         sha256 = hashlib.sha256(data).hexdigest()
         try:
@@ -289,7 +293,35 @@ def _build_dedup_index(
 
 
 def _parse_csv_payload(entry: _SnapshotEntry) -> PhishTankFetchedPayload:
-    text = entry.data.decode("utf-8", errors="replace")
+    text = entry.data.decode("utf-8", errors="replace").strip()
+
+    if text.startswith("[") or text.startswith("{"):
+        try:
+            data = json.loads(text)
+            raw_entries = data if isinstance(data, list) else [data]
+            entries = [
+                {
+                    "phish_id": str(row.get("phish_id", "")),
+                    "url": str(row.get("url", "")),
+                    "phish_detail_url": str(row.get("phish_detail_url", "")),
+                    "submission_time": str(row.get("submission_time", "")),
+                    "verified": str(row.get("verified", "")),
+                    "verification_time": str(row.get("verification_time", "")),
+                    "online": str(row.get("online", "")),
+                    "target": str(row.get("target", "")),
+                }
+                for row in raw_entries
+            ]
+            return PhishTankFetchedPayload(
+                entries=entries,
+                snapshot_bytes=entry.data,
+                content_type="application/json",
+                source_format="json",
+                source_url=entry.source_url,
+            )
+        except json.JSONDecodeError:
+            pass
+
     reader = csv.DictReader(io.StringIO(text))
     entries = [
         {
