@@ -1,4 +1,5 @@
 .PHONY: help install test dev-api \
+        ingest-all-base \
         phishtank-ingest-base phishtank-ingest phishtank-cron phishtank-csv \
         file-ingest-base file-ingest file-cron \
         scraping-ingest-base scraping-ingest scraping-cron \
@@ -7,6 +8,7 @@
         bigdata-crawl bigdata-ingest bigdata-cron bigdata-reviewed-promote \
         cron-orchestrate \
         normalize normalize-dry \
+        annotate \
         generate-data dataset-build dataset-export \
         r2-freeze-proof
 
@@ -26,6 +28,7 @@ help:
 	@echo "  make dev-api                   - Start FastAPI development server"
 	@echo ""
 	@echo "  Base Ingestion  (deterministic, frozen snapshots — used to build sicurre.db from scratch)"
+	@echo "  make ingest-all-base           - Wipe DB and run ALL base ingestion steps in order"
 	@echo "  make phishtank-ingest-base     - Reset DB, ingest all frozen PhishTank R2+local snapshots"
 	@echo "  make file-ingest-base          - Ingest all local CSV datasets (no DB reset)"
 	@echo "  make scraping-ingest-base      - Ingest frozen CERT-FR + SAP Labs snapshots (no DB reset)"
@@ -59,6 +62,9 @@ help:
 	@echo "  make normalize                 - Normalize all raw records in sicurre.db"
 	@echo "  make normalize-dry             - Preview normalization without DB writes"
 	@echo ""
+	@echo "  Annotation"
+	@echo "  make annotate                  - Backfill missing annotations on normalized messages"
+	@echo ""
 	@echo "  Dataset"
 	@echo "  make generate-data             - Run canonical generation pipeline (adapted + CC lanes)"
 	@echo "  make dataset-build             - Build DB-backed dataset from annotated normalized messages"
@@ -77,6 +83,15 @@ dev-api:
 	uv run uvicorn src.data_platform.api.main:app --reload
 
 # ── Base Ingestion ─────────────────────────────────────────────────────────────
+
+ingest-all-base: phishtank-ingest-base file-ingest-base scraping-ingest-base db-ingest-base bigdata-ingest-base
+	@echo ""
+	@echo "============================================================================"
+	@echo "  ALL BASE INGESTION COMPLETE"
+	@echo "============================================================================"
+	@echo "  Total rows: $$(sqlite3 data/local/sicurre.db 'SELECT COUNT(*) FROM data_raw_record')"
+	@echo "  Target    : 191,983"
+	@echo "============================================================================"
 
 phishtank-ingest-base:
 	@echo "Resetting sicurre.db and running deterministic PhishTank base ingestion (R2 + local)..."
@@ -173,6 +188,12 @@ normalize:
 normalize-dry:
 	@echo "Previewing normalization (no DB writes)..."
 	uv run python src/data_platform/cli/normalize/messages.py --dry-run $(NORMALIZE_ARGS)
+
+# ── Annotation ────────────────────────────────────────────────────────────────
+
+annotate:
+	@echo "Backfilling missing annotations on normalized messages..."
+	uv run python src/data_platform/cli/maintenance/annotation_backfill.py
 
 # ── Dataset ───────────────────────────────────────────────────────────────────
 
