@@ -12,7 +12,7 @@ from pathlib import Path
 
 # Force the ingestion service to write its final snapshot to R2 under the cron/ prefix
 os.environ["SICURRE_COMMON_CRAWL_SNAPSHOT_STORAGE_BACKEND"] = "prod"
-os.environ["SICURRE_COMMON_CRAWL_SNAPSHOT_PREFIX"] = "cron/common_crawl"
+os.environ["SICURRE_COMMON_CRAWL_SNAPSHOT_PREFIX"] = "cron/bigdata/common_crawl"
 
 ROOT_DIR = Path(__file__).resolve().parents[4]
 SRC_ROOT = ROOT_DIR / "src"

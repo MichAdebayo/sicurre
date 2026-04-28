@@ -1,11 +1,18 @@
-"""Run the scheduled CSV ingestion delegate."""
+"""Run the scheduled CSV ingestion delegate.
+
+Forces R2 storage under cron/files/csv/ prefix.
+"""
 
 from __future__ import annotations
 
-import argparse
 import asyncio
+import logging
+import os
 import sys
 from pathlib import Path
+
+# Force snapshot storage to R2 under the cron/files/csv prefix
+os.environ["SICURRE_RAW_SNAPSHOT_STORAGE_BACKEND"] = "prod"
 
 ROOT_DIR = Path(__file__).resolve().parents[4]
 SRC_ROOT = ROOT_DIR / "src"
@@ -15,14 +22,13 @@ if str(SRC_ROOT) not in sys.path:
 
 from data_platform.cli.ingest.file.csv_ingestion import run_ingestion
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+)
+logger = logging.getLogger(__name__)
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Ingest static CSV datasets.")
-    parser.add_argument(
-        "--dir",
-        type=str,
-        default="data/raw/file/csv",
-        help="Directory to recursively search for CSV files.",
-    )
-    args = parser.parse_args()
-    asyncio.run(run_ingestion(args.dir, trigger_mode="scheduled"))
+    logger.info("Starting CSV file cron (R2 target: cron/files/csv)")
+    asyncio.run(run_ingestion("data/raw/file/csv", trigger_mode="scheduled"))
