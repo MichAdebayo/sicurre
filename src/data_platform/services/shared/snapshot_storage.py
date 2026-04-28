@@ -148,7 +148,7 @@ def build_snapshot_store(
         else settings.resolve_snapshot_storage_backend(source_key=source_key)
     )
 
-    if resolved_backend == "r2":
+    if resolved_backend in ("r2", "prod"):
         required_settings = {
             "raw_snapshot_r2_bucket_name": settings.raw_snapshot_r2_bucket_name,
             "raw_snapshot_r2_endpoint_url": settings.raw_snapshot_r2_endpoint_url,
