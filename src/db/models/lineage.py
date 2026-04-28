@@ -616,3 +616,30 @@ class DataGenerationSampleSourceLink(Base):
     raw_record: Mapped[DataRawRecord] = relationship(
         back_populates="generation_sample_source_links"
     )
+
+
+class PipelineState(Base):
+    """Durable key-value state for resumable cron pipelines.
+
+    Each pipeline (e.g., ``common_crawl_cron``) stores its checkpoint
+    as a JSON blob so it can resume across runs.
+    """
+
+    __tablename__ = "pipeline_state"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        sa.Uuid(), primary_key=True, default=uuid.uuid4
+    )
+    pipeline_name: Mapped[str] = mapped_column(
+        sa.Text(), nullable=False, unique=True
+    )
+    state_data: Mapped[dict[str, Any]] = mapped_column(
+        JSON_VARIANT, nullable=False, default=dict
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
