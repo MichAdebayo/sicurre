@@ -1,16 +1,18 @@
 .PHONY: help install test dev-api \
         ingest-all-base \
-        phishtank-ingest-base phishtank-ingest phishtank-cron phishtank-csv \
-        file-ingest-base file-ingest file-cron \
-        scraping-ingest-base scraping-ingest scraping-cron \
-        db-ingest-base db-ingest db-cron db-seed \
+        phishtank-ingest-base \
+        file-ingest-base \
+        scraping-ingest-base \
+        db-ingest-base \
         bigdata-ingest-base \
-        bigdata-crawl bigdata-ingest bigdata-cron bigdata-reviewed-promote \
-        cron-orchestrate \
+        phishtank-cron file-cron scraping-cron db-cron bigdata-cron \
+        cron-orchestrate ingest-all-cron \
+        bigdata-crawl bigdata-ingest bigdata-reviewed-promote \
         normalize normalize-dry \
         annotate \
         generate-data dataset-build dataset-export \
-        r2-freeze-proof
+        pipeline-push demo-v1 demo-v2 \
+        poc db-seed r2-freeze-proof
 
 NORMALIZE_ARGS ?=
 GENERATE_ARGS ?=
@@ -35,43 +37,29 @@ help:
 	@echo "  make db-ingest-base            - Seed external_threats.db (3-class, seed=42) + ingest into sicurre.db"
 	@echo "  make bigdata-ingest-base       - Merge R2 + local CC CSVs into base parquet, then ingest into sicurre.db"
 	@echo ""
-	@echo "  Live Ingestion  (one-off manual backfill against live sources)"
-	@echo "  make phishtank-ingest          - Live PhishTank ingestion (HTTP feed)"
-	@echo "  make phishtank-csv             - PhishTank ingestion from local CSV fallback"
-	@echo "  make file-ingest               - One-off CSV dataset ingestion"
-	@echo "  make scraping-ingest           - Full historical CERT-FR backfill + SAP Labs scrape"
-	@echo "  make db-ingest                 - Sync external_threats.db → sicurre.db only (no seeding; use after db-cron partial failure)"
-	@echo ""
 	@echo "  Cron  (scheduled, incremental — simulates production)"
 	@echo "  make phishtank-cron            - Scheduled PhishTank ingestion"
 	@echo "  make file-cron                 - Scheduled CSV ingestion"
 	@echo "  make scraping-cron             - Scheduled CERT-FR scraping (capped index scan)"
-	@echo "  make db-cron                   - Scheduled DB feed: append new rows to feeder DB + ingest delta"
+	@echo "  make db-cron                   - Scheduled DB feed: ingest delta from external_threats.db"
 	@echo "  make bigdata-cron              - Scheduled Common Crawl extract→ingest pipeline"
-	@echo "  make cron-orchestrate          - Run full cron suite manually"
+	@echo "  make ingest-all-cron           - Run full cron ingestion suite"
 	@echo ""
-	@echo "  Common Crawl"
-	@echo "  make bigdata-crawl             - Run Common Crawl extraction to Cloudflare R2"
-	@echo "  make bigdata-ingest            - Manually ingest latest Common Crawl snapshot"
-	@echo "  make bigdata-reviewed-promote  - Promote reviewed Common Crawl exports into curated tables"
-	@echo ""
-	@echo "  R2 Freeze Proof  (upload all source files to R2 base/ and verify counts)"
-	@echo "  make r2-freeze-proof           - Upload all sources to R2 base/, prove deterministic reproduction"
-	@echo ""
-	@echo "  Normalization"
-	@echo "  make normalize                 - Normalize all raw records in sicurre.db"
-	@echo "  make normalize-dry             - Preview normalization without DB writes"
-	@echo ""
-	@echo "  Annotation"
-	@echo "  make annotate                  - Backfill missing annotations on normalized messages"
+	@echo "  Pipeline & Demos"
+	@echo "  make pipeline-push             - Push raw data through normalize → annotate → dataset-build"
+	@echo "  make demo-v1                   - Full demo: base ingestion + pipeline push (dataset v1)"
+	@echo "  make demo-v2                   - Full demo: generate delta + cron ingestion + pipeline push (dataset v2)"
 	@echo ""
 	@echo "  Dataset"
 	@echo "  make generate-data             - Run canonical generation pipeline (adapted + CC lanes)"
 	@echo "  make dataset-build             - Build DB-backed dataset from annotated normalized messages"
 	@echo "  make dataset-export            - Serialize frozen dataset to CSV/JSONL for PyTorch"
 	@echo ""
+	@echo "  POC"
+	@echo "  make poc                       - Launch Streamlit POC dashboard"
+	@echo ""
 	@echo "  Dev"
-	@echo "  make db-seed                   - Manually seed external_threats.db (dev utility, supports --append-n)"
+	@echo "  make db-seed                   - Manually seed external_threats.db (dev utility)"
 
 install:
 	uv sync
@@ -112,34 +100,11 @@ db-ingest-base:
 	@echo "Seeding external_threats.db (3-class, seed=42) then ingesting into sicurre.db (deterministic)..."
 	unset SICURRE_DATABASE_URL && uv run python src/data_platform/base_ingest/db/ingest.py
 
-# ── Live Ingestion ─────────────────────────────────────────────────────────────
-
-phishtank-ingest:
-	@echo "Starting one-off live PhishTank ingestion..."
-	uv run python src/data_platform/cli/ingest/api/phishtank.py --trigger manual
-
-phishtank-csv:
-	@echo "Starting PhishTank ingestion from local CSV fallback..."
-	uv run python src/data_platform/cli/ingest/api/phishtank.py --trigger manual --csv data/raw/api/phishtank/phishing-tank.csv
-
-file-ingest:
-	@echo "Starting one-off CSV dataset ingestion..."
-	uv run python src/data_platform/cli/ingest/file/csv_ingestion.py --dir data/raw/file/csv
-
-scraping-ingest:
-	@echo "Starting full historical CERT-FR backfill then SAP Labs scrape..."
-	uv run python src/data_platform/cli/ingest/scraping/certfr.py --trigger manual --historical
-	uv run python src/data_platform/cli/ingest/scraping/sap_labs.py
-
-db-ingest:
-	@echo "Starting full backfill: sync all external_threats.db rows into sicurre.db..."
-	uv run python src/data_platform/cli/ingest/database/legacy_db.py
-
 # ── Cron ──────────────────────────────────────────────────────────────────────
 
 phishtank-cron:
 	@echo "Running scheduled PhishTank ingestion..."
-	uv run python src/data_platform/cli/ingest/api/phishtank.py --trigger scheduled
+	uv run python src/data_platform/cron_schedulers/api/run_phishtank_ingestion.py
 
 file-cron:
 	@echo "Running scheduled CSV ingestion..."
@@ -151,7 +116,7 @@ scraping-cron:
 
 db-cron:
 	@echo "Running scheduled DB feed: append new rows to feeder DB + ingest delta into sicurre.db..."
-	uv run python src/data_platform/cron_schedulers/database/run_database_historical_feed.py
+	uv run python src/data_platform/cron_schedulers/database/run_sql_ingestion.py
 
 bigdata-ingest-base:
 	@echo "Step 1/2 — Building merged Common Crawl base parquet (R2 + legacy CSVs, dedup by content_hash)..."
@@ -169,7 +134,7 @@ bigdata-ingest:
 
 bigdata-cron:
 	@echo "Running scheduled Common Crawl extract→ingest pipeline..."
-	uv run python src/data_platform/cron_schedulers/bigdata/run_common_crawl_pipeline.py
+	uv run python src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py
 
 bigdata-reviewed-promote:
 	@echo "Promoting reviewed Common Crawl exports into curated tables..."
@@ -178,6 +143,9 @@ bigdata-reviewed-promote:
 cron-orchestrate:
 	@echo "Running full cron suite manually..."
 	uv run python src/data_platform/cli/maintenance/cron_orchestrator.py $(CRON_ARGS)
+
+ingest-all-cron: cron-orchestrate
+	@echo "All cron ingestion tasks completed."
 
 # ── Normalization ─────────────────────────────────────────────────────────────
 
@@ -208,6 +176,33 @@ dataset-build:
 dataset-export:
 	@echo "Serializing frozen dataset to CSV/JSONL for PyTorch..."
 	uv run python src/data_platform/cli/datasets/export.py $(EXPORT_ARGS)
+
+# ── Pipeline & Demos ──────────────────────────────────────────────────────────
+
+pipeline-push: normalize annotate dataset-build
+	@echo "Data pushed through normalization, annotation, and dataset builder."
+
+demo-v1: ingest-all-base pipeline-push
+	@echo "Demo V1 Dataset Generated"
+
+demo-v2:
+	@echo "Simulating time passage: Generating 50 new external threat records..."
+	uv run python src/data_platform/cli/generate_sql_delta.py -n 50
+	@echo "Running cron..."
+	$(MAKE) ingest-all-cron
+	@echo "Pushing new data through pipeline..."
+	$(MAKE) pipeline-push
+	@echo "Demo V2 Dataset Generated"
+
+# ── POC ───────────────────────────────────────────────────────────────────────
+
+poc-seed:
+	@echo "Seeding POC users (admin + demo)..."
+	uv run python src/poc/seed_users.py
+
+poc: poc-seed
+	@echo "Starting Sicurre POC Streamlit Dashboard..."
+	uv run streamlit run src/poc/app.py --server.port 8501
 
 # ── Dev ───────────────────────────────────────────────────────────────────────
 
