@@ -537,24 +537,58 @@ class IncrementalCommonCrawlExtractor:
     # ------------------------------------------------------------------
 
     async def _flush_to_r2(self, crawl_id: str, pages: list[dict[str, Any]]) -> str:
-        """Write extracted pages to R2 as a parquet file."""
+        """Write extracted pages to R2 mirroring the base dataset structure (raw, fr_usable, quality)."""
         df = pd.DataFrame(pages)
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        base_prefix = f"cron/bigdata/common_crawl/{crawl_id}/{timestamp}"
 
-        buffer = io.BytesIO()
-        df.to_parquet(buffer, index=False, engine="pyarrow")
-        payload = buffer.getvalue()
-
-        object_key = self.snapshot_store.build_object_key(
-            source_prefix=f"cron/bigdata/common_crawl/{crawl_id}/{timestamp}",
-            filename=f"cc_incremental_{len(df)}_{timestamp}.parquet",
+        # 1. Save raw data
+        raw_buffer = io.BytesIO()
+        df.to_parquet(raw_buffer, index=False, engine="pyarrow")
+        raw_key = self.snapshot_store.build_object_key(
+            source_prefix=f"{base_prefix}/raw",
+            filename=f"cc_incremental_raw_{len(df)}_{timestamp}.parquet",
         )
-        result = await self.snapshot_store.write_snapshot(
-            object_key=object_key,
-            payload=payload,
+        await self.snapshot_store.write_snapshot(
+            object_key=raw_key,
+            payload=raw_buffer.getvalue(),
             content_type="application/vnd.apache.parquet",
         )
-        return result.storage_uri
+
+        # 2. Save fr_usable data
+        fr_df = df[df["language"] == "fr"].copy() if not df.empty else df.copy()
+        fr_buffer = io.BytesIO()
+        fr_df.to_parquet(fr_buffer, index=False, engine="pyarrow")
+        fr_key = self.snapshot_store.build_object_key(
+            source_prefix=f"{base_prefix}/fr_usable",
+            filename=f"cc_incremental_fr_usable_{len(fr_df)}_{timestamp}.parquet",
+        )
+        await self.snapshot_store.write_snapshot(
+            object_key=fr_key,
+            payload=fr_buffer.getvalue(),
+            content_type="application/vnd.apache.parquet",
+        )
+
+        # 3. Save quality report
+        quality_report = {
+            "index": crawl_id,
+            "timestamp": timestamp,
+            "total_extracted": len(df),
+            "fr_usable_count": len(fr_df),
+            "language_distribution": df["language"].value_counts().to_dict() if not df.empty else {},
+            "category_distribution": df["category"].value_counts().to_dict() if not df.empty else {},
+        }
+        quality_key = self.snapshot_store.build_object_key(
+            source_prefix=f"{base_prefix}/quality",
+            filename=f"quality_report_{timestamp}.json",
+        )
+        await self.snapshot_store.write_snapshot(
+            object_key=quality_key,
+            payload=json.dumps(quality_report, indent=2).encode("utf-8"),
+            content_type="application/json",
+        )
+
+        return raw_key
 
     # ------------------------------------------------------------------
     # Checkpoint (DB-backed)

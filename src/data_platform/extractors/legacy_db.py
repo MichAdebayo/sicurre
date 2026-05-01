@@ -81,7 +81,7 @@ class LegacyDbConnector:
 
         return Path(database)
 
-    async def fetch_threats(self) -> list[dict[str, Any]]:
+    async def fetch_threats(self, since_date: str | None = None) -> list[dict[str, Any]]:
         """Extract threat logs from the monolithic legacy database."""
         db_path = self._resolved_db_path()
         if db_path is not None and not db_path.exists():
@@ -93,9 +93,7 @@ class LegacyDbConnector:
 
         try:
             async with engine.connect() as conn:
-                # We do a direct extraction from the monolithic DB tables
-                query = text(
-                    """
+                query_str = """
                     SELECT 
                         t.id as threat_id,
                         t.message_id,
@@ -107,11 +105,15 @@ class LegacyDbConnector:
                         t.archetype,
                         t.source_dataset,
                         t.received_at,
+                        t.created_at,
                         u.email as user_email
                     FROM threat_log t
                     JOIN users u ON t.user_id = u.id
                 """
-                )
+                if since_date:
+                    query_str += f" WHERE t.created_at > '{since_date}' ORDER BY t.created_at ASC"
+                    
+                query = text(query_str)
                 result = await conn.execute(query)
                 # Convert rows to dict mappings
                 rows = result.mappings().fetchall()
@@ -176,6 +178,7 @@ class LegacyDbIngestionService:
         *,
         trigger_mode: str = "manual",
         started_at: datetime | None = None,
+        since_date: str | None = None,
     ) -> LegacyDbIngestionResult:
         run_started_at = started_at or datetime.now(timezone.utc)
         self.trace.trace(
@@ -200,9 +203,9 @@ class LegacyDbIngestionService:
             self.trace.trace(
                 stage="extraction",
                 status="start",
-                message="Connecting to external legacy DB",
+                message=f"Connecting to external legacy DB (since {since_date or 'beginning'})",
             )
-            entries = await self.connector.fetch_threats()
+            entries = await self.connector.fetch_threats(since_date=since_date)
             total_extracted_count = len(entries)
             self.trace.trace(
                 stage="extraction",
@@ -525,6 +528,7 @@ class LegacyDbIngestionService:
                 "source": child_source_name,
                 "archetype": entry.get("archetype"),
                 "signals": entry.get("signals"),
+                "created_at": str(entry.get("created_at")) if entry.get("created_at") else None,
             }
 
             raw_content = json.dumps(

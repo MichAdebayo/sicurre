@@ -1,0 +1,110 @@
+"""Run the incremental SQL cron ingestion from the external threat database.
+
+This orchestrator:
+1. Forces snapshot storage to R2 under cron/db/external_threats.
+2. Retrieves the maximum created_at (watermark) currently in the DB.
+3. Fetches new records from external_threats.db using the watermark.
+4. Saves a JSON snapshot to R2 and writes raw records to the platform.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import os
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+# Force snapshot storage to R2 under the cron/db/external_threats prefix
+os.environ["SICURRE_DATABASE_HISTORICAL_SNAPSHOT_STORAGE_BACKEND"] = "prod"
+os.environ["SICURRE_DATABASE_HISTORICAL_SNAPSHOT_PREFIX"] = "cron/db/external_threats"
+
+ROOT_DIR = Path(__file__).resolve().parents[4]
+SRC_ROOT = ROOT_DIR / "src"
+
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from core.config import get_settings
+from core.database import Base
+from data_platform.extractors.legacy_db import LegacyDbIngestionService
+from db.models import PipelineState
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+
+async def run_incremental_sql_cron() -> None:
+    settings = get_settings()
+    engine = create_async_engine(settings.database_url, echo=False)
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    session_factory = async_sessionmaker(
+        engine, expire_on_commit=False, class_=AsyncSession
+    )
+
+    pipeline_name = "sql_cron"
+
+    async with session_factory() as session:
+        stmt = select(PipelineState).where(PipelineState.pipeline_name == pipeline_name)
+        row = await session.scalar(stmt)
+        if row is None:
+            last_known_date = "1970-01-01 00:00:00"
+        else:
+            last_known_date = row.state_data.get("last_created_at", "1970-01-01 00:00:00")
+
+    logger.info("SQL Cron last known created_at: %s", last_known_date)
+
+    service = LegacyDbIngestionService()
+    
+    async with session_factory() as session:
+        result = await service.run(
+            session, 
+            trigger_mode="scheduled",
+            since_date=last_known_date,
+        )
+
+    if result.raw_record_count > 0:
+        # Update watermark in PipelineState
+        now = datetime.now(timezone.utc)
+        async with session_factory() as session:
+            stmt = select(PipelineState).where(PipelineState.pipeline_name == pipeline_name)
+            row = await session.scalar(stmt)
+            if row is None:
+                row = PipelineState(
+                    pipeline_name=pipeline_name,
+                    state_data={"last_created_at": now.strftime("%Y-%m-%d %H:%M:%S.%f"), "updated_at": now.strftime("%Y-%m-%d %H:%M:%S.%f")},
+                )
+                session.add(row)
+            else:
+                row.state_data = {
+                    **row.state_data,
+                    "last_created_at": now.strftime("%Y-%m-%d %H:%M:%S.%f"),
+                    "updated_at": now.strftime("%Y-%m-%d %H:%M:%S.%f"),
+                }
+            await session.commit()
+        logger.info("Pipeline state updated with new watermark: %s", now.strftime("%Y-%m-%d %H:%M:%S.%f"))
+
+    logger.info("--- SQL Cron Summary ---")
+    logger.info(result.log_message or "DB ingestion completed")
+    logger.info("Raw Object Count: %d", result.raw_object_count)
+    logger.info("New Records:      %d", result.raw_record_count)
+    logger.info("Skipped (dupes):  %d", result.skipped_count)
+    logger.info("Total Extracted:  %d", result.total_extracted_count)
+    if result.snapshot_storage_uri:
+        logger.info("R2 Snapshot URI:  %s", result.snapshot_storage_uri)
+
+    await engine.dispose()
+
+
+if __name__ == "__main__":
+    asyncio.run(run_incremental_sql_cron())
