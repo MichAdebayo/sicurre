@@ -65,14 +65,14 @@ CRON_JOBS: tuple[CronJobSpec, ...] = (
         name="database_historical",
         label="Database Historical Feed",
         script_path=ROOT_DIR
-        / "src/data_platform/cron_schedulers/database/run_database_historical_feed.py",
+        / "src/data_platform/cron_schedulers/database/run_sql_ingestion.py",
         source_names=("database-historical",),
     ),
     CronJobSpec(
         name="common_crawl",
         label="Common Crawl",
         script_path=ROOT_DIR
-        / "src/data_platform/cron_schedulers/bigdata/run_common_crawl_pipeline.py",
+        / "src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py",
         source_names=("common-crawl-bigdata",),
     ),
 )
