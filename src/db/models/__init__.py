@@ -20,9 +20,11 @@ from db.models.lineage import (
     NormalizedLabel,
     ObjectType,
     PipelineState,
+    PocUser,
     RedactionStatus,
     SourceType,
     SplitName,
+    UserRole,
 )
 
 __all__ = [
@@ -47,7 +49,9 @@ __all__ = [
     "NormalizedLabel",
     "ObjectType",
     "PipelineState",
+    "PocUser",
     "RedactionStatus",
     "SourceType",
     "SplitName",
+    "UserRole",
 ]

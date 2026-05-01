@@ -643,3 +643,41 @@ class PipelineState(Base):
         sa.DateTime(timezone=True), nullable=False, default=utc_now
     )
 
+
+class UserRole(StrEnum):
+    ADMIN = "admin"
+    VIEWER = "viewer"
+
+
+class PocUser(Base):
+    """Lightweight user table for the Streamlit POC.
+
+    Stores bcrypt-hashed passwords. Will be replaced by Better Auth
+    when migrating to the TypeScript production app.
+    """
+
+    __tablename__ = "poc_user"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        sa.Uuid(), primary_key=True, default=uuid.uuid4
+    )
+    email: Mapped[str] = mapped_column(
+        sa.Text(), nullable=False, unique=True
+    )
+    display_name: Mapped[str] = mapped_column(
+        sa.Text(), nullable=False
+    )
+    password_hash: Mapped[str] = mapped_column(
+        sa.Text(), nullable=False
+    )
+    role: Mapped[str] = mapped_column(
+        sa.Text(),
+        nullable=False,
+        default=UserRole.VIEWER.value,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), nullable=False, default=utc_now
+    )
+    last_login_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
