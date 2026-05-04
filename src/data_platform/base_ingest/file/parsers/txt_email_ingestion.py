@@ -84,6 +84,43 @@ def _parse_email_block(block: str, source: str) -> TxtEmailRecord | None:
     return TxtEmailRecord(text=text, label="spam", source=source, language=None)
 
 
+def _fallback_record(raw_text: str, source: str) -> TxtEmailRecord | None:
+    text = raw_text.strip()
+    if not text:
+        return None
+    return TxtEmailRecord(text=text, label="spam", source=source, language=None)
+
+
+def _parse_txt_content(
+    raw_text: str, source: str, log_context: str
+) -> list[TxtEmailRecord]:
+    records: list[TxtEmailRecord] = []
+    blocks = re.split(r"\n(?=   From:)", raw_text)
+
+    for block in blocks:
+        block = block.strip()
+        if not block:
+            continue
+        record = _parse_email_block(block, source)
+        if record is None:
+            logger.warning("Empty/unparseable block in %s; skipping.", log_context)
+            continue
+        records.append(record)
+
+    if records:
+        return records
+
+    fallback_record = _fallback_record(raw_text, source)
+    if fallback_record is None:
+        return []
+
+    logger.info(
+        "Falling back to single-record TXT ingestion for %s due to unsupported block structure",
+        log_context,
+    )
+    return [fallback_record]
+
+
 def parse_txt_emails(file_path: Path) -> list[TxtEmailRecord]:
     """Parse a multi-email TXT file and return one :class:`TxtEmailRecord` per email.
 
@@ -101,19 +138,7 @@ def parse_txt_emails(file_path: Path) -> list[TxtEmailRecord]:
 
     raw_text = raw_text.replace("\r\n", "\n").replace("\r", "\n")
 
-    # Split on the record-start boundary "   From:" (3-space prefix).
-    # re.split with a look-ahead keeps the boundary in the subsequent segment.
-    blocks = re.split(r"\n(?=   From:)", raw_text)
-
-    for block in blocks:
-        block = block.strip()
-        if not block:
-            continue
-        record = _parse_email_block(block, source)
-        if record is None:
-            logger.warning("Empty/unparseable block in %s; skipping.", file_path.name)
-            continue
-        records.append(record)
+    records = _parse_txt_content(raw_text, source, file_path.name)
 
     logger.info("Parsed %d email records from %s", len(records), file_path.name)
     return records
@@ -124,20 +149,9 @@ def parse_txt_emails_from_bytes(data: bytes, source: str) -> list[TxtEmailRecord
 
     Mirrors :func:`parse_txt_emails` but accepts bytes instead of a :class:`Path`.
     """
-    records: list[TxtEmailRecord] = []
     raw_text = data.decode("utf-8", errors="replace")
     raw_text = raw_text.replace("\r\n", "\n").replace("\r", "\n")
-    blocks = re.split(r"\n(?=   From:)", raw_text)
-
-    for block in blocks:
-        block = block.strip()
-        if not block:
-            continue
-        record = _parse_email_block(block, source)
-        if record is None:
-            logger.warning("Empty/unparseable block in %s; skipping.", source)
-            continue
-        records.append(record)
+    records = _parse_txt_content(raw_text, source, source)
 
     logger.info("Parsed %d email records from bytes (%s)", len(records), source)
     return records
