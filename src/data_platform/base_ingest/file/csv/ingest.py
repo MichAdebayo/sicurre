@@ -48,12 +48,12 @@ from core.trace_logger import SemanticTraceLogger  # noqa: E402
 from db.models import DataRawObject, DataRawRecord  # noqa: E402
 from db.queries import IngestionRunQueries, SourceSystemQueries  # noqa: E402
 from data_platform.api.schemas import IngestionRunCreate  # noqa: E402
-from data_platform.cli.ingest.file.csv_ingestion import (  # noqa: E402
+from data_platform.base_ingest.file.parsers.csv_ingestion import (  # noqa: E402
     get_or_create_source_system,
     ingest_csv_file,
 )
-from data_platform.cli.ingest.file.jsonl_ingestion import parse_jsonl  # noqa: E402
-from data_platform.cli.ingest.file.txt_email_ingestion import (
+from data_platform.base_ingest.file.parsers.jsonl_ingestion import parse_jsonl  # noqa: E402
+from data_platform.base_ingest.file.parsers.txt_email_ingestion import (
     parse_txt_emails,
 )  # noqa: E402
 
