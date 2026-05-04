@@ -32,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from core.config import get_settings
 from core.database import Base
 from data_platform.extractors.legacy_db import LegacyDbIngestionService
+from data_platform.services.database.cron_feed import append_cron_generation_batch
 from db.models import PipelineState
 
 logging.basicConfig(
@@ -39,6 +40,16 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+_CRON_GENERATION_LABELS: tuple[str, ...] = ("phishing", "spam", "legitimate")
+
+
+def _build_generation_counts(total_count: int) -> dict[str, int]:
+    base_count, remainder = divmod(total_count, len(_CRON_GENERATION_LABELS))
+    counts = {label: base_count for label in _CRON_GENERATION_LABELS}
+    for index in range(remainder):
+        counts[_CRON_GENERATION_LABELS[index]] += 1
+    return counts
 
 
 async def run_incremental_sql_cron() -> None:
@@ -60,15 +71,41 @@ async def run_incremental_sql_cron() -> None:
         if row is None:
             last_known_date = "1970-01-01 00:00:00"
         else:
-            last_known_date = row.state_data.get("last_created_at", "1970-01-01 00:00:00")
+            last_known_date = row.state_data.get(
+                "last_created_at", "1970-01-01 00:00:00"
+            )
 
     logger.info("SQL Cron last known created_at: %s", last_known_date)
 
+    requested_total_count = settings.database_historical_cron_total_count
+    max_total_count = settings.database_historical_cron_max_total_count
+    if requested_total_count < 0:
+        raise ValueError("SICURRE_DATABASE_HISTORICAL_CRON_TOTAL_COUNT must be >= 0")
+
+    generated_total_count = 0
+    if requested_total_count > 0:
+        effective_total_count = min(requested_total_count, max_total_count)
+        if effective_total_count != requested_total_count:
+            logger.warning(
+                "Clamping requested SQL cron generation batch from %d to %d",
+                requested_total_count,
+                effective_total_count,
+            )
+
+        class_counts = _build_generation_counts(effective_total_count)
+        generation_result = append_cron_generation_batch(class_counts=class_counts)
+        generated_total_count = generation_result.inserted_total
+        logger.info(
+            "Generated %d template-backed external DB row(s) before SQL cron: %s",
+            generated_total_count,
+            generation_result.inserted_by_class,
+        )
+
     service = LegacyDbIngestionService()
-    
+
     async with session_factory() as session:
         result = await service.run(
-            session, 
+            session,
             trigger_mode="scheduled",
             since_date=last_known_date,
         )
@@ -77,12 +114,17 @@ async def run_incremental_sql_cron() -> None:
         # Update watermark in PipelineState
         now = datetime.now(timezone.utc)
         async with session_factory() as session:
-            stmt = select(PipelineState).where(PipelineState.pipeline_name == pipeline_name)
+            stmt = select(PipelineState).where(
+                PipelineState.pipeline_name == pipeline_name
+            )
             row = await session.scalar(stmt)
             if row is None:
                 row = PipelineState(
                     pipeline_name=pipeline_name,
-                    state_data={"last_created_at": now.strftime("%Y-%m-%d %H:%M:%S.%f"), "updated_at": now.strftime("%Y-%m-%d %H:%M:%S.%f")},
+                    state_data={
+                        "last_created_at": now.strftime("%Y-%m-%d %H:%M:%S.%f"),
+                        "updated_at": now.strftime("%Y-%m-%d %H:%M:%S.%f"),
+                    },
                 )
                 session.add(row)
             else:
@@ -92,7 +134,10 @@ async def run_incremental_sql_cron() -> None:
                     "updated_at": now.strftime("%Y-%m-%d %H:%M:%S.%f"),
                 }
             await session.commit()
-        logger.info("Pipeline state updated with new watermark: %s", now.strftime("%Y-%m-%d %H:%M:%S.%f"))
+        logger.info(
+            "Pipeline state updated with new watermark: %s",
+            now.strftime("%Y-%m-%d %H:%M:%S.%f"),
+        )
 
     logger.info("--- SQL Cron Summary ---")
     logger.info(result.log_message or "DB ingestion completed")
@@ -100,6 +145,7 @@ async def run_incremental_sql_cron() -> None:
     logger.info("New Records:      %d", result.raw_record_count)
     logger.info("Skipped (dupes):  %d", result.skipped_count)
     logger.info("Total Extracted:  %d", result.total_extracted_count)
+    logger.info("Generated Delta:  %d", generated_total_count)
     if result.snapshot_storage_uri:
         logger.info("R2 Snapshot URI:  %s", result.snapshot_storage_uri)
 
