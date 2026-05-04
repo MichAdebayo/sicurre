@@ -98,7 +98,7 @@ scraping-ingest-base:
 
 db-ingest-base:
 	@echo "Seeding external_threats.db (3-class, seed=42) then ingesting into sicurre.db (deterministic)..."
-	unset SICURRE_DATABASE_URL && uv run python src/data_platform/base_ingest/db/ingest.py
+	unset SICURRE_DATABASE_URL && SICURRE_DB_INGEST_FORCE_RESEED=false uv run python src/data_platform/base_ingest/db/ingest.py
 
 # ── Cron ──────────────────────────────────────────────────────────────────────
 
