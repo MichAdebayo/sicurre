@@ -117,12 +117,12 @@ def _enumerate_cron_file_objects(r2: R2ReadClient) -> list[CronFileObject]:
 async def _cron_file_content_already_ingested(
     session: AsyncSession,
     *,
-    bucket: str,
     sha256: str,
+    source_url: str,
 ) -> bool:
     stmt = select(DataRawObject.id).where(
         DataRawObject.content_hash == sha256,
-        DataRawObject.storage_uri.like(f"r2://{bucket}/cron/file/%"),
+        DataRawObject.storage_uri == source_url,
     )
     return await session.scalar(stmt) is not None
 
@@ -298,8 +298,8 @@ async def run_cron_file_ingestion(
             async with session_factory() as session:
                 if await _cron_file_content_already_ingested(
                     session,
-                    bucket=r2.bucket,
                     sha256=entry.sha256,
+                    source_url=entry.source_url,
                 ):
                     rows.append(
                         {
