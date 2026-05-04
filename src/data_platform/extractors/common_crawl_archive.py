@@ -28,6 +28,10 @@ from data_platform.services.shared.snapshot_storage import (
 logger = logging.getLogger(__name__)
 
 CC_WARC_BASE = "https://data.commoncrawl.org/"
+COMMON_CRAWL_REQUEST_HEADERS = {
+    "User-Agent": "sicurre-common-crawl/1.0",
+    "Accept": "application/json, text/plain, */*",
+}
 DEFAULT_BATCH_SIZE = 5_000
 
 CC_CRAWL_INDICES: tuple[str, ...] = (
@@ -389,6 +393,7 @@ class CommonCrawlArchiveExtractor:
         timeout = httpx.Timeout(self.settings.request_timeout)
 
         async with httpx.AsyncClient(
+            headers=COMMON_CRAWL_REQUEST_HEADERS,
             limits=limits,
             timeout=timeout,
             follow_redirects=True,
@@ -552,6 +557,7 @@ class CommonCrawlArchiveExtractor:
         timeout = httpx.Timeout(self.settings.request_timeout)
 
         async with httpx.AsyncClient(
+            headers=COMMON_CRAWL_REQUEST_HEADERS,
             limits=limits,
             timeout=timeout,
             follow_redirects=True,
@@ -715,7 +721,10 @@ class CommonCrawlArchiveExtractor:
 
         offset = int(row["offset"])
         end = offset + int(row["length"]) - 1
-        headers = {"Range": f"bytes={offset}-{end}"}
+        headers = {
+            **COMMON_CRAWL_REQUEST_HEADERS,
+            "Range": f"bytes={offset}-{end}",
+        }
         warc_url = f"{CC_WARC_BASE}{row['filename']}"
 
         async with semaphore:
