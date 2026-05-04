@@ -17,6 +17,10 @@
 NORMALIZE_ARGS ?=
 GENERATE_ARGS ?=
 DATASET_ARGS ?=
+DATASET_NAME ?= sicurre_training
+DATASET_VERSION_TAG ?= $(shell date -u +%Y%m%d-%H%M%S)
+DATASET_TARGET_USAGE ?= training
+DATASET_STATUS ?= frozen
 EXPORT_ARGS ?=
 BIGDATA_PROMOTION_ARGS ?=
 CRON_ARGS ?=
@@ -169,7 +173,13 @@ generate-data:
 
 dataset-build:
 	@echo "Building DB-backed dataset from annotated normalized messages..."
-	uv run python src/data_platform/cli/datasets/build.py $(DATASET_ARGS)
+	uv run python src/data_platform/cli/datasets/build.py \
+		--name "$(DATASET_NAME)" \
+		--version-tag "$(DATASET_VERSION_TAG)" \
+		--target-usage "$(DATASET_TARGET_USAGE)" \
+		--status "$(DATASET_STATUS)" \
+		--write \
+		$(DATASET_ARGS)
 
 dataset-export:
 	@echo "Serializing frozen dataset to CSV/JSONL for PyTorch..."
