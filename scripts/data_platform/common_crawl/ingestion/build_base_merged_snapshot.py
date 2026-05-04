@@ -62,7 +62,7 @@ TEXT_LENGTH_MAX = 10_000
 
 def _load_latest_recovery_parquet() -> tuple[pd.DataFrame, Path]:
     parquet_files = sorted(
-        FR_USABLE_DIR.glob("*.parquet"),
+        FR_USABLE_DIR.glob("*_recovery_*.parquet"),
         key=lambda p: p.stat().st_mtime,
     )
     if not parquet_files:
