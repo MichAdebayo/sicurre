@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import csv
 import hashlib
+import io
 import json
 import logging
 import sys
@@ -43,7 +44,6 @@ from data_platform.api.schemas import (  # noqa: E402
     DataSourceCreate,
     IngestionRunCreate,
 )
-
 
 logging.basicConfig(
     level=logging.INFO,
@@ -421,6 +421,222 @@ async def ingest_csv_file(
             )
         return CsvIngestionResult(
             file_path=file_path,
+            inserted_count=inserted_count,
+            status="ingested_merged",
+        )
+
+
+async def ingest_csv_bytes(
+    data: bytes,
+    filename: str,
+    external_ref: str,
+    storage_uri: str,
+    session: AsyncSession,
+    source_repo: SourceSystemQueries,
+    run_repo: IngestionRunQueries,
+    *,
+    trigger_mode: str = "manual",
+    trace: SemanticTraceLogger | None = None,
+) -> CsvIngestionResult:
+    """Ingest a CSV file supplied as raw bytes (R2-downloaded).
+
+    Mirrors :func:`ingest_csv_file` but derives file size and content hash
+    from *data* directly instead of reading the filesystem.  *external_ref*
+    and *storage_uri* are caller-provided (typically ``r2://bucket/key``).
+    """
+    # Treat the bytes as a virtual Path for helper functions that only use
+    # ``.name`` for logging or schema-detection — no filesystem access occurs.
+    virtual_path = Path(filename)
+
+    logger.info("Processing R2 file: %s", filename)
+    if trace is not None:
+        trace.trace(
+            stage="ingestion",
+            status="start",
+            message=f"CSV ingestion starting for {filename}",
+            entity_type="csv_file",
+            entity_id=filename,
+        )
+
+    try:
+        text_data = data.decode("utf-8", errors="replace")
+        reader = csv.DictReader(io.StringIO(text_data))
+        fieldnames = _normalize_csv_fieldnames(reader.fieldnames)
+        rows = list(reader)
+    except Exception as exc:
+        logger.error("Failed to parse %s: %s", filename, exc)
+        return CsvIngestionResult(
+            file_path=virtual_path, inserted_count=0, status="read_error"
+        )
+
+    if not rows:
+        logger.warning("File %s is empty or has no rows. Skipping.", filename)
+        return CsvIngestionResult(
+            file_path=virtual_path, inserted_count=0, status="empty"
+        )
+
+    file_content_hash = hashlib.sha256(data).hexdigest()
+
+    query = select(DataRawObject).where(
+        DataRawObject.external_ref == external_ref,
+        DataRawObject.content_hash == file_content_hash,
+    )
+    result = await session.execute(query)
+    if result.scalar_one_or_none():
+        logger.info("File %s is already ingested (hash matches). Skipping.", filename)
+        if trace is not None:
+            trace.trace(
+                stage="ingestion",
+                status="skipped",
+                message=f"CSV {filename} unchanged; skipping",
+                entity_type="csv_file",
+                entity_id=filename,
+            )
+        return CsvIngestionResult(
+            file_path=virtual_path, inserted_count=0, status="skipped_unchanged"
+        )
+
+    if not _validate_csv_schema(virtual_path, fieldnames):
+        return CsvIngestionResult(
+            file_path=virtual_path,
+            inserted_count=0,
+            status="skipped_invalid_schema",
+        )
+
+    uses_text_only = _uses_text_only_historical_schema(virtual_path, fieldnames)
+
+    if not _validate_csv_rows(virtual_path, rows, allow_blank_labels=uses_text_only):
+        return CsvIngestionResult(
+            file_path=virtual_path, inserted_count=0, status="skipped_invalid_rows"
+        )
+
+    first_row = rows[0]
+    source_machine_name = (
+        first_row.get("source", "").strip() or virtual_path.stem.lower()
+    )
+
+    source_sys = await get_or_create_source_system(
+        session, source_repo, source_machine_name
+    )
+
+    started_at = datetime.now(timezone.utc)
+    ingestion_run = await run_repo.create(
+        session,
+        payload=IngestionRunCreate(
+            source_system_id=source_sys.id,
+            trigger_mode=trigger_mode,
+            status="pending",
+            started_at=started_at,
+        ),
+    )
+
+    raw_object = DataRawObject(
+        ingestion_run_id=ingestion_run.id,
+        external_ref=external_ref,
+        object_type="api_payload",
+        storage_uri=storage_uri,
+        source_format="csv",
+        content_hash=file_content_hash,
+        size_bytes=len(data),
+        source_metadata={"filename": filename, "entry_count": len(rows)},
+        collected_at=started_at,
+    )
+    session.add(raw_object)
+    await session.flush()
+
+    extracted_at = datetime.now(timezone.utc)
+    records_to_add: list[DataRawRecord] = []
+    raw_keys_seen: set[str] = set()
+
+    for idx, row in enumerate(rows, start=1):
+        text = str(row.get("text", "")).strip()
+        if uses_text_only:
+            label = ""
+            lang = None
+        else:
+            label = str(row.get("label", "")).strip()
+            lang = str(row.get("language", "")).strip() or None
+        record_key = hash_text_for_dedup(text) if text else f"empty-text-{idx}"
+
+        if record_key in raw_keys_seen:
+            continue
+        raw_keys_seen.add(record_key)
+
+        is_usable = bool(text)
+        raw_content = json.dumps(
+            {
+                "text": text,
+                "label": label,
+                "source": source_machine_name,
+                "language": lang,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+        records_to_add.append(
+            DataRawRecord(
+                raw_object_id=raw_object.id,
+                source_system_id=source_sys.id,
+                record_key=record_key,
+                raw_content=raw_content,
+                detected_language=lang,
+                is_usable=is_usable,
+                rejection_reason=None if is_usable else "empty_text",
+                extracted_at=extracted_at,
+            )
+        )
+
+    chunk_size = 5000
+    for index in range(0, len(records_to_add), chunk_size):
+        session.add_all(records_to_add[index : index + chunk_size])
+
+    ingestion_run.finished_at = datetime.now(timezone.utc)
+    ingestion_run.status = "completed"
+    ingestion_run.raw_record_count = len(records_to_add)
+
+    try:
+        await session.commit()
+        logger.info(
+            "Successfully inserted %d unique records for %s",
+            len(records_to_add),
+            filename,
+        )
+        if trace is not None:
+            trace.trace(
+                stage="ingestion",
+                status="success",
+                message=f"CSV {filename} ingested",
+                entity_type="csv_file",
+                entity_id=filename,
+                metrics={"inserted": len(records_to_add)},
+            )
+        return CsvIngestionResult(
+            file_path=virtual_path,
+            inserted_count=len(records_to_add),
+            status="ingested",
+        )
+    except Exception as exc:
+        await session.rollback()
+        logger.warning(
+            "Constraint violation for %s, retrying with merge... (%s)", filename, exc
+        )
+        inserted_count = 0
+        for record in records_to_add:
+            try:
+                async with session.begin_nested():
+                    session.add(record)
+                inserted_count += 1
+            except Exception:
+                pass
+        ingestion_run.raw_record_count = inserted_count
+        await session.commit()
+        logger.info(
+            "Merge complete. Inserted %d unique new records for %s.",
+            inserted_count,
+            filename,
+        )
+        return CsvIngestionResult(
+            file_path=virtual_path,
             inserted_count=inserted_count,
             status="ingested_merged",
         )
