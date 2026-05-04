@@ -21,13 +21,45 @@ SRC_ROOT = ROOT_DIR / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from data_platform.cli.ingest.scraping.certfr import run_ingestion
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from core.config import get_settings
+from core.database import Base
+from data_platform.extractors.certfr_cti import CertFRCtiExtractor
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+async def run_ingestion(
+    *,
+    trigger_mode: str = "scheduled",
+    fetch_historical: bool = False,
+) -> object:
+    settings = get_settings()
+    engine = create_async_engine(settings.database_url, echo=False)
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    session_factory = async_sessionmaker(
+        engine,
+        expire_on_commit=False,
+        class_=AsyncSession,
+    )
+    extractor = CertFRCtiExtractor()
+    try:
+        async with session_factory() as session:
+            return await extractor.run(
+                session,
+                trigger_mode=trigger_mode,
+                fetch_historical=fetch_historical,
+            )
+    finally:
+        await engine.dispose()
 
 
 async def main() -> None:
