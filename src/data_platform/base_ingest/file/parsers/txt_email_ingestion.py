@@ -117,3 +117,27 @@ def parse_txt_emails(file_path: Path) -> list[TxtEmailRecord]:
 
     logger.info("Parsed %d email records from %s", len(records), file_path.name)
     return records
+
+
+def parse_txt_emails_from_bytes(data: bytes, source: str) -> list[TxtEmailRecord]:
+    """Parse multi-email TXT content from raw bytes (R2-downloaded).
+
+    Mirrors :func:`parse_txt_emails` but accepts bytes instead of a :class:`Path`.
+    """
+    records: list[TxtEmailRecord] = []
+    raw_text = data.decode("utf-8", errors="replace")
+    raw_text = raw_text.replace("\r\n", "\n").replace("\r", "\n")
+    blocks = re.split(r"\n(?=   From:)", raw_text)
+
+    for block in blocks:
+        block = block.strip()
+        if not block:
+            continue
+        record = _parse_email_block(block, source)
+        if record is None:
+            logger.warning("Empty/unparseable block in %s; skipping.", source)
+            continue
+        records.append(record)
+
+    logger.info("Parsed %d email records from bytes (%s)", len(records), source)
+    return records
