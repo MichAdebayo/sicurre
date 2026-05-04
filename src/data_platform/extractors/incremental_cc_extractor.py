@@ -43,12 +43,16 @@ logger = logging.getLogger(__name__)
 CC_WARC_BASE = "https://data.commoncrawl.org/"
 COLLINFO_URL = "https://index.commoncrawl.org/collinfo.json"
 PIPELINE_NAME = "common_crawl_cron"
+COMMON_CRAWL_REQUEST_HEADERS = {
+    "User-Agent": "sicurre-common-crawl/1.0",
+    "Accept": "application/json, text/plain, */*",
+}
 
 # The last index that base fully covered — everything after this is cron territory
 BASE_CUTOFF_INDEX = "CC-MAIN-2025-08"
 
 DURATION_MAP: dict[str, int] = {
-    "short": 30 * 60,       # 30 minutes
+    "short": 30 * 60,  # 30 minutes
     "standard": 8 * 60 * 60,  # 8 hours
 }
 
@@ -76,15 +80,23 @@ PHISHING_QUERIES: tuple[CrawlQuery, ...] = (
     CrawlQuery("cybermalveillance.gouv.fr/*", "phishing_related", "cert_gov_fr"),
     CrawlQuery("zataz.com/*", "phishing_related", "security_news_fr"),
     CrawlQuery("undernews.fr/*", "phishing_related", "security_news_fr"),
-    CrawlQuery("internet-signalement.gouv.fr/*", "phishing_related", "reporting_gov_fr"),
+    CrawlQuery(
+        "internet-signalement.gouv.fr/*", "phishing_related", "reporting_gov_fr"
+    ),
     CrawlQuery("urlscan.io/result/*", "phishing_related", "url_scanning"),
     CrawlQuery("openphish.com/*", "phishing_related", "phishing_feed"),
     CrawlQuery("abuse.ch/*", "phishing_related", "abuse_ch"),
-    CrawlQuery("forum.quechoisir.org/*arnaque*", "phishing_related", "consumer_forum_fr"),
-    CrawlQuery("forum.quechoisir.org/*phishing*", "phishing_related", "consumer_forum_fr"),
+    CrawlQuery(
+        "forum.quechoisir.org/*arnaque*", "phishing_related", "consumer_forum_fr"
+    ),
+    CrawlQuery(
+        "forum.quechoisir.org/*phishing*", "phishing_related", "consumer_forum_fr"
+    ),
     CrawlQuery("commentcamarche.net/*phishing*", "phishing_related", "tech_forum_fr"),
     CrawlQuery("commentcamarche.net/*arnaque*", "phishing_related", "tech_forum_fr"),
-    CrawlQuery("forums.futura-sciences.com/*arnaque*", "phishing_related", "science_forum_fr"),
+    CrawlQuery(
+        "forums.futura-sciences.com/*arnaque*", "phishing_related", "science_forum_fr"
+    ),
     CrawlQuery("signal-spam.fr/*", "phishing_related", "signal_spam_fr"),
     CrawlQuery("blog.sekoia.io/*", "phishing_related", "threat_intel_fr"),
     CrawlQuery("therecord.media/*phishing*", "phishing_related", "security_news"),
@@ -206,24 +218,36 @@ class IncrementalCommonCrawlExtractor:
 
         logger.info("=" * 60)
         logger.info("INCREMENTAL COMMON CRAWL CRON STARTING")
-        logger.info("Max runtime: %d seconds (%d min)", self.max_runtime_seconds, self.max_runtime_seconds // 60)
+        logger.info(
+            "Max runtime: %d seconds (%d min)",
+            self.max_runtime_seconds,
+            self.max_runtime_seconds // 60,
+        )
         logger.info("=" * 60)
 
         # 1. Discover all available indices
         all_indices = await self._fetch_available_indices()
         if not all_indices:
-            raise RuntimeError("Failed to fetch Common Crawl index list from collinfo.json")
+            raise RuntimeError(
+                "Failed to fetch Common Crawl index list from collinfo.json"
+            )
 
-        logger.info("Available CC indices: %d (latest: %s)", len(all_indices), all_indices[0])
+        logger.info(
+            "Available CC indices: %d (latest: %s)", len(all_indices), all_indices[0]
+        )
 
         # 2. Read checkpoint from DB
         last_completed = await self._read_checkpoint(session)
-        logger.info("Last completed index (checkpoint): %s", last_completed or BASE_CUTOFF_INDEX)
+        logger.info(
+            "Last completed index (checkpoint): %s", last_completed or BASE_CUTOFF_INDEX
+        )
 
         # 3. Compute the missing indices (after base cutoff or last checkpoint)
         cutoff = last_completed or BASE_CUTOFF_INDEX
         missing_indices = self._compute_missing_indices(all_indices, cutoff)
-        logger.info("Missing indices to process: %d — %s", len(missing_indices), missing_indices)
+        logger.info(
+            "Missing indices to process: %d — %s", len(missing_indices), missing_indices
+        )
 
         if not missing_indices:
             logger.info("All available indices already processed. Nothing to do.")
@@ -244,7 +268,9 @@ class IncrementalCommonCrawlExtractor:
         for crawl_id in missing_indices:
             elapsed = time.monotonic() - start_time
             if elapsed >= self.max_runtime_seconds:
-                logger.info("Time limit reached (%d s). Stopping gracefully.", int(elapsed))
+                logger.info(
+                    "Time limit reached (%d s). Stopping gracefully.", int(elapsed)
+                )
                 stats.timed_out = True
                 break
 
@@ -267,7 +293,11 @@ class IncrementalCommonCrawlExtractor:
             # Check if we timed out mid-index
             elapsed = time.monotonic() - start_time
             if elapsed >= self.max_runtime_seconds:
-                logger.info("Time limit reached mid-index %s after %d s. Partial flush done.", crawl_id, int(elapsed))
+                logger.info(
+                    "Time limit reached mid-index %s after %d s. Partial flush done.",
+                    crawl_id,
+                    int(elapsed),
+                )
                 stats.timed_out = True
                 # Still update checkpoint since we flushed what we had
                 await self._update_checkpoint(session, crawl_id)
@@ -282,7 +312,11 @@ class IncrementalCommonCrawlExtractor:
 
         logger.info("=" * 60)
         logger.info("INCREMENTAL CC CRON COMPLETE")
-        logger.info("Processed: %d indices, Extracted: %d pages", len(indices_completed), stats.extracted)
+        logger.info(
+            "Processed: %d indices, Extracted: %d pages",
+            len(indices_completed),
+            stats.extracted,
+        )
         logger.info("Timed out: %s", stats.timed_out)
         logger.info("=" * 60)
 
@@ -301,7 +335,11 @@ class IncrementalCommonCrawlExtractor:
 
     async def _fetch_available_indices(self) -> list[str]:
         """Fetch the live list of CC indices from collinfo.json."""
-        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+        async with httpx.AsyncClient(
+            headers=COMMON_CRAWL_REQUEST_HEADERS,
+            timeout=30,
+            follow_redirects=True,
+        ) as client:
             resp = await client.get(COLLINFO_URL)
             resp.raise_for_status()
             return [item["id"] for item in resp.json() if "id" in item]
@@ -342,7 +380,11 @@ class IncrementalCommonCrawlExtractor:
         stats.total_index_hits += len(index_hits)
 
         # Phase 2: Download WARC pages
-        df = pd.DataFrame(index_hits).drop_duplicates(subset=["url"]).reset_index(drop=True)
+        df = (
+            pd.DataFrame(index_hits)
+            .drop_duplicates(subset=["url"])
+            .reset_index(drop=True)
+        )
 
         # Filter for 200s and HTML
         if "status" in df.columns:
@@ -352,7 +394,9 @@ class IncrementalCommonCrawlExtractor:
 
         limit = min(self.max_warc_downloads_per_index, len(df))
         df = df.head(limit).reset_index(drop=True)
-        logger.info("Index %s: %d unique URLs ready for WARC download.", crawl_id, len(df))
+        logger.info(
+            "Index %s: %d unique URLs ready for WARC download.", crawl_id, len(df)
+        )
 
         extracted_pages: list[dict[str, Any]] = []
         limits = httpx.Limits(
@@ -361,7 +405,12 @@ class IncrementalCommonCrawlExtractor:
         )
         timeout = httpx.Timeout(self.request_timeout)
 
-        async with httpx.AsyncClient(limits=limits, timeout=timeout, follow_redirects=True) as client:
+        async with httpx.AsyncClient(
+            headers=COMMON_CRAWL_REQUEST_HEADERS,
+            limits=limits,
+            timeout=timeout,
+            follow_redirects=True,
+        ) as client:
             semaphore = asyncio.Semaphore(self.async_concurrency)
             batch_size = 5_000
 
@@ -369,10 +418,14 @@ class IncrementalCommonCrawlExtractor:
                 # Check time budget before each batch
                 elapsed = time.monotonic() - start_time
                 if elapsed >= self.max_runtime_seconds:
-                    logger.info("Time limit reached during WARC downloads for %s", crawl_id)
+                    logger.info(
+                        "Time limit reached during WARC downloads for %s", crawl_id
+                    )
                     break
 
-                batch_rows = df.iloc[batch_start:batch_start + batch_size].to_dict("records")
+                batch_rows = df.iloc[batch_start : batch_start + batch_size].to_dict(
+                    "records"
+                )
                 tasks = [
                     self._fetch_warc_record(client, row, semaphore, stats)
                     for row in batch_rows
@@ -381,19 +434,29 @@ class IncrementalCommonCrawlExtractor:
                 extracted_pages.extend(page for page in results if page is not None)
                 logger.info(
                     "  [%s] batch %d-%d: downloaded=%d, extracted=%d",
-                    crawl_id, batch_start, batch_start + len(batch_rows),
-                    stats.total_downloaded, stats.extracted,
+                    crawl_id,
+                    batch_start,
+                    batch_start + len(batch_rows),
+                    stats.total_downloaded,
+                    stats.extracted,
                 )
 
         return extracted_pages
 
-    async def _collect_index_hits_for_crawl(self, crawl_id: str) -> list[dict[str, Any]]:
+    async def _collect_index_hits_for_crawl(
+        self, crawl_id: str
+    ) -> list[dict[str, Any]]:
         """Query the CC index API for all configured queries against a single crawl."""
         all_records: list[dict[str, Any]] = []
         limits = httpx.Limits(max_keepalive_connections=10, max_connections=15)
         timeout = httpx.Timeout(self.request_timeout)
 
-        async with httpx.AsyncClient(limits=limits, timeout=timeout, follow_redirects=True) as client:
+        async with httpx.AsyncClient(
+            headers=COMMON_CRAWL_REQUEST_HEADERS,
+            limits=limits,
+            timeout=timeout,
+            follow_redirects=True,
+        ) as client:
             semaphore = asyncio.Semaphore(3)
             tasks = [
                 self._fetch_index_page(client, query, crawl_id, semaphore)
@@ -425,7 +488,7 @@ class IncrementalCommonCrawlExtractor:
                 try:
                     response = await client.get(url, params=params)
                     if response.status_code in (429, 503):
-                        await asyncio.sleep(2 ** attempt)
+                        await asyncio.sleep(2**attempt)
                         continue
                     response.raise_for_status()
                     return self._parse_index_payload(
@@ -435,8 +498,10 @@ class IncrementalCommonCrawlExtractor:
                     )
                 except Exception as exc:
                     if attempt == 3:
-                        logger.debug("Failed query %s on %s: %s", query.pattern, crawl_id, exc)
-                    await asyncio.sleep(2 ** attempt)
+                        logger.debug(
+                            "Failed query %s on %s: %s", query.pattern, crawl_id, exc
+                        )
+                    await asyncio.sleep(2**attempt)
         return []
 
     def _parse_index_payload(
@@ -461,7 +526,9 @@ class IncrementalCommonCrawlExtractor:
                     "_label": query.label,
                     "_query": query.pattern,
                     "_crawl_id": crawl_id,
-                    "_url_priority_score": CommonCrawlContentService.score_url(url, query.category),
+                    "_url_priority_score": CommonCrawlContentService.score_url(
+                        url, query.category
+                    ),
                 }
             )
             records.append(record)
@@ -478,7 +545,10 @@ class IncrementalCommonCrawlExtractor:
 
         offset = int(row["offset"])
         end = offset + int(row["length"]) - 1
-        headers = {"Range": f"bytes={offset}-{end}"}
+        headers = {
+            **COMMON_CRAWL_REQUEST_HEADERS,
+            "Range": f"bytes={offset}-{end}",
+        }
         warc_url = f"{CC_WARC_BASE}{row['filename']}"
 
         async with semaphore:
@@ -494,12 +564,11 @@ class IncrementalCommonCrawlExtractor:
                     if record.rec_type != "response":
                         continue
                     html_text = (
-                        record.content_stream()
-                        .read()
-                        .decode("utf-8", errors="replace")
+                        record.content_stream().read().decode("utf-8", errors="replace")
                     )
                     text = CommonCrawlContentService.extract_text_from_html(
-                        html_text, max_length=self.max_text_length,
+                        html_text,
+                        max_length=self.max_text_length,
                     )
                     if len(text) < self.min_text_length:
                         stats.skipped_short += 1
@@ -512,8 +581,12 @@ class IncrementalCommonCrawlExtractor:
 
                     stats.seen_hashes.add(content_hash)
                     language = self._detect_language(text)
-                    stats.per_language[language] = stats.per_language.get(language, 0) + 1
-                    stats.per_category[row["_category"]] = stats.per_category.get(row["_category"], 0) + 1
+                    stats.per_language[language] = (
+                        stats.per_language.get(language, 0) + 1
+                    )
+                    stats.per_category[row["_category"]] = (
+                        stats.per_category.get(row["_category"], 0) + 1
+                    )
                     stats.extracted += 1
                     return {
                         "url": row["url"],
@@ -575,8 +648,12 @@ class IncrementalCommonCrawlExtractor:
             "timestamp": timestamp,
             "total_extracted": len(df),
             "fr_usable_count": len(fr_df),
-            "language_distribution": df["language"].value_counts().to_dict() if not df.empty else {},
-            "category_distribution": df["category"].value_counts().to_dict() if not df.empty else {},
+            "language_distribution": (
+                df["language"].value_counts().to_dict() if not df.empty else {}
+            ),
+            "category_distribution": (
+                df["category"].value_counts().to_dict() if not df.empty else {}
+            ),
         }
         quality_key = self.snapshot_store.build_object_key(
             source_prefix=f"{base_prefix}/quality",
@@ -612,7 +689,10 @@ class IncrementalCommonCrawlExtractor:
         if row is None:
             row = PipelineState(
                 pipeline_name=PIPELINE_NAME,
-                state_data={"last_completed_index": crawl_id, "updated_at": now.isoformat()},
+                state_data={
+                    "last_completed_index": crawl_id,
+                    "updated_at": now.isoformat(),
+                },
             )
             session.add(row)
         else:
