@@ -39,6 +39,7 @@ from core.database import Base  # noqa: E402
 from data_platform.extractors.sap_labs import (  # noqa: E402
     SapLabsIngestionResult,
     SapLabsIngestionService,
+    SapLabsScraperClient,
 )
 from data_platform.services.shared.snapshot_storage import (  # noqa: E402
     SnapshotWriteResult,
@@ -63,10 +64,11 @@ PRIOR_RECORD_COUNT = 163_459
 # ── R2-backed scraper client ───────────────────────────────────────────────────
 
 
-class _R2SapScraperClient:
+class _R2SapScraperClient(SapLabsScraperClient):
     """Inline scraper client that serves pre-downloaded email records from R2."""
 
     def __init__(self, emails: list[dict[str, Any]]) -> None:
+        super().__init__(url=f"r2://sicurre-raw/{R2_SAP_LABS_KEY}")
         self._emails = emails
 
     async def fetch_entries(self) -> list[dict[str, Any]]:
