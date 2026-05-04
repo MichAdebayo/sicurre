@@ -10,7 +10,6 @@ from __future__ import annotations
 from alembic import op
 import sqlalchemy as sa
 
-
 revision = "20260306_0001"
 down_revision = None
 branch_labels = None
@@ -21,7 +20,7 @@ SOURCE_TYPE_CHECK = (
     "source_type IN ('api', 'file', 'scraping', 'sql', 'bigdata', 'manual')"
 )
 STATUS_CHECK = "status IN ('pending', 'running', 'completed', 'failed', 'partial')"
-OBJECT_TYPE_CHECK = "object_type IN ('file', 'api_payload', 'html_page', 'sql_export', 'bigdata_extract')"
+OBJECT_TYPE_CHECK = "object_type IN ('file', 'api_payload', 'html_page', 'pdf_document', 'sql_export', 'bigdata_extract')"
 LABEL_CHECK = "current_label IN ('phishing', 'spam', 'legitimate', 'unknown')"
 ANNOTATION_LABEL_CHECK = "label IN ('phishing', 'spam', 'legitimate', 'unknown')"
 REDACTION_CHECK = "redaction_status IN ('not_required', 'redacted', 'review_needed')"
