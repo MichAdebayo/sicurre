@@ -1,18 +1,20 @@
 """Base ingestion for the Common Crawl bigdata source — deterministic one-time population.
 
-Reads the pre-built base parquet from data/raw/bigdata/common_crawl/fr_usable/
-(produced by build_base_merged_snapshot.py) and ingests it into sicurre.db via
-CommonCrawlIngestionService with LocalCommonCrawlClient.
+Downloads the canonical base parquet from Cloudflare R2 under:
+
+    raw-snapshots/base/bigdata/common_crawl/fr_usable/
+
+Then ingests it into sicurre.db via CommonCrawlIngestionService with
+LocalCommonCrawlClient pointed at the temporary download directory.
 
 Key properties:
-- LocalCommonCrawlClient is instantiated directly — CC_INPUT_BACKEND env var is
-  intentionally bypassed so this always reads local files regardless of .env.
-- NoOpSnapshotStore is used — no R2 writes (keeps base ingest local-only).
+- LocalCommonCrawlClient reads the downloaded parquet from a temp dir.
+- NoOpSnapshotStore is used — no R2 writes.
 - Idempotent: if sicurre.db already has ≥ IDEMPOTENCY_THRESHOLD rows for the
   common-crawl-bigdata source, the run exits early without touching the DB.
 - Manifest written only when raw_record_count > 0 (same guard as db-ingest-base).
 
-Must be run AFTER build_base_merged_snapshot.py (step 1 of bigdata-ingest-base).
+Must be run AFTER db-ingest-base.
 PRIOR_RECORD_COUNT reflects the cumulative count after db-ingest-base.
 """
 
@@ -46,6 +48,7 @@ from data_platform.extractors.common_crawl_ingestion import (  # noqa: E402
 from data_platform.services.shared.snapshot_storage import (  # noqa: E402
     SnapshotWriteResult,
 )
+from data_platform.services.shared.r2_read_client import R2ReadClient  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -56,6 +59,7 @@ logger = logging.getLogger(__name__)
 # ── Constants ──────────────────────────────────────────────────────────────────
 
 SOURCE_NAME = "common-crawl-bigdata"
+R2_CC_PREFIX = "raw-snapshots/base/bigdata/common_crawl/fr_usable"
 MANIFEST_DIR = ROOT_DIR / "data" / "local" / "base-manifest" / "bigdata"
 MANIFEST_PATH = MANIFEST_DIR / "cc_base_ingest_manifest.json"
 
@@ -155,7 +159,7 @@ def _print_report(result: CommonCrawlIngestionResult, prior: int) -> None:
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 
-async def run_cc_ingestion() -> CommonCrawlIngestionResult:
+async def run_cc_ingestion(local_parquet_dir: Path) -> CommonCrawlIngestionResult:
     settings = get_settings()
     logger.info("Using database: %s", settings.database_url)
     engine = create_async_engine(settings.database_url, echo=False)
@@ -194,9 +198,8 @@ async def run_cc_ingestion() -> CommonCrawlIngestionResult:
         engine, expire_on_commit=False, class_=AsyncSession
     )
 
-    # Instantiate LocalCommonCrawlClient directly — bypasses CC_INPUT_BACKEND env var
-    # so this always reads the local base parquet regardless of .env config.
-    local_client = LocalCommonCrawlClient()
+    # Instantiate LocalCommonCrawlClient with the temp download directory
+    local_client = LocalCommonCrawlClient(local_parquet_dir=local_parquet_dir)
     service = CommonCrawlIngestionService(
         bq_client=local_client,
         snapshot_store=NoOpSnapshotStore(),
@@ -212,8 +215,25 @@ async def run_cc_ingestion() -> CommonCrawlIngestionResult:
 
 
 def run_base_ingestion() -> None:
-    logger.info("Common Crawl base ingestion starting …")
-    result = asyncio.run(run_cc_ingestion())
+    r2 = R2ReadClient()
+
+    # Find the most recent base-proof parquet under the R2 prefix
+    objects = r2.list_objects(R2_CC_PREFIX, suffix=".parquet")
+    proof_objects = [o for o in objects if "_base_proof_" in o.key]
+    if not proof_objects:
+        raise RuntimeError(
+            f"No '_base_proof_' parquet found under R2 prefix {R2_CC_PREFIX!r}. "
+            "Upload a base parquet before running this script."
+        )
+    # list_objects returns sorted by key; take the last (most recent by name sort)
+    target_key = proof_objects[-1].key
+    logger.info(
+        "Using R2 parquet: %s (%d bytes)", target_key, proof_objects[-1].size_bytes
+    )
+
+    with r2.download_to_tempfile(target_key) as tmp_path:
+        logger.info("Common Crawl base ingestion starting …")
+        result = asyncio.run(run_cc_ingestion(tmp_path.parent))
 
     if result.ingestion_run_id == "skipped":
         _print_report(result, PRIOR_RECORD_COUNT)

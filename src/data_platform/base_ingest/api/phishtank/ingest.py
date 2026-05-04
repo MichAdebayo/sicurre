@@ -1,15 +1,11 @@
 """Base ingestion for PhishTank — one-time deterministic population of sicurre.db.
 
-Reads ALL frozen CSV snapshots from two sources, in this fixed order:
-  1. Cloudflare R2  → raw-snapshots/phishtank/*.csv  (sorted by R2 key)
-  2. Local disk     → data/raw/api/phishtank/*.csv    (sorted by filename)
+Reads ALL frozen CSV snapshots from Cloudflare R2 under
+``raw-snapshots/base/api/phishtank/`` (sorted by R2 key for reproducibility).
 
-Files are deduplicated by SHA-256 of raw bytes so any file present in both R2
-and local is only processed once (R2 copy takes precedence).
-
-After discovery the exact set of files — including R2 keys, ETags, and SHA-256
-hashes — is written to data/local/phishtank_base_ingest_manifest.json so that
-the exact same dataset composition can be replayed for jury evaluation.
+The exact set of files — including R2 keys, ETags, and SHA-256 hashes — is
+written to data/local/phishtank_base_ingest_manifest.json so that the same
+dataset composition can be replayed for jury evaluation.
 
 This script is read-only with respect to snapshot storage: it uses a
 NoOpSnapshotStore that returns a stub SnapshotWriteResult without touching
@@ -25,15 +21,12 @@ import hashlib
 import io
 import json
 import logging
-import os
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import boto3
-from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 ROOT_DIR = Path(__file__).resolve().parents[5]  # repo root
@@ -49,9 +42,10 @@ from data_platform.extractors.phishtank import (  # noqa: E402
     PhishTankIngestionResult,
     PhishTankIngestionService,
 )
-from data_platform.services.shared.snapshot_storage import (
+from data_platform.services.shared.r2_read_client import R2ReadClient  # noqa: E402
+from data_platform.services.shared.snapshot_storage import (  # noqa: E402
     SnapshotWriteResult,
-)  # noqa: E402
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -61,8 +55,7 @@ logger = logging.getLogger(__name__)
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
-R2_PHISHTANK_PREFIX = "raw-snapshots/phishtank"
-LOCAL_PHISHTANK_DIR = ROOT_DIR / "data" / "raw" / "api" / "phishtank"
+R2_PHISHTANK_PREFIX = "raw-snapshots/base/api/phishtank"
 MANIFEST_PATH = ROOT_DIR / "data" / "local" / "phishtank_base_ingest_manifest.json"
 
 # Records present in sicurre.db before this ingestion run (prior live-API run).
@@ -113,180 +106,35 @@ class _SnapshotEntry:
     r2_etag: str | None = None
 
 
-def _build_r2_client() -> tuple[Any, str]:
-    load_dotenv(ROOT_DIR / ".env")
-    bucket = os.environ.get("SICURRE_RAW_SNAPSHOT_R2_BUCKET_NAME", "sicurre-raw")
-    endpoint = os.environ.get("SICURRE_RAW_SNAPSHOT_R2_ENDPOINT_URL")
-    access_key = os.environ.get("SICURRE_RAW_SNAPSHOT_R2_ACCESS_KEY_ID")
-    secret_key = os.environ.get("SICURRE_RAW_SNAPSHOT_R2_SECRET_ACCESS_KEY")
-    region = os.environ.get("SICURRE_RAW_SNAPSHOT_R2_REGION", "auto")
-    if not all([endpoint, access_key, secret_key]):
-        raise RuntimeError(
-            "Missing R2 credentials in .env — check SICURRE_RAW_SNAPSHOT_R2_* vars"
-        )
-    client = boto3.client(
-        "s3",
-        endpoint_url=endpoint,
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        region_name=region,
-    )
-    return client, bucket
+def _enumerate_r2_snapshots(r2: R2ReadClient) -> list[_SnapshotEntry]:
+    """List and download all CSV/JSON snapshots from the R2 base phishtank prefix.
 
-
-def _enumerate_r2_snapshots(s3_client: Any, bucket: str) -> list[_SnapshotEntry]:
-    """List and download all CSV snapshots from the R2 phishtank prefix.
-
-    Objects are enumerated via paginator and sorted by key before download to
-    guarantee a stable, reproducible processing order.
+    Objects are sorted by key before download to guarantee a stable,
+    reproducible processing order.
     """
-    paginator = s3_client.get_paginator("list_objects_v2")
-    objects: list[dict[str, Any]] = []
-    for page in paginator.paginate(Bucket=bucket, Prefix=R2_PHISHTANK_PREFIX + "/"):
-        objects.extend(page.get("Contents", []))
-
-    # Deterministic order: alphabetical by R2 key
-    objects.sort(key=lambda o: o["Key"])
-
+    objects = r2.list_objects(R2_PHISHTANK_PREFIX)
     entries: list[_SnapshotEntry] = []
     for obj in objects:
-        key: str = obj["Key"]
-        if not key.lower().endswith(".csv") and not key.lower().endswith(".json"):
-            logger.debug("Skipping non-CSV/JSON R2 object: %s", key)
+        if not (obj.key.lower().endswith(".csv") or obj.key.lower().endswith(".json")):
+            logger.debug("Skipping non-CSV/JSON R2 object: %s", obj.key)
             continue
-        filename = key.split("/")[-1]
-        logger.info("Downloading R2: %s (%d bytes)", key, obj["Size"])
-        data: bytes = s3_client.get_object(Bucket=bucket, Key=key)["Body"].read()
+        filename = obj.key.rsplit("/", 1)[-1]
+        logger.info("Downloading R2: %s (%d bytes)", obj.key, obj.size_bytes)
+        data = r2.download_bytes(obj.key)
         sha256 = hashlib.sha256(data).hexdigest()
-        etag = obj.get("ETag", "").strip('"')
         entries.append(
             _SnapshotEntry(
                 sha256=sha256,
                 label="r2",
                 filename=filename,
-                source_url=f"r2://{bucket}/{key}",
+                source_url=f"r2://{r2.bucket}/{obj.key}",
                 data=data,
                 size_bytes=len(data),
-                r2_key=key,
-                r2_etag=etag,
+                r2_key=obj.key,
+                r2_etag=obj.etag,
             )
         )
     return entries
-
-
-def _enumerate_local_snapshots() -> list[_SnapshotEntry]:
-    """List all local CSV snapshots, sorted by filename for determinism."""
-    if not LOCAL_PHISHTANK_DIR.exists():
-        logger.warning("Local phishtank dir not found: %s", LOCAL_PHISHTANK_DIR)
-        return []
-
-    files = []
-    for ext in ("*.csv", "*.json"):
-        files.extend(LOCAL_PHISHTANK_DIR.glob(ext))
-    files.sort(key=lambda p: p.name)
-
-    entries: list[_SnapshotEntry] = []
-    for path in files:
-        data = path.read_bytes()
-        sha256 = hashlib.sha256(data).hexdigest()
-        try:
-            rel = path.relative_to(ROOT_DIR)
-        except ValueError:
-            rel = path
-        entries.append(
-            _SnapshotEntry(
-                sha256=sha256,
-                label="local",
-                filename=path.name,
-                source_url=f"file://{rel}",
-                data=data,
-                size_bytes=len(data),
-            )
-        )
-    return entries
-
-
-def _build_dedup_index(
-    r2_entries: list[_SnapshotEntry],
-    local_entries: list[_SnapshotEntry],
-) -> tuple[list[_SnapshotEntry], list[dict[str, Any]]]:
-    """Deduplicate by SHA-256. R2 entries take precedence on collision.
-
-    Returns:
-        unique_entries: ordered list of snapshots to process (R2 first, then
-            local-only), in stable alphabetical order within each group.
-        manifest_records: full provenance record for every discovered file.
-    """
-    seen: dict[str, _SnapshotEntry] = {}  # sha256 -> first selected entry
-    manifest_records: list[dict[str, Any]] = []
-
-    # R2 first
-    for entry in r2_entries:
-        if entry.sha256 in seen:
-            selected = False
-            duplicate_of: str | None = seen[entry.sha256].filename
-            logger.info(
-                "Dedup: R2 '%s' is a duplicate of '%s' (sha256=%s…) — skipping",
-                entry.filename,
-                duplicate_of,
-                entry.sha256[:12],
-            )
-        else:
-            seen[entry.sha256] = entry
-            selected = True
-            duplicate_of = None
-
-        manifest_records.append(
-            {
-                "source": "r2",
-                "r2_key": entry.r2_key,
-                "r2_etag": entry.r2_etag,
-                "filename": entry.filename,
-                "source_url": entry.source_url,
-                "sha256": entry.sha256,
-                "size_bytes": entry.size_bytes,
-                "selected": selected,
-                "duplicate_of": duplicate_of,
-            }
-        )
-
-    # Local second (only add if hash not already seen from R2)
-    for entry in local_entries:
-        if entry.sha256 in seen:
-            selected = False
-            duplicate_of = seen[entry.sha256].filename
-            logger.info(
-                "Dedup: local '%s' matches existing '%s' (sha256=%s…) — skipping",
-                entry.filename,
-                duplicate_of,
-                entry.sha256[:12],
-            )
-        else:
-            seen[entry.sha256] = entry
-            selected = True
-            duplicate_of = None
-
-        manifest_records.append(
-            {
-                "source": "local",
-                "r2_key": None,
-                "r2_etag": None,
-                "filename": entry.filename,
-                "source_url": entry.source_url,
-                "sha256": entry.sha256,
-                "size_bytes": entry.size_bytes,
-                "selected": selected,
-                "duplicate_of": duplicate_of,
-            }
-        )
-
-    # Stable output order: selected R2 entries first (already sorted by key),
-    # then selected local-only entries (already sorted by filename).
-    r2_unique = [e for e in r2_entries if seen.get(e.sha256) is e]
-    local_unique = [e for e in local_entries if seen.get(e.sha256) is e]
-    unique_entries = r2_unique + local_unique
-
-    return unique_entries, manifest_records
 
 
 # ── CSV parsing ────────────────────────────────────────────────────────────────
@@ -348,19 +196,30 @@ def _parse_csv_payload(entry: _SnapshotEntry) -> PhishTankFetchedPayload:
 # ── Manifest persistence ───────────────────────────────────────────────────────
 
 
-def _save_manifest(manifest_records: list[dict[str, Any]]) -> None:
+def _save_manifest(entries: list[_SnapshotEntry]) -> None:
     MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
-    selected = [r for r in manifest_records if r["selected"]]
+    snapshots = [
+        {
+            "source": "r2",
+            "r2_key": e.r2_key,
+            "r2_etag": e.r2_etag,
+            "filename": e.filename,
+            "source_url": e.source_url,
+            "sha256": e.sha256,
+            "size_bytes": e.size_bytes,
+        }
+        for e in entries
+    ]
     manifest = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "description": (
-            "Exact R2 + local snapshots used for PhishTank base ingestion. "
+            "R2-only PhishTank base snapshots used for base ingestion. "
             "Replay with 'make phishtank-ingest-base' on an empty DB to reproduce "
             "the identical dataset composition."
         ),
-        "selected_count": len(selected),
-        "total_discovered": len(manifest_records),
-        "snapshots": manifest_records,
+        "selected_count": len(snapshots),
+        "total_discovered": len(snapshots),
+        "snapshots": snapshots,
     }
     MANIFEST_PATH.write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
     logger.info("Manifest saved → %s", MANIFEST_PATH.relative_to(ROOT_DIR))
@@ -406,28 +265,18 @@ def _print_report(
 
 
 async def run_base_ingestion() -> None:
-    # 1. Discover snapshots
-    s3_client, bucket = _build_r2_client()
-    logger.info("Enumerating R2 snapshots under %s/%s/ …", bucket, R2_PHISHTANK_PREFIX)
-    r2_entries = _enumerate_r2_snapshots(s3_client, bucket)
-    logger.info("R2 snapshots found: %d", len(r2_entries))
-
-    logger.info("Enumerating local snapshots in %s …", LOCAL_PHISHTANK_DIR)
-    local_entries = _enumerate_local_snapshots()
-    logger.info("Local snapshots found: %d", len(local_entries))
-
-    # 2. Deduplicate
-    unique_entries, manifest_records = _build_dedup_index(r2_entries, local_entries)
+    # 1. Discover snapshots from R2
+    r2 = R2ReadClient()
     logger.info(
-        "Unique snapshots to process: %d (from %d total discovered)",
-        len(unique_entries),
-        len(r2_entries) + len(local_entries),
+        "Enumerating R2 snapshots under %s/%s/ …", r2.bucket, R2_PHISHTANK_PREFIX
     )
+    entries = _enumerate_r2_snapshots(r2)
+    logger.info("R2 snapshots found: %d", len(entries))
 
-    # 3. Save manifest before any DB writes (fail-safe: manifest is always written)
-    _save_manifest(manifest_records)
+    # 2. Save manifest before any DB writes (fail-safe)
+    _save_manifest(entries)
 
-    # 4. Set up DB connection
+    # 3. Set up DB connection
     settings = get_settings()
     logger.info("Using database: %s", settings.database_url)
     engine = create_async_engine(settings.database_url, echo=False)
@@ -439,15 +288,14 @@ async def run_base_ingestion() -> None:
         engine, expire_on_commit=False, class_=AsyncSession
     )
 
-    # 5. Ingest each unique snapshot in stable order
+    # 4. Ingest each snapshot in stable order
     totals: dict[str, int] = {"new": 0, "skipped": 0, "filtered": 0, "feed": 0}
     rows: list[dict[str, Any]] = []
 
-    for entry in unique_entries:
+    for entry in entries:
         payload = _parse_csv_payload(entry)
         logger.info(
-            "Processing [%s] %s (%d entries parsed) …",
-            entry.label.upper(),
+            "Processing [R2] %s (%d entries parsed) …",
             entry.filename,
             len(payload.entries),
         )
@@ -492,7 +340,7 @@ async def run_base_ingestion() -> None:
 
     await engine.dispose()
 
-    # 6. Print summary report
+    # 5. Print summary report
     _print_report(rows, totals)
 
 

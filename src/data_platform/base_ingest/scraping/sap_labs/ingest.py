@@ -1,17 +1,14 @@
 """Base ingestion for SAP Labs — deterministic one-time population of sicurre.db.
 
-The SAP Labs dataset is a curated set of 18 French phishing/legitimate emails
-published in a SAP community blog post and extracted into a local JSON file:
+Reads the 18 French phishing/legitimate emails from the canonical JSON snapshot
+stored in Cloudflare R2 at:
 
-    data/raw/scraping/sap_labs_fr_emails_18.json
-
-Seven snapshot files exist (3 in R2, 4 local, 1 fallback JSON) but all contain
-the same 18 email IDs — confirmed by cross-inventory.  The canonical data is
-the fallback JSON used by SapLabsIngestionService when the live blog is blocked.
+    raw-snapshots/base/scraping/sap_labs/sap_labs_fr_emails_18.json
 
 This script:
-  1. Calls SapLabsIngestionService with a NoOpSnapshotStore (no R2 write).
-  2. The service reads its fallback JSON and inserts 18 new records.
+  1. Downloads the JSON from R2.
+  2. Calls SapLabsIngestionService with an inline R2-backed scraper client
+     and a NoOpSnapshotStore (no R2 write).
   3. Writes a manifest to data/local/sap_labs_base_ingest_manifest.json.
 
 Must be run AFTER certfr-ingest-base (DB contains ~163,459 records).
@@ -46,6 +43,7 @@ from data_platform.extractors.sap_labs import (  # noqa: E402
 from data_platform.services.shared.snapshot_storage import (  # noqa: E402
     SnapshotWriteResult,
 )
+from data_platform.services.shared.r2_read_client import R2ReadClient  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -55,11 +53,24 @@ logger = logging.getLogger(__name__)
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
-FALLBACK_JSON = ROOT_DIR / "data" / "raw" / "scraping" / "sap_labs_fr_emails_18.json"
+R2_SAP_LABS_KEY = "raw-snapshots/base/scraping/sap_labs/sap_labs_fr_emails_18.json"
 MANIFEST_PATH = ROOT_DIR / "data" / "local" / "sap_labs_base_ingest_manifest.json"
 
 # Records in sicurre.db after CERT-FR base ingestion.
 PRIOR_RECORD_COUNT = 163_459
+
+
+# ── R2-backed scraper client ───────────────────────────────────────────────────
+
+
+class _R2SapScraperClient:
+    """Inline scraper client that serves pre-downloaded email records from R2."""
+
+    def __init__(self, emails: list[dict[str, Any]]) -> None:
+        self._emails = emails
+
+    async def fetch_entries(self) -> list[dict[str, Any]]:
+        return self._emails
 
 
 # ── NoOpSnapshotStore ──────────────────────────────────────────────────────────
@@ -89,25 +100,24 @@ class NoOpSnapshotStore:
 # ── Manifest ──────────────────────────────────────────────────────────────────
 
 
-def _save_manifest(result: SapLabsIngestionResult) -> None:
+def _save_manifest(
+    result: SapLabsIngestionResult, r2_sha256: str, email_ids: list[Any]
+) -> None:
     MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
-    fallback_data = json.loads(FALLBACK_JSON.read_text(encoding="utf-8"))
-    emails = fallback_data.get("emails", [])
     manifest = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "description": (
             "SAP Labs base ingestion — 18 French phishing/legitimate emails "
-            "from the SAP community blog fallback JSON. "
-            "Replay with 'make sap-ingest-base'."
+            "read from R2. Replay with 'make sap-ingest-base'."
         ),
-        "source_file": str(FALLBACK_JSON.relative_to(ROOT_DIR)),
-        "source_sha256": hashlib.sha256(FALLBACK_JSON.read_bytes()).hexdigest(),
+        "r2_key": R2_SAP_LABS_KEY,
+        "source_sha256": r2_sha256,
         "ingestion_run_id": result.ingestion_run_id,
         "source_system_id": result.source_system_id,
         "raw_record_count": result.raw_record_count,
         "skipped_count": result.skipped_count,
         "total_scraped_count": result.total_scraped_count,
-        "email_ids": [e.get("id") for e in emails],
+        "email_ids": email_ids,
     }
     MANIFEST_PATH.write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
     logger.info("Manifest saved → %s", MANIFEST_PATH.relative_to(ROOT_DIR))
@@ -138,16 +148,19 @@ def _print_report(result: SapLabsIngestionResult, prior: int) -> None:
 
 
 async def run_base_ingestion() -> None:
-    # 1. Verify fallback JSON exists
-    if not FALLBACK_JSON.exists():
-        raise FileNotFoundError(
-            f"SAP Labs fallback JSON not found: {FALLBACK_JSON}\n"
-            "Ensure data/raw/scraping/sap_labs_fr_emails_18.json is present."
+    # 1. Download JSON from R2
+    r2 = R2ReadClient()
+    logger.info("Downloading SAP Labs JSON from R2: %s", R2_SAP_LABS_KEY)
+    raw_bytes = r2.download_bytes(R2_SAP_LABS_KEY)
+    r2_sha256 = hashlib.sha256(raw_bytes).hexdigest()
+    emails: list[dict[str, Any]] = json.loads(
+        raw_bytes.decode("utf-8", errors="replace")
+    ).get("emails", [])
+    if not emails:
+        raise RuntimeError(
+            f"R2 object {R2_SAP_LABS_KEY!r} contained no 'emails' entries."
         )
-    fallback_emails = json.loads(FALLBACK_JSON.read_text(encoding="utf-8")).get(
-        "emails", []
-    )
-    logger.info("Fallback JSON contains %d emails", len(fallback_emails))
+    logger.info("R2 JSON contains %d emails", len(emails))
 
     # 2. DB setup
     settings = get_settings()
@@ -161,8 +174,11 @@ async def run_base_ingestion() -> None:
         engine, expire_on_commit=False, class_=AsyncSession
     )
 
-    # 3. Run ingestion (NoOp snapshot store — no R2 writes)
-    service = SapLabsIngestionService(snapshot_store=NoOpSnapshotStore())
+    # 3. Run ingestion (R2-backed scraper, NoOp snapshot store)
+    service = SapLabsIngestionService(
+        scraper_client=_R2SapScraperClient(emails),
+        snapshot_store=NoOpSnapshotStore(),
+    )
 
     async with session_factory() as session:
         result: SapLabsIngestionResult = await service.run(
@@ -178,7 +194,8 @@ async def run_base_ingestion() -> None:
     await engine.dispose()
 
     # 4. Save manifest
-    _save_manifest(result)
+    email_ids = [e.get("id") for e in emails]
+    _save_manifest(result, r2_sha256, email_ids)
 
     # 5. Print summary
     _print_report(result, PRIOR_RECORD_COUNT)
