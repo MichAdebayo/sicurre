@@ -30,15 +30,32 @@ st.set_page_config(
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Sora:wght@600;700&display=swap');
+
 :root {
     --primary: #1B4FCC; --primary-dark: #1239A6; --primary-light: #EEF3FF;
     --danger: #EF4444; --danger-bg: #FEF2F2;
     --safe: #10B981; --safe-bg: #ECFDF5;
     --warning: #F59E0B; --warning-bg: #FFFBEB;
-    --bg: #F8FAFC; --surface: #FFFFFF; --border: #E2E8F0;
+    --surface: #FFFFFF; --border: #E2E8F0;
     --text: #0F172A; --text-sec: #475569; --text-muted: #94A3B8;
 }
-html, body, [class*="st-"] { font-family: 'Inter', system-ui, sans-serif; }
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --primary-light: #1E3A8A;
+        --danger-bg: #7F1D1D;
+        --safe-bg: #064E3B;
+        --warning-bg: #78350F;
+        --surface: #1E293B; --border: #334155;
+        --text: #F8FAFC; --text-sec: #CBD5E1; --text-muted: #64748B;
+    }
+}
+
+/* Base font, but DO NOT override Material Icons used by Streamlit */
+body, p, h1, h2, h3, h4, h5, h6, span:not(.material-symbols-rounded):not([class^="st-emotion-cache"]) {
+    font-family: 'Inter', system-ui, sans-serif !important;
+}
+
 .main .block-container { max-width: 1100px; padding-top: 1.5rem; }
 h1, h2, h3 { color: var(--text) !important; }
 
@@ -48,7 +65,7 @@ h1, h2, h3 { color: var(--text) !important; }
     border: 1px solid var(--border); box-shadow: 0 8px 32px rgba(0,0,0,0.06);
 }
 .login-logo { text-align: center; margin-bottom: 1.5rem; }
-.login-logo h1 { font-family: 'Sora', sans-serif; font-size: 2rem; color: var(--primary) !important; margin: 0; }
+.login-logo h1 { font-family: 'Sora', sans-serif !important; font-size: 2rem; color: var(--primary) !important; margin: 0; }
 .login-logo p { color: var(--text-sec); font-size: 0.85rem; margin-top: 0.25rem; }
 
 .metric-card {
@@ -57,7 +74,7 @@ h1, h2, h3 { color: var(--text) !important; }
     box-shadow: 0 1px 3px rgba(0,0,0,0.04); transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .metric-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
-.metric-card .value { font-size: 1.75rem; font-weight: 700; color: var(--primary); font-family: 'JetBrains Mono', monospace; }
+.metric-card .value { font-size: 1.75rem; font-weight: 700; color: var(--primary); font-family: 'JetBrains Mono', monospace !important; }
 .metric-card .label { font-size: 0.8rem; color: var(--text-sec); margin-top: 0.25rem; }
 
 .badge { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -75,11 +92,11 @@ h1, h2, h3 { color: var(--text) !important; }
 .threat-row:hover { border-color: var(--primary); }
 .threat-row .subject { font-weight: 500; color: var(--text); font-size: 0.9rem; flex: 1; }
 .threat-row .meta { font-size: 0.75rem; color: var(--text-muted); }
-.threat-row .confidence { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--text-sec); }
+.threat-row .confidence { font-family: 'JetBrains Mono', monospace !important; font-size: 0.8rem; color: var(--text-sec); }
 
 .terminal-box {
     background: #0F172A; border-radius: 12px; padding: 1.25rem;
-    font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; line-height: 1.6;
+    font-family: 'JetBrains Mono', monospace !important; font-size: 0.78rem; line-height: 1.6;
     max-height: 420px; overflow-y: auto; border: 1px solid #1E293B;
     box-shadow: 0 4px 24px rgba(0,0,0,0.12);
 }
@@ -90,8 +107,8 @@ h1, h2, h3 { color: var(--text) !important; }
 
 .source-tbl { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; font-size: 0.85rem; }
 .source-tbl th { background: var(--primary-light); color: var(--primary); padding: 0.6rem 1rem; text-align: left; font-weight: 600; }
-.source-tbl td { padding: 0.5rem 1rem; border-top: 1px solid var(--border); }
-.source-tbl tr:hover td { background: #F1F5F9; }
+.source-tbl td { padding: 0.5rem 1rem; border-top: 1px solid var(--border); color: var(--text); }
+.source-tbl tr:hover td { background: var(--surface); filter: brightness(0.95); }
 
 .topbar { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; margin-bottom: 1rem; border-bottom: 1px solid var(--border); }
 .topbar .greeting { font-size: 0.85rem; color: var(--text-sec); }
@@ -119,7 +136,7 @@ def get_dataset_versions() -> list[tuple]:
 
 def get_threat_samples(limit: int = 30) -> list[dict]:
     rows = _q("""
-        SELECT dnm.id, dnm.normalized_text, dnm.extracted_label, dnm.text_length,
+        SELECT dnm.id, dnm.normalized_text, dnm.current_label, dnm.text_length,
                ds.name as source_name, dnm.created_at
         FROM data_normalized_message dnm
         JOIN data_raw_record drr ON drr.id = dnm.raw_record_id

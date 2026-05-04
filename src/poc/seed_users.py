@@ -12,6 +12,9 @@ SRC_ROOT = ROOT_DIR / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
+import logging
+import os
+
 import bcrypt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -20,14 +23,21 @@ from core.config import get_settings
 from core.database import Base
 from db.models import PocUser, UserRole
 
+logger = logging.getLogger(__name__)
 
-DEFAULT_ADMIN_EMAIL = "admin@sicurre.fr"
-DEFAULT_ADMIN_PASSWORD = "sicurre2026"
-DEFAULT_ADMIN_NAME = "Administrateur Sicurre"
+# ── POC seed credentials — read from environment, never hardcoded ──────────
+_FALLBACK_ADMIN_EMAIL = "admin@sicurre.fr"
+_FALLBACK_ADMIN_NAME = "Administrateur Sicurre"
+_FALLBACK_VIEWER_EMAIL = "demo@sicurre.fr"
+_FALLBACK_VIEWER_NAME = "Utilisateur Démo"
 
-DEFAULT_VIEWER_EMAIL = "demo@sicurre.fr"
-DEFAULT_VIEWER_PASSWORD = "demo2026"
-DEFAULT_VIEWER_NAME = "Utilisateur Démo"
+DEFAULT_ADMIN_EMAIL = os.environ.get("SICURRE_POC_ADMIN_EMAIL", _FALLBACK_ADMIN_EMAIL)
+DEFAULT_ADMIN_PASSWORD = os.environ["SICURRE_POC_ADMIN_PASSWORD"]  # required — no default
+DEFAULT_ADMIN_NAME = os.environ.get("SICURRE_POC_ADMIN_NAME", _FALLBACK_ADMIN_NAME)
+
+DEFAULT_VIEWER_EMAIL = os.environ.get("SICURRE_POC_VIEWER_EMAIL", _FALLBACK_VIEWER_EMAIL)
+DEFAULT_VIEWER_PASSWORD = os.environ["SICURRE_POC_VIEWER_PASSWORD"]  # required — no default
+DEFAULT_VIEWER_NAME = os.environ.get("SICURRE_POC_VIEWER_NAME", _FALLBACK_VIEWER_NAME)
 
 
 def hash_password(password: str) -> str:
