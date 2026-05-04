@@ -475,7 +475,7 @@ elif page == "▶️ Pipeline" and is_admin():
             )
 
     with tab_push:
-        st.markdown("Normalisation → Annotation → Construction dataset.")
+        st.markdown("Normalisation puis ecriture des annotations manquantes.")
         if st.button("▶️ Lancer pipeline push", key="run_push", type="primary"):
             s, t = st.empty(), st.empty()
             for name, tgt in [
