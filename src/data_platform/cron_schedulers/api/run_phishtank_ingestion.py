@@ -15,8 +15,8 @@ import csv
 import logging
 import os
 import sys
-import tempfile
 from datetime import datetime, timezone
+from io import StringIO
 from pathlib import Path
 
 # Force snapshot storage to R2 under the cron/api/phishtank prefix
@@ -32,8 +32,13 @@ if str(SRC_ROOT) not in sys.path:
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from core.config import get_settings
-from data_platform.cli.ingest.api.phishtank import run_ingestion
-from data_platform.extractors.phishtank import PhishTankFeedClient, PHISHTANK_CSV_FIELDS
+from core.database import Base
+from data_platform.extractors.phishtank import (
+    PHISHTANK_CSV_FIELDS,
+    PhishTankFeedClient,
+    PhishTankFetchedPayload,
+    PhishTankIngestionService,
+)
 from data_platform.services.shared.snapshot_storage import build_snapshot_store
 from data_platform.services.shared.watermark import WatermarkService
 
@@ -44,9 +49,29 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _build_csv_payload(
+    *,
+    entries: list[dict[str, str]],
+    fieldnames: list[str],
+    csv_bytes: bytes,
+    source_url: str,
+) -> PhishTankFetchedPayload:
+    return PhishTankFetchedPayload(
+        entries=entries,
+        snapshot_bytes=csv_bytes,
+        source_url=source_url,
+        content_type="text/csv",
+        source_format="csv",
+    )
+
+
 async def run_incremental_phishtank_cron() -> None:
     settings = get_settings()
     engine = create_async_engine(settings.database_url, echo=False)
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
     session_factory = async_sessionmaker(
         engine, expire_on_commit=False, class_=AsyncSession
     )
@@ -73,7 +98,8 @@ async def run_incremental_phishtank_cron() -> None:
 
     # Filter for entries strictly newer than the watermark
     new_entries = [
-        entry for entry in payload.entries
+        entry
+        for entry in payload.entries
         if str(entry.get("submission_time", "")) > last_known_date
     ]
 
@@ -91,11 +117,15 @@ async def run_incremental_phishtank_cron() -> None:
     fieldnames = [
         *PHISHTANK_CSV_FIELDS,
         *sorted(
-            {key for entry in new_entries for key in entry if key not in PHISHTANK_CSV_FIELDS}
+            {
+                key
+                for entry in new_entries
+                for key in entry
+                if key not in PHISHTANK_CSV_FIELDS
+            }
         ),
     ]
 
-    from io import StringIO
     buf = StringIO()
     writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
     writer.writeheader()
@@ -120,17 +150,19 @@ async def run_incremental_phishtank_cron() -> None:
     )
     logger.info("Delta CSV uploaded to: %s", result.storage_uri)
 
-    # Write a local temp copy for the CLI ingestion to read
-    with tempfile.NamedTemporaryFile(
-        mode="wb", suffix=".csv", delete=False, dir=str(ROOT_DIR / "data" / "local")
-    ) as tmp:
-        tmp.write(csv_bytes)
-        temp_csv_path = tmp.name
+    payload_for_ingestion = _build_csv_payload(
+        entries=new_entries,
+        fieldnames=fieldnames,
+        csv_bytes=csv_bytes,
+        source_url=result.storage_uri,
+    )
 
-    try:
-        await run_ingestion(trigger_mode="scheduled", csv_path=temp_csv_path)
-    finally:
-        Path(temp_csv_path).unlink(missing_ok=True)
+    async def fetch_entries() -> PhishTankFetchedPayload:
+        return payload_for_ingestion
+
+    service = PhishTankIngestionService(fetch_entries=fetch_entries)
+    async with session_factory() as session:
+        await service.run(session, trigger_mode="scheduled")
 
     await engine.dispose()
 
