@@ -27,7 +27,8 @@ st.set_page_config(
 )
 
 # ── Brand CSS ─────────────────────────────────────────────────────────────────
-st.markdown("""
+st.markdown(
+    """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Sora:wght@600;700&display=swap');
 
@@ -114,28 +115,42 @@ h1, h2, h3 { color: var(--text) !important; }
 .topbar .greeting { font-size: 0.85rem; color: var(--text-sec); }
 .topbar .role-badge { font-size: 0.7rem; }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 
 # ── DB Helpers ────────────────────────────────────────────────────────────────
 def _q(sql: str, params: tuple = ()) -> list:
-    if not DB_PATH.exists(): return []
+    if not DB_PATH.exists():
+        return []
     conn = sqlite3.connect(str(DB_PATH))
-    try: return conn.execute(sql, params).fetchall()
-    finally: conn.close()
+    try:
+        return conn.execute(sql, params).fetchall()
+    finally:
+        conn.close()
+
 
 def get_total(table: str) -> int:
     r = _q(f"SELECT COUNT(*) FROM {table}")
     return r[0][0] if r else 0
 
+
 def get_source_counts() -> list[tuple[str, int]]:
-    return _q("SELECT ds.name, COUNT(*) FROM data_raw_record drr JOIN data_source_system ds ON ds.id = drr.source_system_id GROUP BY ds.name ORDER BY COUNT(*) DESC")
+    return _q(
+        "SELECT ds.name, COUNT(*) FROM data_raw_record drr JOIN data_source_system ds ON ds.id = drr.source_system_id GROUP BY ds.name ORDER BY COUNT(*) DESC"
+    )
+
 
 def get_dataset_versions() -> list[tuple]:
-    return _q("SELECT version_tag, item_count, status, frozen_at FROM data_dataset ORDER BY created_at DESC")
+    return _q(
+        "SELECT version_tag, item_count, status, frozen_at FROM data_dataset ORDER BY created_at DESC"
+    )
+
 
 def get_threat_samples(limit: int = 30) -> list[dict]:
-    rows = _q("""
+    rows = _q(
+        """
         SELECT dnm.id, dnm.normalized_text, dnm.current_label, dnm.text_length,
                ds.name as source_name, dnm.created_at
         FROM data_normalized_message dnm
@@ -144,8 +159,20 @@ def get_threat_samples(limit: int = 30) -> list[dict]:
         JOIN data_ingestion_run dir ON dir.id = dro.ingestion_run_id
         JOIN data_source_system ds ON ds.id = dir.source_system_id
         ORDER BY dnm.created_at DESC LIMIT ?
-    """, (limit,))
-    return [{"id": r[0], "text": r[1], "label": r[2], "length": r[3], "source": r[4], "date": r[5]} for r in rows]
+    """,
+        (limit,),
+    )
+    return [
+        {
+            "id": r[0],
+            "text": r[1],
+            "label": r[2],
+            "length": r[3],
+            "source": r[4],
+            "date": r[5],
+        }
+        for r in rows
+    ]
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -157,13 +184,18 @@ def _rate_limit_check() -> bool:
     st.session_state["_login_attempts"] = attempts
     return len(attempts) < 5
 
+
 def _record_attempt():
     attempts = st.session_state.get("_login_attempts", [])
     attempts.append(time.time())
     st.session_state["_login_attempts"] = attempts
 
+
 def authenticate(email: str, password: str) -> dict | None:
-    rows = _q("SELECT id, email, display_name, password_hash, role FROM poc_user WHERE email = ?", (email,))
+    rows = _q(
+        "SELECT id, email, display_name, password_hash, role FROM poc_user WHERE email = ?",
+        (email,),
+    )
     if not rows:
         return None
     uid, em, name, pw_hash, role = rows[0]
@@ -171,12 +203,19 @@ def authenticate(email: str, password: str) -> dict | None:
         return {"id": uid, "email": em, "name": name, "role": role}
     return None
 
+
 def is_admin() -> bool:
     return st.session_state.get("user", {}).get("role") == "admin"
 
 
 # ── Terminal Rendering ────────────────────────────────────────────────────────
-STATUS_CLS = {"start": "t-start", "success": "t-ok", "failed": "t-fail", "skipped": "t-skip"}
+STATUS_CLS = {
+    "start": "t-start",
+    "success": "t-ok",
+    "failed": "t-fail",
+    "skipped": "t-skip",
+}
+
 
 def render_trace(event: dict) -> str:
     if event["type"] == "trace":
@@ -188,22 +227,35 @@ def render_trace(event: dict) -> str:
         return f'<span class="t-stage">{t.get("stage","")}</span>/<span class="{sc}">{t.get("status","")}</span> {t.get("message","")}{met}'
     return f'<span class="t-log">{event["content"]}</span>'
 
+
 def run_and_stream(cmd: list[str], terminal_ph, status_ph) -> int:
     lines = []
     env = {**os.environ, "PYTHONUNBUFFERED": "1"}
-    proc = subprocess.Popen(cmd, cwd=str(ROOT_DIR), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env, bufsize=1)
+    proc = subprocess.Popen(
+        cmd,
+        cwd=str(ROOT_DIR),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        env=env,
+        bufsize=1,
+    )
     assert proc.stdout
     for raw in proc.stdout:
         raw = raw.rstrip()
-        if not raw: continue
+        if not raw:
+            continue
         ev = {"type": "log", "content": raw}
         if raw.startswith("{"):
             try:
                 p = json.loads(raw)
                 if "stage" in p and "status" in p:
                     ev = {"type": "trace", "content": p}
-                    status_ph.markdown(f"⏳ **{p.get('child_target','')}** — {p.get('message','')}")
-            except json.JSONDecodeError: pass
+                    status_ph.markdown(
+                        f"⏳ **{p.get('child_target','')}** — {p.get('message','')}"
+                    )
+            except json.JSONDecodeError:
+                pass
         lines.append(render_trace(ev))
         html = '<div class="terminal-box">' + "<br>".join(lines[-150:]) + "</div>"
         terminal_ph.markdown(html, unsafe_allow_html=True)
@@ -213,22 +265,29 @@ def run_and_stream(cmd: list[str], terminal_ph, status_ph) -> int:
 
 # ── Login Screen ──────────────────────────────────────────────────────────────
 if "user" not in st.session_state:
-    st.markdown("""
+    st.markdown(
+        """
     <div class="login-container">
         <div class="login-logo">
             <h1>🛡️ Sicurre</h1>
             <p>Vos emails, protégés en 2 secondes.</p>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
     with st.container():
         col_spacer_l, col_form, col_spacer_r = st.columns([1, 2, 1])
         with col_form:
             with st.form("login_form"):
                 email = st.text_input("Adresse email", placeholder="admin@sicurre.fr")
-                password = st.text_input("Mot de passe", type="password", placeholder="••••••••")
-                submitted = st.form_submit_button("Se connecter", type="primary", use_container_width=True)
+                password = st.text_input(
+                    "Mot de passe", type="password", placeholder="••••••••"
+                )
+                submitted = st.form_submit_button(
+                    "Se connecter", type="primary", use_container_width=True
+                )
 
             if submitted:
                 if not _rate_limit_check():
@@ -244,8 +303,11 @@ if "user" not in st.session_state:
                     else:
                         st.error("Email ou mot de passe incorrect.")
 
-            st.caption("Comptes de démonstration :")
-            st.code("Admin : admin@sicurre.fr / sicurre2026\nViewer: demo@sicurre.fr  / demo2026", language=None)
+            admin_email = os.environ.get("SICURRE_POC_ADMIN_EMAIL", "admin@sicurre.fr")
+            viewer_email = os.environ.get("SICURRE_POC_VIEWER_EMAIL", "demo@sicurre.fr")
+            st.caption(
+                f"Comptes de démonstration : `{admin_email}` (admin) · `{viewer_email}` (viewer)"
+            )
     st.stop()
 
 
@@ -255,7 +317,10 @@ user = st.session_state["user"]
 # Sidebar
 with st.sidebar:
     st.markdown(f"### 🛡️ Sicurre")
-    st.markdown(f'<span class="badge badge-info">{user["role"].upper()}</span>', unsafe_allow_html=True)
+    st.markdown(
+        f'<span class="badge badge-info">{user["role"].upper()}</span>',
+        unsafe_allow_html=True,
+    )
     st.caption(f'Connecté : {user["name"]}')
     st.markdown("---")
 
@@ -279,11 +344,17 @@ if page == "📬 Journal des menaces":
     st.markdown("## Journal des menaces")
     st.markdown("Derniers emails analysés par le système de détection Sicurre.")
 
-    label_map = {"phishing": ("🔴 Phishing", "badge-phishing"), "spam": ("🟡 Indésirable", "badge-spam"), "legitimate": ("🟢 Légitime", "badge-legitimate")}
+    label_map = {
+        "phishing": ("🔴 Phishing", "badge-phishing"),
+        "spam": ("🟡 Indésirable", "badge-spam"),
+        "legitimate": ("🟢 Légitime", "badge-legitimate"),
+    }
 
     col_f1, col_f2 = st.columns(2)
     with col_f1:
-        filter_label = st.selectbox("Filtrer par verdict", ["Tous", "phishing", "spam", "legitimate"])
+        filter_label = st.selectbox(
+            "Filtrer par verdict", ["Tous", "phishing", "spam", "legitimate"]
+        )
     with col_f2:
         n_results = st.slider("Nombre de résultats", 10, 100, 30, step=10)
 
@@ -310,14 +381,17 @@ if page == "📬 Journal des menaces":
             preview = (t["text"] or "")[:120].replace("\n", " ")
             if len(t["text"] or "") > 120:
                 preview += "…"
-            st.markdown(f"""
+            st.markdown(
+                f"""
             <div class="threat-row">
                 <span class="badge {label_info[1]}">{label_info[0]}</span>
                 <span class="subject">{preview}</span>
                 <span class="meta">{t["source"]}</span>
                 <span class="confidence">{t["length"]} car.</span>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
 
 
 # ── Page: Dashboard ───────────────────────────────────────────────────────────
@@ -332,20 +406,32 @@ elif page == "📊 Tableau de bord":
         (c4, get_total("data_dataset_item"), "Items dataset"),
     ]:
         with col:
-            st.markdown(f'<div class="metric-card"><div class="value">{val:,}</div><div class="label">{lbl}</div></div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="metric-card"><div class="value">{val:,}</div><div class="label">{lbl}</div></div>',
+                unsafe_allow_html=True,
+            )
 
     st.markdown("---")
     st.markdown("### Sources de données")
     sc = get_source_counts()
     if sc:
-        rows_html = "".join(f"<tr><td>{n}</td><td style='text-align:right;font-family:JetBrains Mono,monospace'>{c:,}</td></tr>" for n, c in sc)
-        st.markdown(f'<table class="source-tbl"><thead><tr><th>Source</th><th style="text-align:right">Nombre</th></tr></thead><tbody>{rows_html}</tbody></table>', unsafe_allow_html=True)
+        rows_html = "".join(
+            f"<tr><td>{n}</td><td style='text-align:right;font-family:JetBrains Mono,monospace'>{c:,}</td></tr>"
+            for n, c in sc
+        )
+        st.markdown(
+            f'<table class="source-tbl"><thead><tr><th>Source</th><th style="text-align:right">Nombre</th></tr></thead><tbody>{rows_html}</tbody></table>',
+            unsafe_allow_html=True,
+        )
 
     st.markdown("---")
     st.markdown("### Versions du jeu de données")
-    for tag, count, status, frozen in (get_dataset_versions() or []):
+    for tag, count, status, frozen in get_dataset_versions() or []:
         bcls = "badge-legitimate" if status == "frozen" else "badge-spam"
-        st.markdown(f'<div class="metric-card" style="text-align:left;margin-bottom:0.5rem"><strong>v{tag}</strong> <span class="badge {bcls}">{status}</span><span style="float:right;font-family:JetBrains Mono,monospace;color:var(--primary)">{count:,} items</span></div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="metric-card" style="text-align:left;margin-bottom:0.5rem"><strong>v{tag}</strong> <span class="badge {bcls}">{status}</span><span style="float:right;font-family:JetBrains Mono,monospace;color:var(--primary)">{count:,} items</span></div>',
+            unsafe_allow_html=True,
+        )
 
 
 # ── Page: Pipeline (Admin) ───────────────────────────────────────────────────
@@ -360,7 +446,9 @@ elif page == "▶️ Pipeline" and is_admin():
             s, t = st.empty(), st.empty()
             s.markdown("⏳ **Ingestion de base en cours…**")
             code = run_and_stream(["make", "ingest-all-base"], t, s)
-            s.markdown("✅ **Terminé.**" if code == 0 else f"❌ **Échec (code {code})**")
+            s.markdown(
+                "✅ **Terminé.**" if code == 0 else f"❌ **Échec (code {code})**"
+            )
 
     with tab_cron:
         st.markdown("Ingère les données incrémentales (cron).")
@@ -370,16 +458,30 @@ elif page == "▶️ Pipeline" and is_admin():
             s, t = st.empty(), st.empty()
             if gen and n > 0:
                 s.markdown(f"⏳ **Génération de {n} entrées…**")
-                run_and_stream([sys.executable, str(ROOT_DIR / "src/data_platform/cli/generate_sql_delta.py"), "-n", str(n)], t, s)
+                run_and_stream(
+                    [
+                        sys.executable,
+                        str(ROOT_DIR / "src/data_platform/cli/generate_sql_delta.py"),
+                        "-n",
+                        str(n),
+                    ],
+                    t,
+                    s,
+                )
             s.markdown("⏳ **Cron en cours…**")
             code = run_and_stream(["make", "ingest-all-cron"], t, s)
-            s.markdown("✅ **Terminé.**" if code == 0 else f"❌ **Échec (code {code})**")
+            s.markdown(
+                "✅ **Terminé.**" if code == 0 else f"❌ **Échec (code {code})**"
+            )
 
     with tab_push:
         st.markdown("Normalisation → Annotation → Construction dataset.")
         if st.button("▶️ Lancer pipeline push", key="run_push", type="primary"):
             s, t = st.empty(), st.empty()
-            for name, tgt in [("Normalisation", "normalize"), ("Annotation", "annotate")]:
+            for name, tgt in [
+                ("Normalisation", "normalize"),
+                ("Annotation", "annotate"),
+            ]:
                 s.markdown(f"⏳ **{name}…**")
                 code = run_and_stream(["make", tgt], t, s)
                 if code != 0:
@@ -405,17 +507,45 @@ elif page == "📦 Jeux de données" and is_admin():
     if submitted:
         s, t = st.empty(), st.empty()
         s.markdown(f"⏳ **Construction v{vtag}…**")
-        code = run_and_stream([sys.executable, str(ROOT_DIR / "src/data_platform/cli/datasets/build.py"), "--name", ds_name, "--version-tag", vtag, "--target-usage", usage, "--write"], t, s)
-        s.markdown(f"✅ **v{vtag} construit.**" if code == 0 else f"❌ **Échec (code {code})**")
+        code = run_and_stream(
+            [
+                sys.executable,
+                str(ROOT_DIR / "src/data_platform/cli/datasets/build.py"),
+                "--name",
+                ds_name,
+                "--version-tag",
+                vtag,
+                "--target-usage",
+                usage,
+                "--write",
+            ],
+            t,
+            s,
+        )
+        s.markdown(
+            f"✅ **v{vtag} construit.**" if code == 0 else f"❌ **Échec (code {code})**"
+        )
 
     st.markdown("---")
     st.markdown("### Versions existantes")
-    for tag, count, status, frozen in (get_dataset_versions() or []):
+    for tag, count, status, frozen in get_dataset_versions() or []:
         c1, c2 = st.columns([4, 1])
         with c1:
             bcls = "badge-legitimate" if status == "frozen" else "badge-spam"
-            st.markdown(f'**v{tag}** <span class="badge {bcls}">{status}</span> — `{count:,}` items', unsafe_allow_html=True)
+            st.markdown(
+                f'**v{tag}** <span class="badge {bcls}">{status}</span> — `{count:,}` items',
+                unsafe_allow_html=True,
+            )
         with c2:
             if st.button(f"📥 Exporter", key=f"exp_{tag}"):
                 s, t = st.empty(), st.empty()
-                run_and_stream([sys.executable, str(ROOT_DIR / "src/data_platform/cli/datasets/export.py"), "--version-tag", tag], t, s)
+                run_and_stream(
+                    [
+                        sys.executable,
+                        str(ROOT_DIR / "src/data_platform/cli/datasets/export.py"),
+                        "--version-tag",
+                        tag,
+                    ],
+                    t,
+                    s,
+                )
