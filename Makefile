@@ -78,7 +78,7 @@ ingest-all-base: phishtank-ingest-base file-ingest-base scraping-ingest-base db-
 	@echo "  ALL BASE INGESTION COMPLETE"
 	@echo "============================================================================"
 	@echo "  Total rows: $$(sqlite3 data/local/sicurre.db 'SELECT COUNT(*) FROM data_raw_record')"
-	@echo "  Target    : 191,983"
+	@echo "  Target    : 192,037"
 	@echo "============================================================================"
 
 phishtank-ingest-base:
