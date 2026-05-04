@@ -46,7 +46,7 @@ help:
 	@echo "  make ingest-all-cron           - Run full cron ingestion suite"
 	@echo ""
 	@echo "  Pipeline & Demos"
-	@echo "  make pipeline-push             - Push raw data through normalize → annotate → dataset-build"
+	@echo "  make pipeline-push             - Push raw data through normalize → annotate(write) → dataset-build"
 	@echo "  make demo-v1                   - Full demo: base ingestion + pipeline push (dataset v1)"
 	@echo "  make demo-v2                   - Full demo: generate delta + cron ingestion + pipeline push (dataset v2)"
 	@echo ""
@@ -78,7 +78,7 @@ ingest-all-base: phishtank-ingest-base file-ingest-base scraping-ingest-base db-
 	@echo "  ALL BASE INGESTION COMPLETE"
 	@echo "============================================================================"
 	@echo "  Total rows: $$(sqlite3 data/local/sicurre.db 'SELECT COUNT(*) FROM data_raw_record')"
-	@echo "  Target    : 192,037"
+	@echo "  Target    : 191,983"
 	@echo "============================================================================"
 
 phishtank-ingest-base:
@@ -158,8 +158,8 @@ normalize-dry:
 # ── Annotation ────────────────────────────────────────────────────────────────
 
 annotate:
-	@echo "Backfilling missing annotations on normalized messages..."
-	uv run python src/data_platform/cli/maintenance/annotation_backfill.py
+	@echo "Persisting missing annotations on normalized messages..."
+	uv run python src/data_platform/cli/maintenance/annotation_backfill.py --write
 
 # ── Dataset ───────────────────────────────────────────────────────────────────
 
