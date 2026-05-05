@@ -23,7 +23,9 @@ logger = logging.getLogger(__name__)
 
 
 async def main() -> None:
-    logger.info("Starting file cron (R2 inputs: cron/file/csv + cron/file/txt)")
+    logger.info(
+        "Starting file cron (R2 inputs: raw-snapshots/cron/file/csv + raw-snapshots/cron/file/txt)"
+    )
     result = await run_cron_file_ingestion(trigger_mode="scheduled")
     logger.info(
         "File cron complete: processed=%d inserted=%d skipped=%d",

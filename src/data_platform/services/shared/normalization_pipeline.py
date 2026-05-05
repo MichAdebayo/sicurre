@@ -855,10 +855,13 @@ class NormalizationPipeline:
                 DataRawRecord.detected_language == "fr",  # Tri-path isolation
                 DataRawRecord.is_usable.is_(True),
             )
-            .limit(batch_size)
+            .order_by(DataRawRecord.extracted_at.asc(), DataRawRecord.id.asc())
         )
         if target_source_ids:
             query = query.where(DataRawRecord.source_system_id.in_(target_source_ids))
+
+        if batch_size > 0:
+            query = query.limit(batch_size)
 
         result = await self.session.execute(query)
         records = result.scalars().all()

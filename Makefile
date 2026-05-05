@@ -153,7 +153,7 @@ ingest-all-cron: cron-orchestrate
 
 normalize:
 	@echo "Normalizing all raw records in sicurre.db..."
-	uv run python src/data_platform/cli/normalize/messages.py $(NORMALIZE_ARGS)
+	uv run python src/data_platform/cli/normalize/messages.py --all-pending $(NORMALIZE_ARGS)
 
 normalize-dry:
 	@echo "Previewing normalization (no DB writes)..."
@@ -183,12 +183,14 @@ dataset-build:
 
 dataset-export:
 	@echo "Serializing frozen dataset to CSV/JSONL for PyTorch..."
-	uv run python src/data_platform/cli/datasets/export.py $(EXPORT_ARGS)
+	uv run python src/data_platform/cli/datasets/export.py \
+		--version-tag "$(DATASET_VERSION_TAG)" \
+		$(EXPORT_ARGS)
 
 # ── Pipeline & Demos ──────────────────────────────────────────────────────────
 
-pipeline-push: normalize annotate dataset-build
-	@echo "Data pushed through normalization, annotation, and dataset builder."
+pipeline-push: normalize annotate dataset-build dataset-export
+	@echo "Data pushed through normalization, annotation, dataset build, and dataset export."
 
 demo-v1: ingest-all-base pipeline-push
 	@echo "Demo V1 Dataset Generated"

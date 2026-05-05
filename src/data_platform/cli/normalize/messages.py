@@ -206,6 +206,11 @@ if __name__ == "__main__":
             description="Sicurre DB Normalization Pipeline (Phase 2)"
         )
         parser.add_argument("--batch-size", type=int, default=1000)
+        parser.add_argument(
+            "--all-pending",
+            action="store_true",
+            help="Normalize all currently pending eligible raw records in one pass.",
+        )
         parser.add_argument("--source", type=str, default=None)
         parser.add_argument("--dry-run", action="store_true")
         parser.add_argument("--review-output", type=Path, default=None)
@@ -255,8 +260,9 @@ if __name__ == "__main__":
                         max_kept_samples_per_source=args.max_review_samples,
                     )
                 else:
+                    effective_batch_size = 0 if args.all_pending else args.batch_size
                     result = await pipeline.run_batch(
-                        batch_size=args.batch_size,
+                        batch_size=effective_batch_size,
                         source_system_name=args.source,
                         dry_run=args.dry_run,
                     )
@@ -380,7 +386,10 @@ if __name__ == "__main__":
                         stage="normalization",
                         status="success",
                         message="Normalization batch completed",
-                        metrics={"processed": result.get("processed", 0)},
+                        metrics={
+                            "normalized": result.get("normalized", 0),
+                            "skipped": result.get("skipped", 0),
+                        },
                     )
         except Exception as exc:
             trace.trace(

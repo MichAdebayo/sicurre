@@ -3,8 +3,8 @@
 This module polls the user-managed recurring file prefixes and ingests them
 directly into the platform:
 
-- cron/file/csv -> recurring CSV datasets
-- cron/file/txt -> exported TXT email bundles
+- raw-snapshots/cron/file/csv -> recurring CSV datasets
+- raw-snapshots/cron/file/txt -> exported TXT email bundles
 
 The uploaded objects already live in R2, so the ingestion records keep their
 original ``r2://`` storage URI instead of creating a second derived snapshot.
@@ -52,11 +52,17 @@ logger = logging.getLogger(__name__)
 
 CRON_FILE_CSV_PREFIX = os.environ.get(
     "SICURRE_FILE_CRON_CSV_PREFIX",
-    os.environ.get("SICURRE_FILE_DROPZONE_CSV_PREFIX", "cron/file/csv"),
+    os.environ.get(
+        "SICURRE_FILE_DROPZONE_CSV_PREFIX",
+        "raw-snapshots/cron/file/csv",
+    ),
 )
 CRON_FILE_TXT_PREFIX = os.environ.get(
     "SICURRE_FILE_CRON_TXT_PREFIX",
-    os.environ.get("SICURRE_FILE_DROPZONE_TXT_PREFIX", "cron/file/txt"),
+    os.environ.get(
+        "SICURRE_FILE_DROPZONE_TXT_PREFIX",
+        "raw-snapshots/cron/file/txt",
+    ),
 )
 
 
@@ -158,7 +164,7 @@ async def _persist_txt_records(
         payload=IngestionRunCreate(
             source_system_id=source_sys.id,
             trigger_mode=trigger_mode,
-            status="pending",
+            status="running",
             started_at=started_at,
         ),
     )
@@ -225,7 +231,9 @@ async def _persist_txt_records(
 
     ingestion_run.finished_at = datetime.now(timezone.utc)
     ingestion_run.status = "completed"
+    ingestion_run.raw_object_count = 1
     ingestion_run.raw_record_count = len(records_to_add)
+    ingestion_run.log_message = f"TXT cron ingestion completed: {len(records_to_add)} record(s) from {entry.filename}"
     await session.commit()
 
     trace.trace(

@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     sap_labs_snapshot_storage_backend: str | None = None
     common_crawl_snapshot_storage_backend: str | None = None
     database_historical_snapshot_storage_backend: str | None = None
+    training_dataset_snapshot_storage_backend: str | None = "prod"
+    training_dataset_snapshot_prefix: str = "training_dataset"
     cc_cron_duration_mode: str = Field(
         default="short",
         description="'short' = 30 min, 'standard' = 8 hours max runtime for CC cron.",
