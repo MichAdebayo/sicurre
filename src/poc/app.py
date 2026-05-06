@@ -10,7 +10,7 @@ import sqlite3
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import bcrypt
@@ -263,6 +263,102 @@ def run_and_stream(cmd: list[str], terminal_ph, status_ph) -> int:
     return proc.returncode
 
 
+# ── Email Classifier (placeholder until ONNX model is ready) ──────────────────────
+_PHISHING_KEYWORDS = [
+    "compte suspendu",
+    "vérifier",
+    "urgent",
+    "mot de passe",
+    "cliquez",
+    "connexion",
+    "sécurité",
+    "identifiant",
+    "informations personnelles",
+    "définitivement fermé",
+    "sous 24h",
+    "vérification requise",
+    "accès bloqué",
+    "carte bancaire",
+    "rib",
+    "virement",
+    "ameli",
+    "caf",
+    "chronopost",
+    "laposte",
+    "douanes",
+    "impots",
+    "remboursement",
+]
+_SPAM_KEYWORDS = [
+    "promo",
+    "réduction",
+    "offre",
+    "gratuit",
+    "remise",
+    "casino",
+    "gagnez",
+    "félicitations",
+    "sélectionné",
+    "bon d’achat",
+    "prix",
+    "48h",
+    "soldes",
+    "exclusif",
+    "s’abonner",
+    "newsletter",
+    "désinscription",
+]
+
+SAMPLE_EMAILS: list[dict] = [
+    {
+        "label": "phishing",
+        "title": "🔴 Phishing — Usurpation La Poste",
+        "text": (
+            "Votre colis n° CL-847291 est en attente de livraison. Des frais de douane "
+            "de 2,99€ sont dus. Votre compte La Poste a été temporairement suspendu. "
+            "Veuillez vérifier vos informations sous 24h sinon votre compte sera "
+            "définitivement fermé. Cliquez ici : https://laposte-secure-login.xyz/verify"
+        ),
+    },
+    {
+        "label": "spam",
+        "title": "🟡 Spam — Faux bon d’achat",
+        "text": (
+            "FÉLICITATIONS ! Vous avez été sélectionné pour recevoir un bon d’achat de 500€ "
+            "chez Amazon. Offre exclusive valable 48h seulement. Cliquez maintenant pour "
+            "réclamer votre prix gratuit ! Promotion exceptionnelle, ne manquez pas cette réduction."
+        ),
+    },
+    {
+        "label": "legitimate",
+        "title": "🟢 Légitime — Email professionnel",
+        "text": (
+            "Bonjour Monsieur Adebayo, suite à notre échange téléphonique de ce matin, "
+            "je vous transmets le compte rendu de la réunion du 5 mai. Merci de bien vouloir "
+            "confirmer la réception de ce message et de revenir vers moi avant vendredi. "
+            "Cordialement, Marie Dupont, Responsable projet."
+        ),
+    },
+]
+
+
+def classify_email(text: str) -> dict[str, float]:
+    """Placeholder classifier — keyword-based scoring.
+    Replace body with ONNX model call when model is ready:
+        model = onnxruntime.InferenceSession('data/models/camembertv2-phishing-fr/model.onnx')
+    """
+    t = text.lower()
+    ph = sum(0.18 for kw in _PHISHING_KEYWORDS if kw in t)
+    sp = sum(0.14 for kw in _SPAM_KEYWORDS if kw in t)
+    le = max(0.05, 1.0 - ph - sp)
+    total = ph + sp + le
+    return {
+        "phishing": round(ph / total, 3),
+        "spam": round(sp / total, 3),
+        "legitimate": round(le / total, 3),
+    }
+
+
 # ── Login Screen ──────────────────────────────────────────────────────────────
 if "user" not in st.session_state:
     st.markdown(
@@ -302,12 +398,6 @@ if "user" not in st.session_state:
                         st.rerun()
                     else:
                         st.error("Email ou mot de passe incorrect.")
-
-            admin_email = os.environ.get("SICURRE_POC_ADMIN_EMAIL", "admin@sicurre.fr")
-            viewer_email = os.environ.get("SICURRE_POC_VIEWER_EMAIL", "demo@sicurre.fr")
-            st.caption(
-                f"Comptes de démonstration : `{admin_email}` (admin) · `{viewer_email}` (viewer)"
-            )
     st.stop()
 
 
@@ -324,7 +414,7 @@ with st.sidebar:
     st.caption(f'Connecté : {user["name"]}')
     st.markdown("---")
 
-    pages = ["📬 Journal des menaces", "📊 Tableau de bord"]
+    pages = ["📬 Journal des menaces", "📊 Tableau de bord", "🤖 Classificateur"]
     if is_admin():
         pages.extend(["▶️ Pipeline", "📦 Jeux de données"])
 
@@ -334,6 +424,22 @@ with st.sidebar:
     if st.button("🚪 Se déconnecter", use_container_width=True):
         del st.session_state["user"]
         st.rerun()
+
+    # Demo mode countdown indicator
+    if st.session_state.get("demo_mode"):
+        next_at = st.session_state.get("demo_next_at")
+        if next_at:
+            remaining = max(
+                0, int((next_at - datetime.now(timezone.utc)).total_seconds())
+            )
+            mins, secs = divmod(remaining, 60)
+            st.markdown(
+                f'<div style="background:#064E3B;border-radius:8px;padding:0.5rem;'
+                f'text-align:center;margin-top:0.5rem">'
+                f'<span style="color:#34D399;font-size:0.75rem;font-weight:600">'
+                f"⏱ Cron dans {mins:02d}:{secs:02d}</span></div>",
+                unsafe_allow_html=True,
+            )
 
     st.caption("Sicurre v0.1 — POC Simplon")
     st.caption("*Vos emails, protégés en 2 secondes.*")
@@ -451,27 +557,116 @@ elif page == "▶️ Pipeline" and is_admin():
             )
 
     with tab_cron:
-        st.markdown("Ingère les données incrémentales (cron).")
-        n = st.number_input("Entrées synthétiques à générer", 0, 500, 50, 10)
-        gen = st.checkbox("Générer avant le cron", True)
-        if st.button("▶️ Lancer le cron", key="run_cron", type="primary"):
-            s, t = st.empty(), st.empty()
-            if gen and n > 0:
-                s.markdown(f"⏳ **Génération de {n} entrées…**")
+        st.markdown("### Ingestion incrémentale (cron)")
+        st.markdown(
+            "Lance tous les collecteurs en séquence : **PhishTank → CERT-FR → CSV → "
+            "Base de données → Common Crawl**. La durée du crawl CC est contrôlée par "
+            "`SICURRE_CC_CRON_DURATION_MODE` dans `.env` "
+            "(`short` = 30 min · `standard` = 8 h)."
+        )
+
+        # ─ Manual trigger ──────────────────────────────────────────────────────
+        col_run, col_gen = st.columns(2)
+        with col_run:
+            if st.button(
+                "▶️ Lancer le cron maintenant", key="run_cron", type="primary"
+            ):
+                s_ph, t_ph = st.empty(), st.empty()
+                s_ph.markdown("⏳ **Cron en cours…**")
+                code = run_and_stream(["make", "ingest-all-cron"], t_ph, s_ph)
+                s_ph.markdown(
+                    "✅ **Terminé.**" if code == 0 else f"❌ **Échec (code {code})**"
+                )
+        with col_gen:
+            n_gen = st.number_input("Entrées DB synthétiques à générer", 0, 500, 50, 10)
+            if st.button("🔧 Générer delta DB", key="run_gen"):
+                s_ph, t_ph = st.empty(), st.empty()
                 run_and_stream(
                     [
                         sys.executable,
                         str(ROOT_DIR / "src/data_platform/cli/generate_sql_delta.py"),
                         "-n",
-                        str(n),
+                        str(n_gen),
                     ],
-                    t,
-                    s,
+                    t_ph,
+                    s_ph,
                 )
-            s.markdown("⏳ **Cron en cours…**")
-            code = run_and_stream(["make", "ingest-all-cron"], t, s)
-            s.markdown(
-                "✅ **Terminé.**" if code == 0 else f"❌ **Échec (code {code})**"
+
+        st.markdown("---")
+        st.markdown("#### 🎬 Mode démo — déclenchement automatique")
+        st.markdown(
+            "Démarre un minuteur récurrent. Le cron se déclenche automatiquement "
+            "toutes les N minutes à partir du moment où vous cliquez ▶ Démarrer."
+        )
+
+        col_int, col_btn = st.columns([3, 1])
+        with col_int:
+            demo_interval = st.number_input(
+                "Intervalle (minutes)",
+                min_value=1,
+                max_value=60,
+                value=st.session_state.get("demo_interval_minutes", 5),
+                step=1,
+            )
+        with col_btn:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if not st.session_state.get("demo_mode"):
+                if st.button("▶ Démarrer", key="start_demo", type="primary"):
+                    st.session_state["demo_mode"] = True
+                    st.session_state["demo_interval_minutes"] = demo_interval
+                    st.session_state["demo_next_at"] = datetime.now(
+                        timezone.utc
+                    ) + timedelta(minutes=demo_interval)
+                    st.session_state["demo_cron_last_fired"] = None
+                    st.rerun()
+            else:
+                if st.button("⏹ Arrêter", key="stop_demo"):
+                    st.session_state["demo_mode"] = False
+                    st.session_state.pop("demo_next_at", None)
+                    st.rerun()
+
+        if st.session_state.get("demo_mode"):
+            next_at = st.session_state.get("demo_next_at")
+            if next_at:
+                now = datetime.now(timezone.utc)
+                if now >= next_at:
+                    # Timer fired — run cron and reset
+                    interval_m = st.session_state.get("demo_interval_minutes", 5)
+                    st.session_state["demo_next_at"] = now + timedelta(
+                        minutes=interval_m
+                    )
+                    st.session_state["demo_cron_last_fired"] = now.strftime("%H:%M:%S")
+                    s_ph, t_ph = st.empty(), st.empty()
+                    s_ph.markdown("🔄 **Mode démo — cron automatique en cours…**")
+                    code = run_and_stream(["make", "ingest-all-cron"], t_ph, s_ph)
+                    s_ph.markdown(
+                        "✅ **Cron automatique terminé.**"
+                        if code == 0
+                        else f"❌ **Cron automatique échoué (code {code})**"
+                    )
+                else:
+                    remaining = max(0, int((next_at - now).total_seconds()))
+                    mins, secs = divmod(remaining, 60)
+                    st.markdown(
+                        f'<div style="background:#064E3B;border-radius:10px;padding:1rem;'
+                        f'text-align:center;margin:0.75rem 0">'
+                        f'<span style="color:#34D399;font-size:1.4rem;font-family:JetBrains Mono,monospace">'
+                        f"⏱ {mins:02d}:{secs:02d}</span><br>"
+                        f'<span style="color:#6EE7B7;font-size:0.75rem">'
+                        f"Prochain cron automatique · toutes les "
+                        f'{st.session_state["demo_interval_minutes"]} min</span></div>',
+                        unsafe_allow_html=True,
+                    )
+
+            if last := st.session_state.get("demo_cron_last_fired"):
+                st.success(f"Dernier déclenchement automatique : {last}")
+
+            # Live 1-second refresh for the countdown
+            time.sleep(1)
+            st.rerun()
+        else:
+            st.info(
+                "Mode démo désactivé. Définissez un intervalle et cliquez sur ▶ Démarrer."
             )
 
     with tab_push:
@@ -499,7 +694,8 @@ elif page == "📦 Jeux de données" and is_admin():
         c1, c2 = st.columns(2)
         with c1:
             ds_name = st.text_input("Nom", "sicurre-core")
-            vtag = st.text_input("Version", "1.0.0")
+            auto_tag = datetime.now(timezone.utc).strftime("base-%Y%m%d-%H%M%S")
+            vtag = st.text_input("Version (tag auto-généré, modifiable)", auto_tag)
         with c2:
             usage = st.selectbox("Usage", ["training", "evaluation"])
         submitted = st.form_submit_button("🔨 Construire", type="primary")
@@ -549,3 +745,130 @@ elif page == "📦 Jeux de données" and is_admin():
                     t,
                     s,
                 )
+
+
+# ── Page: Classificateur ──────────────────────────────────────────────────────
+elif page == "🤖 Classificateur":
+    st.markdown("## 🤖 Classificateur d'emails")
+    st.markdown(
+        "Détectez phishing, spam et emails légitimes. "
+        "Le modèle CamemBERTav2 sera chargé depuis "
+        "`data/models/camembertv2-phishing-fr/` une fois entraîné — "
+        "en attendant, un classificateur heuristique démonstratif est actif."
+    )
+
+    _LABEL_META = {
+        "phishing": ("🔴 Phishing", "badge-phishing", "#EF4444"),
+        "spam": ("🟡 Indésirable", "badge-spam", "#F59E0B"),
+        "legitimate": ("🟢 Légitime", "badge-legitimate", "#10B981"),
+    }
+
+    def _render_result(scores: dict[str, float]) -> None:
+        top_label = max(scores, key=scores.__getitem__)
+        label_text, badge_cls, color = _LABEL_META.get(
+            top_label, (top_label, "badge-info", "#1B4FCC")
+        )
+        st.markdown(
+            f'<div style="background:var(--surface);border:2px solid {color};'
+            f'border-radius:12px;padding:1.25rem;margin:0.75rem 0">'
+            f'<div style="font-size:1.1rem;font-weight:700;color:{color}'
+            f';margin-bottom:0.75rem">Verdict : {label_text}</div>',
+            unsafe_allow_html=True,
+        )
+        for lbl, score in sorted(scores.items(), key=lambda x: -x[1]):
+            lmeta = _LABEL_META.get(lbl, (lbl, "badge-info", "#1B4FCC"))
+            pct = int(score * 100)
+            bar_w = max(2, pct)
+            st.markdown(
+                f'<div style="display:flex;align-items:center;gap:0.75rem;margin:0.3rem 0">'
+                f'<span style="width:80px;font-size:0.8rem;color:var(--text-sec)">'
+                f"{lmeta[0]}</span>"
+                f'<div style="flex:1;background:var(--border);border-radius:4px;height:8px">'
+                f'<div style="width:{bar_w}%;background:{lmeta[2]};height:8px;'
+                f'border-radius:4px;transition:width 0.4s ease"></div></div>'
+                f'<span style="width:45px;text-align:right;font-family:JetBrains Mono,monospace;'
+                f'font-size:0.8rem;color:var(--text)">{pct}%</span></div>',
+                unsafe_allow_html=True,
+            )
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    tab_manual, tab_demo = st.tabs(["✍️ Analyse manuelle", "🎞️ Démo automatique"])
+
+    with tab_manual:
+        st.markdown("Collez le corps d'un email pour l'analyser.")
+        user_text = st.text_area(
+            "Texte de l'email",
+            placeholder="Coller ici le contenu de l'email à analyser…",
+            height=160,
+        )
+        if st.button("🔍 Analyser", type="primary", key="classify_manual"):
+            if not user_text.strip():
+                st.warning("Veuillez saisir un texte.")
+            else:
+                with st.spinner("Classification en cours…"):
+                    time.sleep(0.4)  # Simulate model inference latency
+                    scores = classify_email(user_text)
+                _render_result(scores)
+
+        model_path = ROOT_DIR / "data" / "models" / "camembertv2-phishing-fr"
+        model_ready = any(model_path.glob("*.onnx"))
+        if model_ready:
+            st.success(
+                "✅ Modèle ONNX chargé depuis `data/models/camembertv2-phishing-fr/`"
+            )
+        else:
+            st.info(
+                "⚙️ Modèle ONNX non encore disponible — "
+                "classificateur heuristique actif (placeholder). "
+                "Entraînez le modèle et déposez `model.onnx` dans "
+                "`data/models/camembertv2-phishing-fr/` pour activer l'inférence réelle."
+            )
+
+    with tab_demo:
+        st.markdown(
+            "Simulation d'arrivée d'emails en temps réel. "
+            "Cliquez sur un exemple pour le classifier instantanément."
+        )
+        for i, sample in enumerate(SAMPLE_EMAILS):
+            with st.container():
+                col_info, col_btn = st.columns([5, 1])
+                with col_info:
+                    st.markdown(f"**{sample['title']}**")
+                    preview = sample["text"][:110].replace("\n", " ") + "…"
+                    st.caption(preview)
+                with col_btn:
+                    if st.button("Analyser", key=f"sample_{i}"):
+                        st.session_state[f"sample_result_{i}"] = classify_email(
+                            sample["text"]
+                        )
+                if result := st.session_state.get(f"sample_result_{i}"):
+                    _render_result(result)
+                st.markdown("---")
+
+        st.markdown("#### 🔴 Simulation temps réel — email entrant")
+        st.markdown(
+            "Cette section simulera l'arrivée d'un email via Gmail Pub/Sub "
+            "et son passage dans le classificateur en moins de 2 secondes. "
+            "*(Disponible une fois le modèle et l'intégration Gmail câblés.)*"
+        )
+        if st.button("📨 Simuler un email entrant", key="simulate_incoming"):
+            import random
+
+            chosen = random.choice(SAMPLE_EMAILS)
+            with st.spinner("📡 Email reçu via Pub/Sub… Classification en cours…"):
+                time.sleep(1.2)
+            scores = classify_email(chosen["text"])
+            top = max(scores, key=scores.__getitem__)
+            icon = {"phishing": "🚨", "spam": "⚠️", "legitimate": "✅"}.get(top, "🔍")
+            st.markdown(
+                f'<div style="border-left:4px solid '
+                f'{"#EF4444" if top=="phishing" else "#F59E0B" if top=="spam" else "#10B981"}'
+                f";padding:0.75rem 1rem;background:var(--surface);border-radius:0 8px 8px 0;"
+                f'margin:0.5rem 0">'
+                f"<strong>{icon} Alerte Sicurre</strong> — "
+                f"Email classifié comme <strong>{top}</strong> en 1.2 s<br>"
+                f'<span style="font-size:0.8rem;color:var(--text-sec)">'
+                f'Sujet (simulé) : {chosen["title"]}</span></div>',
+                unsafe_allow_html=True,
+            )
+            _render_result(scores)

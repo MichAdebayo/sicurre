@@ -55,7 +55,8 @@ logger = logging.getLogger(__name__)
 # ── Constants ──────────────────────────────────────────────────────────────────
 
 R2_SAP_LABS_KEY = "raw-snapshots/base/scraping/sap_labs/sap_labs_fr_emails_18.json"
-MANIFEST_PATH = ROOT_DIR / "data" / "local" / "sap_labs_base_ingest_manifest.json"
+MANIFEST_DIR = ROOT_DIR / "data" / "local" / "base-manifest" / "scraping"
+MANIFEST_PATH = MANIFEST_DIR / "sap_labs_base_ingest_manifest.json"
 
 # Records in sicurre.db after CERT-FR base ingestion.
 PRIOR_RECORD_COUNT = 163_459

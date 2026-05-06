@@ -56,7 +56,8 @@ logger = logging.getLogger(__name__)
 # ── Constants ──────────────────────────────────────────────────────────────────
 
 R2_PHISHTANK_PREFIX = "raw-snapshots/base/api/phishtank"
-MANIFEST_PATH = ROOT_DIR / "data" / "local" / "phishtank_base_ingest_manifest.json"
+MANIFEST_DIR = ROOT_DIR / "data" / "local" / "base-manifest" / "api"
+MANIFEST_PATH = MANIFEST_DIR / "phishtank_base_ingest_manifest.json"
 
 # Records present in sicurre.db before this ingestion run (prior live-API run).
 # Used only for the delta report — does not affect processing logic.

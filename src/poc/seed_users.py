@@ -16,6 +16,10 @@ import logging
 import os
 
 import bcrypt
+from dotenv import load_dotenv
+
+# Load .env before any os.environ reads so POC credentials are available
+load_dotenv(ROOT_DIR / ".env", override=False)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -32,11 +36,17 @@ _FALLBACK_VIEWER_EMAIL = "demo@sicurre.fr"
 _FALLBACK_VIEWER_NAME = "Utilisateur Démo"
 
 DEFAULT_ADMIN_EMAIL = os.environ.get("SICURRE_POC_ADMIN_EMAIL", _FALLBACK_ADMIN_EMAIL)
-DEFAULT_ADMIN_PASSWORD = os.environ["SICURRE_POC_ADMIN_PASSWORD"]  # required — no default
+DEFAULT_ADMIN_PASSWORD = os.environ[
+    "SICURRE_POC_ADMIN_PASSWORD"
+]  # required — no default
 DEFAULT_ADMIN_NAME = os.environ.get("SICURRE_POC_ADMIN_NAME", _FALLBACK_ADMIN_NAME)
 
-DEFAULT_VIEWER_EMAIL = os.environ.get("SICURRE_POC_VIEWER_EMAIL", _FALLBACK_VIEWER_EMAIL)
-DEFAULT_VIEWER_PASSWORD = os.environ["SICURRE_POC_VIEWER_PASSWORD"]  # required — no default
+DEFAULT_VIEWER_EMAIL = os.environ.get(
+    "SICURRE_POC_VIEWER_EMAIL", _FALLBACK_VIEWER_EMAIL
+)
+DEFAULT_VIEWER_PASSWORD = os.environ[
+    "SICURRE_POC_VIEWER_PASSWORD"
+]  # required — no default
 DEFAULT_VIEWER_NAME = os.environ.get("SICURRE_POC_VIEWER_NAME", _FALLBACK_VIEWER_NAME)
 
 
@@ -51,14 +61,28 @@ async def seed_users() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    session_factory = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    session_factory = async_sessionmaker(
+        engine, expire_on_commit=False, class_=AsyncSession
+    )
 
     async with session_factory() as session:
         for email, password, name, role in [
-            (DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD, DEFAULT_ADMIN_NAME, UserRole.ADMIN),
-            (DEFAULT_VIEWER_EMAIL, DEFAULT_VIEWER_PASSWORD, DEFAULT_VIEWER_NAME, UserRole.VIEWER),
+            (
+                DEFAULT_ADMIN_EMAIL,
+                DEFAULT_ADMIN_PASSWORD,
+                DEFAULT_ADMIN_NAME,
+                UserRole.ADMIN,
+            ),
+            (
+                DEFAULT_VIEWER_EMAIL,
+                DEFAULT_VIEWER_PASSWORD,
+                DEFAULT_VIEWER_NAME,
+                UserRole.VIEWER,
+            ),
         ]:
-            existing = await session.scalar(select(PocUser).where(PocUser.email == email))
+            existing = await session.scalar(
+                select(PocUser).where(PocUser.email == email)
+            )
             if existing:
                 print(f"  User {email} already exists — skipping.")
                 continue

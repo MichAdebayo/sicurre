@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Any, Literal
 
 
@@ -58,6 +59,7 @@ class SemanticTraceLogger:
             "stage": stage,
             "status": status,
             "message": message,
+            "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         }
 
         if entity_type:
@@ -67,10 +69,19 @@ class SemanticTraceLogger:
         if metrics:
             payload["metrics"] = metrics
 
-        json_output = json.dumps(payload, ensure_ascii=False)
+        # ── Tier 1: Human-readable line (raw terminal / judge demo) ──────────
+        _STATUS_ICON = {"start": "▶", "success": "✓", "failed": "✗", "skipped": "○"}
+        ts = datetime.now(timezone.utc).strftime("%H:%M:%S")
+        icon = _STATUS_ICON.get(status, "·")
+        human_line = f"[{ts}] {icon} [{stage.upper()}] {message}"
+        if metrics:
+            human_line += "  · " + "  ".join(f"{k}={v}" for k, v in metrics.items())
+        print(human_line, flush=True)
 
-        # Output directly to stdout sequence so Streamlit subprocess interceptors
-        # can safely JSON parse the distinct traces row by row.
+        # ── Tier 2: Strict JSON trace (parsed by Streamlit terminal renderer) ─
+        json_output = json.dumps(payload, ensure_ascii=False)
+        # Output directly to stdout so Streamlit subprocess interceptors can
+        # safely JSON-parse each distinct trace line row by row.
         print(json_output, flush=True)
 
         # Mirror cleanly to traditional internal logs for redundancy context

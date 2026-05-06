@@ -65,7 +65,8 @@ logger = logging.getLogger(__name__)
 # ── Constants ──────────────────────────────────────────────────────────────────
 
 R2_CERTFR_PREFIX = "raw-snapshots/base/scraping/certfr"
-MANIFEST_PATH = ROOT_DIR / "data" / "local" / "certfr_base_ingest_manifest.json"
+MANIFEST_DIR = ROOT_DIR / "data" / "local" / "base-manifest" / "scraping"
+MANIFEST_PATH = MANIFEST_DIR / "certfr_base_ingest_manifest.json"
 
 SOURCE_MACHINE_NAME = "cert-fr-cti"
 SOURCE_DISPLAY_NAME = "CERT-FR CTI"

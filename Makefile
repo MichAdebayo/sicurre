@@ -18,7 +18,8 @@ NORMALIZE_ARGS ?=
 GENERATE_ARGS ?=
 DATASET_ARGS ?=
 DATASET_NAME ?= sicurre_training
-DATASET_VERSION_TAG := $(shell date -u +%Y%m%d-%H%M%S)
+DATASET_TAG_PREFIX ?= base
+DATASET_VERSION_TAG := $(DATASET_TAG_PREFIX)-$(shell date -u +%Y%m%d-%H%M%S)
 DATASET_TARGET_USAGE ?= training
 DATASET_STATUS ?= frozen
 EXPORT_ARGS ?=
@@ -204,7 +205,7 @@ demo-v2:
 	@echo "Running cron..."
 	$(MAKE) ingest-all-cron
 	@echo "Pushing new data through pipeline..."
-	$(MAKE) pipeline-push
+	$(MAKE) pipeline-push DATASET_TAG_PREFIX=cron
 	@echo "Demo V2 Dataset Generated"
 
 # ── POC ───────────────────────────────────────────────────────────────────────

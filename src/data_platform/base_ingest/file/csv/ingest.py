@@ -71,7 +71,8 @@ logger = logging.getLogger(__name__)
 
 R2_CSV_PREFIX = "raw-snapshots/base/file/csv"
 R2_TXT_PREFIX = "raw-snapshots/base/file/txt"
-MANIFEST_PATH = ROOT_DIR / "data" / "local" / "file_csv_base_ingest_manifest.json"
+MANIFEST_DIR = ROOT_DIR / "data" / "local" / "base-manifest" / "file"
+MANIFEST_PATH = MANIFEST_DIR / "file_csv_base_ingest_manifest.json"
 
 # JSONL file explicitly excluded per user decision (duplicate of fr CSV).
 EXCLUDED_JSONL: frozenset[str] = frozenset({"data.jsonl"})
