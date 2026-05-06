@@ -18,7 +18,7 @@ NORMALIZE_ARGS ?=
 GENERATE_ARGS ?=
 DATASET_ARGS ?=
 DATASET_NAME ?= sicurre_training
-DATASET_VERSION_TAG ?= $(shell date -u +%Y%m%d-%H%M%S)
+DATASET_VERSION_TAG := $(shell date -u +%Y%m%d-%H%M%S)
 DATASET_TARGET_USAGE ?= training
 DATASET_STATUS ?= frozen
 EXPORT_ARGS ?=
@@ -192,7 +192,10 @@ dataset-export:
 pipeline-push: normalize annotate dataset-build dataset-export
 	@echo "Data pushed through normalization, annotation, dataset build, and dataset export."
 
-demo-v1: ingest-all-base pipeline-push
+demo-v1: ingest-all-base
+	@echo "Running canonical generation lanes before pipeline push..."
+	$(MAKE) generate-data
+	$(MAKE) pipeline-push
 	@echo "Demo V1 Dataset Generated"
 
 demo-v2:

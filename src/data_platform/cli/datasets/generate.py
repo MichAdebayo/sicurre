@@ -5,6 +5,7 @@ import asyncio
 import json
 import logging
 import sys
+from collections import Counter, defaultdict
 from pathlib import Path
 
 import pandas as pd
@@ -38,8 +39,23 @@ from data_platform.services.shared.generation_lineage import (  # noqa: E402
 from data_platform.services.shared.generation_staging import (
     GenerationStagingService,
 )  # noqa: E402
+from data_platform.services.shared.normalization_pipeline import (
+    NormalizationPipeline,
+)  # noqa: E402
 from data_platform.services.shared.review_persistence import (
     ReviewPersistenceService,
+)  # noqa: E402
+from data_platform.services.shared.stage_two_action_artifacts import (
+    StageTwoActionArtifactsService,
+)  # noqa: E402
+from data_platform.services.shared.stage_two_reviewed_export import (
+    StageTwoReviewedExportService,
+)  # noqa: E402
+from data_platform.services.shared.stage_two_rewrite_drafts import (
+    StageTwoRewriteDraftService,
+)  # noqa: E402
+from data_platform.services.shared.stage_two_rewrite_jobs import (
+    StageTwoRewriteJobService,
 )  # noqa: E402
 from data_platform.services.shared.structured_review_artifact import (  # noqa: E402
     StructuredReviewArtifactService,
@@ -49,6 +65,28 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s — %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+COMMON_CRAWL_SOURCE_NAME = "common-crawl-bigdata"
+ADAPTABLE_SUBTYPES = {
+    "instructional_legitimate",
+    "awareness_or_report",
+    "promotional_spam",
+    "phishing_lure_candidate",
+}
+
+
+def _target_from_subtype(route_subtype: str | None) -> str:
+    if route_subtype in {
+        "transactional_legitimate",
+        "instructional_legitimate",
+        "awareness_or_report",
+    }:
+        return "legitimate"
+    if route_subtype in {"promotional_spam"}:
+        return "spam"
+    if route_subtype in {"phishing_lure_candidate"}:
+        return "phishing"
+    return "holdout"
 
 
 def parse_args() -> argparse.Namespace:
@@ -75,14 +113,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--corpus-path",
         type=Path,
-        default=Path("data/raw/file/csv/en/combined_final_clean.csv"),
-        help="English phishing corpus used for the adapted generation lane.",
+        default=None,
+        help="Path to a local English phishing CSV corpus. Not required when --db-sources is set.",
     )
     parser.add_argument(
         "--db-sources",
         type=str,
-        default=None,
-        help="Comma-separated DB source names to use as adapted phishing seeds instead of a CSV corpus.",
+        default="zefang_phishing",
+        help="Comma-separated DB source names to use as adapted phishing seeds (default: zefang_phishing).",
     )
     parser.add_argument(
         "--adapted-target-per-archetype",
@@ -207,9 +245,13 @@ async def _run_adapted_generation(
     if source_names:
         logger.info("Loading seeds from DB sources: %s", source_names)
         source_df = await _load_db_seed_dataframe(session, source_names)
-    else:
+    elif args.corpus_path is not None:
         logger.info("Loading seeds from CSV corpus: %s", args.corpus_path)
         source_df = service.load_phishing_corpus(args.corpus_path)
+    else:
+        raise SystemExit(
+            "ERROR: Adapted lane requires either --db-sources or --corpus-path."
+        )
 
     logger.info("Seed rows loaded: %d", len(source_df))
     matched_df = service.attach_archetype_matches(source_df)
@@ -360,17 +402,155 @@ async def _run_cc_acceptance(
 # ── Main ──────────────────────────────────────────────────────
 
 
-def _load_cc_export(args: argparse.Namespace) -> dict[str, object]:
-    """Load the CC evaluated export JSON required by CC modes."""
-    if args.cc_export_json is None:
-        raise SystemExit(
-            "ERROR: --cc-export-json is required for cc-signal, cc-acceptance, and all modes.\n"
-            "Generate the export first with the normalization pipeline, then pass the JSON path."
+async def _load_cc_export_rows_from_db(
+    session: AsyncSession,
+) -> list[tuple[str, dict[str, object]]]:
+    source = await session.scalar(
+        select(DataSourceSystem).where(
+            DataSourceSystem.name == COMMON_CRAWL_SOURCE_NAME
         )
-    if not args.cc_export_json.exists():
-        raise SystemExit(f"ERROR: CC export JSON not found: {args.cc_export_json}")
-    logger.info("Loading CC export from %s", args.cc_export_json)
-    return StructuredReviewArtifactService.read_json(args.cc_export_json)
+    )
+    if source is None:
+        return []
+
+    result = await session.execute(
+        select(DataRawRecord.id, DataRawRecord.raw_content)
+        .where(
+            DataRawRecord.source_system_id == source.id,
+            DataRawRecord.is_usable.is_(True),
+        )
+        .order_by(DataRawRecord.raw_content.asc())
+    )
+    rows: list[tuple[str, dict[str, object]]] = []
+    for raw_record_id, raw_content in result.all():
+        payload = json.loads(str(raw_content))
+        if isinstance(payload, dict):
+            rows.append((str(raw_record_id), payload))
+    return rows
+
+
+def _build_cc_export_from_rows(
+    rows: list[tuple[str, dict[str, object]]],
+) -> dict[str, object]:
+    pipeline = NormalizationPipeline(session=None)  # type: ignore[arg-type]
+    samples_by_subtype: dict[str, list[dict[str, object]]] = defaultdict(list)
+
+    for raw_record_id, row in rows:
+        payload = pipeline.extract_payload(
+            COMMON_CRAWL_SOURCE_NAME,
+            {
+                "text": row.get("text", ""),
+                "label": row.get("label"),
+                "category": row.get("category"),
+                "query": row.get("query"),
+                "query_label": row.get("query_label") or row.get("label"),
+                "url": row.get("url"),
+            },
+        )
+        route_subtype = payload.route_subtype
+        if route_subtype not in ADAPTABLE_SUBTYPES:
+            continue
+
+        text = payload.text or ""
+        route_target = _target_from_subtype(route_subtype)
+        extracted_label = (
+            route_target
+            if route_target != "holdout"
+            else str(
+                payload.label.value
+                if hasattr(payload.label, "value")
+                else payload.label
+            )
+        )
+        samples_by_subtype[route_subtype].append(
+            {
+                "raw_record_id": raw_record_id,
+                "route_outcome": payload.route_outcome,
+                "route_subtype": route_subtype,
+                "route_reason": payload.route_reason,
+                "rejection_reason": payload.rejection_reason,
+                "extracted_label": extracted_label,
+                "transformation_strength": "major",
+                "similarity_score": 0.0,
+                "normalized_length": len(text.strip()) if text else 0,
+                "normalized_preview": text,
+                "trace_summary": " > ".join(payload.trace_steps),
+                "derived_payload": payload.derived_payload or {},
+                "source_label": row.get("label") or "unknown",
+                "source_category": row.get("category") or "unknown",
+                "source_url": row.get("url") or "",
+            }
+        )
+
+    rules: list[dict[str, object]] = []
+    for subtype in (
+        "instructional_legitimate",
+        "awareness_or_report",
+        "promotional_spam",
+        "phishing_lure_candidate",
+    ):
+        matching_samples = samples_by_subtype.get(subtype, [])
+        if not matching_samples:
+            continue
+
+        deduped = StageTwoActionArtifactsService._deduplicate_adaptation_samples(
+            matching_samples
+        )
+        label_summary = Counter(
+            str(sample.get("extracted_label") or "unknown") for sample in deduped
+        )
+        rules.append(
+            {
+                "source_name": COMMON_CRAWL_SOURCE_NAME,
+                "key_type": "route_subtype",
+                "key": subtype,
+                "action": "adapt",
+                "output_bucket": "adaptation_queue",
+                "adaptation_fit": "high",
+                "rationale": "in_memory_generation",
+                "current_count": len(matching_samples),
+                "sampled_record_count": len(deduped),
+                "sampled_records": deduped,
+                "label_summary": dict(label_summary),
+            }
+        )
+
+    adaptation_queue: dict[str, object] = {
+        "mode": "common_crawl_live_three_class_adaptation_queue",
+        "sources": [{"source_name": COMMON_CRAWL_SOURCE_NAME, "rules": rules}],
+    }
+    rewrite_jobs = StageTwoRewriteJobService.build_jobs(adaptation_queue)
+    rewrite_drafts = StageTwoRewriteDraftService.build_drafts(rewrite_jobs)
+    return StageTwoReviewedExportService().build_export(rewrite_drafts)
+
+
+async def _load_cc_export(
+    session: AsyncSession,
+    args: argparse.Namespace,
+) -> dict[str, object]:
+    """Load the CC evaluated export JSON required by CC modes."""
+    if args.cc_export_json is not None:
+        if not args.cc_export_json.exists():
+            raise SystemExit(f"ERROR: CC export JSON not found: {args.cc_export_json}")
+        logger.info("Loading CC export from %s", args.cc_export_json)
+        return StructuredReviewArtifactService.read_json(args.cc_export_json)
+
+    logger.info(
+        "No --cc-export-json provided; building Common Crawl reviewed export in memory from '%s' DB records",
+        COMMON_CRAWL_SOURCE_NAME,
+    )
+    rows = await _load_cc_export_rows_from_db(session)
+    if not rows:
+        raise SystemExit(
+            "ERROR: No usable common-crawl-bigdata raw records found in DB to build CC export in memory."
+        )
+    export_payload = _build_cc_export_from_rows(rows)
+    logger.info(
+        "Built in-memory CC export: candidates=%d label_summary=%s",
+        int(export_payload.get("exported_candidate_count") or 0),
+        export_payload.get("label_summary"),
+    )
+    return export_payload
 
 
 async def main() -> None:
@@ -390,7 +570,7 @@ async def main() -> None:
             # Pre-load CC export if needed
             cc_export: dict[str, object] | None = None
             if args.mode in {"cc-signal", "cc-acceptance", "all"}:
-                cc_export = _load_cc_export(args)
+                cc_export = await _load_cc_export(session, args)
 
             if args.mode in {"adapted", "all"}:
                 output["adapted"] = await _run_adapted_generation(session, args)

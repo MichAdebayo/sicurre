@@ -255,9 +255,17 @@ class CommonCrawlSignalSyntheticService:
 
     @staticmethod
     def _build_reference(seed: dict[str, Any], variant_index: int, theme: str) -> str:
-        raw_record_id = str(seed.get("raw_record_id") or "seed")
+        # Use text_sha256 (content-stable across DB resets) rather than raw_record_id
+        # (a UUID that is re-generated every time the DB is wiped and re-ingested).
+        # This makes template rotation deterministic regardless of DB state.
+        stable_key = str(
+            seed.get("text_sha256")
+            or seed.get("normalized_text")
+            or seed.get("raw_record_id")
+            or "seed"
+        )
         digest = (
-            hashlib.sha256(f"{raw_record_id}:{variant_index}".encode("utf-8"))
+            hashlib.sha256(f"{stable_key}:{variant_index}".encode("utf-8"))
             .hexdigest()
             .upper()
         )
