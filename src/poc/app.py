@@ -52,6 +52,16 @@ st.markdown(
     }
 }
 
+/* Streamlit dark-mode: mirror the OS media query so both mechanisms work */
+[data-theme="dark"] {
+    --primary-light: #1E3A8A;
+    --danger-bg: #7F1D1D;
+    --safe-bg: #064E3B;
+    --warning-bg: #78350F;
+    --surface: #1E293B; --border: #334155;
+    --text: #F8FAFC; --text-sec: #CBD5E1; --text-muted: #64748B;
+}
+
 /* Base font, but DO NOT override Material Icons used by Streamlit */
 body, p, h1, h2, h3, h4, h5, h6, span:not(.material-symbols-rounded):not([class^="st-emotion-cache"]) {
     font-family: 'Inter', system-ui, sans-serif !important;
@@ -114,6 +124,23 @@ h1, h2, h3 { color: var(--text) !important; }
 .topbar { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; margin-bottom: 1rem; border-bottom: 1px solid var(--border); }
 .topbar .greeting { font-size: 0.85rem; color: var(--text-sec); }
 .topbar .role-badge { font-size: 0.7rem; }
+
+.user-card { background: var(--primary-light); border-radius: 10px; padding: 0.75rem 1rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.6rem; }
+.user-card .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; flex-shrink: 0; }
+.user-card .info { min-width: 0; }
+.user-card .name { font-size: 0.82rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-card .role { font-size: 0.7rem; color: var(--text-sec); }
+
+.sys-status { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.75rem; font-size: 0.75rem; color: var(--text-sec); }
+.sys-status .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; }
+.sys-status .dot-green { background: #10B981; }
+.sys-status .dot-amber { background: #F59E0B; }
+.sys-status .dot-gray { background: #94A3B8; }
+
+.funnel-bar { margin: 0.4rem 0; }
+.funnel-bar .bar-track { background: var(--border); border-radius: 6px; height: 22px; position: relative; overflow: hidden; }
+.funnel-bar .bar-fill { height: 100%; border-radius: 6px; display: flex; align-items: center; padding: 0 0.6rem; font-size: 0.72rem; font-family: 'JetBrains Mono', monospace; color: #fff; font-weight: 500; white-space: nowrap; }
+.funnel-bar .bar-label { font-size: 0.78rem; color: var(--text-sec); margin-bottom: 0.15rem; }
 </style>
 """,
     unsafe_allow_html=True,
@@ -146,6 +173,25 @@ def get_dataset_versions() -> list[tuple]:
     return _q(
         "SELECT version_tag, item_count, status, frozen_at FROM data_dataset ORDER BY created_at DESC"
     )
+
+
+def get_db_size_mb() -> float:
+    try:
+        return DB_PATH.stat().st_size / 1024 / 1024
+    except FileNotFoundError:
+        return 0.0
+
+
+def get_label_distribution() -> dict[str, int]:
+    rows = _q(
+        "SELECT current_label, COUNT(*) FROM data_normalized_message GROUP BY current_label"
+    )
+    return {r[0]: r[1] for r in rows}
+
+
+def get_ingestion_run_count() -> int:
+    r = _q("SELECT COUNT(*) FROM data_ingestion_run")
+    return r[0][0] if r else 0
 
 
 def get_threat_samples(limit: int = 30) -> list[dict]:
@@ -406,12 +452,25 @@ user = st.session_state["user"]
 
 # Sidebar
 with st.sidebar:
-    st.markdown(f"### 🛡️ Sicurre")
     st.markdown(
-        f'<span class="badge badge-info">{user["role"].upper()}</span>',
+        "<p style=\"font-family:'Sora',sans-serif;font-size:1.3rem;font-weight:700;"
+        'color:var(--primary);margin:0 0 0.75rem 0">🛡️ Sicurre</p>',
         unsafe_allow_html=True,
     )
-    st.caption(f'Connecté : {user["name"]}')
+
+    # User card
+    initial = user["name"][0].upper() if user["name"] else "?"
+    role_label = "Administrateur" if is_admin() else "Observateur"
+    st.markdown(
+        f'<div class="user-card">'
+        f'<div class="avatar">{initial}</div>'
+        f'<div class="info">'
+        f'<div class="name">{user["name"]}</div>'
+        f'<div class="role">{role_label}</div>'
+        f"</div></div>",
+        unsafe_allow_html=True,
+    )
+
     st.markdown("---")
 
     pages = ["📬 Journal des menaces", "📊 Tableau de bord", "🤖 Classificateur"]
@@ -425,7 +484,21 @@ with st.sidebar:
         del st.session_state["user"]
         st.rerun()
 
-    # Demo mode countdown indicator
+    # System status panel
+    db_mb = get_db_size_mb()
+    model_path = ROOT_DIR / "data" / "models" / "camembertv2-phishing-fr"
+    model_ready = any(model_path.glob("*.onnx"))
+    model_dot = "dot-green" if model_ready else "dot-amber"
+    model_label = "ONNX chargé" if model_ready else "Placeholder actif"
+    st.markdown(
+        f'<div class="sys-status">'
+        f'<div><span class="dot dot-green"></span>DB — {db_mb:.0f} MB</div>'
+        f'<div style="margin-top:3px"><span class="dot {model_dot}"></span>Modèle — {model_label}</div>'
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    # Demo mode countdown
     if st.session_state.get("demo_mode"):
         next_at = st.session_state.get("demo_next_at")
         if next_at:
@@ -434,15 +507,15 @@ with st.sidebar:
             )
             mins, secs = divmod(remaining, 60)
             st.markdown(
-                f'<div style="background:#064E3B;border-radius:8px;padding:0.5rem;'
+                f'<div style="background:var(--safe-bg);border-radius:8px;padding:0.5rem;'
                 f'text-align:center;margin-top:0.5rem">'
                 f'<span style="color:#34D399;font-size:0.75rem;font-weight:600">'
                 f"⏱ Cron dans {mins:02d}:{secs:02d}</span></div>",
                 unsafe_allow_html=True,
             )
 
-    st.caption("Sicurre v0.1 — POC Simplon")
-    st.caption("*Vos emails, protégés en 2 secondes.*")
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.caption("Sicurre v0.1 — POC Simplon 2026")
 
 
 # ── Page: Threat Log ──────────────────────────────────────────────────────────
@@ -503,41 +576,134 @@ if page == "📬 Journal des menaces":
 # ── Page: Dashboard ───────────────────────────────────────────────────────────
 elif page == "📊 Tableau de bord":
     st.markdown("## Tableau de bord")
+    st.markdown(
+        "Vue globale du pipeline de données — de la collecte brute au jeu de données final."
+    )
+
+    # ── Key metrics (3 meaningful numbers, not 4 identical ones) ──────────────
+    raw_total = get_total("data_raw_record")
+    norm_total = get_total("data_normalized_message")
+    source_count = len(get_source_counts())
+    run_count = get_ingestion_run_count()
 
     c1, c2, c3, c4 = st.columns(4)
-    for col, val, lbl in [
-        (c1, get_total("data_raw_record"), "Enregistrements bruts"),
-        (c2, get_total("data_normalized_message"), "Messages normalisés"),
-        (c3, get_total("data_annotation"), "Annotations"),
-        (c4, get_total("data_dataset_item"), "Items dataset"),
+    for col, val, lbl, hint in [
+        (c1, raw_total, "Enregistrements bruts", "Collecte multi-sources"),
+        (
+            c2,
+            norm_total,
+            "Dataset final",
+            f"{norm_total/raw_total*100:.1f}% retenus" if raw_total else "",
+        ),
+        (c3, source_count, "Sources actives", "Phishing, spam, légitimes"),
+        (c4, run_count, "Runs d'ingestion", "Total historique"),
     ]:
         with col:
             st.markdown(
-                f'<div class="metric-card"><div class="value">{val:,}</div><div class="label">{lbl}</div></div>',
+                f'<div class="metric-card">'
+                f'<div class="value">{val:,}</div>'
+                f'<div class="label">{lbl}</div>'
+                f'<div style="font-size:0.68rem;color:var(--text-muted);margin-top:0.2rem">{hint}</div>'
+                f"</div>",
                 unsafe_allow_html=True,
             )
 
     st.markdown("---")
-    st.markdown("### Sources de données")
-    sc = get_source_counts()
-    if sc:
-        rows_html = "".join(
-            f"<tr><td>{n}</td><td style='text-align:right;font-family:JetBrains Mono,monospace'>{c:,}</td></tr>"
-            for n, c in sc
-        )
-        st.markdown(
-            f'<table class="source-tbl"><thead><tr><th>Source</th><th style="text-align:right">Nombre</th></tr></thead><tbody>{rows_html}</tbody></table>',
-            unsafe_allow_html=True,
-        )
 
-    st.markdown("---")
-    st.markdown("### Versions du jeu de données")
-    for tag, count, status, frozen in get_dataset_versions() or []:
-        bcls = "badge-legitimate" if status == "frozen" else "badge-spam"
-        st.markdown(
-            f'<div class="metric-card" style="text-align:left;margin-bottom:0.5rem"><strong>v{tag}</strong> <span class="badge {bcls}">{status}</span><span style="float:right;font-family:JetBrains Mono,monospace;color:var(--primary)">{count:,} items</span></div>',
-            unsafe_allow_html=True,
-        )
+    col_left, col_right = st.columns([5, 4])
+
+    with col_left:
+        st.markdown("#### Distribution des labels")
+        dist = get_label_distribution()
+        total_dist = sum(dist.values()) or 1
+        _DIST_META = {
+            "phishing": ("🔴 Phishing", "#EF4444"),
+            "spam": ("🟡 Indésirable", "#F59E0B"),
+            "legitimate": ("🟢 Légitime", "#10B981"),
+        }
+        for lbl, (display, color) in _DIST_META.items():
+            cnt = dist.get(lbl, 0)
+            pct = cnt / total_dist * 100
+            st.markdown(
+                f'<div class="funnel-bar">'
+                f'<div style="display:flex;justify-content:space-between;margin-bottom:3px">'
+                f'<span style="font-size:0.8rem;color:var(--text)">{display}</span>'
+                f'<span style="font-size:0.75rem;font-family:JetBrains Mono,monospace;color:var(--text-sec)">{cnt:,} ({pct:.1f}%)</span>'
+                f"</div>"
+                f'<div class="bar-track">'
+                f'<div class="bar-fill" style="width:{pct:.1f}%;background:{color}">{pct:.0f}%</div>'
+                f"</div></div>",
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("#### Entonnoir pipeline")
+        funnel = [
+            ("Bruts collectés", raw_total, "#1B4FCC", 100.0),
+            (
+                "Normalisés & annotés",
+                norm_total,
+                "#7C3AED",
+                norm_total / raw_total * 100 if raw_total else 0,
+            ),
+        ]
+        for label, cnt, color, pct in funnel:
+            bar_w = max(3, pct)
+            st.markdown(
+                f'<div class="funnel-bar">'
+                f'<div style="display:flex;justify-content:space-between;margin-bottom:3px">'
+                f'<span style="font-size:0.8rem;color:var(--text)">{label}</span>'
+                f'<span style="font-size:0.75rem;font-family:JetBrains Mono,monospace;color:var(--text-sec)">{cnt:,}</span>'
+                f"</div>"
+                f'<div class="bar-track">'
+                f'<div class="bar-fill" style="width:{bar_w:.1f}%;background:{color}">{pct:.1f}%</div>'
+                f"</div></div>",
+                unsafe_allow_html=True,
+            )
+
+    with col_right:
+        st.markdown("#### Top 7 sources")
+        sc = get_source_counts()
+        top_sources = sc[:7] if sc else []
+        max_src = top_sources[0][1] if top_sources else 1
+        for name, cnt in top_sources:
+            bar_w = max(3, cnt / max_src * 100)
+            short_name = name if len(name) <= 28 else name[:25] + "…"
+            st.markdown(
+                f'<div style="margin:0.35rem 0">'
+                f'<div style="display:flex;justify-content:space-between;margin-bottom:2px">'
+                f'<span style="font-size:0.75rem;color:var(--text-sec)">{short_name}</span>'
+                f'<span style="font-size:0.72rem;font-family:JetBrains Mono,monospace;color:var(--text-muted)">{cnt:,}</span>'
+                f"</div>"
+                f'<div style="background:var(--border);border-radius:4px;height:6px">'
+                f'<div style="width:{bar_w:.1f}%;background:var(--primary);height:6px;border-radius:4px"></div>'
+                f"</div></div>",
+                unsafe_allow_html=True,
+            )
+        if len(sc) > 7:
+            st.caption(f"+ {len(sc) - 7} autres sources")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("#### Versions du dataset")
+        versions = get_dataset_versions()
+        if versions:
+            for tag, count, status, frozen in versions:
+                bcls = "badge-legitimate" if status == "frozen" else "badge-spam"
+                frozen_str = f" · gelé {frozen[:10]}" if frozen else ""
+                st.markdown(
+                    f'<div style="background:var(--surface);border:1px solid var(--border);'
+                    f'border-radius:8px;padding:0.6rem 0.75rem;margin-bottom:0.4rem">'
+                    f'<div style="display:flex;justify-content:space-between;align-items:center">'
+                    f'<span style="font-size:0.8rem;font-weight:600;color:var(--text)">{tag}</span>'
+                    f'<span class="badge {bcls}">{status}</span>'
+                    f"</div>"
+                    f'<div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px">'
+                    f"{count:,} items{frozen_str}</div>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+        else:
+            st.caption("Aucun dataset construit. Lancez le pipeline push.")
 
 
 # ── Page: Pipeline (Admin) ───────────────────────────────────────────────────
@@ -547,7 +713,20 @@ elif page == "▶️ Pipeline" and is_admin():
     tab_base, tab_cron, tab_push = st.tabs(["🏗️ Base", "🔄 Cron", "📤 Push"])
 
     with tab_base:
-        st.markdown("Reconstruit le jeu de données de base (~191k enregistrements).")
+        st.markdown("### Ingestion de base")
+        st.markdown(
+            "Télécharge et insère **tous les enregistrements historiques** depuis les 5 sources "
+            "(PhishTank, CERT-FR, CSV, Base de données, Common Crawl) vers `sicurre.db`.\n\n"
+            "- Durée typique : **15–45 min** · environ 194 000 enregistrements bruts\n"
+            "- Résultat : **~32 000 messages normalisés** après déduplication + filtrage\n"
+            "- **Idempotent** : relancer ne crée pas de doublons — les runs existants sont ignorés\n"
+            "- Si un dataset existe déjà, cette action ne le supprime pas — seule l'ingestion est rejouée"
+        )
+        st.warning(
+            "⚠️ Ce bouton efface et réinsère les données brutes. "
+            "À réserver au démo initial ou à une réinitialisation complète.",
+            icon="⚠️",
+        )
         if st.button("▶️ Lancer l'ingestion de base", key="run_base", type="primary"):
             s, t = st.empty(), st.empty()
             s.markdown("⏳ **Ingestion de base en cours…**")
@@ -688,7 +867,16 @@ elif page == "▶️ Pipeline" and is_admin():
 
 # ── Page: Datasets (Admin) ───────────────────────────────────────────────────
 elif page == "📦 Jeux de données" and is_admin():
-    st.markdown("## Jeux de données")
+    st.markdown("## 📦 Jeux de données (Dataset Management)")
+    st.markdown(
+        "Construit et exporte des **snapshots versionnés** du dataset pour l'entraînement du modèle.\n\n"
+        "| Action | Ce qui se passe |\n"
+        "|--------|-----------------|\n"
+        "| **Construire** | Crée une nouvelle entrée dans `data_dataset` avec un tag unique (ex. `base-20260506-…`). Les items du pipeline sont figés dans `data_dataset_item`. Chaque build = une **nouvelle version** — rien n'est écrasé. |\n"
+        "| **Exporter** | Envoie le dataset vers R2 sous `raw-snapshots/training_dataset/<version_tag>/train|val|test/`. |\n\n"
+        "Le tag de version est préfixé `base-` ou `cron-` selon l'origine du build."
+    )
+    st.markdown("---")
 
     with st.form("build_form"):
         c1, c2 = st.columns(2)
@@ -749,13 +937,39 @@ elif page == "📦 Jeux de données" and is_admin():
 
 # ── Page: Classificateur ──────────────────────────────────────────────────────
 elif page == "🤖 Classificateur":
+    model_path_cls = ROOT_DIR / "data" / "models" / "camembertv2-phishing-fr"
+    model_ready_cls = any(model_path_cls.glob("*.onnx"))
+
     st.markdown("## 🤖 Classificateur d'emails")
-    st.markdown(
-        "Détectez phishing, spam et emails légitimes. "
-        "Le modèle CamemBERTav2 sera chargé depuis "
-        "`data/models/camembertv2-phishing-fr/` une fois entraîné — "
-        "en attendant, un classificateur heuristique démonstratif est actif."
-    )
+    if model_ready_cls:
+        st.success(
+            "✅ Modèle CamemBERTav2 ONNX chargé depuis `data/models/camembertv2-phishing-fr/`",
+            icon="✅",
+        )
+    else:
+        st.info(
+            "**Modèle placeholder actif** — Le moteur heuristique ci-dessous simule la "
+            "classification jusqu'à ce que le modèle CamemBERTav2 fine-tuné soit disponible.\n\n"
+            "**Prochaine étape :** entraîner sur Databricks (MLflow expérience "
+            "`sicurre-camembertav2-phishing-fr`), exporter en ONNX INT8, déposer dans "
+            "`data/models/camembertv2-phishing-fr/model.onnx`.",
+        )
+
+    # Roadmap accordion
+    with st.expander(
+        "🗺️ Feuille de route — Du dataset au modèle en production", expanded=False
+    ):
+        st.markdown("""
+| Étape | Statut | Description |
+|-------|--------|-------------|
+| 1. Collecte de données | ✅ Fait | 194 000 emails multi-sources, 27 sources, 3 classes |
+| 2. Normalisation & annotation | ✅ Fait | 32 288 messages filtrés, dédupliqués, annotés |
+| 3. Export dataset | ✅ Fait | `base-20260506-075504` → R2 (train/val/test splits) |
+| 4. Fine-tuning CamemBERTav2 | ⏳ En cours | Databricks + MLflow, ONNX INT8 export |
+| 5. Intégration modèle ONNX | 🔜 Planifié | Remplacer `classify_email()` par `OnnxClassifier` |
+| 6. Gmail Pub/Sub live | 🔜 Planifié | Cloud Run listener → phishing-api → Gmail Trash |
+| 7. Alerte temps réel (<2 s) | 🔜 Planifié | Fin-to-fin : réception → verdict → action Gmail |
+            """)
 
     _LABEL_META = {
         "phishing": ("🔴 Phishing", "badge-phishing", "#EF4444"),
@@ -768,10 +982,11 @@ elif page == "🤖 Classificateur":
         label_text, badge_cls, color = _LABEL_META.get(
             top_label, (top_label, "badge-info", "#1B4FCC")
         )
+        # Use CSS vars for background — only border/text color remains hardcoded per-label
         st.markdown(
             f'<div style="background:var(--surface);border:2px solid {color};'
             f'border-radius:12px;padding:1.25rem;margin:0.75rem 0">'
-            f'<div style="font-size:1.1rem;font-weight:700;color:{color}'
+            f'<div style="font-size:1.05rem;font-weight:700;color:{color}'
             f';margin-bottom:0.75rem">Verdict : {label_text}</div>',
             unsafe_allow_html=True,
         )
@@ -780,12 +995,12 @@ elif page == "🤖 Classificateur":
             pct = int(score * 100)
             bar_w = max(2, pct)
             st.markdown(
-                f'<div style="display:flex;align-items:center;gap:0.75rem;margin:0.3rem 0">'
-                f'<span style="width:80px;font-size:0.8rem;color:var(--text-sec)">'
+                f'<div style="display:flex;align-items:center;gap:0.75rem;margin:0.4rem 0">'
+                f'<span style="width:90px;font-size:0.8rem;color:var(--text-sec)">'
                 f"{lmeta[0]}</span>"
-                f'<div style="flex:1;background:var(--border);border-radius:4px;height:8px">'
-                f'<div style="width:{bar_w}%;background:{lmeta[2]};height:8px;'
-                f'border-radius:4px;transition:width 0.4s ease"></div></div>'
+                f'<div style="flex:1;background:var(--border);border-radius:4px;height:10px">'
+                f'<div style="width:{bar_w}%;background:{lmeta[2]};height:10px;'
+                f'border-radius:4px;transition:width 0.5s ease"></div></div>'
                 f'<span style="width:45px;text-align:right;font-family:JetBrains Mono,monospace;'
                 f'font-size:0.8rem;color:var(--text)">{pct}%</span></div>',
                 unsafe_allow_html=True,
