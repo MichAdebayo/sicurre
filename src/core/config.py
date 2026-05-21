@@ -61,6 +61,21 @@ class Settings(BaseSettings):
         default="prod",
         validation_alias="CC_INPUT_BACKEND",
     )
+    # ── Dataset publish / Kaggle sync ─────────────────────────────────────────
+    kaggle_username: str | None = Field(
+        default=None, validation_alias="KAGGLE_USERNAME"
+    )
+    kaggle_key: str | None = Field(default=None, validation_alias="KAGGLE_API_TOKEN")
+    kaggle_dataset_slug: str | None = Field(
+        default=None, validation_alias="KAGGLE_DATASET_SLUG"
+    )
+    github_ml_repo_owner: str | None = Field(
+        default=None, validation_alias="SICURRE_GITHUB_ML_REPO_OWNER"
+    )
+    github_ml_repo_name: str = "sicurre-ml"
+    github_ml_dispatch_token: str | None = Field(
+        default=None, validation_alias="SICURRE_GITHUB_ML_DISPATCH_TOKEN"
+    )
 
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),

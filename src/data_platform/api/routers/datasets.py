@@ -5,8 +5,16 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.config import Settings
 from core.database import get_async_session
 from core.rate_limit import limiter, touch_rate_limit_request
+from data_platform.services.dataset_publish import (
+    DatasetNotFrozenError,
+    DatasetPublishConfigError,
+    DatasetPublishService,
+    GitHubDispatchPublishError,
+    KagglePushPublishError,
+)
 from db.models import DatasetStatus
 from db.queries import (
     DatasetNotFoundError,
@@ -17,13 +25,14 @@ from data_platform.api.schemas import (
     DatasetItemListResponse,
     DatasetItemRead,
     DatasetListResponse,
+    DatasetPublishResponse,
     DatasetRead,
 )
 from db.services import DatasetService
 
-
 router = APIRouter(tags=["data-datasets"])
 service = DatasetService()
+publish_service = DatasetPublishService(settings=Settings())
 
 
 @router.get("/datasets", response_model=DatasetListResponse)
@@ -90,4 +99,48 @@ async def list_dataset_items(
         ) from exc
     return DatasetItemListResponse(
         items=[DatasetItemRead.model_validate(item) for item in items], total=total
+    )
+
+
+@router.post("/datasets/{id}/publish", response_model=DatasetPublishResponse)
+@limiter.limit("5/hour")
+async def publish_dataset(
+    request: Request,
+    id: UUID,
+    session: AsyncSession = Depends(get_async_session),
+) -> DatasetPublishResponse:
+    touch_rate_limit_request(request)
+    try:
+        result = await publish_service.publish(session, id)
+    except DatasetNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found"
+        ) from exc
+    except DatasetNotFrozenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Dataset must be in FROZEN status to publish",
+        ) from exc
+    except DatasetPublishConfigError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Dataset publish feature is not configured",
+        ) from exc
+    except KagglePushPublishError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Kaggle push failed — dataset was not published",
+        ) from exc
+    except GitHubDispatchPublishError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                f"Kaggle push succeeded (version {exc.kaggle_version_id}) "
+                "but GitHub workflow dispatch failed"
+            ),
+        ) from exc
+    return DatasetPublishResponse(
+        kaggle_url=result.kaggle_url,
+        kaggle_version_id=result.kaggle_version_id,
+        github_dispatch_sent=result.github_dispatch_sent,
     )
