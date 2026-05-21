@@ -108,6 +108,12 @@ class DatasetListResponse(BaseModel):
     total: int
 
 
+class DatasetPublishResponse(BaseModel):
+    kaggle_url: str
+    kaggle_version_id: int
+    github_dispatch_sent: bool
+
+
 class DatasetItemRead(BaseModel):
     id: UUID
     dataset_id: UUID
