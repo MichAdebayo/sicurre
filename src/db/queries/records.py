@@ -358,7 +358,9 @@ class DatasetQueries:
         label_weights: dict[str, float] = {}
         for label, rows in rows_by_label.items():
             if rows:
-                label_weights[label] = round(total_eligible / (num_labels * len(rows)), 4)
+                label_weights[label] = round(
+                    total_eligible / (num_labels * len(rows)), 4
+                )
 
         split_buckets: dict[str, list[tuple[str, UUID, float]]] = {
             split_name: [] for split_name, _ in splits
@@ -368,7 +370,11 @@ class DatasetQueries:
                 rows_by_label[label],
                 key=lambda row: _stable_dataset_rank(str(row["text_sha256"])),
             )
-            weight = sample_weight if sample_weight is not None else label_weights.get(label, 1.0)
+            weight = (
+                sample_weight
+                if sample_weight is not None
+                else label_weights.get(label, 1.0)
+            )
             label_counts = _compute_split_counts(len(ranked_rows), splits)
             start_index = 0
             for split_name, _ in splits:
@@ -410,6 +416,53 @@ class DatasetQueries:
 
         await session.refresh(dataset)
         return DatasetBuildResult(dataset=dataset, split_counts=split_counts)
+
+    async def get(self, session: AsyncSession, dataset_id: UUID) -> DataDataset:
+        dataset = await session.get(DataDataset, dataset_id)
+        if dataset is None:
+            raise DatasetNotFoundError(dataset_id)
+        return dataset
+
+    async def update_publish_result(
+        self,
+        session: AsyncSession,
+        dataset_id: UUID,
+        *,
+        kaggle_version_id: int,
+        published_at: datetime,
+    ) -> None:
+        dataset = await session.get(DataDataset, dataset_id)
+        if dataset is None:
+            raise DatasetNotFoundError(dataset_id)
+        dataset.kaggle_version_id = kaggle_version_id
+        dataset.published_at = published_at
+        await session.commit()
+
+    async def list_items_for_export(
+        self,
+        session: AsyncSession,
+        dataset_id: UUID,
+        *,
+        split_name: str,
+    ) -> list[tuple[str, str]]:
+        """Return (normalized_text, label) pairs for the given split."""
+        result = await session.execute(
+            select(
+                DataNormalizedMessage.normalized_text,
+                DataNormalizedMessage.current_label,
+            )
+            .join(
+                DataDatasetItem,
+                DataDatasetItem.normalized_message_id == DataNormalizedMessage.id,
+            )
+            .where(DataDatasetItem.dataset_id == dataset_id)
+            .where(DataDatasetItem.split_name == split_name)
+            .order_by(
+                DataDatasetItem.row_order.asc().nulls_last(),
+                DataDatasetItem.created_at.asc(),
+            )
+        )
+        return [(str(row[0]), str(row[1])) for row in result.all()]
 
     async def list_items(
         self, session: AsyncSession, dataset_id: UUID, *, limit: int, offset: int

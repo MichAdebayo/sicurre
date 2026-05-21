@@ -11,7 +11,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from core.database import Base
 
-
 JSON_VARIANT = sa.JSON().with_variant(JSONB(), "postgresql")
 
 
@@ -418,6 +417,8 @@ class DataDataset(Base):
     status: Mapped[str] = mapped_column(sa.Text(), nullable=False)
     frozen_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     item_count: Mapped[int] = mapped_column(sa.Integer(), nullable=False, default=0)
+    kaggle_version_id: Mapped[int | None] = mapped_column(sa.Integer())
+    published_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True), nullable=False, default=utc_now
     )
@@ -630,9 +631,7 @@ class PipelineState(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         sa.Uuid(), primary_key=True, default=uuid.uuid4
     )
-    pipeline_name: Mapped[str] = mapped_column(
-        sa.Text(), nullable=False, unique=True
-    )
+    pipeline_name: Mapped[str] = mapped_column(sa.Text(), nullable=False, unique=True)
     state_data: Mapped[dict[str, Any]] = mapped_column(
         JSON_VARIANT, nullable=False, default=dict
     )
@@ -661,15 +660,9 @@ class PocUser(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         sa.Uuid(), primary_key=True, default=uuid.uuid4
     )
-    email: Mapped[str] = mapped_column(
-        sa.Text(), nullable=False, unique=True
-    )
-    display_name: Mapped[str] = mapped_column(
-        sa.Text(), nullable=False
-    )
-    password_hash: Mapped[str] = mapped_column(
-        sa.Text(), nullable=False
-    )
+    email: Mapped[str] = mapped_column(sa.Text(), nullable=False, unique=True)
+    display_name: Mapped[str] = mapped_column(sa.Text(), nullable=False)
+    password_hash: Mapped[str] = mapped_column(sa.Text(), nullable=False)
     role: Mapped[str] = mapped_column(
         sa.Text(),
         nullable=False,
