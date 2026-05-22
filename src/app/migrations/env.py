@@ -6,17 +6,24 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from core.config import get_settings
-from core.database import Base
-from db.models import lineage  # noqa: F401
 
 config = context.config
 settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.sync_data_platform_database_url)
+
+if not settings.app_neon_database_url:
+    raise RuntimeError(
+        "SICURRE_APP_NEON_DATABASE_URL is not set. "
+        "App migrations require a Neon PostgreSQL connection."
+    )
+
+config.set_main_option("sqlalchemy.url", settings.app_neon_database_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-target_metadata = Base.metadata
+# App models will be imported here as they are created.
+# Example: from app.models import users  # noqa: F401
+target_metadata = None
 
 
 def run_migrations_offline() -> None:

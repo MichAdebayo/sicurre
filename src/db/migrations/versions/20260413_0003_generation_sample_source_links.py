@@ -10,7 +10,6 @@ from __future__ import annotations
 from alembic import op
 import sqlalchemy as sa
 
-
 revision = "20260413_0003"
 down_revision = "20260408_0002"
 branch_labels = None
@@ -43,19 +42,13 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["generation_sample_id"],
             ["data_generation_sample.id"],
-            name=(
-                "fk_data_generation_sample_source_link_generation_sample_id_"
-                "data_generation_sample"
-            ),
+            name=("fk_gen_sample_source_link_gen_sample_id"),
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
             ["raw_record_id"],
             ["data_raw_record.id"],
-            name=(
-                "fk_data_generation_sample_source_link_raw_record_id_"
-                "data_raw_record"
-            ),
+            name=("fk_gen_sample_source_link_raw_record_id"),
             ondelete="RESTRICT",
         ),
         sa.PrimaryKeyConstraint("id", name="pk_data_generation_sample_source_link"),

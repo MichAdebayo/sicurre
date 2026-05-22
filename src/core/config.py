@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     app_name: str = "Sicurre API"
     environment: str = "dev"
     database_url: str = _DEFAULT_DB_URL
+    data_platform_database_url: str = _DEFAULT_DB_URL
+    app_neon_database_url: str | None = None
     database_echo: bool = False
     database_historical_cron_total_count: int = 0
     database_historical_cron_max_total_count: int = 1000
@@ -95,6 +97,15 @@ class Settings(BaseSettings):
                 )
             case _:
                 return self.database_url
+
+    @property
+    def sync_data_platform_database_url(self) -> str:
+        if self.data_platform_database_url.startswith("sqlite+aiosqlite://"):
+            return self.data_platform_database_url.replace(
+                "sqlite+aiosqlite://", "sqlite://", 1
+            )
+        # postgresql+psycopg:// is valid for both sync and async with psycopg3
+        return self.data_platform_database_url
 
     def resolve_snapshot_storage_backend(self, *, source_key: str | None = None) -> str:
         override = self._resolve_source_snapshot_override(

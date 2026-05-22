@@ -218,7 +218,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["processing_run_id"],
             ["data_processing_run.id"],
-            name="fk_data_normalized_message_processing_run_id_data_processing_run",
+            name="fk_data_norm_msg_processing_run_id_proc_run",
             ondelete="RESTRICT",
         ),
         sa.ForeignKeyConstraint(
@@ -272,7 +272,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["normalized_message_id"],
             ["data_normalized_message.id"],
-            name="fk_data_annotation_normalized_message_id_data_normalized_message",
+            name="fk_data_annotation_norm_msg_id_norm_msg",
             ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id", name="pk_data_annotation"),
@@ -329,7 +329,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["normalized_message_id"],
             ["data_normalized_message.id"],
-            name="fk_data_dataset_item_normalized_message_id_data_normalized_message",
+            name="fk_data_dataset_item_norm_msg_id_norm_msg",
             ondelete="RESTRICT",
         ),
         sa.PrimaryKeyConstraint("id", name="pk_data_dataset_item"),

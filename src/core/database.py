@@ -15,7 +15,6 @@ from sqlalchemy.orm import DeclarativeBase
 
 from core.config import get_settings
 
-
 NAMING_CONVENTION = {
     "ix": "ix_%(table_name)s_%(column_0_name)s",
     "uq": "uq_%(table_name)s_%(column_0_name)s",
@@ -30,7 +29,9 @@ class Base(AsyncAttrs, DeclarativeBase):
 
 
 settings = get_settings()
-engine = create_async_engine(settings.database_url, echo=settings.database_echo)
+engine = create_async_engine(
+    settings.data_platform_database_url, echo=settings.database_echo
+)
 AsyncSessionFactory = async_sessionmaker(
     bind=engine, expire_on_commit=False, class_=AsyncSession
 )
