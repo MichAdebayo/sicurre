@@ -78,6 +78,9 @@ class Settings(BaseSettings):
     github_ml_dispatch_token: str | None = Field(
         default=None, validation_alias="SICURRE_GITHUB_ML_DISPATCH_TOKEN"
     )
+    internal_api_key: str | None = Field(
+        default=None, validation_alias="INTERNAL_API_KEY"
+    )
 
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),

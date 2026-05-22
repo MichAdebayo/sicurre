@@ -164,3 +164,18 @@ async def require_authenticated_principal(
 
     request.state.auth_principal = principal
     return principal
+
+
+async def require_internal_key(
+    credentials: HTTPAuthorizationCredentials | None = Security(_bearer_scheme),
+    settings: Settings = Depends(get_settings),
+) -> None:
+    """Validates the service-to-service bearer token for internal endpoints."""
+    if not settings.internal_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Internal API not configured",
+        )
+    token = credentials.credentials if credentials is not None else None
+    if not token or token != settings.internal_api_key:
+        raise _unauthorized("Invalid internal API key")
