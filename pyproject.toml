@@ -19,6 +19,7 @@ dependencies = [
     "pandas>=2.3.3",
     "pdfplumber>=0.11.9",
     "psycopg-binary>=3.3.3",
+    "psycopg[binary]>=3.3.3",
     "pydantic>=2.12.5",
     "pydantic-core>=2.41.5",
     "pydantic-settings>=2.13.1",
