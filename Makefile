@@ -32,7 +32,7 @@ help:
 	@echo "  Setup"
 	@echo "  make install                   - Install local python dependencies"
 	@echo "  make test                      - Run backend test suite"
-	@echo "  make dev-api                   - Start FastAPI development server"
+	@echo "  make dev-api                   - Start data platform API on http://localhost:8001"
 	@echo ""
 	@echo "  Base Ingestion  (deterministic, frozen snapshots — used to build sicurre.db from scratch)"
 	@echo "  make ingest-all-base           - Wipe DB and run ALL base ingestion steps in order"
@@ -73,7 +73,7 @@ test:
 	uv run pytest tests/
 
 dev-api:
-	uv run uvicorn src.data_platform.api.main:app --reload
+	PYTHONPATH=src uv run uvicorn data_platform.api.main:app --reload --port 8001
 
 # ── Base Ingestion ─────────────────────────────────────────────────────────────
 

@@ -618,6 +618,40 @@ paths:
         "401":
           description: Not authenticated
 
+  /internal/phishtank/snapshot:
+    get:
+      tags: [internal]
+      summary: Export all usable PhishTank phishing URLs
+      description: >
+        Returns a flat list of phishing URLs sourced from the `phishtank-online-valid`
+        feed. Intended for service-to-service calls (e.g. sicurre-ml classifier pipeline).
+        Authenticated with a static bearer token (`INTERNAL_API_KEY`).
+        Use the `since` parameter for incremental syncs after the initial seed load.
+      security:
+        - InternalServiceAuth: []
+      parameters:
+        - name: since
+          in: query
+          required: false
+          description: ISO 8601 timestamp — only return URLs extracted after this time.
+          schema:
+            type: string
+            format: date-time
+            example: "2025-01-01T00:00:00Z"
+      responses:
+        "200":
+          description: Snapshot of known PhishTank phishing URLs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhishtankSnapshotResponse"
+        "401":
+          description: Missing or invalid internal API key
+        "429":
+          description: Rate limit exceeded (10/minute)
+        "503":
+          description: Internal API not configured (INTERNAL_API_KEY not set)
+
   /internal/renew-watches:
     post:
       tags: [internal]
@@ -650,6 +684,32 @@ components:
       scheme: bearer
       description: GCP IAM identity token for internal scheduled calls.
   schemas:
+    PhishtankSnapshotResponse:
+      type: object
+      required: [urls, count, source, generated_at]
+      properties:
+        urls:
+          type: array
+          items:
+            type: string
+            format: uri
+          description: Flat list of phishing URLs from PhishTank.
+          example:
+            - "http://example-phish.fr/login"
+            - "http://urssaf-verify.net/compte"
+        count:
+          type: integer
+          description: Number of URLs returned.
+          example: 4218
+        source:
+          type: string
+          description: Source system name.
+          example: phishtank-online-valid
+        generated_at:
+          type: string
+          format: date-time
+          description: UTC timestamp when the snapshot was generated.
+          example: "2025-05-22T14:30:00Z"
     DataSourceCreate:
       type: object
       required: [name, source_type]
