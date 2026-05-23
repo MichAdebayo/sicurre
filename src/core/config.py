@@ -78,9 +78,7 @@ class Settings(BaseSettings):
     github_ml_dispatch_token: str | None = Field(
         default=None, validation_alias="SICURRE_GITHUB_ML_DISPATCH_TOKEN"
     )
-    internal_api_key: str | None = Field(
-        default=None, validation_alias="INTERNAL_API_KEY"
-    )
+    internal_api_key: str | None = None  # reads SICURRE_INTERNAL_API_KEY via env_prefix
 
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),
@@ -116,7 +114,7 @@ class Settings(BaseSettings):
             setting_name="storage_backend",
         )
         backend = override or self.raw_snapshot_storage_backend
-        return backend.strip().lower()
+        return str(backend).strip().lower()
 
     def _resolve_source_snapshot_override(
         self,
