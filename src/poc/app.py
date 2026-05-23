@@ -14,10 +14,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import bcrypt
+import httpx
 import streamlit as st
+from dotenv import load_dotenv
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DB_PATH = ROOT_DIR / "data" / "local" / "sicurre.db"
+
+load_dotenv(ROOT_DIR / ".env", override=True)
 
 st.set_page_config(
     page_title="Sicurre — Détection de phishing",
@@ -389,10 +393,54 @@ SAMPLE_EMAILS: list[dict] = [
 
 
 def classify_email(text: str) -> dict[str, float]:
-    """Placeholder classifier — keyword-based scoring.
-    Replace body with ONNX model call when model is ready:
-        model = onnxruntime.InferenceSession('data/models/camembertv2-phishing-fr/model.onnx')
+    """Classify text via inference API; fall back to keyword scoring when API is unavailable.
+
+    Inference API contract (POST /v1/classify):
+      request:  {"text": str, "use_llm": false}
+      response: {"verdict": str, "composite_score": float, "stage_scores": {...}, ...}
+
+    The API returns verdict in {"phishing", "spam", "legitimate"} with a composite_score
+    representing confidence.  We map that to a 3-class float dict for display.
     """
+    api_url = os.getenv("INFERENCE_API_URL") or "http://localhost:8000/v1/classify"
+    api_key = os.getenv("INFERENCE_API_KEY")
+
+    if api_key:
+        try:
+            r = httpx.post(
+                api_url,
+                json={"text": text, "use_llm": False},
+                headers={"Authorization": f"Bearer {api_key}"},
+                timeout=5.0,
+            )
+            if r.status_code == 200:
+                d = r.json()
+                verdict = d.get("verdict", "legitimate")
+                score = float(d.get("composite_score", 0.5))
+                remainder = round(1.0 - score, 3)
+                match verdict:
+                    case "phishing":
+                        return {
+                            "phishing": round(score, 3),
+                            "spam": round(remainder * 0.3, 3),
+                            "legitimate": round(remainder * 0.7, 3),
+                        }
+                    case "spam":
+                        return {
+                            "phishing": round(remainder * 0.3, 3),
+                            "spam": round(score, 3),
+                            "legitimate": round(remainder * 0.7, 3),
+                        }
+                    case _:
+                        return {
+                            "phishing": round(remainder * 0.2, 3),
+                            "spam": round(remainder * 0.2, 3),
+                            "legitimate": round(score, 3),
+                        }
+        except Exception:
+            pass  # fall through to keyword fallback
+
+    # Keyword fallback — used when API is unreachable or key is not set
     t = text.lower()
     ph = sum(0.18 for kw in _PHISHING_KEYWORDS if kw in t)
     sp = sum(0.14 for kw in _SPAM_KEYWORDS if kw in t)

@@ -1,4 +1,4 @@
-.PHONY: help install test dev-api \
+.PHONY: help install test dev-api test-inference \
         ingest-all-base \
         phishtank-ingest-base \
         file-ingest-base \
@@ -32,6 +32,7 @@ help:
 	@echo "  Setup"
 	@echo "  make install                   - Install local python dependencies"
 	@echo "  make test                      - Run backend test suite"
+	@echo "  make test-inference            - Smoke-test the inference API (localhost:8000)"
 	@echo "  make dev-api                   - Start data platform API on http://localhost:8001"
 	@echo ""
 	@echo "  Base Ingestion  (deterministic, frozen snapshots — used to build sicurre.db from scratch)"
@@ -74,6 +75,9 @@ test:
 
 dev-api:
 	PYTHONPATH=src uv run uvicorn data_platform.api.main:app --reload --port 8001
+
+test-inference:
+	uv run scripts/app/test_inference_api.py
 
 # ── Base Ingestion ─────────────────────────────────────────────────────────────
 

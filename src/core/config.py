@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -78,7 +78,16 @@ class Settings(BaseSettings):
     github_ml_dispatch_token: str | None = Field(
         default=None, validation_alias="SICURRE_GITHUB_ML_DISPATCH_TOKEN"
     )
-    internal_api_key: str | None = None  # reads SICURRE_INTERNAL_API_KEY via env_prefix
+    internal_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("INTERNAL_API_KEY", "SICURRE_INTERNAL_API_KEY"),
+    )
+    inference_api_key: str | None = Field(
+        default=None, validation_alias="INFERENCE_API_KEY"
+    )
+    inference_api_url: str | None = Field(
+        default=None, validation_alias="INFERENCE_API_URL"
+    )
 
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),
