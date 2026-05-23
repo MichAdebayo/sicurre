@@ -101,7 +101,7 @@ async def run_incremental_cc_cron() -> None:
         max_runtime // 60,
     )
 
-    engine = create_async_engine(settings.database_url, echo=False)
+    engine = create_async_engine(settings.data_platform_database_url, echo=False)
 
     # Ensure the pipeline_state table exists
     async with engine.begin() as conn:

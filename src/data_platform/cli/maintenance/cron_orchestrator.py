@@ -307,7 +307,7 @@ async def run_orchestrator(
 ) -> dict[str, Any]:
     selected_jobs = _selected_jobs(job_names)
     settings = get_settings()
-    engine = create_async_engine(settings.database_url, echo=False)
+    engine = create_async_engine(settings.data_platform_database_url, echo=False)
     session_factory = async_sessionmaker(
         engine,
         expire_on_commit=False,
@@ -330,7 +330,7 @@ async def run_orchestrator(
     )
 
     payload: dict[str, Any] = {
-        "database_url": settings.database_url,
+        "database_url": settings.data_platform_database_url,
         "jobs": [],
     }
 

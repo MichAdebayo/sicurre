@@ -224,13 +224,13 @@ if __name__ == "__main__":
         args = parser.parse_args()
 
         settings = get_settings()
-        engine = create_async_engine(settings.database_url, echo=False)
+        engine = create_async_engine(settings.data_platform_database_url, echo=False)
         session_maker = async_sessionmaker(
             engine,
             expire_on_commit=False,
             class_=AsyncSession,
         )
-        logger.info("Connecting to database: %s", settings.database_url)
+        logger.info("Connecting to database: %s", settings.data_platform_database_url)
         trace = SemanticTraceLogger(
             parent_type="Normalization",
             child_target="Message Normalization",

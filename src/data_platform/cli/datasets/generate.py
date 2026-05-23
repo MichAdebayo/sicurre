@@ -556,7 +556,7 @@ async def _load_cc_export(
 async def main() -> None:
     args = parse_args()
     settings = get_settings()
-    engine = create_async_engine(settings.database_url, echo=False)
+    engine = create_async_engine(settings.data_platform_database_url, echo=False)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
     try:

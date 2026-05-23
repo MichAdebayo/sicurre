@@ -644,7 +644,7 @@ async def ingest_csv_bytes(
 
 async def run_ingestion(base_dir: str, *, trigger_mode: str = "manual") -> None:
     settings = get_settings()
-    db_url = settings.database_url
+    db_url = settings.data_platform_database_url
     logger.info("Using database: %s", db_url)
     trace = SemanticTraceLogger(
         parent_type="File",

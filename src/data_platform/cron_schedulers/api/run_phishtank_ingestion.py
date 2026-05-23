@@ -67,7 +67,7 @@ def _build_csv_payload(
 
 async def run_incremental_phishtank_cron() -> None:
     settings = get_settings()
-    engine = create_async_engine(settings.database_url, echo=False)
+    engine = create_async_engine(settings.data_platform_database_url, echo=False)
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

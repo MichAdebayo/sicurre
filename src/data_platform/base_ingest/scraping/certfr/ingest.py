@@ -362,8 +362,8 @@ async def _run_db_ingestion(
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """Insert all snapshots into the DB. Returns (rows, totals)."""
     settings = get_settings()
-    logger.info("Using database: %s", settings.database_url)
-    engine = create_async_engine(settings.database_url, echo=False)
+    logger.info("Using database: %s", settings.data_platform_database_url)
+    engine = create_async_engine(settings.data_platform_database_url, echo=False)
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

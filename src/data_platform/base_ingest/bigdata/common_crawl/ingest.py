@@ -161,8 +161,8 @@ def _print_report(result: CommonCrawlIngestionResult, prior: int) -> None:
 
 async def run_cc_ingestion(local_parquet_dir: Path) -> CommonCrawlIngestionResult:
     settings = get_settings()
-    logger.info("Using database: %s", settings.database_url)
-    engine = create_async_engine(settings.database_url, echo=False)
+    logger.info("Using database: %s", settings.data_platform_database_url)
+    engine = create_async_engine(settings.data_platform_database_url, echo=False)
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

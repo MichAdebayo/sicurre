@@ -44,7 +44,7 @@ def parse_args() -> argparse.Namespace:
 async def run_ingestion(*, trigger_mode: str = "manual") -> object:
     load_dotenv(ROOT_DIR / ".env", override=True)
     settings = get_settings()
-    db_url = settings.database_url
+    db_url = settings.data_platform_database_url
     logger.info("Using Sicurre main database: %s", db_url)
 
     engine = create_async_engine(db_url, echo=False)

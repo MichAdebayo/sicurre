@@ -142,8 +142,8 @@ def _print_report(result: LegacyDbIngestionResult, prior: int) -> None:
 
 async def run_db_ingestion(db_path: Path) -> LegacyDbIngestionResult:
     settings = get_settings()
-    logger.info("Using database: %s", settings.database_url)
-    engine = create_async_engine(settings.database_url, echo=False)
+    logger.info("Using database: %s", settings.data_platform_database_url)
+    engine = create_async_engine(settings.data_platform_database_url, echo=False)
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
