@@ -104,6 +104,14 @@ async def seed(
         sha: (split, label) for sha, split, label in frozen_rows
     }
 
+    is_sqlite = db_url.startswith("sqlite")
+
+    def _uuid(u: uuid.UUID) -> str | uuid.UUID:
+        return str(u) if is_sqlite else u
+
+    def _dt(dt: "datetime") -> str | "datetime":
+        return dt.isoformat() if is_sqlite else dt
+
     engine = create_async_engine(db_url, echo=False)
     async with async_sessionmaker(
         engine, expire_on_commit=False, class_=AsyncSession
@@ -183,14 +191,14 @@ async def seed(
                 "(id, name, version_tag, target_usage, status, frozen_at, item_count, created_at) "
                 "VALUES (:id, :name, :vt, :usage, :status, :frozen_at, :item_count, :created_at)"
             ).bindparams(
-                id=dataset_id,
+                id=_uuid(dataset_id),
                 name="sicurre_training",
                 vt=version_tag,
                 usage="training",
                 status="frozen",
-                frozen_at=now,
+                frozen_at=_dt(now),
                 item_count=match_count,
-                created_at=now,
+                created_at=_dt(now),
             )
         )
         logger.info("Inserted data_dataset (id=%s)", dataset_id)
@@ -203,13 +211,15 @@ async def seed(
                 continue
             item_rows.append(
                 {
-                    "id": uuid.uuid4(),
-                    "dataset_id": dataset_id,
-                    "normalized_message_id": nm_id,
+                    "id": _uuid(uuid.uuid4()),
+                    "dataset_id": _uuid(dataset_id),
+                    "normalized_message_id": (
+                        _uuid(nm_id) if isinstance(nm_id, uuid.UUID) else nm_id
+                    ),
                     "split_name": split_name,
                     "sample_weight": 1.0,
                     "row_order": row_order,
-                    "created_at": now,
+                    "created_at": _dt(now),
                 }
             )
 
