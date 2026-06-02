@@ -17,11 +17,16 @@ import bcrypt
 import httpx
 import streamlit as st
 from dotenv import load_dotenv
+from sqlalchemy import create_engine, text as sql_text
+
+from core.config import get_settings
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-DB_PATH = ROOT_DIR / "data" / "local" / "sicurre.db"
+LOCAL_POC_DB_PATH = ROOT_DIR / "data" / "local" / "sicurre.db"
 
 load_dotenv(ROOT_DIR / ".env", override=True)
+DATA_SETTINGS = get_settings()
+DATA_SYNC_DB_URL = DATA_SETTINGS.sync_data_platform_database_url
 
 st.set_page_config(
     page_title="Sicurre — Détection de phishing",
@@ -152,54 +157,83 @@ h1, h2, h3 { color: var(--text) !important; }
 
 
 # ── DB Helpers ────────────────────────────────────────────────────────────────
-def _q(sql: str, params: tuple = ()) -> list:
-    if not DB_PATH.exists():
+def _auth_q(sql: str, params: tuple = ()) -> list:
+    if not LOCAL_POC_DB_PATH.exists():
         return []
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = sqlite3.connect(str(LOCAL_POC_DB_PATH))
     try:
         return conn.execute(sql, params).fetchall()
     finally:
         conn.close()
 
 
+@st.cache_resource(show_spinner=False)
+def _get_data_engine():
+    return create_engine(DATA_SYNC_DB_URL, pool_pre_ping=True)
+
+
+def _data_q(sql: str, params: dict | None = None) -> list[tuple]:
+    try:
+        with _get_data_engine().connect() as conn:
+            rows = conn.execute(sql_text(sql), params or {}).fetchall()
+        return [tuple(row) for row in rows]
+    except Exception:
+        return []
+
+
+def get_data_store_label() -> str:
+    if DATA_SYNC_DB_URL.startswith("postgresql"):
+        return "Neon PostgreSQL"
+    if DATA_SYNC_DB_URL.startswith("sqlite:///"):
+        return "SQLite locale"
+    return "Base configurée"
+
+
+def get_data_store_size_mb() -> float | None:
+    if not DATA_SYNC_DB_URL.startswith("sqlite:///"):
+        return None
+    db_path = Path(DATA_SYNC_DB_URL.removeprefix("sqlite:///"))
+    try:
+        return db_path.stat().st_size / 1024 / 1024
+    except FileNotFoundError:
+        return 0.0
+
+
 def get_total(table: str) -> int:
-    r = _q(f"SELECT COUNT(*) FROM {table}")
+    r = _data_q(f"SELECT COUNT(*) FROM {table}")
     return r[0][0] if r else 0
 
 
 def get_source_counts() -> list[tuple[str, int]]:
-    return _q(
+    return _data_q(
         "SELECT ds.name, COUNT(*) FROM data_raw_record drr JOIN data_source_system ds ON ds.id = drr.source_system_id GROUP BY ds.name ORDER BY COUNT(*) DESC"
     )
 
 
 def get_dataset_versions() -> list[tuple]:
-    return _q(
+    return _data_q(
         "SELECT version_tag, item_count, status, frozen_at FROM data_dataset ORDER BY created_at DESC"
     )
 
 
 def get_db_size_mb() -> float:
-    try:
-        return DB_PATH.stat().st_size / 1024 / 1024
-    except FileNotFoundError:
-        return 0.0
+    return get_data_store_size_mb() or 0.0
 
 
 def get_label_distribution() -> dict[str, int]:
-    rows = _q(
+    rows = _data_q(
         "SELECT current_label, COUNT(*) FROM data_normalized_message GROUP BY current_label"
     )
     return {r[0]: r[1] for r in rows}
 
 
 def get_ingestion_run_count() -> int:
-    r = _q("SELECT COUNT(*) FROM data_ingestion_run")
+    r = _data_q("SELECT COUNT(*) FROM data_ingestion_run")
     return r[0][0] if r else 0
 
 
 def get_threat_samples(limit: int = 30) -> list[dict]:
-    rows = _q(
+    rows = _data_q(
         """
         SELECT dnm.id, dnm.normalized_text, dnm.current_label, dnm.text_length,
                ds.name as source_name, dnm.created_at
@@ -208,9 +242,9 @@ def get_threat_samples(limit: int = 30) -> list[dict]:
         JOIN data_raw_object dro ON dro.id = drr.raw_object_id
         JOIN data_ingestion_run dir ON dir.id = dro.ingestion_run_id
         JOIN data_source_system ds ON ds.id = dir.source_system_id
-        ORDER BY dnm.created_at DESC LIMIT ?
+        ORDER BY dnm.created_at DESC LIMIT :limit
     """,
-        (limit,),
+        {"limit": int(limit)},
     )
     return [
         {
@@ -242,7 +276,7 @@ def _record_attempt():
 
 
 def authenticate(email: str, password: str) -> dict | None:
-    rows = _q(
+    rows = _auth_q(
         "SELECT id, email, display_name, password_hash, role FROM poc_user WHERE email = ?",
         (email,),
     )
@@ -533,14 +567,16 @@ with st.sidebar:
         st.rerun()
 
     # System status panel
-    db_mb = get_db_size_mb()
+    db_mb = get_data_store_size_mb()
+    db_label = get_data_store_label()
     model_path = ROOT_DIR / "data" / "models" / "camembertv2-phishing-fr"
     model_ready = any(model_path.glob("*.onnx"))
     model_dot = "dot-green" if model_ready else "dot-amber"
     model_label = "ONNX chargé" if model_ready else "Placeholder actif"
+    db_summary = f"{db_label} · {db_mb:.0f} MB" if db_mb is not None else db_label
     st.markdown(
         f'<div class="sys-status">'
-        f'<div><span class="dot dot-green"></span>DB — {db_mb:.0f} MB</div>'
+        f'<div><span class="dot dot-green"></span>DB — {db_summary}</div>'
         f'<div style="margin-top:3px"><span class="dot {model_dot}"></span>Modèle — {model_label}</div>'
         f"</div>",
         unsafe_allow_html=True,
@@ -764,15 +800,15 @@ elif page == "▶️ Pipeline" and is_admin():
         st.markdown("### Ingestion de base")
         st.markdown(
             "Télécharge et insère **tous les enregistrements historiques** depuis les 5 sources "
-            "(PhishTank, CERT-FR, CSV, Base de données, Common Crawl) vers `sicurre.db`.\n\n"
+            "(PhishTank, CERT-FR, CSV, Base de données, Common Crawl) vers la **base de données configurée pour l'environnement**.\n\n"
             "- Durée typique : **15–45 min** · environ 194 000 enregistrements bruts\n"
             "- Résultat : **~32 000 messages normalisés** après déduplication + filtrage\n"
             "- **Idempotent** : relancer ne crée pas de doublons — les runs existants sont ignorés\n"
             "- Si un dataset existe déjà, cette action ne le supprime pas — seule l'ingestion est rejouée"
         )
         st.warning(
-            "⚠️ Ce bouton efface et réinsère les données brutes. "
-            "À réserver au démo initial ou à une réinitialisation complète.",
+            "⚠️ Ce bouton relance les targets de base du dépôt sur la base de données actuellement configurée. "
+            "À utiliser seulement sur l'environnement que vous souhaitez rejouer.",
             icon="⚠️",
         )
         if st.button("▶️ Lancer l'ingestion de base", key="run_base", type="primary"):
