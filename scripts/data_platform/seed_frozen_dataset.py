@@ -519,6 +519,10 @@ async def seed(
             miss_count,
         )
 
+        # End the read-only transaction before local file processing so Neon does not
+        # keep an idle transaction open while we compute provenance estimates.
+        await session.rollback()
+
         if match_count == 0:
             logger.error(
                 "Zero matches found — DB may not have annotations yet. Run normalize + annotate first."
@@ -569,6 +573,7 @@ async def seed(
                 len(all_sha256s) if materialize_missing else match_count
             )
             if existing_dataset_id and sync_existing_version:
+                await session.rollback()
                 existing_hashes = await _load_existing_dataset_hashes(
                     session, existing_dataset_id
                 )
