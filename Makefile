@@ -6,11 +6,14 @@
         db-ingest-base \
         bigdata-ingest-base \
         phishtank-cron file-cron scraping-cron db-cron bigdata-cron \
+        phishtank-cron-reserved file-cron-reserved scraping-cron-reserved \
+        db-cron-reserved bigdata-cron-reserved \
         cron-orchestrate ingest-all-cron \
         bigdata-crawl bigdata-ingest bigdata-reviewed-promote \
         normalize normalize-dry \
         annotate \
         generate-data dataset-build dataset-export \
+        seed-frozen-dataset \
         pipeline-push demo-v1 demo-v2 \
         poc db-seed r2-freeze-proof
 
@@ -44,11 +47,12 @@ help:
 	@echo "  make bigdata-ingest-base       - Ingest R2 CC base parquet into sicurre.db"
 	@echo ""
 	@echo "  Cron  (scheduled, incremental — simulates production)"
-	@echo "  make phishtank-cron            - Scheduled PhishTank ingestion"
-	@echo "  make file-cron                 - Scheduled CSV ingestion"
-	@echo "  make scraping-cron             - Scheduled CERT-FR scraping (capped index scan)"
-	@echo "  make db-cron                   - Scheduled DB feed: ingest delta from external_threats.db"
-	@echo "  make bigdata-cron              - Scheduled Common Crawl extract→ingest pipeline"
+	@echo "  make phishtank-cron            - Scheduled PhishTank ingestion  (set CRON_ARGS=--reserved for reserved slot)"
+	@echo "  make file-cron                 - Scheduled CSV ingestion         (set CRON_ARGS=--reserved for reserved slot)"
+	@echo "  make scraping-cron             - Scheduled CERT-FR scraping      (set CRON_ARGS=--reserved for reserved slot)"
+	@echo "  make db-cron                   - Scheduled DB feed                (set CRON_ARGS=--reserved for reserved slot)"
+	@echo "  make bigdata-cron              - Scheduled Common Crawl pipeline  (set CRON_ARGS=--reserved for reserved slot)"
+	@echo "  make *-cron-reserved           - Shorthand for CRON_ARGS=--reserved make *-cron"
 	@echo "  make ingest-all-cron           - Run full cron ingestion suite"
 	@echo ""
 	@echo "  Pipeline & Demos"
@@ -60,6 +64,7 @@ help:
 	@echo "  make generate-data             - Run canonical generation pipeline (adapted + CC lanes)"
 	@echo "  make dataset-build             - Build DB-backed dataset from annotated normalized messages"
 	@echo "  make dataset-export            - Serialize frozen dataset to CSV/JSONL for PyTorch"
+	@echo "  make seed-frozen-dataset       - Seed current_frozen provenance into data_dataset + data_dataset_item"
 	@echo ""
 	@echo "  POC"
 	@echo "  make poc                       - Launch Streamlit POC dashboard"
@@ -112,20 +117,32 @@ db-ingest-base:
 # ── Cron ──────────────────────────────────────────────────────────────────────
 
 phishtank-cron:
-	@echo "Running scheduled PhishTank ingestion..."
-	uv run python src/data_platform/cron_schedulers/api/run_phishtank_ingestion.py
+	@echo "Running scheduled PhishTank ingestion$(if $(CRON_ARGS), [args: $(CRON_ARGS)])..."
+	uv run python src/data_platform/cron_schedulers/api/run_phishtank_ingestion.py $(CRON_ARGS)
+
+phishtank-cron-reserved:
+	$(MAKE) phishtank-cron CRON_ARGS=--reserved
 
 file-cron:
-	@echo "Running scheduled CSV ingestion..."
-	uv run python src/data_platform/cron_schedulers/file/run_csv_ingestion.py
+	@echo "Running scheduled CSV ingestion$(if $(CRON_ARGS), [args: $(CRON_ARGS)])..."
+	uv run python src/data_platform/cron_schedulers/file/run_csv_ingestion.py $(CRON_ARGS)
+
+file-cron-reserved:
+	$(MAKE) file-cron CRON_ARGS=--reserved
 
 scraping-cron:
-	@echo "Running scheduled CERT-FR scraping (capped index scan)..."
-	uv run python src/data_platform/cron_schedulers/scraping/run_certfr_cti.py
+	@echo "Running scheduled CERT-FR scraping$(if $(CRON_ARGS), [args: $(CRON_ARGS)])..."
+	uv run python src/data_platform/cron_schedulers/scraping/run_certfr_cti.py $(CRON_ARGS)
+
+scraping-cron-reserved:
+	$(MAKE) scraping-cron CRON_ARGS=--reserved
 
 db-cron:
-	@echo "Running scheduled DB feed: append new rows to feeder DB + ingest delta into sicurre.db..."
-	uv run python src/data_platform/cron_schedulers/database/run_sql_ingestion.py
+	@echo "Running scheduled DB feed$(if $(CRON_ARGS), [args: $(CRON_ARGS)])..."
+	uv run python src/data_platform/cron_schedulers/database/run_sql_ingestion.py $(CRON_ARGS)
+
+db-cron-reserved:
+	$(MAKE) db-cron CRON_ARGS=--reserved
 
 bigdata-ingest-base:
 	@echo "Ingesting Common Crawl base parquet from R2 into sicurre.db..."
@@ -140,8 +157,11 @@ bigdata-ingest:
 	uv run python src/data_platform/cli/bigdata/common_crawl_ingest.py
 
 bigdata-cron:
-	@echo "Running scheduled Common Crawl extract→ingest pipeline..."
-	uv run python src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py
+	@echo "Running scheduled Common Crawl extract→ingest pipeline$(if $(CRON_ARGS), [args: $(CRON_ARGS)])..."
+	uv run python src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py $(CRON_ARGS)
+
+bigdata-cron-reserved:
+	$(MAKE) bigdata-cron CRON_ARGS=--reserved
 
 bigdata-reviewed-promote:
 	@echo "Promoting reviewed Common Crawl exports into curated tables..."
@@ -191,6 +211,10 @@ dataset-export:
 	uv run python src/data_platform/cli/datasets/export.py \
 		--version-tag "$(DATASET_VERSION_TAG)" \
 		$(EXPORT_ARGS)
+
+seed-frozen-dataset:
+	@echo "Seeding current_frozen provenance into data_dataset + data_dataset_item..."
+	uv run python scripts/data_platform/seed_frozen_dataset.py $(SEED_ARGS)
 
 # ── Pipeline & Demos ──────────────────────────────────────────────────────────
 

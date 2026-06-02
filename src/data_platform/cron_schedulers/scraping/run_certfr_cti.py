@@ -1,19 +1,31 @@
 """Run the scheduled CERT-FR CTI ingestion delegate.
 
 Forces R2 storage under cron/scraping/certfr_cti/ prefix.
+Pass --reserved to write under cron/reserved/scraping/certfr_cti/ instead.
 """
 
 from __future__ import annotations
 
+import argparse as _argparse
 import asyncio
 import logging
 import os
 import sys
 from pathlib import Path
 
-# Force snapshot storage to R2 under the cron/scraping/certfr_cti prefix
+# ── Reserved-slot routing (must happen before settings are loaded) ─────────────
+_parser = _argparse.ArgumentParser(add_help=False)
+_parser.add_argument("--reserved", action="store_true", default=False)
+_reserved_args, _ = _parser.parse_known_args()
+
+# Force snapshot storage to R2 under the appropriate cron prefix
 os.environ["SICURRE_CERTFR_SNAPSHOT_STORAGE_BACKEND"] = "prod"
-os.environ["SICURRE_CERTFR_SNAPSHOT_PREFIX"] = "cron/scraping/certfr_cti"
+os.environ["SICURRE_CERTFR_SNAPSHOT_PREFIX"] = (
+    "cron/reserved/scraping/certfr_cti"
+    if _reserved_args.reserved
+    else "cron/scraping/certfr_cti"
+)
+# ──────────────────────────────────────────────────────────────────────────────
 
 ROOT_DIR = Path(__file__).resolve().parents[4]
 SRC_ROOT = ROOT_DIR / "src"
@@ -63,7 +75,8 @@ async def run_ingestion(
 
 
 async def main() -> None:
-    logger.info("Starting CERT-FR CTI cron (R2 target: cron/scraping/certfr_cti)")
+    _r2_prefix = os.environ["SICURRE_CERTFR_SNAPSHOT_PREFIX"]
+    logger.info("Starting CERT-FR CTI cron (R2 target: %s)", _r2_prefix)
     await run_ingestion(trigger_mode="scheduled", fetch_historical=False)
 
 

@@ -1,6 +1,7 @@
 """Run the resumable, time-bounded Common Crawl cron pipeline.
 
 Forces R2 storage under cron/bigdata/common_crawl/ prefix.
+Pass --reserved to write under cron/reserved/bigdata/common_crawl/ instead.
 Duration is controlled by SICURRE_CC_CRON_DURATION_MODE:
   - 'short'    → 30 minutes (for demos / jury)
   - 'standard' → 8 hours    (for overnight runs)
@@ -8,6 +9,7 @@ Duration is controlled by SICURRE_CC_CRON_DURATION_MODE:
 
 from __future__ import annotations
 
+import argparse as _argparse
 import asyncio
 import io
 import logging
@@ -18,9 +20,19 @@ from typing import Sequence
 
 import pandas as pd
 
-# Force snapshot storage to R2 under the cron/bigdata/common_crawl prefix
+# ── Reserved-slot routing (must happen before settings are loaded) ─────────────
+_parser = _argparse.ArgumentParser(add_help=False)
+_parser.add_argument("--reserved", action="store_true", default=False)
+_reserved_args, _ = _parser.parse_known_args()
+
+# Force snapshot storage to R2 under the appropriate cron prefix
 os.environ["SICURRE_COMMON_CRAWL_SNAPSHOT_STORAGE_BACKEND"] = "prod"
-os.environ["SICURRE_COMMON_CRAWL_SNAPSHOT_PREFIX"] = "cron/bigdata/common_crawl"
+os.environ["SICURRE_COMMON_CRAWL_SNAPSHOT_PREFIX"] = (
+    "cron/reserved/bigdata/common_crawl"
+    if _reserved_args.reserved
+    else "cron/bigdata/common_crawl"
+)
+# ──────────────────────────────────────────────────────────────────────────────
 
 ROOT_DIR = Path(__file__).resolve().parents[4]
 SRC_ROOT = ROOT_DIR / "src"
@@ -138,5 +150,11 @@ async def run_incremental_cc_cron() -> None:
     await engine.dispose()
 
 
+async def main() -> None:
+    _r2_prefix = os.environ["SICURRE_COMMON_CRAWL_SNAPSHOT_PREFIX"]
+    logger.info("Starting Common Crawl cron (R2 target: %s)", _r2_prefix)
+    await run_incremental_cc_cron()
+
+
 if __name__ == "__main__":
-    asyncio.run(run_incremental_cc_cron())
+    asyncio.run(main())

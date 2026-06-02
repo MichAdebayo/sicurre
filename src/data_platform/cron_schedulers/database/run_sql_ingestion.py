@@ -1,14 +1,17 @@
 """Run the incremental SQL cron ingestion from the external threat database.
 
 This orchestrator:
-1. Forces snapshot storage to R2 under cron/db/external_threats.
+1. Forces snapshot storage to R2 under cron/db/external_threats (or reserved/).
 2. Retrieves the maximum created_at (watermark) currently in the DB.
 3. Fetches new records from external_threats.db using the watermark.
 4. Saves a JSON snapshot to R2 and writes raw records to the platform.
+
+Pass --reserved to write under cron/reserved/db/external_threats/ instead.
 """
 
 from __future__ import annotations
 
+import argparse as _argparse
 import asyncio
 import logging
 import os
@@ -16,9 +19,19 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Force snapshot storage to R2 under the cron/db/external_threats prefix
+# ── Reserved-slot routing (must happen before settings are loaded) ─────────────
+_parser = _argparse.ArgumentParser(add_help=False)
+_parser.add_argument("--reserved", action="store_true", default=False)
+_reserved_args, _ = _parser.parse_known_args()
+
+# Force snapshot storage to R2 under the appropriate cron prefix
 os.environ["SICURRE_DATABASE_HISTORICAL_SNAPSHOT_STORAGE_BACKEND"] = "prod"
-os.environ["SICURRE_DATABASE_HISTORICAL_SNAPSHOT_PREFIX"] = "cron/db/external_threats"
+os.environ["SICURRE_DATABASE_HISTORICAL_SNAPSHOT_PREFIX"] = (
+    "cron/reserved/db/external_threats"
+    if _reserved_args.reserved
+    else "cron/db/external_threats"
+)
+# ──────────────────────────────────────────────────────────────────────────────
 
 ROOT_DIR = Path(__file__).resolve().parents[4]
 SRC_ROOT = ROOT_DIR / "src"
@@ -152,5 +165,11 @@ async def run_incremental_sql_cron() -> None:
     await engine.dispose()
 
 
+async def main() -> None:
+    _r2_prefix = os.environ["SICURRE_DATABASE_HISTORICAL_SNAPSHOT_PREFIX"]
+    logger.info("Starting SQL cron (R2 target: %s)", _r2_prefix)
+    await run_incremental_sql_cron()
+
+
 if __name__ == "__main__":
-    asyncio.run(run_incremental_sql_cron())
+    asyncio.run(main())

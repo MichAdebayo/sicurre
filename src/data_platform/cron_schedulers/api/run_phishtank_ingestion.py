@@ -10,6 +10,7 @@ This orchestrator:
 
 from __future__ import annotations
 
+import argparse as _argparse
 import asyncio
 import csv
 import logging
@@ -19,9 +20,19 @@ from datetime import datetime, timezone
 from io import StringIO
 from pathlib import Path
 
-# Force snapshot storage to R2 under the cron/api/phishtank prefix
+# ── Reserved-slot routing (must happen before settings are loaded) ─────────────
+_parser = _argparse.ArgumentParser(add_help=False)
+_parser.add_argument("--reserved", action="store_true", default=False)
+_reserved_args, _ = _parser.parse_known_args()
+
+_CRON_PREFIX_BASE = (
+    "cron/reserved/api/phishtank" if _reserved_args.reserved else "cron/api/phishtank"
+)
+
+# Force snapshot storage to R2 under the appropriate cron prefix
 os.environ["SICURRE_PHISHTANK_SNAPSHOT_STORAGE_BACKEND"] = "prod"
-os.environ["SICURRE_PHISHTANK_SNAPSHOT_PREFIX"] = "cron/api/phishtank"
+os.environ["SICURRE_PHISHTANK_SNAPSHOT_PREFIX"] = _CRON_PREFIX_BASE
+# ──────────────────────────────────────────────────────────────────────────────
 
 ROOT_DIR = Path(__file__).resolve().parents[4]
 SRC_ROOT = ROOT_DIR / "src"
@@ -140,7 +151,7 @@ async def run_incremental_phishtank_cron() -> None:
         source_key="phishtank",
     )
     object_key = snapshot_store.build_object_key(
-        source_prefix=f"cron/api/phishtank/{timestamp_str}",
+        source_prefix=f"{_CRON_PREFIX_BASE}/{timestamp_str}",
         filename="phishtank_delta.csv",
     )
     result = await snapshot_store.write_snapshot(
@@ -167,5 +178,10 @@ async def run_incremental_phishtank_cron() -> None:
     await engine.dispose()
 
 
+async def main() -> None:
+    logger.info("Starting PhishTank cron (R2 target: %s)", _CRON_PREFIX_BASE)
+    await run_incremental_phishtank_cron()
+
+
 if __name__ == "__main__":
-    asyncio.run(run_incremental_phishtank_cron())
+    asyncio.run(main())
