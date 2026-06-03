@@ -91,13 +91,30 @@ ingest-all-base: phishtank-ingest-base file-ingest-base scraping-ingest-base db-
 	@echo "============================================================================"
 	@echo "  ALL BASE INGESTION COMPLETE"
 	@echo "============================================================================"
-	@echo "  Total rows: $$(sqlite3 data/local/sicurre.db 'SELECT COUNT(*) FROM data_raw_record')"
+	@db_url="$${SICURRE_DATA_PLATFORM_DATABASE_URL:-sqlite+aiosqlite:///$$(pwd)/data/local/sicurre.db}"; \
+	case "$$db_url" in \
+	  sqlite+aiosqlite:///*) db_path="$${db_url#sqlite+aiosqlite:///}" ;; \
+	  sqlite:///*) db_path="$${db_url#sqlite:///}" ;; \
+	  *) db_path="" ;; \
+	esac; \
+	if [ -n "$$db_path" ]; then \
+	  echo "  Total rows: $$(sqlite3 "$$db_path" 'SELECT COUNT(*) FROM data_raw_record')"; \
+	  echo "  Database  : $$db_path"; \
+	else \
+	  echo "  Total rows: non disponible pour $$db_url"; \
+	fi
 	@echo "  Target    : 191,983"
 	@echo "============================================================================"
 
 phishtank-ingest-base:
-	@echo "Resetting sicurre.db and running deterministic PhishTank base ingestion (R2 + local)..."
-	rm -f data/local/sicurre.db
+	@db_url="$${SICURRE_DATA_PLATFORM_DATABASE_URL:-sqlite+aiosqlite:///$$(pwd)/data/local/sicurre.db}"; \
+	case "$$db_url" in \
+	  sqlite+aiosqlite:///*) reset_path="$${db_url#sqlite+aiosqlite:///}" ;; \
+	  sqlite:///*) reset_path="$${db_url#sqlite:///}" ;; \
+	  *) echo "Refusing to reset non-SQLite data-platform DB: $$db_url"; exit 1 ;; \
+	esac; \
+	echo "Resetting $$reset_path and running deterministic PhishTank base ingestion (R2 + local)..."; \
+	rm -f "$$reset_path"
 	uv run alembic upgrade head
 	uv run python src/data_platform/base_ingest/api/phishtank/ingest.py
 
@@ -111,7 +128,7 @@ scraping-ingest-base:
 	uv run python src/data_platform/base_ingest/scraping/sap_labs/ingest.py
 
 db-ingest-base:
-	@echo "Seeding external_threats.db (3-class, seed=42) then ingesting into sicurre.db (deterministic)..."
+	@echo "Seeding external_threats.db (3-class, seed=42) then ingesting into the configured data-platform DB (deterministic)..."
 	unset SICURRE_DATABASE_URL && SICURRE_DB_INGEST_FORCE_RESEED=false uv run python src/data_platform/base_ingest/db/ingest.py
 
 # ── Cron ──────────────────────────────────────────────────────────────────────
@@ -145,7 +162,7 @@ db-cron-reserved:
 	$(MAKE) db-cron CRON_ARGS=--reserved
 
 bigdata-ingest-base:
-	@echo "Ingesting Common Crawl base parquet from R2 into sicurre.db..."
+	@echo "Ingesting Common Crawl base parquet from R2 into the configured data-platform DB..."
 	unset SICURRE_DATABASE_URL && uv run python src/data_platform/base_ingest/bigdata/common_crawl/ingest.py
 
 bigdata-crawl:
@@ -177,7 +194,7 @@ ingest-all-cron: cron-orchestrate
 # ── Normalization ─────────────────────────────────────────────────────────────
 
 normalize:
-	@echo "Normalizing all raw records in sicurre.db..."
+	@echo "Normalizing all raw records in the configured data-platform DB..."
 	uv run python src/data_platform/cli/normalize/messages.py --all-pending $(NORMALIZE_ARGS)
 
 normalize-dry:
