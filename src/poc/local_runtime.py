@@ -155,12 +155,32 @@ def ensure_local_auth_db() -> None:
             conn.execute(
                 "ALTER TABLE poc_inference_event ADD COLUMN inference_source TEXT NOT NULL DEFAULT 'api'"
             )
+        if "override_verdict" not in event_columns:
+            conn.execute(
+                "ALTER TABLE poc_inference_event ADD COLUMN override_verdict TEXT NULL"
+            )
+        if "override_by" not in event_columns:
+            conn.execute(
+                "ALTER TABLE poc_inference_event ADD COLUMN override_by TEXT NULL"
+            )
+        if "overridden_at" not in event_columns:
+            conn.execute(
+                "ALTER TABLE poc_inference_event ADD COLUMN overridden_at TEXT NULL"
+            )
         for account in _seed_accounts():
             row = conn.execute(
                 "SELECT id FROM poc_user WHERE email = ?",
                 (account["email"],),
             ).fetchone()
             if row:
+                conn.execute(
+                    "UPDATE poc_user SET display_name = ?, password_hash = ? WHERE email = ?",
+                    (
+                        account["display_name"],
+                        _hash_password(account["password"]),
+                        account["email"],
+                    ),
+                )
                 continue
 
             conn.execute(

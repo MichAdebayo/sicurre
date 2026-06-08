@@ -67,7 +67,7 @@ PROVENANCE_ANGLES: tuple[ProvenanceAngle, ...] = (
 class ProvenanceAngleExportService:
     def __init__(self, output_root: Path | None = None) -> None:
         self.settings = get_settings()
-        self.engine = create_engine(self.settings.sync_database_url)
+        self.engine = create_engine(self.settings.sync_data_platform_database_url)
         self.output_root = output_root or ROOT_DIR / "data" / "final" / "provenance"
 
     def export_angles(self, version_tag: str | None = None) -> dict[str, str]:

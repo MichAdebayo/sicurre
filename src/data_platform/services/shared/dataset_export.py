@@ -22,7 +22,7 @@ class DatasetExportService:
             source_key="training_dataset",
         )
         # We use a sync engine specifically tailored to fast dataframe exports
-        self.engine = create_engine(self.settings.sync_database_url)
+        self.engine = create_engine(self.settings.sync_data_platform_database_url)
 
     def export_dataset(self, version_tag: str) -> None:
         print("=" * 60)
