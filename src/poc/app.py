@@ -42,8 +42,8 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 I18N_PATH = ROOT_DIR / "src" / "poc" / "i18n.json"
 LOGO_PATH = ROOT_DIR / "src" / "app" / "assets" / "sicurre.svg"
 
-INFERENCE_URL = os.environ.get("POC_INFERENCE_URL", "http://127.0.0.1:8000/v1/classify")
-INFERENCE_API_KEY = os.environ.get("INFERENCE_API_KEY", "")
+INFERENCE_URL = os.environ.get("SICURRE_POC_INFERENCE_API_URL", "http://127.0.0.1:8000/v1/classify")
+INFERENCE_API_KEY = os.environ.get("SICURRE_POC_INFERENCE_API_KEY", os.environ.get("INFERENCE_API_KEY", ""))
 
 st.set_page_config(
     page_title="Sicurre - POC Locale",
@@ -144,31 +144,38 @@ footer { visibility: hidden; }
 
 /* ── Logo background fix for dark mode clash ──────────── */
 .logo-container {
-  background: #FFFFFF;
-  border-radius: 8px;
-  padding: 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
 /* ── Global action buttons (primary CTA) ──────────────── */
-.stButton > button[kind="primary"] {
-  background: var(--accent) !important;
-  color: #fff !important;
-  border: none !important;
+button[data-testid="stBaseButton-primary"] {
+  background: var(--primary) !important;
+  color: #FFFFFF !important;
+  border: 1px solid var(--primary) !important;
   border-radius: 8px !important;
   font-weight: 600 !important;
+  transition: all 0.15s ease !important;
 }
-.stButton > button[kind="primary"]:hover {
-  background: var(--accent-dark) !important;
+button[data-testid="stBaseButton-primary"]:hover {
+  background: var(--primary-dark) !important;
+  border-color: var(--primary-dark) !important;
 }
 
 /* ── Secondary buttons ────────────────────────────────── */
-.stButton > button[kind="secondary"] {
+button[data-testid="stBaseButton-secondary"] {
+  border: 1px solid var(--border) !important;
+  background: var(--surface) !important;
+  color: var(--text) !important;
   border-radius: 8px !important;
   font-weight: 500 !important;
+  transition: all 0.15s ease !important;
+}
+button[data-testid="stBaseButton-secondary"]:hover {
+  border-color: var(--primary-border) !important;
+  background: var(--primary-light) !important;
+  color: var(--primary) !important;
 }
 
 /* ── Forms ────────────────────────────────────────────── */
@@ -188,8 +195,12 @@ input[type="checkbox"] {
 }
 
 /* ── Sidebar nav buttons ───────────────────────────────── */
+[data-testid="stSidebar"] [data-testid="stElementContainer"] {
+  width: 100% !important;
+}
 [data-testid="stSidebar"] .stButton {
   margin-bottom: 0.1rem !important;
+  width: 100% !important;
 }
 [data-testid="stSidebar"] .stButton > button {
   background: transparent !important;
@@ -199,9 +210,13 @@ input[type="checkbox"] {
   font-weight: 500 !important;
   font-size: 0.9rem !important;
   text-align: left !important;
+  justify-content: flex-start !important;
   width: 100% !important;
   padding: 0.45rem 0.75rem !important;
-  transition: background 0.12s ease !important;
+  transition: background 0.12s ease, color 0.12s ease !important;
+}
+[data-testid="stSidebar"] .stButton > button > div {
+  justify-content: flex-start !important;
 }
 [data-testid="stSidebar"] .stButton > button:hover {
   background: var(--nav-hover) !important;
@@ -210,6 +225,7 @@ input[type="checkbox"] {
 
 .nav-active {
   display: block;
+  width: 100% !important;
   padding: 0.45rem 0.75rem;
   background: var(--primary-light);
   border-left: 3px solid var(--primary);
@@ -219,6 +235,7 @@ input[type="checkbox"] {
   font-size: 0.9rem;
   margin-bottom: 0.5rem;
   margin-top: 0.2rem;
+  box-sizing: border-box;
 }
 
 /* ── KPI cards ─────────────────────────────────────────── */
@@ -682,7 +699,7 @@ def simulated_result(subject: str, sender: str, text_value: str) -> dict[str, An
             "stage_scores": {"onnx": 0.71, "llm": 0.82},
             "stage_labels": {"onnx": "phishing", "llm": "phishing"},
             "label_distribution": {"legitimate": 0.04, "spam": 0.18, "phishing": 0.78},
-            "explanation": "Simulation locale: tentative de phishing probable.",
+            "explanation": "Simulation locale : tentative de phishing probable.",
             "llm_provider": "simulation",
         }
     elif spam_hits >= 2:
@@ -694,7 +711,7 @@ def simulated_result(subject: str, sender: str, text_value: str) -> dict[str, An
             "stage_scores": {"onnx": 0.19, "llm": 0.33},
             "stage_labels": {"onnx": "spam", "llm": "spam"},
             "label_distribution": {"legitimate": 0.18, "spam": 0.72, "phishing": 0.10},
-            "explanation": "Simulation locale: contenu promotionnel detecte.",
+            "explanation": "Simulation locale : contenu promotionnel détecté.",
             "llm_provider": "simulation",
         }
     else:
@@ -706,7 +723,7 @@ def simulated_result(subject: str, sender: str, text_value: str) -> dict[str, An
             "stage_scores": {"onnx": 0.06, "llm": 0.09},
             "stage_labels": {"onnx": "legitimate", "llm": "legitimate"},
             "label_distribution": {"legitimate": 0.86, "spam": 0.09, "phishing": 0.05},
-            "explanation": "Simulation locale: email legitime.",
+            "explanation": "Simulation locale : e-mail légitime.",
             "llm_provider": "simulation",
         }
 
@@ -1102,7 +1119,7 @@ if not st.session_state["authenticated"]:
     lang_top_c1, lang_top_c2 = st.columns([5, 1])
     with lang_top_c2:
         lopt = st.selectbox(
-            "",
+            tr("language"),
             options=[("fr", "FR"), ("en", "EN")],
             index=0 if st.session_state.get("lang", "fr") == "fr" else 1,
             format_func=lambda item: item[1],
