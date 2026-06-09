@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# Add project root to sys.path to resolve src.poc imports
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 import base64
 import hashlib
 import json
@@ -10,7 +18,6 @@ import sqlite3
 import subprocess
 import time
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -57,18 +64,18 @@ st.markdown(
 <style>
 /* ── Light mode tokens ────────────────────────────────── */
 :root {
-  --bg: #F8FAFC;
+  --bg: #F1F5F9;
   --surface: #FFFFFF;
-  --border: #E2E8F0;
+  --border: #CBD5E1;
   --text: #0F2E7A;
-  --text-2: #475569;
-  --text-muted: #94A3B8;
+  --text-2: #334155;
+  --text-muted: #64748B;
   --primary: #1B4FCC;
   --primary-dark: #1239A6;
   --primary-light: #EEF3FF;
-  --primary-border: #C7D7FF;
+  --primary-border: #CBD5E1;
   --accent: #F59E0B;
-  --accent-dark: #D97706;
+  --accent-dark: #B45309;
   --danger: #EF4444;
   --danger-bg: #FEF2F2;
   --danger-border: #FECACA;
@@ -85,18 +92,18 @@ st.markdown(
 /* ── Dark mode tokens (OS preference) ────────────────── */
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0F172A;
-    --surface: #1E293B;
-    --border: #334155;
+    --bg: #1E293B;
+    --surface: #334155;
+    --border: #475569;
     --text: #F1F5F9;
-    --text-2: #94A3B8;
-    --text-muted: #64748B;
+    --text-2: #CBD5E1;
+    --text-muted: #94A3B8;
     --primary: #60A5FA;
     --primary-dark: #3B82F6;
     --primary-light: #1E3A5F;
-    --primary-border: #2D5A8E;
+    --primary-border: #475569;
     --accent: #F59E0B;
-    --accent-dark: #D97706;
+    --accent-dark: #B45309;
     --danger: #F87171;
     --danger-bg: #450A0A;
     --danger-border: #7F1D1D;
@@ -113,11 +120,11 @@ st.markdown(
 
 /* ── Streamlit dark theme ──────────────────────────────── */
 [data-theme="dark"] {
-  --bg: #0F172A; --surface: #1E293B; --border: #334155;
-  --text: #F1F5F9; --text-2: #94A3B8; --text-muted: #64748B;
+  --bg: #1E293B; --surface: #334155; --border: #475569;
+  --text: #F1F5F9; --text-2: #CBD5E1; --text-muted: #94A3B8;
   --primary: #60A5FA; --primary-dark: #3B82F6;
-  --primary-light: #1E3A5F; --primary-border: #2D5A8E;
-  --accent: #F59E0B; --accent-dark: #D97706;
+  --primary-light: #1E3A5F; --primary-border: #475569;
+  --accent: #F59E0B; --accent-dark: #B45309;
   --danger: #F87171; --danger-bg: #450A0A; --danger-border: #7F1D1D;
   --safe: #34D399; --safe-bg: #022C22; --safe-border: #064E3B;
   --warning: #FBBF24; --warning-bg: #451A03; --warning-border: #78350F;
@@ -150,17 +157,21 @@ footer { visibility: hidden; }
 }
 
 /* ── Global action buttons (primary CTA) ──────────────── */
-button[data-testid="stBaseButton-primary"] {
-  background: var(--primary) !important;
+button[data-testid="stBaseButton-primary"],
+.stButton > button[kind="primary"],
+div[data-testid="stFormSubmitButton"] button {
+  background: var(--accent) !important;
   color: #FFFFFF !important;
-  border: 1px solid var(--primary) !important;
+  border: 1px solid var(--accent) !important;
   border-radius: 8px !important;
   font-weight: 600 !important;
   transition: all 0.15s ease !important;
 }
-button[data-testid="stBaseButton-primary"]:hover {
-  background: var(--primary-dark) !important;
-  border-color: var(--primary-dark) !important;
+button[data-testid="stBaseButton-primary"]:hover,
+.stButton > button[kind="primary"]:hover,
+div[data-testid="stFormSubmitButton"] button:hover {
+  background: var(--accent-dark) !important;
+  border-color: var(--accent-dark) !important;
 }
 
 /* ── Secondary buttons ────────────────────────────────── */
@@ -173,7 +184,7 @@ button[data-testid="stBaseButton-secondary"] {
   transition: all 0.15s ease !important;
 }
 button[data-testid="stBaseButton-secondary"]:hover {
-  border-color: var(--primary-border) !important;
+  border-color: var(--primary) !important;
   background: var(--primary-light) !important;
   color: var(--primary) !important;
 }
@@ -191,15 +202,34 @@ button[data-testid="stBaseButton-secondary"]:hover {
 }
 /* A simpler way to override checkbox color is using accent-color */
 input[type="checkbox"] {
-  accent-color: var(--primary) !important;
+  accent-color: var(--accent) !important;
+}
+[data-testid="stCheckbox"] label span {
+  accent-color: var(--accent) !important;
+}
+div[data-baseweb="checkbox"] > div:first-child {
+  border-color: var(--accent) !important;
+}
+div[data-baseweb="checkbox"] input:checked + div {
+  background-color: var(--accent) !important;
+  border-color: var(--accent) !important;
 }
 
-/* ── Sidebar nav buttons ───────────────────────────────── */
+/* ── Sidebar spacing & positioning ────────────────────── */
+[data-testid="stSidebarUserContent"] {
+  padding-top: 1.2rem !important;
+  padding-bottom: 0.8rem !important;
+}
+[data-testid="stSidebar"] hr {
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.5rem !important;
+}
 [data-testid="stSidebar"] [data-testid="stElementContainer"] {
   width: 100% !important;
 }
 [data-testid="stSidebar"] .stButton {
-  margin-bottom: 0.1rem !important;
+  margin-bottom: 0.05rem !important;
+  margin-top: 0.05rem !important;
   width: 100% !important;
 }
 [data-testid="stSidebar"] .stButton > button {
@@ -212,7 +242,7 @@ input[type="checkbox"] {
   text-align: left !important;
   justify-content: flex-start !important;
   width: 100% !important;
-  padding: 0.45rem 0.75rem !important;
+  padding: 0.35rem 0.75rem !important;
   transition: background 0.12s ease, color 0.12s ease !important;
 }
 [data-testid="stSidebar"] .stButton > button > div {
@@ -226,15 +256,15 @@ input[type="checkbox"] {
 .nav-active {
   display: block;
   width: 100% !important;
-  padding: 0.45rem 0.75rem;
+  padding: 0.35rem 0.75rem;
   background: var(--primary-light);
   border-left: 3px solid var(--primary);
   border-radius: 0 6px 6px 0;
   color: var(--primary);
   font-weight: 700;
   font-size: 0.9rem;
-  margin-bottom: 0.5rem;
-  margin-top: 0.2rem;
+  margin-bottom: 0.1rem;
+  margin-top: 0.1rem;
   box-sizing: border-box;
 }
 
@@ -276,12 +306,12 @@ input[type="checkbox"] {
   font-weight: 700;
   white-space: nowrap;
 }
-.badge-phishing { background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger); }
+.badge-phishing { background: var(--warning-bg); border: 1px solid var(--warning-border); color: var(--warning); }
 .badge-spam     { background: var(--warning-bg); border: 1px solid var(--warning-border); color: var(--warning); }
 .badge-safe     { background: var(--safe-bg); border: 1px solid var(--safe-border); color: var(--safe); }
 /* Legacy aliases */
 .badge-ok      { background: var(--safe-bg); border: 1px solid var(--safe-border); color: var(--safe); }
-.badge-danger  { background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger); }
+.badge-danger  { background: var(--warning-bg); border: 1px solid var(--warning-border); color: var(--warning); }
 .badge-warn    { background: var(--warning-bg); border: 1px solid var(--warning-border); color: var(--warning); }
 
 /* ── Email card (Smail) ────────────────────────────────── */
@@ -305,7 +335,7 @@ input[type="checkbox"] {
   padding: 18px;
   box-shadow: var(--shadow);
 }
-.result-phishing { border-top: 4px solid var(--danger); }
+.result-phishing { border-top: 4px solid var(--accent); }
 .result-spam     { border-top: 4px solid var(--warning); }
 .result-safe     { border-top: 4px solid var(--safe); }
 
@@ -313,7 +343,7 @@ input[type="checkbox"] {
 .threat-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-left: 4px solid var(--danger);
+  border-left: 4px solid var(--accent);
   border-radius: 0 10px 10px 0;
   padding: 12px 14px;
   margin-bottom: 6px;
@@ -914,11 +944,13 @@ def run_and_stream(command: str) -> tuple[bool, str]:
             placeholder.code("".join(output_lines[-40:]), language="bash")
 
         code = process.returncode
+        full_output = "".join(output_lines)
+        placeholder.code(full_output, language="bash")
         if code == 0:
             status.update(label=tr("pipeline_done"), state="complete")
-            return True, "".join(output_lines)
+            return True, full_output
         status.update(label=f"{tr('pipeline_failed')} ({code})", state="error")
-        return False, "".join(output_lines)
+        return False, full_output
 
 
 def run_pipeline_action(title: str, command: str) -> None:
@@ -1133,8 +1165,6 @@ if not st.session_state["authenticated"]:
     c1, c2, c3 = st.columns([1, 1.2, 1])
     with c2:
         st.markdown("<div style='margin-top: 2.5rem;'></div>", unsafe_allow_html=True)
-        render_logo_html(width=120, center=True)
-        st.markdown("<br/>", unsafe_allow_html=True)
         st.markdown(
             f"<h3 style='margin:0 0 4px;color:var(--text);text-align:center;'>{tr('login_title')}</h3>",
             unsafe_allow_html=True,
@@ -1145,6 +1175,8 @@ if not st.session_state["authenticated"]:
         )
 
         with st.form("login_form"):
+            render_logo_html(width=120, center=True)
+            st.markdown("<div style='margin-top: 1rem;'></div>", unsafe_allow_html=True)
             email = st.text_input(tr("email"), placeholder="you@company.com")
             password = st.text_input(tr("password"), type="password")
             remember = st.checkbox(tr("remember_me"), value=True)
@@ -1176,10 +1208,10 @@ user = st.session_state["user"]
 # ── Sidebar ─────────────────────────────────────────────────────────────────
 with st.sidebar:
     render_logo_html(width=100)
-    st.markdown("<div style='margin-bottom:12px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-bottom:4px;'></div>", unsafe_allow_html=True)
     st.markdown(
         f"<div style='font-size:0.82rem;color:var(--text-2);margin-bottom:0;'>{tr('welcome')}</div>"
-        f"<div style='font-weight:700;font-size:0.97rem;color:var(--text);margin-bottom:12px;'>"
+        f"<div style='font-weight:700;font-size:0.97rem;color:var(--text);margin-bottom:4px;'>"
         f"{user['display_name']}</div>",
         unsafe_allow_html=True,
     )
@@ -1469,6 +1501,16 @@ elif page == "nav_playground":
     st.title(tr("playground_title"))
     st.caption(tr("playground_subtitle"))
 
+    # Config options at the top of the page (spanning full width)
+    st.markdown("<div style='margin-bottom:8px;'></div>", unsafe_allow_html=True)
+    c_llm, c_vt = st.columns(2)
+    with c_llm:
+        use_llm = st.checkbox(tr("enable_llm"), value=True, key="pg_use_llm")
+    with c_vt:
+        use_vt = st.checkbox(tr("enable_vt"), value=True, key="pg_use_vt")
+
+    st.markdown("---")
+
     left, right = st.columns([1, 1])
     with left:
         st.markdown(f"#### {tr('preset_scenarios')}")
@@ -1487,10 +1529,9 @@ elif page == "nav_playground":
             unsafe_allow_html=True,
         )
 
-        use_llm = st.checkbox(tr("enable_llm"), value=True)
-        use_vt = st.checkbox(tr("enable_vt"), value=True)
+        st.markdown("<div style='margin-bottom:12px;'></div>", unsafe_allow_html=True)
 
-        if st.button(tr("analyze_email"), type="primary", use_container_width=True):
+        if st.button(tr("analyze_email"), type="primary", use_container_width=True, key="pg_analyze_preset"):
             with st.spinner(tr("analyzing")):
                 result = classify_email(
                     sample["subject"], sample["sender"], sample["text"], use_llm, use_vt
@@ -1522,7 +1563,7 @@ elif page == "nav_playground":
 
         if submit_manual:
             with st.spinner(tr("analyzing")):
-                result = classify_email(m_subject, m_sender, m_body, True, True)
+                result = classify_email(m_subject, m_sender, m_body, use_llm, use_vt)
             st.session_state["last_result"] = result
             log_inference_event(
                 user_email=user["email"],
@@ -1586,9 +1627,7 @@ elif page == "nav_pipeline":
         else:
             st.warning("⚠️ " + tr("pipeline_last_error"))
 
-    if output := st.session_state.get("last_pipeline_output"):
-        with st.expander(tr("pipeline_output"), expanded=True):
-            st.code(output, language="bash")
+
 
 # ── Jeux de données ───────────────────────────────────────────────────────────
 elif page == "nav_datasets":
