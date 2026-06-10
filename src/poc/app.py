@@ -121,21 +121,47 @@ elif theme_mode == "Dark":
   .badge-phishing { background: #450A0A !important; border-color: #7F1D1D !important; color: #F87171 !important; }
   .badge-safe, .badge-ok { background: #022C22 !important; border-color: #064E3B !important; color: #34D399 !important; }
   .badge-danger { background: #450A0A !important; border-color: #7F1D1D !important; color: #F87171 !important; }
+  
   /* Forced dark: semantic buttons */
-  .semantic-btn-danger button { background-color: #450A0A !important; border-color: #7F1D1D !important; color: #F87171 !important; }
-  .semantic-btn-danger button:hover { background-color: #DC2626 !important; border-color: #DC2626 !important; color: #FFFFFF !important; }
-  .semantic-btn-safe button { background-color: #022C22 !important; border-color: #064E3B !important; color: #34D399 !important; }
-  .semantic-btn-safe button:hover { background-color: #059669 !important; border-color: #059669 !important; color: #FFFFFF !important; }
+  div[data-testid="stElementContainer"]:has(.semantic-btn-danger) + div[data-testid="stElementContainer"] button { background-color: #450A0A !important; border-color: #7F1D1D !important; color: #F87171 !important; }
+  div[data-testid="stElementContainer"]:has(.semantic-btn-danger) + div[data-testid="stElementContainer"] button:hover { background-color: #DC2626 !important; border-color: #DC2626 !important; color: #FFFFFF !important; }
+  div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid="stElementContainer"] button { background-color: #022C22 !important; border-color: #064E3B !important; color: #34D399 !important; }
+  div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid="stElementContainer"] button:hover { background-color: #059669 !important; border-color: #059669 !important; color: #FFFFFF !important; }
+  
   /* Forced dark: CTA button text must stay dark on amber */
   button[data-testid="stBaseButton-primary"],
+  button[data-testid="stBaseButton-primary"] *,
   .stButton > button[kind="primary"],
-  div[data-testid="stFormSubmitButton"] button { color: #1E293B !important; }
+  .stButton > button[kind="primary"] *,
+  div[data-testid="stFormSubmitButton"] button,
+  div[data-testid="stFormSubmitButton"] button * { color: #1E293B !important; }
   button[data-testid="stBaseButton-primary"]:hover,
+  button[data-testid="stBaseButton-primary"]:hover *,
   .stButton > button[kind="primary"]:hover,
-  div[data-testid="stFormSubmitButton"] button:hover { color: #FFFFFF !important; }
+  .stButton > button[kind="primary"]:hover *,
+  div[data-testid="stFormSubmitButton"] button:hover,
+  div[data-testid="stFormSubmitButton"] button:hover * { color: #FFFFFF !important; }
+  
   /* Forced dark: expander styling */
   [data-testid="stExpander"] { background: var(--surface) !important; border-color: var(--border) !important; }
   [data-testid="stExpander"] summary span { color: var(--text-2) !important; }
+  
+  /* Forced dark: collapsible sidebar button */
+  [data-testid="stSidebarCollapseButton"] button svg { fill: #FFFFFF !important; color: #FFFFFF !important; }
+  [data-testid="stSidebarCollapseButton"] button:hover svg { fill: var(--accent) !important; color: var(--accent) !important; }
+  
+  /* Forced dark: password reveal eye icon */
+  [data-testid="stTextInput"] button svg,
+  [data-testid="stPasswordInput"] button svg,
+  button[kind="icon"] svg { fill: #FFFFFF !important; color: #FFFFFF !important; }
+  [data-testid="stTextInput"] button:hover svg,
+  [data-testid="stPasswordInput"] button:hover svg,
+  button[kind="icon"]:hover svg { fill: var(--accent) !important; color: var(--accent) !important; }
+  
+  /* Forced dark: alert text contrast */
+  div[data-testid="stAlert"] p,
+  div[data-testid="stAlert"] span,
+  div[data-testid="stAlert"] div { color: #FFFFFF !important; }
   """
 
 st.set_page_config(
@@ -262,6 +288,11 @@ div[data-testid="stFormSubmitButton"] button {{
   font-weight: 600 !important;
   transition: all 0.15s ease !important;
 }}
+button[data-testid="stBaseButton-primary"] *,
+.stButton > button[kind="primary"] *,
+div[data-testid="stFormSubmitButton"] button * {{
+  color: #1E293B !important;
+}}
 button[data-testid="stBaseButton-primary"]:hover,
 button[data-testid="stBaseButton-primary"]:focus,
 button[data-testid="stBaseButton-primary"]:active,
@@ -273,6 +304,17 @@ div[data-testid="stFormSubmitButton"] button:focus,
 div[data-testid="stFormSubmitButton"] button:active {{
   background: var(--accent-dark) !important;
   border-color: var(--accent-dark) !important;
+  color: #FFFFFF !important;
+}}
+button[data-testid="stBaseButton-primary"]:hover *,
+button[data-testid="stBaseButton-primary"]:focus *,
+button[data-testid="stBaseButton-primary"]:active *,
+.stButton > button[kind="primary"]:hover *,
+.stButton > button[kind="primary"]:focus *,
+.stButton > button[kind="primary"]:active *,
+div[data-testid="stFormSubmitButton"] button:hover *,
+div[data-testid="stFormSubmitButton"] button:focus *,
+div[data-testid="stFormSubmitButton"] button:active * {{
   color: #FFFFFF !important;
 }}
 
@@ -693,6 +735,7 @@ div[data-testid="stMarkdownContainer"] h6 {{
   font-size: 0.82rem;
   color: var(--text-2);
   gap: 0;
+  margin-bottom: 1.5rem !important;
 }}
 .inference-status .status-label {{
   font-weight: 600;
@@ -726,7 +769,7 @@ button[kind="icon"] svg,
 }}
 
 /* ── Semantic button: Phishing report (red) ───────────── */
-.semantic-btn-danger button {{
+div[data-testid="stElementContainer"]:has(.semantic-btn-danger) + div[data-testid="stElementContainer"] button {{
   background-color: #FEF2F2 !important;
   border: 1px solid #FECACA !important;
   color: #DC2626 !important;
@@ -734,36 +777,40 @@ button[kind="icon"] svg,
   border-radius: 8px !important;
   transition: all 0.15s ease !important;
 }}
-.semantic-btn-danger button:hover {{
+div[data-testid="stElementContainer"]:has(.semantic-btn-danger) + div[data-testid="stElementContainer"] button *,
+div[data-testid="stElementContainer"]:has(.semantic-btn-danger) + div[data-testid="stElementContainer"] button:hover * {{
+  color: inherit !important;
+}}
+div[data-testid="stElementContainer"]:has(.semantic-btn-danger) + div[data-testid="stElementContainer"] button:hover {{
   background-color: #DC2626 !important;
   border-color: #DC2626 !important;
   color: #FFFFFF !important;
 }}
 @media (prefers-color-scheme: dark) {{
-  .semantic-btn-danger button {{
+  div[data-testid="stElementContainer"]:has(.semantic-btn-danger) + div[data-testid="stElementContainer"] button {{
     background-color: #450A0A !important;
     border-color: #7F1D1D !important;
     color: #F87171 !important;
   }}
-  .semantic-btn-danger button:hover {{
+  div[data-testid="stElementContainer"]:has(.semantic-btn-danger) + div[data-testid="stElementContainer"] button:hover {{
     background-color: #DC2626 !important;
     border-color: #DC2626 !important;
     color: #FFFFFF !important;
   }}
 }}
-[data-theme="dark"] .semantic-btn-danger button {{
+[data-theme="dark"] div[data-testid="stElementContainer"]:has(.semantic-btn-danger) + div[data-testid="stElementContainer"] button {{
   background-color: #450A0A !important;
   border-color: #7F1D1D !important;
   color: #F87171 !important;
 }}
-[data-theme="dark"] .semantic-btn-danger button:hover {{
+[data-theme="dark"] div[data-testid="stElementContainer"]:has(.semantic-btn-danger) + div[data-testid="stElementContainer"] button:hover {{
   background-color: #DC2626 !important;
   border-color: #DC2626 !important;
   color: #FFFFFF !important;
 }}
 
 /* ── Semantic button: Safe / false positive (green) ───── */
-.semantic-btn-safe button {{
+div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid="stElementContainer"] button {{
   background-color: #ECFDF5 !important;
   border: 1px solid #A7F3D0 !important;
   color: #059669 !important;
@@ -771,29 +818,33 @@ button[kind="icon"] svg,
   border-radius: 8px !important;
   transition: all 0.15s ease !important;
 }}
-.semantic-btn-safe button:hover {{
+div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid="stElementContainer"] button *,
+div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid="stElementContainer"] button:hover * {{
+  color: inherit !important;
+}}
+div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid="stElementContainer"] button:hover {{
   background-color: #059669 !important;
   border-color: #059669 !important;
   color: #FFFFFF !important;
 }}
 @media (prefers-color-scheme: dark) {{
-  .semantic-btn-safe button {{
+  div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid="stElementContainer"] button {{
     background-color: #022C22 !important;
     border-color: #064E3B !important;
     color: #34D399 !important;
   }}
-  .semantic-btn-safe button:hover {{
+  div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid="stElementContainer"] button:hover {{
     background-color: #059669 !important;
     border-color: #059669 !important;
     color: #FFFFFF !important;
   }}
 }}
-[data-theme="dark"] .semantic-btn-safe button {{
+[data-theme="dark"] div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid="stElementContainer"] button {{
   background-color: #022C22 !important;
   border-color: #064E3B !important;
   color: #34D399 !important;
 }}
-[data-theme="dark"] .semantic-btn-safe button:hover {{
+[data-theme="dark"] div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid="stElementContainer"] button:hover {{
   background-color: #059669 !important;
   border-color: #059669 !important;
   color: #FFFFFF !important;
@@ -1924,7 +1975,9 @@ elif page == "nav_threat_log":
             ts = event["created_at"].replace("T", " ")[:16]
             score_pct = float(event.get("composite_score") or 0.0) * 100.0
             corr_note = ""
-            if event.get("override_verdict"):
+            if event.get("override_verdict") == "phishing":
+                corr_note = f" &nbsp;<span class='badge badge-phishing'>{tr('corrected_label')}</span>"
+            elif event.get("override_verdict"):
                 corr_note = f" &nbsp;<span class='badge badge-safe'>{tr('corrected_label')}</span>"
             snip = _delink(_safe_text(event.get("snippet") or "", 200))
             st.markdown(
@@ -1936,7 +1989,7 @@ elif page == "nav_threat_log":
             )
             with st.expander(tr("expand_body"), expanded=False):
                 st.markdown(
-                    f"<p style='font-size:0.9rem;color:var(--text);'>{snip}</p>",
+                    f"<p style='font-size:0.9rem;color:#1E293B !important;'>{snip}</p>",
                     unsafe_allow_html=True,
                 )
                 # Semantic green button for marking safe
