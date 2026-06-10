@@ -129,22 +129,39 @@ elif theme_mode == "Dark":
   div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid="stElementContainer"] button:hover { background-color: #059669 !important; border-color: #059669 !important; color: #FFFFFF !important; }
   
   /* Forced dark: CTA button text must stay dark on amber */
-  button[data-testid="stBaseButton-primary"],
-  button[data-testid="stBaseButton-primary"] *,
+  button[data-testid^="stBaseButton-primary"],
+  button[data-testid^="stBaseButton-primary"] *,
   .stButton > button[kind="primary"],
   .stButton > button[kind="primary"] *,
   div[data-testid="stFormSubmitButton"] button,
   div[data-testid="stFormSubmitButton"] button * { color: #1E293B !important; }
-  button[data-testid="stBaseButton-primary"]:hover,
-  button[data-testid="stBaseButton-primary"]:hover *,
+  button[data-testid^="stBaseButton-primary"]:hover,
+  button[data-testid^="stBaseButton-primary"]:hover *,
   .stButton > button[kind="primary"]:hover,
   .stButton > button[kind="primary"]:hover *,
   div[data-testid="stFormSubmitButton"] button:hover,
   div[data-testid="stFormSubmitButton"] button:hover * { color: #FFFFFF !important; }
   
+  /* Forced dark: Active sidebar navigation button overrides */
+  [data-testid="stSidebar"] button[data-testid^="stBaseButton-primary"] *,
+  [data-testid="stSidebar"] button[kind="primary"] * {
+    color: var(--primary) !important;
+  }
+  [data-testid="stSidebar"] button[data-testid^="stBaseButton-primary"]:hover *,
+  [data-testid="stSidebar"] button[kind="primary"]:hover * {
+    color: var(--primary) !important;
+  }
+  
   /* Forced dark: expander styling */
   [data-testid="stExpander"] { background: var(--surface) !important; border-color: var(--border) !important; }
   [data-testid="stExpander"] summary span { color: var(--text-2) !important; }
+  
+  /* Forced dark: Open expander summary text and body snippet */
+  [data-testid="stExpander"][open] summary span,
+  [data-testid="stExpander"][open] summary p,
+  [data-testid="stExpander"][open] p {
+    color: #1E293B !important;
+  }
   
   /* Forced dark: collapsible sidebar button */
   [data-testid="stSidebarCollapseButton"] button svg { fill: #FFFFFF !important; color: #FFFFFF !important; }
@@ -159,9 +176,12 @@ elif theme_mode == "Dark":
   button[kind="icon"]:hover svg { fill: var(--accent) !important; color: var(--accent) !important; }
   
   /* Forced dark: alert text contrast */
-  div[data-testid="stAlert"] p,
-  div[data-testid="stAlert"] span,
-  div[data-testid="stAlert"] div { color: #FFFFFF !important; }
+  div[data-testid="stAlert"],
+  div[data-testid="stAlert"] *,
+  div[data-testid="stNotification"],
+  div[data-testid="stNotification"] *,
+  .stAlert,
+  .stAlert * { color: #FFFFFF !important; }
   """
 
 st.set_page_config(
