@@ -96,6 +96,7 @@ docs/simplon/
 docs/model/
 docs/brand/*.md
 tasks/
+scratch/
 
 research/
 
@@ -112,3 +113,4 @@ relay.md
 data/exports/
 simplon-coverage-checklist.md
 *.png
+.streamlit/

@@ -523,9 +523,10 @@ async def seed(
         # keep an idle transaction open while we compute provenance estimates.
         await session.rollback()
 
-        if match_count == 0:
+        if match_count == 0 and not materialize_missing:
             logger.error(
-                "Zero matches found — DB may not have annotations yet. Run normalize + annotate first."
+                "Zero matches found — DB may not have annotations yet. "
+                "Run normalize + annotate first or re-run with --materialize-missing."
             )
             raise SystemExit(1)
 

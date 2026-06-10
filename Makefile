@@ -14,6 +14,7 @@
         annotate \
         generate-data dataset-build dataset-export \
         seed-frozen-dataset \
+		poc-replay-frozen \
         pipeline-push demo-v1 demo-v2 \
         poc db-seed r2-freeze-proof
 
@@ -65,6 +66,7 @@ help:
 	@echo "  make dataset-build             - Build DB-backed dataset from annotated normalized messages"
 	@echo "  make dataset-export            - Serialize frozen dataset to CSV/JSONL for PyTorch"
 	@echo "  make seed-frozen-dataset       - Seed current_frozen provenance into data_dataset + data_dataset_item"
+	@echo "  make poc-replay-frozen         - Idempotent replay of frozen production dataset lineage for POC"
 	@echo ""
 	@echo "  POC"
 	@echo "  make poc                       - Launch Streamlit POC dashboard"
@@ -232,6 +234,22 @@ dataset-export:
 seed-frozen-dataset:
 	@echo "Seeding current_frozen provenance into data_dataset + data_dataset_item..."
 	uv run python scripts/data_platform/seed_frozen_dataset.py $(SEED_ARGS)
+
+poc-replay-frozen:
+	@echo "Running deterministic POC replay from frozen provenance (with local data DB reset)..."
+	@db_url="$${SICURRE_DATA_PLATFORM_DATABASE_URL:-sqlite+aiosqlite:///$$(pwd)/data/local/sicurre_dataplatform.db}"; \
+	case "$$db_url" in \
+	  sqlite+aiosqlite:///*) reset_path="$${db_url#sqlite+aiosqlite:///}" ;; \
+	  sqlite:///*) reset_path="$${db_url#sqlite:///}" ;; \
+	  *) echo "Refusing to reset non-SQLite data-platform DB: $$db_url"; exit 1 ;; \
+	esac; \
+	echo "Resetting $$reset_path"; \
+	rm -f "$$reset_path" "$$reset_path-shm" "$$reset_path-wal"
+	uv run alembic upgrade head
+	$(MAKE) normalize
+	$(MAKE) annotate
+	$(MAKE) seed-frozen-dataset SEED_ARGS="--materialize-missing --sync-existing-version"
+	@echo "POC frozen replay completed: deterministic parity synced to current_frozen."
 
 # ── Pipeline & Demos ──────────────────────────────────────────────────────────
 
