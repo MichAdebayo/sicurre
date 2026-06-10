@@ -13,7 +13,20 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 LOCAL_DATA_DIR = ROOT_DIR / "data" / "local"
 
 POC_AUTH_DB_PATH = LOCAL_DATA_DIR / "sicurre.db"
-POC_DATA_DB_PATH = LOCAL_DATA_DIR / "sicurre_datapatform.db"
+
+
+def _resolve_poc_data_db_path() -> Path:
+    if configured := os.environ.get("SICURRE_POC_DATA_DB_PATH"):
+        return Path(configured).expanduser().resolve()
+
+    canonical = LOCAL_DATA_DIR / "sicurre_dataplatform.db"
+    legacy_typo = LOCAL_DATA_DIR / "sicurre_datapatform.db"
+    if not canonical.exists() and legacy_typo.exists():
+        legacy_typo.rename(canonical)
+    return canonical
+
+
+POC_DATA_DB_PATH = _resolve_poc_data_db_path()
 
 POC_AUTH_DB_ASYNC_URL = f"sqlite+aiosqlite:///{POC_AUTH_DB_PATH.as_posix()}"
 POC_DATA_DB_ASYNC_URL = f"sqlite+aiosqlite:///{POC_DATA_DB_PATH.as_posix()}"

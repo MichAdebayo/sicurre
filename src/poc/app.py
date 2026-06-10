@@ -24,23 +24,31 @@ from uuid import uuid4
 import bcrypt
 import httpx
 import streamlit as st
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import OperationalError
 
 try:
-    from src.poc.local_runtime import (
+    from poc.local_runtime import (
         POC_AUTH_DB_PATH,
         POC_DATA_DB_PATH,
         build_poc_command_env,
         ensure_local_auth_db,
     )
 except ModuleNotFoundError:
-    from local_runtime import (  # type: ignore
-        POC_AUTH_DB_PATH,
-        POC_DATA_DB_PATH,
-        build_poc_command_env,
-        ensure_local_auth_db,
-    )
+    try:
+        from src.poc.local_runtime import (
+            POC_AUTH_DB_PATH,
+            POC_DATA_DB_PATH,
+            build_poc_command_env,
+            ensure_local_auth_db,
+        )
+    except ModuleNotFoundError:
+        from local_runtime import (  # type: ignore
+            POC_AUTH_DB_PATH,
+            POC_DATA_DB_PATH,
+            build_poc_command_env,
+            ensure_local_auth_db,
+        )
 
 
 ensure_local_auth_db()
@@ -49,24 +57,104 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 I18N_PATH = ROOT_DIR / "src" / "poc" / "i18n.json"
 LOGO_PATH = ROOT_DIR / "src" / "app" / "assets" / "sicurre.svg"
 
-INFERENCE_URL = os.environ.get("SICURRE_POC_INFERENCE_API_URL", "http://127.0.0.1:8000/v1/classify")
-INFERENCE_API_KEY = os.environ.get("SICURRE_POC_INFERENCE_API_KEY", os.environ.get("INFERENCE_API_KEY", ""))
+INFERENCE_URL = os.environ.get(
+    "SICURRE_POC_INFERENCE_API_URL", "http://127.0.0.1:8000/v1/classify"
+)
+INFERENCE_API_KEY = os.environ.get(
+    "SICURRE_POC_INFERENCE_API_KEY", os.environ.get("INFERENCE_API_KEY", "")
+)
+
+# ── Dynamic Theme Mode Override ──────────────────────────────────────────────
+if "theme_mode" not in st.session_state:
+    st.session_state["theme_mode"] = "System"
+
+theme_mode = st.session_state["theme_mode"]
+force_theme_css = ""
+if theme_mode == "Light":
+    force_theme_css = """
+  :root {
+    --bg: #F1F5F9 !important;
+    --surface: #FFFFFF !important;
+    --border: #CBD5E1 !important;
+    --border-line: #CBD5E1 !important;
+    --text: #0F2E7A !important;
+    --text-2: #334155 !important;
+    --text-muted: #64748B !important;
+    --primary: #1B4FCC !important;
+    --primary-dark: #1239A6 !important;
+    --primary-light: #EEF3FF !important;
+    --primary-border: #CBD5E1 !important;
+    --accent: #F59E0B !important;
+    --accent-dark: #B45309 !important;
+    --danger: #D97706 !important;
+    --danger-bg: #FFFBEB !important;
+    --danger-border: #FDE68A !important;
+    --nav-hover: #EEF3FF !important;
+    --danger-semantic: #EF4444 !important;
+    --safe-semantic: #10B981 !important;
+  }
+  """
+elif theme_mode == "Dark":
+    force_theme_css = """
+  :root {
+    --bg: #1E293B !important;
+    --surface: #334155 !important;
+    --border: #475569 !important;
+    --border-line: rgba(255, 255, 255, 0.25) !important;
+    --text: #F1F5F9 !important;
+    --text-2: #CBD5E1 !important;
+    --text-muted: #94A3B8 !important;
+    --primary: #60A5FA !important;
+    --primary-dark: #3B82F6 !important;
+    --primary-light: #1E3A5F !important;
+    --primary-border: #475569 !important;
+    --accent: #F59E0B !important;
+    --accent-dark: #B45309 !important;
+    --danger: #F59E0B !important;
+    --danger-bg: #451A03 !important;
+    --danger-border: #78350F !important;
+    --nav-hover: #1E3A5F !important;
+    --danger-semantic: #EF4444 !important;
+    --safe-semantic: #34D399 !important;
+  }
+  /* Forced dark: badge overrides */
+  .badge-phishing { background: #450A0A !important; border-color: #7F1D1D !important; color: #F87171 !important; }
+  .badge-safe, .badge-ok { background: #022C22 !important; border-color: #064E3B !important; color: #34D399 !important; }
+  .badge-danger { background: #450A0A !important; border-color: #7F1D1D !important; color: #F87171 !important; }
+  /* Forced dark: semantic buttons */
+  .semantic-btn-danger button { background-color: #450A0A !important; border-color: #7F1D1D !important; color: #F87171 !important; }
+  .semantic-btn-danger button:hover { background-color: #DC2626 !important; border-color: #DC2626 !important; color: #FFFFFF !important; }
+  .semantic-btn-safe button { background-color: #022C22 !important; border-color: #064E3B !important; color: #34D399 !important; }
+  .semantic-btn-safe button:hover { background-color: #059669 !important; border-color: #059669 !important; color: #FFFFFF !important; }
+  /* Forced dark: CTA button text must stay dark on amber */
+  button[data-testid="stBaseButton-primary"],
+  .stButton > button[kind="primary"],
+  div[data-testid="stFormSubmitButton"] button { color: #1E293B !important; }
+  button[data-testid="stBaseButton-primary"]:hover,
+  .stButton > button[kind="primary"]:hover,
+  div[data-testid="stFormSubmitButton"] button:hover { color: #FFFFFF !important; }
+  /* Forced dark: expander styling */
+  [data-testid="stExpander"] { background: var(--surface) !important; border-color: var(--border) !important; }
+  [data-testid="stExpander"] summary span { color: var(--text-2) !important; }
+  """
 
 st.set_page_config(
-    page_title="Sicurre - POC Locale",
+    page_title="Sicurre - POC",
     page_icon="S",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 st.markdown(
-    """
+    f"""
 <style>
+{force_theme_css}
 /* ── Light mode tokens ────────────────────────────────── */
-:root {
+:root {{
   --bg: #F1F5F9;
   --surface: #FFFFFF;
   --border: #CBD5E1;
+  --border-line: #CBD5E1;
   --text: #0F2E7A;
   --text-2: #334155;
   --text-muted: #64748B;
@@ -76,9 +164,9 @@ st.markdown(
   --primary-border: #CBD5E1;
   --accent: #F59E0B;
   --accent-dark: #B45309;
-  --danger: #EF4444;
-  --danger-bg: #FEF2F2;
-  --danger-border: #FECACA;
+  --danger: #D97706;
+  --danger-bg: #FFFBEB;
+  --danger-border: #FDE68A;
   --safe: #10B981;
   --safe-bg: #ECFDF5;
   --safe-border: #A7F3D0;
@@ -87,14 +175,17 @@ st.markdown(
   --warning-border: #FDE68A;
   --nav-hover: #EEF3FF;
   --shadow: 0 1px 3px rgba(0,0,0,0.08);
-}
+  --danger-semantic: #EF4444;
+  --safe-semantic: #10B981;
+}}
 
 /* ── Dark mode tokens (OS preference) ────────────────── */
-@media (prefers-color-scheme: dark) {
-  :root {
+@media (prefers-color-scheme: dark) {{
+  :root {{
     --bg: #1E293B;
     --surface: #334155;
     --border: #475569;
+    --border-line: rgba(255, 255, 255, 0.25);
     --text: #F1F5F9;
     --text-2: #CBD5E1;
     --text-muted: #94A3B8;
@@ -104,9 +195,9 @@ st.markdown(
     --primary-border: #475569;
     --accent: #F59E0B;
     --accent-dark: #B45309;
-    --danger: #F87171;
-    --danger-bg: #450A0A;
-    --danger-border: #7F1D1D;
+    --danger: #F59E0B;
+    --danger-bg: #451A03;
+    --danger-border: #78350F;
     --safe: #34D399;
     --safe-bg: #022C22;
     --safe-border: #064E3B;
@@ -115,189 +206,376 @@ st.markdown(
     --warning-border: #78350F;
     --nav-hover: #1E3A5F;
     --shadow: 0 1px 3px rgba(0,0,0,0.4);
-  }
-}
+    --danger-semantic: #EF4444;
+    --safe-semantic: #34D399;
+  }}
+}}
 
 /* ── Streamlit dark theme ──────────────────────────────── */
-[data-theme="dark"] {
+[data-theme="dark"] {{
   --bg: #1E293B; --surface: #334155; --border: #475569;
+  --border-line: rgba(255, 255, 255, 0.25);
   --text: #F1F5F9; --text-2: #CBD5E1; --text-muted: #94A3B8;
   --primary: #60A5FA; --primary-dark: #3B82F6;
   --primary-light: #1E3A5F; --primary-border: #475569;
   --accent: #F59E0B; --accent-dark: #B45309;
-  --danger: #F87171; --danger-bg: #450A0A; --danger-border: #7F1D1D;
+  --danger: #F59E0B; --danger-bg: #451A03; --danger-border: #78350F;
   --safe: #34D399; --safe-bg: #022C22; --safe-border: #064E3B;
   --warning: #FBBF24; --warning-bg: #451A03; --warning-border: #78350F;
   --nav-hover: #1E3A5F; --shadow: 0 1px 3px rgba(0,0,0,0.4);
-}
+  --danger-semantic: #EF4444; --safe-semantic: #34D399;
+}}
 
 /* ── App shell ─────────────────────────────────────────── */
-.stApp { background: var(--bg); }
+.stApp {{ background: var(--bg) !important; color: var(--text) !important; }}
 
-[data-testid="stHeader"] {
+[data-testid="stHeader"] {{
   background: var(--surface) !important;
   border-bottom: 1px solid var(--border) !important;
-}
+}}
 
-[data-testid="stSidebar"] {
+[data-testid="stSidebar"] {{
   background: var(--surface) !important;
   border-right: 1px solid var(--border) !important;
-}
+}}
 
 /* ── Hide chrome ───────────────────────────────────────── */
-#MainMenu { visibility: hidden; }
-footer { visibility: hidden; }
-[data-testid="stDeployButton"] { display: none; }
+#MainMenu {{ visibility: hidden; }}
+footer {{ visibility: hidden; }}
+[data-testid="stDeployButton"] {{ display: none; }}
 
 /* ── Logo background fix for dark mode clash ──────────── */
-.logo-container {
+.logo-container {{
   display: inline-flex;
   align-items: center;
   justify-content: center;
-}
+}}
 
 /* ── Global action buttons (primary CTA) ──────────────── */
 button[data-testid="stBaseButton-primary"],
 .stButton > button[kind="primary"],
-div[data-testid="stFormSubmitButton"] button {
+div[data-testid="stFormSubmitButton"] button {{
   background: var(--accent) !important;
-  color: #FFFFFF !important;
+  color: #1E293B !important;
   border: 1px solid var(--accent) !important;
   border-radius: 8px !important;
   font-weight: 600 !important;
   transition: all 0.15s ease !important;
-}
+}}
 button[data-testid="stBaseButton-primary"]:hover,
+button[data-testid="stBaseButton-primary"]:focus,
+button[data-testid="stBaseButton-primary"]:active,
 .stButton > button[kind="primary"]:hover,
-div[data-testid="stFormSubmitButton"] button:hover {
+.stButton > button[kind="primary"]:focus,
+.stButton > button[kind="primary"]:active,
+div[data-testid="stFormSubmitButton"] button:hover,
+div[data-testid="stFormSubmitButton"] button:focus,
+div[data-testid="stFormSubmitButton"] button:active {{
   background: var(--accent-dark) !important;
   border-color: var(--accent-dark) !important;
-}
+  color: #FFFFFF !important;
+}}
 
 /* ── Secondary buttons ────────────────────────────────── */
-button[data-testid="stBaseButton-secondary"] {
+button[data-testid="stBaseButton-secondary"] {{
   border: 1px solid var(--border) !important;
   background: var(--surface) !important;
-  color: var(--text) !important;
+  color: var(--text-2) !important;
   border-radius: 8px !important;
   font-weight: 500 !important;
   transition: all 0.15s ease !important;
-}
-button[data-testid="stBaseButton-secondary"]:hover {
-  border-color: var(--primary) !important;
+}}
+button[data-testid="stBaseButton-secondary"]:hover {{
+  border-color: var(--accent) !important;
   background: var(--primary-light) !important;
-  color: var(--primary) !important;
-}
+  color: var(--text) !important;
+}}
+
+/* ── Phishing Red Alert Button (Smail simulation) ──────── */
+button[aria-label="Signaler comme phishing"],
+button[aria-label="Report as phishing"] {{
+  background-color: var(--danger-semantic) !important;
+  border-color: var(--danger-semantic) !important;
+  color: #FFFFFF !important;
+}}
+button[aria-label="Signaler comme phishing"]:hover,
+button[aria-label="Report as phishing"]:hover {{
+  background-color: #DC2626 !important;
+  border-color: #DC2626 !important;
+  color: #FFFFFF !important;
+}}
 
 /* ── Forms ────────────────────────────────────────────── */
-[data-testid="stForm"] {
+[data-testid="stForm"] {{
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-}
+}}
+
+/* ── Focus rings & Text Contrast on input fields ─────── */
+div[data-baseweb="input"] > div {{
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
+}}
+div[data-baseweb="input"]:focus-within,
+div[data-baseweb="textarea"]:focus-within,
+div[data-baseweb="input"]:focus-within > div,
+div[data-baseweb="textarea"]:focus-within > div {{
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 1px var(--accent) !important;
+}}
+input[data-testid="stTextInput-Input"]:focus,
+textarea[data-testid="stTextArea-Input"]:focus {{
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 1px var(--accent) !important;
+}}
+
+input[data-testid="stTextInput-Input"],
+textarea[data-testid="stTextArea-Input"],
+div[data-baseweb="input"] input,
+div[data-baseweb="textarea"] textarea,
+[data-baseweb="select"] div,
+[data-baseweb="select"] select {{
+  color: var(--text) !important;
+}}
+
+/* Disabled text inputs in dark and light modes ───────── */
+div[data-baseweb="input"] input:disabled,
+div[data-baseweb="textarea"] textarea:disabled,
+div[data-baseweb="input"] input[disabled],
+div[data-baseweb="textarea"] textarea[disabled] {{
+  color: var(--text-2) !important;
+  -webkit-text-fill-color: var(--text-2) !important;
+  background-color: var(--bg) !important;
+  opacity: 1 !important;
+  cursor: not-allowed !important;
+}}
+div[data-baseweb="input"]:has(input:disabled),
+div[data-baseweb="input"]:has(input[disabled]) {{
+  background-color: var(--bg) !important;
+  border-color: var(--border) !important;
+  opacity: 1 !important;
+}}
+
+div[data-baseweb="input"],
+div[data-baseweb="textarea"],
+div[data-baseweb="select"] {{
+  background-color: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+}}
+
+div[data-baseweb="input"] *,
+div[data-baseweb="textarea"] *,
+div[data-baseweb="select"] * {{
+  background-color: transparent !important;
+}}
+input::placeholder,
+textarea::placeholder,
+input[data-testid="stTextInput-Input"]::placeholder,
+textarea[data-testid="stTextArea-Input"]::placeholder {{
+  color: var(--text-muted) !important;
+  opacity: 0.8 !important;
+}}
+
+/* Popover select menu dropdown contrast */
+div[data-baseweb="popover"] div,
+div[data-baseweb="popover"] span,
+[role="listbox"] li,
+[role="listbox"] div {{
+  color: var(--text-2) !important;
+  background-color: var(--surface) !important;
+}}
+[role="listbox"] li:hover,
+[role="listbox"] div:hover {{
+  background-color: var(--primary-light) !important;
+  color: var(--primary) !important;
+}}
 
 /* ── Checkboxes ───────────────────────────────────────── */
-[data-baseweb="checkbox"] > div:first-child {
-  /* Let's try to override Streamlit checkbox active state if possible. Streamlit 1.30+ uses complex divs. */
-}
-/* A simpler way to override checkbox color is using accent-color */
-input[type="checkbox"] {
+input[type="checkbox"] {{
   accent-color: var(--accent) !important;
-}
-[data-testid="stCheckbox"] label span {
-  accent-color: var(--accent) !important;
-}
-div[data-baseweb="checkbox"] > div:first-child {
+}}
+[data-testid="stCheckbox"] label,
+[data-testid="stCheckbox"] span,
+[data-testid="stCheckbox"] div,
+[data-baseweb="checkbox"] span,
+[data-baseweb="checkbox"] div {{
+  color: var(--text-2) !important;
+}}
+div[data-baseweb="checkbox"] > div:first-child {{
+  border-color: var(--border) !important;
+}}
+div[data-baseweb="checkbox"]:focus-within > div:first-child {{
   border-color: var(--accent) !important;
-}
-div[data-baseweb="checkbox"] input:checked + div {
+}}
+div[data-baseweb="checkbox"] input:checked + div {{
   background-color: var(--accent) !important;
   border-color: var(--accent) !important;
-}
+}}
+div[data-baseweb="checkbox"] input:checked + div svg {{
+  fill: #FFFFFF !important;
+  stroke: #FFFFFF !important;
+}}
+div[data-baseweb="checkbox"]:hover div {{
+  border-color: var(--accent) !important;
+}}
+
+/* ── Streamlit Tabs active highlight ──────────────────── */
+button[data-baseweb="tab"] {{
+  color: var(--text-muted) !important;
+  transition: color 0.15s ease !important;
+}}
+button[data-baseweb="tab"]:hover {{
+  color: var(--accent) !important;
+}}
+button[data-baseweb="tab"][aria-selected="true"] {{
+  color: var(--accent) !important;
+  border-bottom-color: var(--accent) !important;
+}}
+div[data-baseweb="tab-highlight"] {{
+  background-color: var(--accent) !important;
+}}
 
 /* ── Sidebar spacing & positioning ────────────────────── */
-[data-testid="stSidebarUserContent"] {
-  padding-top: 1.2rem !important;
-  padding-bottom: 0.8rem !important;
-}
-[data-testid="stSidebar"] hr {
-  margin-top: 0.5rem !important;
-  margin-bottom: 0.5rem !important;
-}
-[data-testid="stSidebar"] [data-testid="stElementContainer"] {
-  width: 100% !important;
-}
-[data-testid="stSidebar"] .stButton {
-  margin-bottom: 0.05rem !important;
-  margin-top: 0.05rem !important;
-  width: 100% !important;
-}
-[data-testid="stSidebar"] .stButton > button {
+[data-testid="stSidebarUserContent"] {{
+  padding-top: 2rem !important;
+  padding-bottom: 0.4rem !important;
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+}}
+/* Show header but make it transparent so collapse button is visible */
+[data-testid="stSidebarHeader"] {{
   background: transparent !important;
   border: none !important;
-  border-radius: 6px !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+}}
+[data-testid="stSidebarCollapseButton"] {{
+  position: absolute !important;
+  top: 0.8rem !important;
+  right: 0.25rem !important;
+  z-index: 10 !important;
+}}
+[data-testid="stSidebarCollapseButton"] button {{
+  color: var(--text-muted) !important;
+  background: transparent !important;
+  border: none !important;
+}}
+[data-testid="stSidebarCollapseButton"] button:hover {{
+  color: var(--accent) !important;
+}}
+[data-testid="stSidebar"] hr,
+.stApp hr {{
+  border: none !important;
+  border-top: 1px solid var(--border) !important;
+  margin-top: 1.2rem !important;
+  margin-bottom: 1.2rem !important;
+  opacity: 1 !important;
+}}
+[data-testid="stSidebar"] [data-testid="stElementContainer"] {{
+  width: 100% !important;
+}}
+[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.stButton) {{
+  margin-top: 0px !important;
+  margin-bottom: 0px !important;
+  padding: 0 !important;
+}}
+[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {{
+  gap: 0.05rem !important;
+}}
+[data-testid="stSidebar"] .stButton {{
+  margin-bottom: 0.02rem !important;
+  margin-top: 0.02rem !important;
+  width: 100% !important;
+  padding: 0 !important;
+}}
+[data-testid="stSidebar"] .stButton > button {{
+  background: transparent !important;
+  border-left: 3px solid transparent !important;
+  border-top: none !important;
+  border-right: none !important;
+  border-bottom: none !important;
+  border-radius: 0 6px 6px 0 !important;
   color: var(--text-2) !important;
   font-weight: 500 !important;
   font-size: 0.9rem !important;
   text-align: left !important;
   justify-content: flex-start !important;
   width: 100% !important;
-  padding: 0.35rem 0.75rem !important;
+  padding: 0.25rem 0.75rem !important;
   transition: background 0.12s ease, color 0.12s ease !important;
-}
-[data-testid="stSidebar"] .stButton > button > div {
+}}
+[data-testid="stSidebar"] .stButton > button > div {{
   justify-content: flex-start !important;
-}
-[data-testid="stSidebar"] .stButton > button:hover {
+}}
+[data-testid="stSidebar"] .stButton > button:hover {{
   background: var(--nav-hover) !important;
   color: var(--primary) !important;
-}
+}}
 
-.nav-active {
-  display: block;
-  width: 100% !important;
-  padding: 0.35rem 0.75rem;
-  background: var(--primary-light);
-  border-left: 3px solid var(--primary);
-  border-radius: 0 6px 6px 0;
-  color: var(--primary);
-  font-weight: 700;
-  font-size: 0.9rem;
-  margin-bottom: 0.1rem;
-  margin-top: 0.1rem;
-  box-sizing: border-box;
-}
+/* Active primary button in sidebar (No Layout Shift) */
+[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"],
+[data-testid="stSidebar"] button[kind="primary"] {{
+  background: var(--primary-light) !important;
+  border-left: 3px solid var(--primary) !important;
+  border-top: none !important;
+  border-right: none !important;
+  border-bottom: none !important;
+  border-radius: 0 6px 6px 0 !important;
+  color: var(--primary) !important;
+  font-weight: 700 !important;
+}}
+
+/* ── General Text Contrast & Labels ───────────────────── */
+label[data-testid="stWidgetLabel"] p,
+div[data-testid="stWidgetLabel"] p {{
+  color: var(--text) !important;
+}}
+div[data-testid="stMarkdownContainer"] > p {{
+  color: var(--text-2) !important;
+}}
+div[data-testid="stAlert"] p {{
+  color: currentColor !important;
+}}
+div[data-testid="stMarkdownContainer"] h1,
+div[data-testid="stMarkdownContainer"] h2,
+div[data-testid="stMarkdownContainer"] h3,
+div[data-testid="stMarkdownContainer"] h4,
+div[data-testid="stMarkdownContainer"] h5,
+div[data-testid="stMarkdownContainer"] h6 {{
+  color: var(--text) !important;
+}}
 
 /* ── KPI cards ─────────────────────────────────────────── */
-.kpi {
+.kpi {{
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 12px 14px;
   box-shadow: var(--shadow);
-}
-.kpi .label {
+}}
+.kpi .label {{
   font-size: 0.72rem;
   font-weight: 700;
   color: var(--text-2);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 4px;
-}
-.kpi .value {
+}}
+.kpi .value {{
   font-size: 1.7rem;
   font-weight: 800;
   color: var(--text);
   line-height: 1;
-}
-.kpi .sub {
+}}
+.kpi .sub {{
   font-size: 0.78rem;
   color: var(--text-muted);
   margin-top: 2px;
-}
+}}
 
 /* ── Verdict badges ────────────────────────────────────── */
-.badge {
+.badge {{
   display: inline-flex;
   align-items: center;
   padding: 0.2rem 0.65rem;
@@ -305,65 +583,78 @@ div[data-baseweb="checkbox"] input:checked + div {
   font-size: 0.78rem;
   font-weight: 700;
   white-space: nowrap;
-}
-.badge-phishing { background: var(--warning-bg); border: 1px solid var(--warning-border); color: var(--warning); }
-.badge-spam     { background: var(--warning-bg); border: 1px solid var(--warning-border); color: var(--warning); }
-.badge-safe     { background: var(--safe-bg); border: 1px solid var(--safe-border); color: var(--safe); }
-/* Legacy aliases */
-.badge-ok      { background: var(--safe-bg); border: 1px solid var(--safe-border); color: var(--safe); }
-.badge-danger  { background: var(--warning-bg); border: 1px solid var(--warning-border); color: var(--warning); }
-.badge-warn    { background: var(--warning-bg); border: 1px solid var(--warning-border); color: var(--warning); }
+}}
+/* Phishing = RED (semantic danger) */
+.badge-phishing {{ background: #FEF2F2; border: 1px solid #FECACA; color: #DC2626; }}
+/* Spam = AMBER */
+.badge-spam     {{ background: var(--warning-bg); border: 1px solid var(--warning-border); color: var(--warning); }}
+/* Legitimate / Safe = GREEN */
+.badge-safe     {{ background: #ECFDF5; border: 1px solid #A7F3D0; color: #059669; }}
+.badge-ok      {{ background: #ECFDF5; border: 1px solid #A7F3D0; color: #059669; }}
+.badge-danger  {{ background: #FEF2F2; border: 1px solid #FECACA; color: #DC2626; }}
+.badge-warn    {{ background: var(--warning-bg); border: 1px solid var(--warning-border); color: var(--warning); }}
+
+/* Dark mode badge overrides */
+@media (prefers-color-scheme: dark) {{
+  .badge-phishing {{ background: #450A0A; border-color: #7F1D1D; color: #F87171; }}
+  .badge-safe, .badge-ok {{ background: #022C22; border-color: #064E3B; color: #34D399; }}
+  .badge-danger {{ background: #450A0A; border-color: #7F1D1D; color: #F87171; }}
+}}
+[data-theme="dark"] .badge-phishing {{ background: #450A0A; border-color: #7F1D1D; color: #F87171; }}
+[data-theme="dark"] .badge-safe,
+[data-theme="dark"] .badge-ok {{ background: #022C22; border-color: #064E3B; color: #34D399; }}
+[data-theme="dark"] .badge-danger {{ background: #450A0A; border-color: #7F1D1D; color: #F87171; }}
 
 /* ── Email card (Smail) ────────────────────────────────── */
-.email-card {
+.email-card {{
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 12px 14px;
   margin-bottom: 6px;
-}
-.email-card:hover { border-color: var(--primary); }
-.email-card .ec-sender { font-size: 0.78rem; color: var(--text-2); margin-bottom: 1px; }
-.email-card .ec-subject { font-size: 0.95rem; font-weight: 700; color: var(--text); }
-.email-card .ec-snippet { font-size: 0.82rem; color: var(--text-muted); margin-top: 3px; }
+}}
+.email-card:hover {{ border-color: var(--primary); }}
+.email-card .ec-sender {{ font-size: 0.78rem; color: var(--text-2); margin-bottom: 1px; }}
+.email-card .ec-subject {{ font-size: 0.95rem; font-weight: 700; color: var(--text); }}
+.email-card .ec-snippet {{ font-size: 0.82rem; color: var(--text-muted); margin-top: 3px; }}
 
 /* ── Result card (Playground) ──────────────────────────── */
-.result-card {
+.result-card {{
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 18px;
   box-shadow: var(--shadow);
-}
-.result-phishing { border-top: 4px solid var(--accent); }
-.result-spam     { border-top: 4px solid var(--warning); }
-.result-safe     { border-top: 4px solid var(--safe); }
+}}
+.result-phishing {{ border-top: 4px solid var(--accent); }}
+.result-spam     {{ border-top: 4px solid var(--warning); }}
+.result-safe     {{ border-top: 4px solid var(--safe); }}
 
 /* ── Threat log cards ──────────────────────────────────── */
-.threat-card {
+.threat-card {{
   background: var(--surface);
   border: 1px solid var(--border);
   border-left: 4px solid var(--accent);
   border-radius: 0 10px 10px 0;
   padding: 12px 14px;
   margin-bottom: 6px;
-}
-.threat-card .tc-subject { font-size: 0.95rem; font-weight: 700; color: var(--text); }
-.threat-card .tc-meta { font-size: 0.78rem; color: var(--text-2); }
+}}
+.threat-card .tc-subject {{ font-size: 0.95rem; font-weight: 700; color: var(--text); }}
+.threat-card .tc-meta {{ font-size: 0.78rem; color: var(--text-2); }}
 
 /* ── Generic content card ──────────────────────────────── */
-.card {
+.card {{
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px 16px;
   margin-bottom: 8px;
   box-shadow: var(--shadow);
-}
-.card p { margin: 0; }
+}}
+.card p {{ margin: 0; }}
 
 /* ── Login form ────────────────────────────────────────── */
-.login-wrap {
+.login-wrap {{
   max-width: 420px;
   margin: 3.5rem auto 0 auto;
   background: var(--surface);
@@ -372,27 +663,161 @@ div[data-baseweb="checkbox"] input:checked + div {
   padding: 1.8rem 2rem;
   box-shadow: 0 4px 24px rgba(0,0,0,0.06);
   text-align: center;
-}
+}}
 
 /* ── Misc ──────────────────────────────────────────────── */
-.small { font-size: 0.84rem; color: var(--text-2); }
-.muted { font-size: 0.78rem; color: var(--text-muted); }
-.block {
+.small {{ font-size: 0.84rem; color: var(--text-2); }}
+.muted {{ font-size: 0.78rem; color: var(--text-muted); }}
+.block {{
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px 16px;
-}
-.status-dot {
+}}
+.status-dot {{
   display: inline-block;
   width: 8px; height: 8px;
   border-radius: 50%;
   vertical-align: middle;
-  margin-right: 4px;
-}
-.dot-green { background: var(--safe); }
-.dot-red   { background: var(--danger); }
-.dot-grey  { background: var(--text-muted); }
+  margin-right: 6px;
+}}
+.dot-green {{ background: #10B981; }}
+.dot-red   {{ background: #EF4444; }}
+.dot-grey  {{ background: var(--text-muted); }}
+
+/* ── Inference status inline ──────────────────────────── */
+.inference-status {{
+  display: flex;
+  align-items: center;
+  padding: 0 0.75rem;
+  font-size: 0.82rem;
+  color: var(--text-2);
+  gap: 0;
+}}
+.inference-status .status-label {{
+  font-weight: 600;
+  margin-right: 0.35rem;
+}}
+.inference-status .status-value {{
+  color: var(--text-muted);
+  font-weight: 400;
+}}
+
+/* ── Password eye icon & form hints ───────────────────── */
+button[kind="icon"] svg,
+[data-testid="stPasswordInput"] button svg {{
+  fill: var(--text-muted) !important;
+  color: var(--text-muted) !important;
+}}
+[data-testid="stPasswordInput"] button:hover svg {{
+  fill: var(--accent) !important;
+  color: var(--accent) !important;
+}}
+[data-testid="InputInstructions"] {{
+  color: var(--text-muted) !important;
+}}
+
+/* ── Expander toggle text contrast ────────────────────── */
+[data-testid="stExpander"] summary span {{
+  color: var(--text-2) !important;
+}}
+[data-testid="stExpander"] summary:hover span {{
+  color: var(--accent) !important;
+}}
+
+/* ── Semantic button: Phishing report (red) ───────────── */
+.semantic-btn-danger button {{
+  background-color: #FEF2F2 !important;
+  border: 1px solid #FECACA !important;
+  color: #DC2626 !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  transition: all 0.15s ease !important;
+}}
+.semantic-btn-danger button:hover {{
+  background-color: #DC2626 !important;
+  border-color: #DC2626 !important;
+  color: #FFFFFF !important;
+}}
+@media (prefers-color-scheme: dark) {{
+  .semantic-btn-danger button {{
+    background-color: #450A0A !important;
+    border-color: #7F1D1D !important;
+    color: #F87171 !important;
+  }}
+  .semantic-btn-danger button:hover {{
+    background-color: #DC2626 !important;
+    border-color: #DC2626 !important;
+    color: #FFFFFF !important;
+  }}
+}}
+[data-theme="dark"] .semantic-btn-danger button {{
+  background-color: #450A0A !important;
+  border-color: #7F1D1D !important;
+  color: #F87171 !important;
+}}
+[data-theme="dark"] .semantic-btn-danger button:hover {{
+  background-color: #DC2626 !important;
+  border-color: #DC2626 !important;
+  color: #FFFFFF !important;
+}}
+
+/* ── Semantic button: Safe / false positive (green) ───── */
+.semantic-btn-safe button {{
+  background-color: #ECFDF5 !important;
+  border: 1px solid #A7F3D0 !important;
+  color: #059669 !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  transition: all 0.15s ease !important;
+}}
+.semantic-btn-safe button:hover {{
+  background-color: #059669 !important;
+  border-color: #059669 !important;
+  color: #FFFFFF !important;
+}}
+@media (prefers-color-scheme: dark) {{
+  .semantic-btn-safe button {{
+    background-color: #022C22 !important;
+    border-color: #064E3B !important;
+    color: #34D399 !important;
+  }}
+  .semantic-btn-safe button:hover {{
+    background-color: #059669 !important;
+    border-color: #059669 !important;
+    color: #FFFFFF !important;
+  }}
+}}
+[data-theme="dark"] .semantic-btn-safe button {{
+  background-color: #022C22 !important;
+  border-color: #064E3B !important;
+  color: #34D399 !important;
+}}
+[data-theme="dark"] .semantic-btn-safe button:hover {{
+  background-color: #059669 !important;
+  border-color: #059669 !important;
+  color: #FFFFFF !important;
+}}
+
+/* ── Dropdown select icon amber ───────────────────────── */
+[data-baseweb="select"] svg {{
+  fill: var(--accent) !important;
+  color: var(--accent) !important;
+}}
+
+/* ── Sidebar flex bottom push ─────────────────────────── */
+.sidebar-spacer {{
+  flex-grow: 1 !important;
+  min-height: 2rem !important;
+}}
+
+/* ── Login page center fix ────────────────────────────── */
+.login-logo-center {{
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  width: 100% !important;
+}}
 </style>
 """,
     unsafe_allow_html=True,
@@ -518,6 +943,13 @@ def _auth_exec(query: str, params: tuple[Any, ...] = ()) -> None:
 
 @st.cache_resource
 def _data_engine():
+    db_url = os.environ.get("SICURRE_DATA_PLATFORM_DATABASE_URL")
+    if db_url:
+        if db_url.startswith("sqlite+aiosqlite://"):
+            db_url = db_url.replace("sqlite+aiosqlite://", "sqlite://", 1)
+        elif db_url.startswith("postgresql+asyncpg://"):
+            db_url = db_url.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
+        return create_engine(db_url, future=True)
     return create_engine(f"sqlite:///{POC_DATA_DB_PATH}", future=True)
 
 
@@ -527,7 +959,8 @@ def _data_q(query: str, params: dict[str, Any] | None = None) -> list[dict[str, 
     for attempt in range(retries):
         try:
             with _data_engine().connect() as conn:
-                conn.execute(text("PRAGMA journal_mode=WAL"))
+                if _data_engine().dialect.name == "sqlite":
+                    conn.execute(text("PRAGMA journal_mode=WAL"))
                 result = conn.execute(text(query), params or {})
                 return [dict(row._mapping) for row in result]
         except OperationalError as exc:
@@ -541,15 +974,10 @@ def _data_q(query: str, params: dict[str, Any] | None = None) -> list[dict[str, 
 
 
 def _data_table_exists(table_name: str) -> bool:
-    conn = sqlite3.connect(str(POC_DATA_DB_PATH))
     try:
-        row = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name = ?",
-            (table_name,),
-        ).fetchone()
-        return bool(row)
-    finally:
-        conn.close()
+        return bool(inspect(_data_engine()).has_table(table_name))
+    except Exception:
+        return False
 
 
 def _fmt_num(value: int | float) -> str:
@@ -971,14 +1399,20 @@ def run_pipeline_action(title: str, command: str) -> None:
 def render_logo_html(width: int = 160, center: bool = False) -> None:
     if LOGO_PATH.exists():
         b64 = base64.b64encode(LOGO_PATH.read_bytes()).decode()
-        align = "margin: 0 auto;" if center else ""
-        display = "display: block;" if center else "display: inline-block;"
-        st.markdown(
-            f'<div class="logo-container" style="{display}{align}">'
-            f'<img src="data:image/svg+xml;base64,{b64}" width="{width}" />'
-            f"</div>",
-            unsafe_allow_html=True,
-        )
+        if center:
+            st.markdown(
+                f'<div style="display: flex !important; justify-content: center !important; align-items: center !important; width: 100% !important; margin: 0.5rem 0 !important; text-align: center !important;">'
+                f'<img src="data:image/svg+xml;base64,{b64}" width="{width}" style="display: block !important; margin: 0 auto !important; max-width: 100% !important;" />'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                f'<div class="logo-container" style="display: flex !important; align-items: center !important; justify-content: flex-start !important; margin: 0 !important; padding: 0 !important;">'
+                f'<img src="data:image/svg+xml;base64,{b64}" width="{width}" style="max-width: 100% !important; margin: 0 !important;" />'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
     else:
         st.markdown(
             "<span style='font-size:1.4rem;font-weight:900;letter-spacing:-1px;'"
@@ -1049,7 +1483,7 @@ def render_class_dist_chart(events: list[dict[str, Any]]) -> None:
                 "type": "nominal",
                 "scale": {
                     "domain": ["legitimate", "spam", "phishing"],
-                    "range": ["#10B981", "#F59E0B", "#EF4444"],
+                    "range": ["#10B981", "#F59E0B", "#D97706"],
                 },
                 "legend": None,
             },
@@ -1130,6 +1564,7 @@ def render_result_card(result: dict[str, Any]) -> None:
     )
 
     if result.get("stage_breakdown"):
+        st.markdown("<div style='margin-top: 1.5rem;'></div>", unsafe_allow_html=True)
         with st.expander(tr("stage_scores"), expanded=False):
             st.json(result["stage_breakdown"])
 
@@ -1147,24 +1582,23 @@ _restore_session_from_query()
 
 # ── Login page ─────────────────────────────────────────────────────────────
 if not st.session_state["authenticated"]:
-    # Language selector — top right
-    lang_top_c1, lang_top_c2 = st.columns([5, 1])
-    with lang_top_c2:
-        lopt = st.selectbox(
-            tr("language"),
-            options=[("fr", "FR"), ("en", "EN")],
-            index=0 if st.session_state.get("lang", "fr") == "fr" else 1,
-            format_func=lambda item: item[1],
-            key="login_lang_selector",
-            label_visibility="collapsed",
-        )
-        if lopt[0] != st.session_state.get("lang"):
-            _set_lang(lopt[0])
-            st.rerun()
+
 
     c1, c2, c3 = st.columns([1, 1.2, 1])
     with c2:
         st.markdown("<div style='margin-top: 2.5rem;'></div>", unsafe_allow_html=True)
+        # Force logo centering with explicit CSS class wrapper
+        if LOGO_PATH.exists():
+            b64 = base64.b64encode(LOGO_PATH.read_bytes()).decode()
+            st.markdown(
+                f'<div class="login-logo-center">'
+                f'<img src="data:image/svg+xml;base64,{b64}" width="120" style="display: block !important; max-width: 100% !important;" />'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown("<div class='login-logo-center'><span style='font-size:1.6rem;font-weight:900;'>SICURRE</span></div>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top: 1.2rem;'></div>", unsafe_allow_html=True)
         st.markdown(
             f"<h3 style='margin:0 0 4px;color:var(--text);text-align:center;'>{tr('login_title')}</h3>",
             unsafe_allow_html=True,
@@ -1175,8 +1609,6 @@ if not st.session_state["authenticated"]:
         )
 
         with st.form("login_form"):
-            render_logo_html(width=120, center=True)
-            st.markdown("<div style='margin-top: 1rem;'></div>", unsafe_allow_html=True)
             email = st.text_input(tr("email"), placeholder="you@company.com")
             password = st.text_input(tr("password"), type="password")
             remember = st.checkbox(tr("remember_me"), value=True)
@@ -1207,16 +1639,24 @@ user = st.session_state["user"]
 
 # ── Sidebar ─────────────────────────────────────────────────────────────────
 with st.sidebar:
-    render_logo_html(width=100)
-    st.markdown("<div style='margin-bottom:4px;'></div>", unsafe_allow_html=True)
+    # Render the logo and welcome message in a single markdown block with custom margins for proper spacing
+    if LOGO_PATH.exists():
+        b64 = base64.b64encode(LOGO_PATH.read_bytes()).decode()
+        logo_html = f'<img src="data:image/svg+xml;base64,{b64}" width="100" style="max-width: 100% !important; margin: 0 !important; display: block;" />'
+    else:
+        logo_html = '<span style="font-size:1.4rem;font-weight:900;letter-spacing:-1px;">SICURRE</span>'
+
     st.markdown(
-        f"<div style='font-size:0.82rem;color:var(--text-2);margin-bottom:0;'>{tr('welcome')}</div>"
-        f"<div style='font-weight:700;font-size:0.97rem;color:var(--text);margin-bottom:4px;'>"
-        f"{user['display_name']}</div>",
+        f"<div style='margin-top: -1.5rem; margin-bottom: 1.2rem;'>"
+        f"  <div class='logo-container' style='margin-bottom: 1rem;'>{logo_html}</div>"
+        f"  <div style='font-size:0.82rem;color:var(--text-2);margin-top:0.5rem;margin-bottom:0.1rem;'>{tr('welcome')}</div>"
+        f"  <div style='font-weight:700;font-size:1.05rem;color:var(--text);'>{user['display_name']}</div>"
+        f"</div>",
         unsafe_allow_html=True,
     )
 
-    st.markdown("---")
+    # Spacing and dividing line 1 (logo area vs nav list)
+    st.markdown("<hr style='margin: 0.8rem 0 1.2rem 0 !important; border: none !important; border-top: 1px solid var(--border-line) !important; opacity: 1 !important;' />", unsafe_allow_html=True)
 
     NAV_KEYS = [
         "nav_home",
@@ -1229,28 +1669,33 @@ with st.sidebar:
     ]
     current_page = st.session_state.get("page", "nav_home")
     for nav_key in NAV_KEYS:
-        if nav_key == current_page:
-            st.markdown(
-                f"<div class='nav-active'>{tr(nav_key)}</div>",
-                unsafe_allow_html=True,
-            )
-        else:
-            if st.button(tr(nav_key), key=f"_nav_{nav_key}"):
+        is_active = (nav_key == current_page)
+        btn_type = "primary" if is_active else "secondary"
+        if st.button(
+            tr(nav_key),
+            key=f"_nav_{nav_key}",
+            type=btn_type,
+            use_container_width=True,
+        ):
+            if not is_active:
                 st.session_state["page"] = nav_key
                 st.rerun()
 
-    st.markdown("---")
+    # Flex spacer pushes bottom section down
+    st.markdown("<div class='sidebar-spacer'></div>", unsafe_allow_html=True)
 
-    # Inference status at bottom
+    # Spacing and dividing line 2 (nav list vs lower portion)
+    st.markdown("<hr style='margin: 0.8rem 0 !important; border: none !important; border-top: 1px solid var(--border-line) !important; opacity: 1 !important;' />", unsafe_allow_html=True)
+
+    # Inference status — inline on one line
     ok, status_text = inference_status()
     dot_cls = "dot-green" if ok else "dot-red"
     st.markdown(
+        f"<div class='inference-status'>"
         f"<span class='status-dot {dot_cls}'></span>"
-        f"<span style='font-size:0.8rem;color:var(--text-2);'>{tr('inference_status')}</span>",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        f"<span style='font-size:0.75rem;color:var(--text-muted);'>{status_text}</span>",
+        f"<span class='status-label'>{tr('inference_status')} :</span>"
+        f"<span class='status-value'>{status_text}</span>"
+        f"</div>",
         unsafe_allow_html=True,
     )
     st.markdown("<div style='margin-top:12px;'></div>", unsafe_allow_html=True)
@@ -1317,7 +1762,7 @@ if page == "nav_home":
     )
     r2.markdown(
         f"<div class='kpi'><div class='label'>{tr('phishing_blocked')}</div>"
-        f"<div class='value' style='color:var(--danger);'>{_fmt_num(blocked)}</div></div>",
+        f"<div class='value' style='color:var(--danger-semantic);'>{_fmt_num(blocked)}</div></div>",
         unsafe_allow_html=True,
     )
     r3.markdown(
@@ -1423,6 +1868,8 @@ elif page == "nav_smail":
             f"</div>",
             unsafe_allow_html=True,
         )
+        # Semantic red button for phishing report
+        st.markdown("<div class='semantic-btn-danger'>", unsafe_allow_html=True)
         if st.button(
             tr("flag_false_negative"),
             key=f"fn_{tab_key}_{ev['id']}",
@@ -1430,6 +1877,7 @@ elif page == "nav_smail":
             reclassify_event(ev["id"], "phishing", user["email"])
             st.toast(tr("reclassified_done"), icon="✅")
             st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
     with tab1:
         if not legit_events:
@@ -1491,10 +1939,13 @@ elif page == "nav_threat_log":
                     f"<p style='font-size:0.9rem;color:var(--text);'>{snip}</p>",
                     unsafe_allow_html=True,
                 )
+                # Semantic green button for marking safe
+                st.markdown("<div class='semantic-btn-safe'>", unsafe_allow_html=True)
                 if st.button(tr("reclassify_safe"), key=f"fp_{event['id']}"):
                     reclassify_event(event["id"], "safe", user["email"])
                     st.toast(tr("reclassified_done"), icon="✅")
                     st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
 
 # ── Playground ────────────────────────────────────────────────────────────────
 elif page == "nav_playground":
@@ -1531,7 +1982,12 @@ elif page == "nav_playground":
 
         st.markdown("<div style='margin-bottom:12px;'></div>", unsafe_allow_html=True)
 
-        if st.button(tr("analyze_email"), type="primary", use_container_width=True, key="pg_analyze_preset"):
+        if st.button(
+            tr("analyze_email"),
+            type="primary",
+            use_container_width=True,
+            key="pg_analyze_preset",
+        ):
             with st.spinner(tr("analyzing")):
                 result = classify_email(
                     sample["subject"], sample["sender"], sample["text"], use_llm, use_vt
@@ -1578,6 +2034,8 @@ elif page == "nav_playground":
             st.rerun()
 
     with right:
+        st.markdown(f"#### {tr('inference_result')}")
+        st.markdown("<div style='margin-top: 0.5rem;'></div>", unsafe_allow_html=True)
         if st.session_state.get("last_result"):
             render_result_card(st.session_state["last_result"])
         else:
@@ -1598,22 +2056,22 @@ elif page == "nav_pipeline":
 
     b1, b2, b3 = st.columns(3)
     with b1:
-        if st.button(tr("pipeline_base"), disabled=busy, use_container_width=True):
+        if st.button(tr("pipeline_base"), disabled=busy, use_container_width=True, type="primary"):
             st.session_state["_pipeline_pending"] = (
                 tr("pipeline_base"),
-                "make ingest-all-base",
+                "make poc-replay-frozen",
             )
     with b2:
-        if st.button(tr("pipeline_cron"), disabled=busy, use_container_width=True):
+        if st.button(tr("pipeline_cron"), disabled=busy, use_container_width=True, type="primary"):
             st.session_state["_pipeline_pending"] = (
                 tr("pipeline_cron"),
                 "make ingest-all-cron",
             )
     with b3:
-        if st.button(tr("pipeline_push"), disabled=busy, use_container_width=True):
+        if st.button(tr("pipeline_push"), disabled=busy, use_container_width=True, type="primary"):
             st.session_state["_pipeline_pending"] = (
                 tr("pipeline_push"),
-                "make pipeline-push DATASET_TAG_PREFIX=cron",
+                "make poc-replay-frozen",
             )
 
     # Run OUTSIDE the columns so the terminal spans full width
@@ -1626,7 +2084,6 @@ elif page == "nav_pipeline":
             st.info("✅ " + tr("pipeline_last_success"))
         else:
             st.warning("⚠️ " + tr("pipeline_last_error"))
-
 
 
 # ── Jeux de données ───────────────────────────────────────────────────────────
@@ -1678,10 +2135,10 @@ elif page == "nav_datasets":
             type_colors = {
                 "api": "#1B4FCC",
                 "file": "#F59E0B",
-                "scraping": "#EF4444",
+                "scraping": "#EC4899",
                 "sql": "#10B981",
                 "bigdata": "#8B5CF6",
-                "manual": "#334155",
+                "manual": "#F97316",
             }
             chart_rows = [
                 {
@@ -1766,8 +2223,6 @@ elif page == "nav_datasets":
             st.info(tr("no_ingestion"))
     else:
         st.info(tr("run_pipeline_hint"))
-        if user["role"] == "admin" and st.button(tr("run_base_now"), type="primary"):
-            run_pipeline_action(tr("pipeline_base"), "make ingest-all-base")
 
     # Dataset versions
     if _data_table_exists("data_dataset"):
@@ -1798,37 +2253,81 @@ elif page == "nav_settings":
     st.title(tr("settings_title"))
     st.caption(tr("settings_subtitle"))
 
+    st.write(f"**Informations du profil**" if st.session_state.get("lang", "fr") == "fr" else "**Profile Information**")
+
     with st.form("settings_form"):
-        c1, c2 = st.columns(2)
-        with c1:
-            new_name = st.text_input(tr("display_name"), value=user["display_name"])
-        with c2:
-            lang_opts = [("fr", "Français"), ("en", "English")]
-            cur_lang_idx = 0 if st.session_state.get("lang", "fr") == "fr" else 1
-            new_lang_opt = st.selectbox(
-                tr("language"),
-                options=lang_opts,
-                index=cur_lang_idx,
-                format_func=lambda x: x[1],
-            )
+        new_name = st.text_input(tr("display_name"), value=user["display_name"])
         st.text_input(tr("email"), value=user["email"], disabled=True)
-        st.text_input("Rôle", value=user["role"].capitalize(), disabled=True)
+        st.text_input("Rôle" if st.session_state.get("lang", "fr") == "fr" else "Role", value=user["role"].capitalize(), disabled=True)
         saved = st.form_submit_button(
             tr("save_settings"), type="primary", use_container_width=True
         )
 
     if saved:
-        changed = False
         if new_name.strip() and new_name.strip() != user["display_name"]:
             _auth_exec(
                 "UPDATE poc_user SET display_name = ? WHERE id = ?",
                 (new_name.strip(), user["id"]),
             )
             st.session_state["user"]["display_name"] = new_name.strip()
-            changed = True
-        if new_lang_opt[0] != st.session_state.get("lang"):
-            _set_lang(new_lang_opt[0])
-            changed = True
-        if changed:
             st.toast(tr("settings_saved"), icon="✅")
+            st.rerun()
+
+    # Spacing and Divider
+    st.markdown("<hr style='margin: 1.8rem 0 !important; border: none !important; border-top: 1px solid var(--border-line) !important; opacity: 1 !important;' />", unsafe_allow_html=True)
+
+    st.write(f"**{tr('preferences_title')}**")
+
+    # Row 1: Language Selection
+    col_l1, col_r1 = st.columns([3, 1])
+    with col_l1:
+        st.markdown(
+            f"<div style='margin-top: 8px; font-weight: 600;'>{tr('application_language')}</div>"
+            f"<div style='font-size: 0.85rem; color: var(--text-muted);'>{tr('application_language_desc')}</div>",
+            unsafe_allow_html=True
+        )
+    with col_r1:
+        lang_opts = [("fr", "Français 🇫🇷"), ("en", "English 🇬🇧")]
+        cur_lang_idx = 0 if st.session_state.get("lang", "fr") == "fr" else 1
+        new_lang = st.selectbox(
+            "Langue / Language",
+            options=lang_opts,
+            index=cur_lang_idx,
+            format_func=lambda x: x[1],
+            key="settings_lang_selector",
+            label_visibility="collapsed"
+        )
+        if new_lang[0] != st.session_state.get("lang"):
+            _set_lang(new_lang[0])
+            st.rerun()
+
+    # Divider line between toggles
+    st.markdown("<hr style='margin: 0.8rem 0 !important; border: none !important; border-top: 1px solid var(--border-line) !important; opacity: 1 !important;' />", unsafe_allow_html=True)
+
+    # Row 2: Theme Selection
+    col_l2, col_r2 = st.columns([3, 1])
+    with col_l2:
+        st.markdown(
+            f"<div style='margin-top: 8px; font-weight: 600;'>{tr('application_theme')}</div>"
+            f"<div style='font-size: 0.85rem; color: var(--text-muted);'>{tr('application_theme_desc')}</div>",
+            unsafe_allow_html=True
+        )
+    with col_r2:
+        theme_opts = [("System", "🌓 System"), ("Light", "☀️ Light"), ("Dark", "🌙 Dark")]
+        cur_theme = st.session_state.get("theme_mode", "System")
+        theme_idx = 0
+        for idx, (val, name) in enumerate(theme_opts):
+            if val == cur_theme:
+                theme_idx = idx
+                break
+        new_theme = st.selectbox(
+            "Theme",
+            options=theme_opts,
+            index=theme_idx,
+            format_func=lambda x: x[1],
+            key="settings_theme_selector",
+            label_visibility="collapsed"
+        )
+        if new_theme[0] != st.session_state.get("theme_mode"):
+            st.session_state["theme_mode"] = new_theme[0]
             st.rerun()
