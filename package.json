@@ -1,0 +1,24 @@
+{
+  "name": "sicurre",
+  "version": "1.0.0",
+  "description": "Real-time phishing detection and inbox remediation for French auto-entrepreneurs and TPEs. Classifies emails with a fine-tuned CamemBERTv2 model and automatically moves confirmed phishing to Gmail Trash within 2 seconds of delivery.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MichAdebayo/sicurre.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/MichAdebayo/sicurre/issues"
+  },
+  "homepage": "https://github.com/MichAdebayo/sicurre#readme"
+}
