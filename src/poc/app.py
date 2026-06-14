@@ -80,6 +80,8 @@ if theme_mode == "Light":
     --text: #0F2E7A !important;
     --text-2: #334155 !important;
     --text-muted: #64748B !important;
+    --cta-text: #102A43 !important;
+    --empty-text: #334155 !important;
     --primary: #1B4FCC !important;
     --primary-dark: #1239A6 !important;
     --primary-light: #EEF3FF !important;
@@ -104,6 +106,8 @@ elif theme_mode == "Dark":
     --text: #F1F5F9 !important;
     --text-2: #CBD5E1 !important;
     --text-muted: #94A3B8 !important;
+    --cta-text: #111827 !important;
+    --empty-text: #F8FAFC !important;
     --primary: #60A5FA !important;
     --primary-dark: #3B82F6 !important;
     --primary-light: #1E3A5F !important;
@@ -128,39 +132,93 @@ elif theme_mode == "Dark":
   div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid="stElementContainer"] button { background-color: #022C22 !important; border-color: #064E3B !important; color: #34D399 !important; }
   div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid="stElementContainer"] button:hover { background-color: #059669 !important; border-color: #059669 !important; color: #FFFFFF !important; }
   
-  /* Forced dark: CTA button text must stay dark on amber */
+  /* Forced dark: CTA button text must follow theme tokens */
   button[data-testid^="stBaseButton-primary"],
+  button[kind="primaryFormSubmit"],
+  button[data-testid="stBaseButton-primaryFormSubmit"],
   button[data-testid^="stBaseButton-primary"] *,
+  button[kind="primaryFormSubmit"] *,
+  button[data-testid="stBaseButton-primaryFormSubmit"] *,
   .stButton > button[kind="primary"],
   .stButton > button[kind="primary"] *,
   div[data-testid="stFormSubmitButton"] button,
-  div[data-testid="stFormSubmitButton"] button * { color: #1E293B !important; }
+  div[data-testid="stFormSubmitButton"] button * { color: var(--cta-text) !important; }
   button[data-testid^="stBaseButton-primary"]:hover,
-  button[data-testid^="stBaseButton-primary"]:hover *,
+  button[data-testid^="stBaseButton-primary"]:focus,
+  button[data-testid^="stBaseButton-primary"]:active,
+  button[data-testid="stBaseButton-primaryFormSubmit"]:hover,
+  button[data-testid="stBaseButton-primaryFormSubmit"]:focus,
+  button[data-testid="stBaseButton-primaryFormSubmit"]:active,
+  button[kind="primaryFormSubmit"]:hover,
+  button[kind="primaryFormSubmit"]:focus,
+  button[kind="primaryFormSubmit"]:active,
   .stButton > button[kind="primary"]:hover,
-  .stButton > button[kind="primary"]:hover *,
+  .stButton > button[kind="primary"]:focus,
+  .stButton > button[kind="primary"]:active,
   div[data-testid="stFormSubmitButton"] button:hover,
-  div[data-testid="stFormSubmitButton"] button:hover * { color: #FFFFFF !important; }
+  div[data-testid="stFormSubmitButton"] button:focus,
+  div[data-testid="stFormSubmitButton"] button:active,
+  button[data-testid^="stBaseButton-primary"]:hover *,
+  button[data-testid^="stBaseButton-primary"]:focus *,
+  button[data-testid^="stBaseButton-primary"]:active *,
+  button[data-testid="stBaseButton-primaryFormSubmit"]:hover *,
+  button[data-testid="stBaseButton-primaryFormSubmit"]:focus *,
+  button[data-testid="stBaseButton-primaryFormSubmit"]:active *,
+  button[kind="primaryFormSubmit"]:hover *,
+  button[kind="primaryFormSubmit"]:focus *,
+  button[kind="primaryFormSubmit"]:active *,
+  .stButton > button[kind="primary"]:hover *,
+  .stButton > button[kind="primary"]:focus *,
+  .stButton > button[kind="primary"]:active *,
+  div[data-testid="stFormSubmitButton"] button:hover *,
+  div[data-testid="stFormSubmitButton"] button:focus *,
+  div[data-testid="stFormSubmitButton"] button:active * { color: #FFFFFF !important; }
+
+  /* Forced dark: login helper text must stay readable */
+  [data-testid="InputInstructions"],
+  [data-testid="InputInstructions"] *,
+  [data-testid="InputInstructions"] span,
+  [data-testid="InputInstructions"] span * {
+    color: var(--empty-text) !important;
+    opacity: 1 !important;
+  }
   
   /* Forced dark: Active sidebar navigation button overrides */
   [data-testid="stSidebar"] button[data-testid^="stBaseButton-primary"] *,
   [data-testid="stSidebar"] button[kind="primary"] * {
-    color: var(--primary) !important;
+    color: var(--text) !important;
   }
   [data-testid="stSidebar"] button[data-testid^="stBaseButton-primary"]:hover *,
-  [data-testid="stSidebar"] button[kind="primary"]:hover * {
-    color: var(--primary) !important;
+  [data-testid="stSidebar"] button[data-testid^="stBaseButton-primary"]:focus *,
+  [data-testid="stSidebar"] button[data-testid^="stBaseButton-primary"]:active *,
+  [data-testid="stSidebar"] button[kind="primary"]:hover *,
+  [data-testid="stSidebar"] button[kind="primary"]:focus *,
+  [data-testid="stSidebar"] button[kind="primary"]:active * {
+    color: var(--text) !important;
   }
   
   /* Forced dark: expander styling */
-  [data-testid="stExpander"] { background: var(--surface) !important; border-color: var(--border) !important; }
-  [data-testid="stExpander"] summary span { color: var(--text-2) !important; }
-  
-  /* Forced dark: Open expander summary text and body snippet */
-  [data-testid="stExpander"][open] summary span,
-  [data-testid="stExpander"][open] summary p,
-  [data-testid="stExpander"][open] p {
-    color: #1E293B !important;
+  [data-testid="stExpander"] {
+    background: var(--surface) !important;
+    border-color: var(--border) !important;
+    color: var(--text) !important;
+  }
+  [data-testid="stExpander"] summary,
+  [data-testid="stExpander"] summary * {
+    color: var(--text-2) !important;
+    background-color: transparent !important;
+  }
+  [data-testid="stExpander"] [data-testid="stExpanderDetails"],
+  [data-testid="stExpander"] [data-testid="stExpanderDetails"] *,
+  [data-testid="stExpander"] p,
+  [data-testid="stExpander"] li,
+  [data-testid="stExpander"] span {
+    color: var(--text) !important;
+    background-color: transparent !important;
+  }
+  [data-testid="stExpander"][open] summary,
+  [data-testid="stExpander"][open] summary * {
+    color: var(--text) !important;
   }
   
   /* Forced dark: collapsible sidebar button */
@@ -170,7 +228,7 @@ elif theme_mode == "Dark":
   /* Forced dark: password reveal eye icon */
   [data-testid="stTextInput"] button svg,
   [data-testid="stPasswordInput"] button svg,
-  button[kind="icon"] svg { fill: #FFFFFF !important; color: #FFFFFF !important; }
+  button[kind="icon"] svg { fill: var(--text-2) !important; color: var(--text-2) !important; }
   [data-testid="stTextInput"] button:hover svg,
   [data-testid="stPasswordInput"] button:hover svg,
   button[kind="icon"]:hover svg { fill: var(--accent) !important; color: var(--accent) !important; }
@@ -181,7 +239,7 @@ elif theme_mode == "Dark":
   div[data-testid="stNotification"],
   div[data-testid="stNotification"] *,
   .stAlert,
-  .stAlert * { color: #FFFFFF !important; }
+  .stAlert * { color: var(--text) !important; }
   """
 
 st.set_page_config(
@@ -204,6 +262,8 @@ st.markdown(
   --text: #0F2E7A;
   --text-2: #334155;
   --text-muted: #64748B;
+  --cta-text: #102A43;
+  --empty-text: #334155;
   --primary: #1B4FCC;
   --primary-dark: #1239A6;
   --primary-light: #EEF3FF;
@@ -235,6 +295,8 @@ st.markdown(
     --text: #F1F5F9;
     --text-2: #CBD5E1;
     --text-muted: #94A3B8;
+    --cta-text: #111827;
+    --empty-text: #F8FAFC;
     --primary: #60A5FA;
     --primary-dark: #3B82F6;
     --primary-light: #1E3A5F;
@@ -262,6 +324,7 @@ st.markdown(
   --bg: #1E293B; --surface: #334155; --border: #475569;
   --border-line: rgba(255, 255, 255, 0.25);
   --text: #F1F5F9; --text-2: #CBD5E1; --text-muted: #94A3B8;
+  --cta-text: #111827; --empty-text: #F8FAFC;
   --primary: #60A5FA; --primary-dark: #3B82F6;
   --primary-light: #1E3A5F; --primary-border: #475569;
   --accent: #F59E0B; --accent-dark: #B45309;
@@ -298,37 +361,107 @@ footer {{ visibility: hidden; }}
 }}
 
 /* ── Global action buttons (primary CTA) ──────────────── */
-button[data-testid="stBaseButton-primary"],
+button[data-testid^="stBaseButton-primary"],
+button[kind="primaryFormSubmit"],
+button[data-testid="stBaseButton-primaryFormSubmit"],
 .stButton > button[kind="primary"],
 div[data-testid="stFormSubmitButton"] button {{
   background: var(--accent) !important;
-  color: #1E293B !important;
+  color: var(--cta-text) !important;
   border: 1px solid var(--accent) !important;
   border-radius: 8px !important;
   font-weight: 600 !important;
   transition: all 0.15s ease !important;
 }}
-button[data-testid="stBaseButton-primary"] *,
+button[data-testid^="stBaseButton-primary"] *,
+button[kind="primaryFormSubmit"] *,
+button[data-testid="stBaseButton-primaryFormSubmit"] *,
 .stButton > button[kind="primary"] *,
 div[data-testid="stFormSubmitButton"] button * {{
-  color: #1E293B !important;
+  color: var(--cta-text) !important;
 }}
-button[data-testid="stBaseButton-primary"]:hover,
-button[data-testid="stBaseButton-primary"]:focus,
-button[data-testid="stBaseButton-primary"]:active,
-.stButton > button[kind="primary"]:hover,
-.stButton > button[kind="primary"]:focus,
-.stButton > button[kind="primary"]:active,
+
+/* Login helper text must stay readable on dark surfaces */
+[data-testid="InputInstructions"],
+[data-testid="InputInstructions"] *,
+[data-testid="InputInstructions"] span,
+[data-testid="InputInstructions"] span * {{
+  color: var(--empty-text) !important;
+  opacity: 1 !important;
+}}
+
+/* Sidebar nav must stay readable on hover/focus even when the generic CTA rule applies */
+[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"],
+[data-testid="stSidebar"] button[kind="primary"] {{
+  color: var(--text) !important;
+}}
+[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] *,
+[data-testid="stSidebar"] button[kind="primary"] * {{
+  color: var(--text) !important;
+}}
+
+/* Ensure form submit buttons (login) keep readable text */
+[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button,
+[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button * {{
+  color: var(--cta-text) !important;
+}}
+
+button[data-testid^="stBaseButton-primary"]:hover,
+button[data-testid^="stBaseButton-primary"]:focus,
+button[data-testid^="stBaseButton-primary"]:active,
+button[data-testid="stBaseButton-primaryFormSubmit"]:hover,
+button[data-testid="stBaseButton-primaryFormSubmit"]:focus,
+button[data-testid="stBaseButton-primaryFormSubmit"]:active,
+button[kind="primaryFormSubmit"]:hover,
+button[kind="primaryFormSubmit"]:focus,
+button[kind="primaryFormSubmit"]:active,
+button[data-testid^="stBaseButton-primary"]:hover *,
+button[data-testid^="stBaseButton-primary"]:focus *,
+button[data-testid^="stBaseButton-primary"]:active *,
+button[kind="primaryFormSubmit"]:hover *,
+button[kind="primaryFormSubmit"]:focus *,
+button[kind="primaryFormSubmit"]:active *,
+.stButton > button[kind^="primary"]:hover,
+.stButton > button[kind^="primary"]:focus,
+.stButton > button[kind^="primary"]:active,
+.stButton > button[kind^="primary"]:hover *,
+.stButton > button[kind^="primary"]:focus *,
+.stButton > button[kind^="primary"]:active *,
 div[data-testid="stFormSubmitButton"] button:hover,
 div[data-testid="stFormSubmitButton"] button:focus,
-div[data-testid="stFormSubmitButton"] button:active {{
+div[data-testid="stFormSubmitButton"] button:active,
+div[data-testid="stFormSubmitButton"] button:hover *,
+div[data-testid="stFormSubmitButton"] button:focus *,
+div[data-testid="stFormSubmitButton"] button:active * {{
   background: var(--accent-dark) !important;
   border-color: var(--accent-dark) !important;
   color: #FFFFFF !important;
 }}
-button[data-testid="stBaseButton-primary"]:hover *,
-button[data-testid="stBaseButton-primary"]:focus *,
-button[data-testid="stBaseButton-primary"]:active *,
+
+/* Sidebar nav focus/hover must stay on the readable text token, not the dark CTA token */
+[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:hover,
+[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:focus,
+[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:active,
+[data-testid="stSidebar"] button[kind="primary"]:hover,
+[data-testid="stSidebar"] button[kind="primary"]:focus,
+[data-testid="stSidebar"] button[kind="primary"]:active {{
+  color: var(--text) !important;
+  background: var(--nav-hover) !important;
+}}
+[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:hover *,
+[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:focus *,
+[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:active *,
+[data-testid="stSidebar"] button[kind="primary"]:hover *,
+[data-testid="stSidebar"] button[kind="primary"]:focus *,
+[data-testid="stSidebar"] button[kind="primary"]:active * {{
+  color: var(--text) !important;
+}}
+button[data-testid^="stBaseButton-primary"]:hover *,
+button[data-testid^="stBaseButton-primary"]:focus *,
+button[data-testid^="stBaseButton-primary"]:active *,
+button[kind="primaryFormSubmit"]:hover *,
+button[kind="primaryFormSubmit"]:focus *,
+button[kind="primaryFormSubmit"]:active *,
 .stButton > button[kind="primary"]:hover *,
 .stButton > button[kind="primary"]:focus *,
 .stButton > button[kind="primary"]:active *,
@@ -572,7 +705,7 @@ div[data-baseweb="tab-highlight"] {{
 }}
 [data-testid="stSidebar"] .stButton > button:hover {{
   background: var(--nav-hover) !important;
-  color: var(--primary) !important;
+  color: var(--text) !important;
 }}
 
 /* Active primary button in sidebar (No Layout Shift) */
@@ -584,7 +717,7 @@ div[data-baseweb="tab-highlight"] {{
   border-right: none !important;
   border-bottom: none !important;
   border-radius: 0 6px 6px 0 !important;
-  color: var(--primary) !important;
+  color: var(--text) !important;
   font-weight: 700 !important;
 }}
 
@@ -596,8 +729,11 @@ div[data-testid="stWidgetLabel"] p {{
 div[data-testid="stMarkdownContainer"] > p {{
   color: var(--text-2) !important;
 }}
-div[data-testid="stAlert"] p {{
-  color: currentColor !important;
+div[data-testid="stAlert"] p,
+div[data-testid="stInfo"] p,
+div[data-testid="stWarning"] p,
+div[data-testid="stNotification"] p {{
+  color: var(--empty-text) !important;
 }}
 div[data-testid="stMarkdownContainer"] h1,
 div[data-testid="stMarkdownContainer"] h2,
@@ -767,25 +903,57 @@ div[data-testid="stMarkdownContainer"] h6 {{
 }}
 
 /* ── Password eye icon & form hints ───────────────────── */
+/* Password eye icon & form hints (improve contrast) */
+button[kind="icon"],
+button[kind="icon"] *,
+button[aria-label*="password"],
+button[aria-label*="password"] *,
+[data-testid="stPasswordInput"] button,
+[data-testid="stPasswordInput"] button * {{
+  color: var(--text-2) !important;
+}}
 button[kind="icon"] svg,
-[data-testid="stPasswordInput"] button svg {{
-  fill: var(--text-muted) !important;
-  color: var(--text-muted) !important;
+button[kind="icon"] svg path,
+button[aria-label*="password"] svg,
+button[aria-label*="password"] svg path,
+[data-testid="stPasswordInput"] button svg,
+[data-testid="stPasswordInput"] button svg path {{
+  fill: var(--text-2) !important;
+  stroke: var(--text-2) !important;
+  color: var(--text-2) !important;
 }}
-[data-testid="stPasswordInput"] button:hover svg {{
-  fill: var(--accent) !important;
-  color: var(--accent) !important;
-}}
-[data-testid="InputInstructions"] {{
-  color: var(--text-muted) !important;
+button[aria-label*="password"]:hover svg,
+button[aria-label*="password"]:hover svg *,
+[data-testid="stPasswordInput"] button:hover svg,
+[data-testid="stPasswordInput"] button:hover svg * {{
+    fill: var(--accent) !important;
+    stroke: var(--accent) !important;
+    color: var(--accent) !important;
 }}
 
 /* ── Expander toggle text contrast ────────────────────── */
-[data-testid="stExpander"] summary span {{
+[data-testid="stExpander"] summary,
+[data-testid="stExpander"] summary * {{
   color: var(--text-2) !important;
+  background-color: transparent !important;
 }}
-[data-testid="stExpander"] summary:hover span {{
+[data-testid="stExpander"] summary:hover,
+[data-testid="stExpander"] summary:hover * {{
   color: var(--accent) !important;
+}}
+[data-testid="stExpander"] [data-testid="stExpanderDetails"],
+[data-testid="stExpander"] [data-testid="stExpanderDetails"] *,
+[data-testid="stExpander"] p,
+[data-testid="stExpander"] li,
+[data-testid="stExpander"] span {{
+  color: var(--text) !important;
+  background-color: transparent !important;
+}}
+.threat-expander-content p,
+.threat-expander-content span,
+.threat-expander-content li {{
+  color: var(--text) !important;
+  background-color: transparent !important;
 }}
 
 /* ── Semantic button: Phishing report (red) ───────────── */
@@ -889,6 +1057,65 @@ div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid=
   align-items: center !important;
   width: 100% !important;
 }}
+
+/* ── Final overrides to ensure icon/nav/spinner contrast ── */
+[data-testid="stPasswordInput"] button svg,
+[data-testid="stPasswordInput"] button svg path,
+[data-testid="stPasswordInput"] button svg * {{
+    fill: var(--text-2) !important;
+    stroke: var(--text-2) !important;
+    color: var(--text-2) !important;
+}}
+[data-testid="stPasswordInput"] button:hover svg,
+[data-testid="stPasswordInput"] button:hover svg * {{
+    fill: var(--accent) !important;
+    stroke: var(--accent) !important;
+    color: var(--accent) !important;
+}}
+
+/* Sidebar: ensure active/hover uses readable text */
+[data-testid="stSidebar"] .stButton > button:hover,
+[data-testid="stSidebar"] .stButton > button:focus,
+[data-testid="stSidebar"] .stButton > button:active,
+[data-testid="stSidebar"] .stButton > button:hover *,
+[data-testid="stSidebar"] .stButton > button:focus *,
+[data-testid="stSidebar"] .stButton > button:active * {{
+    color: var(--text) !important;
+    background: var(--nav-hover) !important;
+}}
+[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"],
+[data-testid="stSidebar"] button[kind="primary"],
+[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] *,
+[data-testid="stSidebar"] button[kind="primary"] * {{
+    color: var(--text) !important;
+}}
+
+/* Spinner / status text contrast */
+[data-testid="stStatus"],
+[data-testid="stStatus"] *,
+[role="status"],
+[role="status"] * {{
+    background-color: var(--surface) !important;
+    color: var(--text) !important;
+}}
+[data-testid="stStatus"] code,
+[data-testid="stStatus"] pre,
+[data-testid="stStatus"] .stCodeBlock,
+[role="status"] code,
+[role="status"] pre,
+[role="status"] .stCodeBlock {{
+    background-color: var(--bg) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 8px !important;
+}}
+[data-testid="stSpinner"],
+[data-testid="stSpinner"] *,
+.stSpinner, .stSpinner * {{
+    color: var(--text) !important;
+    background-color: transparent !important;
+}}
+
 </style>
 """,
     unsafe_allow_html=True,
@@ -1474,14 +1701,14 @@ def render_logo_html(width: int = 160, center: bool = False) -> None:
             st.markdown(
                 f'<div style="display: flex !important; justify-content: center !important; align-items: center !important; width: 100% !important; margin: 0.5rem 0 !important; text-align: center !important;">'
                 f'<img src="data:image/svg+xml;base64,{b64}" width="{width}" style="display: block !important; margin: 0 auto !important; max-width: 100% !important;" />'
-                f'</div>',
+                f"</div>",
                 unsafe_allow_html=True,
             )
         else:
             st.markdown(
                 f'<div class="logo-container" style="display: flex !important; align-items: center !important; justify-content: flex-start !important; margin: 0 !important; padding: 0 !important;">'
                 f'<img src="data:image/svg+xml;base64,{b64}" width="{width}" style="max-width: 100% !important; margin: 0 !important;" />'
-                f'</div>',
+                f"</div>",
                 unsafe_allow_html=True,
             )
     else:
@@ -1654,7 +1881,6 @@ _restore_session_from_query()
 # ── Login page ─────────────────────────────────────────────────────────────
 if not st.session_state["authenticated"]:
 
-
     c1, c2, c3 = st.columns([1, 1.2, 1])
     with c2:
         st.markdown("<div style='margin-top: 2.5rem;'></div>", unsafe_allow_html=True)
@@ -1664,11 +1890,14 @@ if not st.session_state["authenticated"]:
             st.markdown(
                 f'<div class="login-logo-center">'
                 f'<img src="data:image/svg+xml;base64,{b64}" width="120" style="display: block !important; max-width: 100% !important;" />'
-                f'</div>',
+                f"</div>",
                 unsafe_allow_html=True,
             )
         else:
-            st.markdown("<div class='login-logo-center'><span style='font-size:1.6rem;font-weight:900;'>SICURRE</span></div>", unsafe_allow_html=True)
+            st.markdown(
+                "<div class='login-logo-center'><span style='font-size:1.6rem;font-weight:900;'>SICURRE</span></div>",
+                unsafe_allow_html=True,
+            )
         st.markdown("<div style='margin-top: 1.2rem;'></div>", unsafe_allow_html=True)
         st.markdown(
             f"<h3 style='margin:0 0 4px;color:var(--text);text-align:center;'>{tr('login_title')}</h3>",
@@ -1727,7 +1956,10 @@ with st.sidebar:
     )
 
     # Spacing and dividing line 1 (logo area vs nav list)
-    st.markdown("<hr style='margin: 0.8rem 0 1.2rem 0 !important; border: none !important; border-top: 1px solid var(--border-line) !important; opacity: 1 !important;' />", unsafe_allow_html=True)
+    st.markdown(
+        "<hr style='margin: 0.8rem 0 1.2rem 0 !important; border: none !important; border-top: 1px solid var(--border-line) !important; opacity: 1 !important;' />",
+        unsafe_allow_html=True,
+    )
 
     NAV_KEYS = [
         "nav_home",
@@ -1740,7 +1972,7 @@ with st.sidebar:
     ]
     current_page = st.session_state.get("page", "nav_home")
     for nav_key in NAV_KEYS:
-        is_active = (nav_key == current_page)
+        is_active = nav_key == current_page
         btn_type = "primary" if is_active else "secondary"
         if st.button(
             tr(nav_key),
@@ -1756,7 +1988,10 @@ with st.sidebar:
     st.markdown("<div class='sidebar-spacer'></div>", unsafe_allow_html=True)
 
     # Spacing and dividing line 2 (nav list vs lower portion)
-    st.markdown("<hr style='margin: 0.8rem 0 !important; border: none !important; border-top: 1px solid var(--border-line) !important; opacity: 1 !important;' />", unsafe_allow_html=True)
+    st.markdown(
+        "<hr style='margin: 0.8rem 0 !important; border: none !important; border-top: 1px solid var(--border-line) !important; opacity: 1 !important;' />",
+        unsafe_allow_html=True,
+    )
 
     # Inference status — inline on one line
     ok, status_text = inference_status()
@@ -2009,7 +2244,9 @@ elif page == "nav_threat_log":
             )
             with st.expander(tr("expand_body"), expanded=False):
                 st.markdown(
-                    f"<p style='font-size:0.9rem;color:#1E293B !important;'>{snip}</p>",
+                    "<div class='threat-expander-content' style='font-size:0.9rem; margin: 0;'>"
+                    f"<p style='margin: 0 !important;'>{snip}</p>"
+                    "</div>",
                     unsafe_allow_html=True,
                 )
                 # Semantic green button for marking safe
@@ -2129,19 +2366,25 @@ elif page == "nav_pipeline":
 
     b1, b2, b3 = st.columns(3)
     with b1:
-        if st.button(tr("pipeline_base"), disabled=busy, use_container_width=True, type="primary"):
+        if st.button(
+            tr("pipeline_base"), disabled=busy, use_container_width=True, type="primary"
+        ):
             st.session_state["_pipeline_pending"] = (
                 tr("pipeline_base"),
                 "make poc-replay-frozen",
             )
     with b2:
-        if st.button(tr("pipeline_cron"), disabled=busy, use_container_width=True, type="primary"):
+        if st.button(
+            tr("pipeline_cron"), disabled=busy, use_container_width=True, type="primary"
+        ):
             st.session_state["_pipeline_pending"] = (
                 tr("pipeline_cron"),
                 "make ingest-all-cron",
             )
     with b3:
-        if st.button(tr("pipeline_push"), disabled=busy, use_container_width=True, type="primary"):
+        if st.button(
+            tr("pipeline_push"), disabled=busy, use_container_width=True, type="primary"
+        ):
             st.session_state["_pipeline_pending"] = (
                 tr("pipeline_push"),
                 "make poc-replay-frozen",
@@ -2326,12 +2569,20 @@ elif page == "nav_settings":
     st.title(tr("settings_title"))
     st.caption(tr("settings_subtitle"))
 
-    st.write(f"**Informations du profil**" if st.session_state.get("lang", "fr") == "fr" else "**Profile Information**")
+    st.write(
+        f"**Informations du profil**"
+        if st.session_state.get("lang", "fr") == "fr"
+        else "**Profile Information**"
+    )
 
     with st.form("settings_form"):
         new_name = st.text_input(tr("display_name"), value=user["display_name"])
         st.text_input(tr("email"), value=user["email"], disabled=True)
-        st.text_input("Rôle" if st.session_state.get("lang", "fr") == "fr" else "Role", value=user["role"].capitalize(), disabled=True)
+        st.text_input(
+            "Rôle" if st.session_state.get("lang", "fr") == "fr" else "Role",
+            value=user["role"].capitalize(),
+            disabled=True,
+        )
         saved = st.form_submit_button(
             tr("save_settings"), type="primary", use_container_width=True
         )
@@ -2347,7 +2598,10 @@ elif page == "nav_settings":
             st.rerun()
 
     # Spacing and Divider
-    st.markdown("<hr style='margin: 1.8rem 0 !important; border: none !important; border-top: 1px solid var(--border-line) !important; opacity: 1 !important;' />", unsafe_allow_html=True)
+    st.markdown(
+        "<hr style='margin: 1.8rem 0 !important; border: none !important; border-top: 1px solid var(--border-line) !important; opacity: 1 !important;' />",
+        unsafe_allow_html=True,
+    )
 
     st.write(f"**{tr('preferences_title')}**")
 
@@ -2357,7 +2611,7 @@ elif page == "nav_settings":
         st.markdown(
             f"<div style='margin-top: 8px; font-weight: 600;'>{tr('application_language')}</div>"
             f"<div style='font-size: 0.85rem; color: var(--text-muted);'>{tr('application_language_desc')}</div>",
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
     with col_r1:
         lang_opts = [("fr", "Français 🇫🇷"), ("en", "English 🇬🇧")]
@@ -2368,14 +2622,17 @@ elif page == "nav_settings":
             index=cur_lang_idx,
             format_func=lambda x: x[1],
             key="settings_lang_selector",
-            label_visibility="collapsed"
+            label_visibility="collapsed",
         )
         if new_lang[0] != st.session_state.get("lang"):
             _set_lang(new_lang[0])
             st.rerun()
 
     # Divider line between toggles
-    st.markdown("<hr style='margin: 0.8rem 0 !important; border: none !important; border-top: 1px solid var(--border-line) !important; opacity: 1 !important;' />", unsafe_allow_html=True)
+    st.markdown(
+        "<hr style='margin: 0.8rem 0 !important; border: none !important; border-top: 1px solid var(--border-line) !important; opacity: 1 !important;' />",
+        unsafe_allow_html=True,
+    )
 
     # Row 2: Theme Selection
     col_l2, col_r2 = st.columns([3, 1])
@@ -2383,10 +2640,14 @@ elif page == "nav_settings":
         st.markdown(
             f"<div style='margin-top: 8px; font-weight: 600;'>{tr('application_theme')}</div>"
             f"<div style='font-size: 0.85rem; color: var(--text-muted);'>{tr('application_theme_desc')}</div>",
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
     with col_r2:
-        theme_opts = [("System", "🌓 System"), ("Light", "☀️ Light"), ("Dark", "🌙 Dark")]
+        theme_opts = [
+            ("System", "🌓 System"),
+            ("Light", "☀️ Light"),
+            ("Dark", "🌙 Dark"),
+        ]
         cur_theme = st.session_state.get("theme_mode", "System")
         theme_idx = 0
         for idx, (val, name) in enumerate(theme_opts):
@@ -2399,7 +2660,7 @@ elif page == "nav_settings":
             index=theme_idx,
             format_func=lambda x: x[1],
             key="settings_theme_selector",
-            label_visibility="collapsed"
+            label_visibility="collapsed",
         )
         if new_theme[0] != st.session_state.get("theme_mode"):
             st.session_state["theme_mode"] = new_theme[0]
