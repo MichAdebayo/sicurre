@@ -1,0 +1,95 @@
+{
+  "common": {
+    "dashboard": "Tableau de bord",
+    "threat_log": "Journal des menaces",
+    "smail_simulator": "Simulateur de boîte mail (Smail)",
+    "datasets": "Jeux de données (Jeux des données)",
+    "settings": "Paramètres",
+    "logout": "Déconnexion",
+    "loading": "Chargement en cours...",
+    "error_occurred": "Une erreur est survenue. Réessayez dans quelques instants.",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "search": "Rechercher",
+    "success": "Succès"
+  },
+  "login": {
+    "title": "Connectez-vous à votre espace Sicurre",
+    "subtitle": "Vos emails, protégés en 2 secondes.",
+    "email_label": "Adresse email professionnelle",
+    "password_label": "Mot de passe",
+    "button": "Se connecter",
+    "error_invalid": "Identifiants incorrects. Veuillez vérifier vos saisies."
+  },
+  "sidebar": {
+    "status_active": "Protection active",
+    "status_inactive": "Inactif",
+    "connected_as": "Connecté en tant que"
+  },
+  "dashboard": {
+    "welcome": "Ravi de vous revoir,",
+    "subtitle": "Voici l'état actuel de votre boîte de messagerie.",
+    "kpi_raw": "Emails analysés",
+    "kpi_normalized": "Messages normalisés",
+    "kpi_dataset": "Éléments du dataset",
+    "recent_activity": "Activité récente",
+    "no_threats": "Aucun email suspect cette semaine 🎉",
+    "verdict_distribution": "Distribution des classifications"
+  },
+  "threats": {
+    "title": "Journal des menaces",
+    "subtitle": "Historique des classifications et des actions de remédiation.",
+    "subject": "Objet du message",
+    "received_at": "Reçu le",
+    "verdict": "Verdict",
+    "confidence": "Confiance",
+    "action": "Action",
+    "badge_phishing": "Phishing",
+    "badge_spam": "Indésirable",
+    "badge_legitimate": "Légitime",
+    "moved_to_trash": "Déplacé dans la corbeille",
+    "restored": "Restauré",
+    "action_restore": "Restaurer",
+    "action_trash": "Mettre à la corbeille",
+    "search_placeholder": "Filtrer les messages par objet..."
+  },
+  "smail": {
+    "title": "Simulateur Smail",
+    "subtitle": "Testez en temps réel l'intégration de la protection Sicurre.",
+    "empty_inbox": "Votre boîte de réception est vide.",
+    "report_phishing": "Signaler comme phishing",
+    "report_spam": "Signaler comme indésirable",
+    "mark_safe": "Marquer comme légitime",
+    "verdict_safe_desc": "Cet email a été classé comme légitime.",
+    "verdict_phishing_desc": "Attention ! Cet email a été classé comme phishing et déplacé dans la corbeille.",
+    "verdict_spam_desc": "Cet email a été classé comme indésirable."
+  },
+  "datasets": {
+    "title": "Jeux des données & Pipeline",
+    "subtitle": "Visualisez et pilotez le cycle de vie de la donnée d'entraînement.",
+    "kpi_total_versions": "Total des versions",
+    "kpi_items": "Éléments exportés",
+    "table_version": "Version / Tag",
+    "table_items": "Éléments",
+    "table_status": "Statut",
+    "table_published": "Publié le",
+    "build_new_version": "Construire une nouvelle version",
+    "push_to_kaggle": "Synchroniser avec Kaggle",
+    "status_frozen": "Gelé",
+    "status_draft": "Brouillon",
+    "not_published": "Non publié",
+    "pipeline_run": "Lancer le pipeline incrémental",
+    "pipeline_running": "Exécution en cours..."
+  },
+  "settings": {
+    "title": "Configuration de Sicurre",
+    "subtitle": "Gérez vos clés d'API et les paramètres du daemon d'ingestion.",
+    "section_api": "Clés d'API",
+    "section_scheduler": "Planificateur de tâches (Daemon)",
+    "api_key_label": "Clé d'API Sicurre",
+    "api_url_label": "URL de l'API d'Inférence",
+    "scheduler_enabled": "Activer le daemon d'ingestion en arrière-plan",
+    "scheduler_interval": "Intervalle de synchronisation (secondes)",
+    "save_success": "Configuration enregistrée avec succès."
+  }
+}
