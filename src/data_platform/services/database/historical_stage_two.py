@@ -90,7 +90,7 @@ class HistoricalStageTwoService:
         historical_source = cls.get_subsource(raw_content)
         if historical_source.startswith("synthetic_phishing"):
             return NormalizedLabel.PHISHING
-        if historical_source.startswith("synthetic_spam"):
+        if historical_source.startswith("synthetic_spam") or historical_source.startswith("crowdsourced_spam"):
             return NormalizedLabel.SPAM
         if historical_source.startswith("synthetic_legitimate"):
             return NormalizedLabel.LEGITIMATE
@@ -216,6 +216,24 @@ class HistoricalStageTwoService:
                 "historical_html_repair_required",
                 tuple(trace_steps),
             )
+
+        body_text = text
+        if text.startswith("Objet : "):
+            subject = str(raw_content.get("subject") or "").strip()
+            if subject:
+                from data_platform.cleaning.normalization import clean_text
+                cleaned_subject = clean_text(subject)
+                subject_prefix = f"Objet : {cleaned_subject}"
+                if text.startswith(subject_prefix):
+                    body_text = text[len(subject_prefix):].strip()
+                else:
+                    body_text = text[len("Objet : "):].strip()
+            else:
+                body_text = text[len("Objet : "):].strip()
+
+        if len(body_text.strip()) < 30:
+            trace_steps.append("historical_quality_gate_failed")
+            return "specialized_processing", "historical_content_too_thin", tuple(trace_steps)
 
         trace_steps.append("historical_quality_gate_passed")
         return "accepted", None, tuple(trace_steps)

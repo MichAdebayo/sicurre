@@ -65,6 +65,54 @@ def _build_generation_counts(total_count: int) -> dict[str, int]:
     return counts
 
 
+def _resolve_class_counts(
+    total_count: int | None,
+    phishing_count: int | None,
+    spam_count: int | None,
+    legitimate_count: int | None,
+    default_total_count: int,
+    max_total_count: int,
+) -> dict[str, int]:
+    if total_count is not None and (
+        phishing_count is not None
+        or spam_count is not None
+        or legitimate_count is not None
+    ):
+        raise ValueError("Specify either --total-count or explicit class counts, not both")
+
+    if (
+        phishing_count is not None
+        or spam_count is not None
+        or legitimate_count is not None
+    ):
+        phishing = phishing_count or 0
+        spam = spam_count or 0
+        legitimate = legitimate_count or 0
+        resolved_total = phishing + spam + legitimate
+    else:
+        resolved_total = total_count if total_count is not None else default_total_count
+
+    if resolved_total > max_total_count:
+        raise ValueError(
+            f"Requested count {resolved_total} exceeds max_total_count {max_total_count}"
+        )
+
+    # Distribute the total balanced across classes
+    base_count, remainder = divmod(resolved_total, 3)
+    counts = {
+        "phishing": base_count,
+        "spam": base_count,
+        "legitimate": base_count,
+    }
+    # distribute remainder to phishing then spam
+    if remainder > 0:
+        counts["phishing"] += 1
+    if remainder > 1:
+        counts["spam"] += 1
+
+    return counts
+
+
 async def run_incremental_sql_cron() -> None:
     settings = get_settings()
     engine = create_async_engine(settings.data_platform_database_url, echo=False)

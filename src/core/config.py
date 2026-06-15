@@ -88,6 +88,8 @@ class Settings(BaseSettings):
     inference_api_url: str | None = Field(
         default=None, validation_alias="INFERENCE_API_URL"
     )
+    scheduler_enabled: bool = False
+    scheduler_interval_seconds: int = 604800
 
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),

@@ -2379,7 +2379,7 @@ elif page == "nav_pipeline":
         ):
             st.session_state["_pipeline_pending"] = (
                 tr("pipeline_cron"),
-                "make ingest-all-cron",
+                "make run-pipeline",
             )
     with b3:
         if st.button(
@@ -2387,7 +2387,7 @@ elif page == "nav_pipeline":
         ):
             st.session_state["_pipeline_pending"] = (
                 tr("pipeline_push"),
-                "make poc-replay-frozen",
+                "make pipeline-push",
             )
 
     # Run OUTSIDE the columns so the terminal spans full width
@@ -2410,14 +2410,18 @@ elif page == "nav_datasets":
     # Top-level volume stats
     raw_count = 0
     norm_count = 0
+    dataset_item_count = 0
     if _data_table_exists("data_raw_record"):
         rows_raw = _data_q("SELECT COUNT(*) AS cnt FROM data_raw_record")
         raw_count = int(rows_raw[0]["cnt"]) if rows_raw else 0
     if _data_table_exists("data_normalized_message"):
         rows_norm = _data_q("SELECT COUNT(*) AS cnt FROM data_normalized_message")
         norm_count = int(rows_norm[0]["cnt"]) if rows_norm else 0
+    if _data_table_exists("data_dataset_item"):
+        rows_items = _data_q("SELECT COUNT(*) AS cnt FROM data_dataset_item")
+        dataset_item_count = int(rows_items[0]["cnt"]) if rows_items else 0
 
-    m1, m2 = st.columns(2)
+    m1, m2, m3 = st.columns(3)
     m1.markdown(
         f"<div class='kpi'><div class='label'>{tr('total_raw')}</div>"
         f"<div class='value'>{_fmt_num(raw_count)}</div></div>",
@@ -2426,6 +2430,11 @@ elif page == "nav_datasets":
     m2.markdown(
         f"<div class='kpi'><div class='label'>{tr('total_normalized')}</div>"
         f"<div class='value'>{_fmt_num(norm_count)}</div></div>",
+        unsafe_allow_html=True,
+    )
+    m3.markdown(
+        f"<div class='kpi'><div class='label'>{tr('total_dataset_items')}</div>"
+        f"<div class='value'>{_fmt_num(dataset_item_count)}</div></div>",
         unsafe_allow_html=True,
     )
     st.markdown("<div style='margin-bottom:16px;'></div>", unsafe_allow_html=True)
