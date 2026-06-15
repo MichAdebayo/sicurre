@@ -8,14 +8,14 @@
         phishtank-cron file-cron scraping-cron db-cron bigdata-cron \
         phishtank-cron-reserved file-cron-reserved scraping-cron-reserved \
         db-cron-reserved bigdata-cron-reserved \
-        cron-orchestrate ingest-all-cron \
+        cron-orchestrate ingest-all-cron run-scheduler \
         bigdata-crawl bigdata-ingest bigdata-reviewed-promote \
         normalize normalize-dry \
         annotate \
         generate-data dataset-build dataset-export \
         seed-frozen-dataset \
 		poc-replay-frozen \
-        pipeline-push demo-v1 demo-v2 \
+        pipeline-push run-pipeline demo-v1 demo-v2 \
         poc db-seed r2-freeze-proof
 
 NORMALIZE_ARGS ?=
@@ -54,12 +54,13 @@ help:
 	@echo "  make db-cron                   - Scheduled DB feed                (set CRON_ARGS=--reserved for reserved slot)"
 	@echo "  make bigdata-cron              - Scheduled Common Crawl pipeline  (set CRON_ARGS=--reserved for reserved slot)"
 	@echo "  make *-cron-reserved           - Shorthand for CRON_ARGS=--reserved make *-cron"
-	@echo "  make ingest-all-cron           - Run full cron ingestion suite"
+	@echo "  make run-scheduler             - Run all scheduled ingestion tasks sequentially"
 	@echo ""
-	@echo "  Pipeline & Demos"
-	@echo "  make pipeline-push             - Push raw data through normalize → annotate(write) → dataset-build"
-	@echo "  make demo-v1                   - Full demo: base ingestion + pipeline push (dataset v1)"
-	@echo "  make demo-v2                   - Full demo: generate delta + cron ingestion + pipeline push (dataset v2)"
+	@echo "  Pipeline Execution"
+	@echo "  make pipeline-push             - Normalize raw records, annotate them, build a dataset, and export it"
+	@echo "  make run-pipeline              - Run full cron suite and push updates to Kaggle/R2 (incremental end-to-end)"
+	@echo "  make demo-v1                   - Legacy/demo alias: base ingestion + pipeline push"
+	@echo "  make demo-v2                   - Legacy/demo alias: run-pipeline with mock delta generator"
 	@echo ""
 	@echo "  Dataset"
 	@echo "  make generate-data             - Run canonical generation pipeline (adapted + CC lanes)"
@@ -190,8 +191,10 @@ cron-orchestrate:
 	@echo "Running full cron suite manually..."
 	uv run python src/data_platform/cli/maintenance/cron_orchestrator.py $(CRON_ARGS)
 
-ingest-all-cron: cron-orchestrate
+run-scheduler: cron-orchestrate
 	@echo "All cron ingestion tasks completed."
+
+ingest-all-cron: run-scheduler
 
 # ── Normalization ─────────────────────────────────────────────────────────────
 
@@ -256,6 +259,10 @@ poc-replay-frozen:
 pipeline-push: normalize annotate dataset-build dataset-export
 	@echo "Data pushed through normalization, annotation, dataset build, and dataset export."
 
+run-pipeline: run-scheduler
+	$(MAKE) pipeline-push DATASET_TAG_PREFIX=cron
+	@echo "End-to-end scheduler run and pipeline push completed."
+
 demo-v1: ingest-all-base
 	@echo "Running canonical generation lanes before pipeline push..."
 	$(MAKE) generate-data
@@ -265,10 +272,7 @@ demo-v1: ingest-all-base
 demo-v2:
 	@echo "Simulating time passage: Generating 50 new external threat records..."
 	uv run python src/data_platform/cli/generate_sql_delta.py -n 50
-	@echo "Running cron..."
-	$(MAKE) ingest-all-cron
-	@echo "Pushing new data through pipeline..."
-	$(MAKE) pipeline-push DATASET_TAG_PREFIX=cron
+	$(MAKE) run-pipeline
 	@echo "Demo V2 Dataset Generated"
 
 # ── POC ───────────────────────────────────────────────────────────────────────
