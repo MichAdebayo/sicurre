@@ -36,7 +36,8 @@ def _prepare_external_db(db_path: Path) -> None:
                 signals TEXT,
                 archetype TEXT,
                 source_dataset TEXT,
-                received_at TEXT
+                received_at TEXT,
+                created_at TEXT
             );
             """
         )
@@ -48,8 +49,8 @@ def _prepare_external_db(db_path: Path) -> None:
             """
             INSERT INTO threat_log (
                 id, user_id, message_id, subject, body_preview, verdict,
-                confidence, signals, archetype, source_dataset, received_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                confidence, signals, archetype, source_dataset, received_at, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 "threat-1",
@@ -62,6 +63,7 @@ def _prepare_external_db(db_path: Path) -> None:
                 "[]",
                 "banking",
                 "synthetic_phishing_medium",
+                "2026-04-17T08:00:00+00:00",
                 "2026-04-17T08:00:00+00:00",
             ),
         )

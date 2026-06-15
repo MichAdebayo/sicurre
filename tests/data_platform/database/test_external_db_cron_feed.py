@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from data_platform.cron_schedulers.database.run_database_historical_feed import (
+from data_platform.cron_schedulers.database.run_sql_ingestion import (
     _resolve_class_counts,
 )
 from data_platform.services.database.cron_scenarios import (

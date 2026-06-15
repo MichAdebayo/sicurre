@@ -4,7 +4,17 @@ from core.config import Settings
 from data_platform.services.shared import snapshot_storage as module
 
 
-def test_resolve_snapshot_storage_backend_uses_source_override() -> None:
+def test_resolve_snapshot_storage_backend_uses_source_override(monkeypatch) -> None:
+    for key in [
+        "SICURRE_PHISHTANK_SNAPSHOT_STORAGE_BACKEND",
+        "SICURRE_DATABASE_HISTORICAL_SNAPSHOT_STORAGE_BACKEND",
+        "SICURRE_SAP_LABS_SNAPSHOT_STORAGE_BACKEND",
+        "SICURRE_CERTFR_SNAPSHOT_STORAGE_BACKEND",
+        "SICURRE_COMMON_CRAWL_SNAPSHOT_STORAGE_BACKEND",
+        "SICURRE_RAW_SNAPSHOT_STORAGE_BACKEND",
+    ]:
+        monkeypatch.delenv(key, raising=False)
+
     settings = Settings(
         _env_file=None,
         raw_snapshot_storage_backend="r2",

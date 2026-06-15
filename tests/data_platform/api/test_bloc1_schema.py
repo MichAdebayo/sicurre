@@ -29,4 +29,6 @@ def test_bloc1_schema_creates_all_tables() -> None:
         "data_raw_object",
         "data_raw_record",
         "data_source_system",
+        "poc_user",
+        "pipeline_state",
     }
