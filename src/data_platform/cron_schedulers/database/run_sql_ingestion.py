@@ -162,7 +162,9 @@ async def run_incremental_sql_cron() -> None:
             generation_result.inserted_by_class,
         )
 
-    service = LegacyDbIngestionService()
+    service = LegacyDbIngestionService(
+        snapshot_prefix=settings.database_historical_snapshot_prefix
+    )
 
     async with session_factory() as session:
         result = await service.run(

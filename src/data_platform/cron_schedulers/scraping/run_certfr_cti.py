@@ -62,7 +62,9 @@ async def run_ingestion(
         expire_on_commit=False,
         class_=AsyncSession,
     )
-    extractor = CertFRCtiExtractor()
+    extractor = CertFRCtiExtractor(
+        snapshot_prefix=settings.certfr_snapshot_prefix
+    )
     try:
         async with session_factory() as session:
             return await extractor.run(

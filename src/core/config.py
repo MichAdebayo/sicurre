@@ -50,9 +50,11 @@ class Settings(BaseSettings):
     phishtank_snapshot_local_dir: Path = ROOT_DIR / "data" / "raw" / "api" / "phishtank"
     phishtank_snapshot_prefix: str = "phishtank"
     certfr_snapshot_storage_backend: str | None = None
+    certfr_snapshot_prefix: str = "cert-fr"
     sap_labs_snapshot_storage_backend: str | None = None
     common_crawl_snapshot_storage_backend: str | None = None
     database_historical_snapshot_storage_backend: str | None = None
+    database_historical_snapshot_prefix: str = "db_historical"
     training_dataset_snapshot_storage_backend: str | None = "prod"
     training_dataset_snapshot_prefix: str = "training_dataset"
     cc_cron_duration_mode: str = Field(

@@ -85,35 +85,35 @@ def test_parse_version_number_first_numeric_wins(gateway: KaggleGateway) -> None
     assert gateway._parse_version_number(stdout) == 3
 
 
-# ── KaggleGateway._push_sync ─────────────────────────────────────────────────
-
-
 def test_push_sync_success(gateway: KaggleGateway, tmp_path: Path) -> None:
-    mock_result = MagicMock(spec=subprocess.CompletedProcess)
-    mock_result.returncode = 0
-    mock_result.stdout = "Your dataset has been updated to version 7."
+    mock_api = MagicMock()
+    mock_api.dataset_create_version.return_value = MagicMock(versionNumber=7)
 
-    with patch("subprocess.run", return_value=mock_result) as mock_run:
+    with patch("kaggle.KaggleApi", return_value=mock_api):
         version = gateway._push_sync("user/sicurre-data", tmp_path, "Test message")
 
     assert version == 7
-    mock_run.assert_called_once()
-    call_kwargs = mock_run.call_args[1]
-    assert call_kwargs["env"]["KAGGLE_USERNAME"] == "testuser"
-    assert call_kwargs["env"]["KAGGLE_KEY"] == "testkey"
+    mock_api.authenticate.assert_called_once()
+    mock_api.dataset_create_version.assert_called_once_with(
+        folder=str(tmp_path),
+        version_notes="Test message",
+        quiet=True,
+        convert_to_csv=False,
+        dir_mode="tar",
+    )
 
 
-def test_push_sync_raises_on_nonzero_exit(
+def test_push_sync_raises_on_failure(
     gateway: KaggleGateway, tmp_path: Path
 ) -> None:
-    mock_result = MagicMock(spec=subprocess.CompletedProcess)
-    mock_result.returncode = 1
-    mock_result.stderr = "Error: dataset not found"
-    mock_result.stdout = ""
+    mock_api = MagicMock()
+    mock_api.dataset_create_version.side_effect = Exception("API error")
 
-    with patch("subprocess.run", return_value=mock_result):
-        with pytest.raises(KagglePushError, match="kaggle CLI exited 1"):
+    with patch("kaggle.KaggleApi", return_value=mock_api):
+        with pytest.raises(KagglePushError, match="Kaggle push failed"):
             gateway._push_sync("user/sicurre-data", tmp_path, "msg")
+
+
 
 
 @pytest.mark.asyncio
