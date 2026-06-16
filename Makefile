@@ -16,7 +16,7 @@
         seed-frozen-dataset \
 		poc-replay-frozen \
         pipeline-push run-pipeline demo-v1 demo-v2 \
-        poc db-seed r2-freeze-proof
+        poc db-seed r2-freeze-proof dev-app dev
 
 NORMALIZE_ARGS ?=
 GENERATE_ARGS ?=
@@ -83,6 +83,12 @@ test:
 
 dev-api:
 	PYTHONPATH=src uv run uvicorn data_platform.api.main:app --reload --port 8001
+
+dev-app:
+	npm run dev
+
+dev:
+	npx --yes concurrently --kill-others "make dev-api" "make dev-app"
 
 test-inference:
 	uv run scripts/app/test_inference_api.py
