@@ -1241,8 +1241,7 @@ def _auth_exec(query: str, params: tuple[Any, ...] = ()) -> None:
 
 @st.cache_resource
 def _data_engine():
-    db_url = os.environ.get("SICURRE_DATA_PLATFORM_DATABASE_URL")
-    if db_url:
+    if db_url := os.environ.get("SICURRE_DATA_PLATFORM_DATABASE_URL"):
         if db_url.startswith("sqlite+aiosqlite://"):
             db_url = db_url.replace("sqlite+aiosqlite://", "sqlite://", 1)
         elif db_url.startswith("postgresql+asyncpg://"):
@@ -1917,15 +1916,14 @@ if not st.session_state["authenticated"]:
             )
 
         if submitted:
-            user = authenticate_user(email, password)
-            if user:
-                _set_user_session(user)
+            if auth_result := authenticate_user(email, password):
+                _set_user_session(auth_result)
                 _auth_exec(
                     "UPDATE poc_user SET last_login_at = ? WHERE id = ?",
-                    (datetime.now(timezone.utc).isoformat(), user["id"]),
+                    (datetime.now(timezone.utc).isoformat(), auth_result["id"]),
                 )
                 if remember:
-                    sid = _persist_session(user["id"])
+                    sid = _persist_session(auth_result["id"])
                     st.query_params["sid"] = sid
                 st.rerun()
             else:
@@ -1935,7 +1933,7 @@ if not st.session_state["authenticated"]:
     st.stop()
 
 
-user = st.session_state["user"]
+user: dict[str, Any] = st.session_state["user"]
 
 # ── Sidebar ─────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -1974,15 +1972,17 @@ with st.sidebar:
     for nav_key in NAV_KEYS:
         is_active = nav_key == current_page
         btn_type = "primary" if is_active else "secondary"
-        if st.button(
-            tr(nav_key),
-            key=f"_nav_{nav_key}",
-            type=btn_type,
-            use_container_width=True,
+        if (
+            st.button(
+                tr(nav_key),
+                key=f"_nav_{nav_key}",
+                type=btn_type,
+                use_container_width=True,
+            )
+            and not is_active
         ):
-            if not is_active:
-                st.session_state["page"] = nav_key
-                st.rerun()
+            st.session_state["page"] = nav_key
+            st.rerun()
 
     # Flex spacer pushes bottom section down
     st.markdown("<div class='sidebar-spacer'></div>", unsafe_allow_html=True)
@@ -2024,25 +2024,23 @@ if page == "nav_home":
     st.markdown("<div style='margin-bottom:4px;'></div>", unsafe_allow_html=True)
 
     total = len(events)
-    blocked = sum(1 for e in events if _eff_verdict(e) == "phishing")
-    delivered = sum(1 for e in events if _eff_verdict(e) == "safe")
+    blocked = sum(_eff_verdict(e) == "phishing" for e in events)
+    delivered = sum(_eff_verdict(e) == "safe" for e in events)
     spam_safe = sum(
-        1 for e in events if _eff_verdict(e) == "safe" and _eff_label(e) == "spam"
+        _eff_verdict(e) == "safe" and _eff_label(e) == "spam" for e in events
     )
 
     if eval_events := [e for e in events if e.get("expected_label")]:
         fp_block = sum(
-            1
+            _eff_verdict(e) == "phishing" and e.get("expected_label") != "phishing"
             for e in eval_events
-            if _eff_verdict(e) == "phishing" and e.get("expected_label") != "phishing"
         )
         fn_miss = sum(
-            1
+            _eff_verdict(e) != "phishing" and e.get("expected_label") == "phishing"
             for e in eval_events
-            if _eff_verdict(e) != "phishing" and e.get("expected_label") == "phishing"
         )
         label_acc = (
-            sum(1 for e in eval_events if _eff_label(e) == e["expected_label"])
+            sum(_eff_label(e) == e["expected_label"] for e in eval_events)
             / len(eval_events)
             * 100.0
         )
@@ -2597,12 +2595,13 @@ elif page == "nav_settings":
         )
 
     if saved:
-        if new_name.strip() and new_name.strip() != user["display_name"]:
+        name_trimmed = (new_name or "").strip()
+        if name_trimmed and name_trimmed != user["display_name"]:
             _auth_exec(
                 "UPDATE poc_user SET display_name = ? WHERE id = ?",
-                (new_name.strip(), user["id"]),
+                (name_trimmed, user["id"]),
             )
-            st.session_state["user"]["display_name"] = new_name.strip()
+            st.session_state["user"]["display_name"] = name_trimmed
             st.toast(tr("settings_saved"), icon="✅")
             st.rerun()
 

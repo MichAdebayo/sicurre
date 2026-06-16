@@ -11,6 +11,7 @@ from core.config import get_settings
 from core.rate_limit import limiter
 from data_platform.api.routers import router as data_platform_router
 from data_platform.api.routers.internal import router as internal_router
+from data_platform.api.routers.app_routes import router as app_routes_router
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,7 @@ def create_app() -> FastAPI:
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     app.include_router(data_platform_router)
     app.include_router(internal_router)
+    app.include_router(app_routes_router)
 
     @app.get("/health", tags=["system"])
     async def healthcheck() -> dict[str, str]:
