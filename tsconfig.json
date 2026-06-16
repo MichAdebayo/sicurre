@@ -21,6 +21,8 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
 
+    /* Path aliases — baseUrl is deprecated in TS 5.x; ignoreDeprecations suppresses the warning */
+    "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
