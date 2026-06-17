@@ -7,13 +7,15 @@ import App from "./App.tsx";
 import "./index.css";
 
 import frTranslation from "./locales/fr.json";
+import enTranslation from "./locales/en.json";
 
 // Initialize translations
 i18n.use(initReactI18next).init({
   resources: {
     fr: { translation: frTranslation },
+    en: { translation: enTranslation },
   },
-  lng: "fr",
+  lng: localStorage.getItem("sicurre_lang") || "fr",
   fallbackLng: "fr",
   interpolation: {
     escapeValue: false,

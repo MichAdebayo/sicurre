@@ -88,9 +88,9 @@ export default function LoginRoute({ onLoginSuccess }: LoginRouteProps) {
           {/* Brand Identity Header */}
           <div className="flex flex-col items-center text-center mb-8">
             <div className="p-3 bg-primary/[0.06] border border-primary/15 rounded-xl mb-4">
-              <img src={sicurreLogo} alt="Sicurre" className="w-8 h-8" />
+              <img src={sicurreLogo} alt="Sicurre" className="w-12 h-12" />
             </div>
-            <h1 className="font-display font-bold text-2xl text-on-surface tracking-tight">
+            <h1 className="font-display font-bold text-3xl text-on-surface tracking-tight">
               Sicurre
             </h1>
             <p className="text-sm text-on-surface-variant mt-1.5">
