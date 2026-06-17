@@ -23,14 +23,6 @@ export interface ThreatLog {
   received_at: string;
 }
 
-export interface DatasetVersion {
-  id: string;
-  version_tag: string;
-  item_count: number;
-  status: "draft" | "frozen";
-  published_at: string | null;
-}
-
 // Fetch helper (replaces Axios to block supply chain vulnerabilities)
 async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
   const token = localStorage.getItem("sicurre_session_token");
@@ -79,25 +71,6 @@ export function useUpdateThreatStatus() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["threats"] });
-      queryClient.invalidateQueries({ queryKey: ["kpis"] });
-    },
-  });
-}
-
-export function useDatasets() {
-  return useQuery<DatasetVersion[]>({
-    queryKey: ["datasets"],
-    queryFn: () => fetchJson<DatasetVersion[]>("/datasets"),
-  });
-}
-
-export function useRunPipeline() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: () => fetchJson<{ run_id: string }>("/pipeline/run", { method: "POST" }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["threats"] });
-      queryClient.invalidateQueries({ queryKey: ["datasets"] });
       queryClient.invalidateQueries({ queryKey: ["kpis"] });
     },
   });

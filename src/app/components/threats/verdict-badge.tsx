@@ -1,5 +1,5 @@
-import { useTranslation } from "react-i18next";
 import { ShieldCheck, ShieldAlert, MailWarning } from "lucide-react";
+import { clsx } from "clsx";
 
 interface VerdictBadgeProps {
   verdict: "phishing" | "spam" | "legitimate";
@@ -7,27 +7,35 @@ interface VerdictBadgeProps {
 }
 
 export function VerdictBadge({ verdict, confidence }: VerdictBadgeProps) {
-  const { t } = useTranslation();
-
-  let bgClass = "bg-green-50 text-green-700 border-green-200";
+  let badgeStyles = "bg-safe-bg text-safe border-safe/20";
   let Icon = ShieldCheck;
-  let label = t("threats.badge_legitimate");
+  let label = "Légitime";
 
   if (verdict === "phishing") {
-    bgClass = "bg-red-50 text-red-700 border-red-200";
+    badgeStyles = "bg-error/10 text-error border-error/20";
     Icon = ShieldAlert;
-    label = t("threats.badge_phishing");
+    label = "Phishing";
   } else if (verdict === "spam") {
-    bgClass = "bg-amber-50 text-amber-700 border-amber-200";
+    badgeStyles = "bg-warning-bg text-warning border-warning/20";
     Icon = MailWarning;
-    label = t("threats.badge_spam");
+    label = "Spam";
   }
 
+  // French format: space before percent symbol
+  const formattedConfidence = `${(confidence * 100).toFixed(0)} %`;
+
   return (
-    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium ${bgClass}`}>
-      <Icon className="w-3.5 h-3.5 stroke-[1.5]" />
+    <div
+      className={clsx(
+        "inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-body-sm font-semibold transition-all select-none",
+        badgeStyles,
+      )}
+    >
+      <Icon className="w-4 h-4 stroke-[1.5]" />
       <span>{label}</span>
-      <span className="font-mono opacity-85 ml-0.5">{(confidence * 100).toFixed(0)} %</span>
+      <span className="font-mono text-mono-data opacity-90 ml-1.5">
+        {formattedConfidence}
+      </span>
     </div>
   );
 }

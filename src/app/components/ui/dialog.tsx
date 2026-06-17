@@ -22,7 +22,7 @@ export function Dialog({ isOpen, onClose, title, children }: DialogProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-on-background/60 backdrop-blur-sm"
           />
 
           {/* Modal content box */}
@@ -31,18 +31,18 @@ export function Dialog({ isOpen, onClose, title, children }: DialogProps) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="relative w-full max-w-lg overflow-hidden rounded-xl border border-slate-200 bg-white p-6 shadow-2xl z-10"
+            className="relative w-full max-w-lg overflow-hidden rounded-xl border border-border-subtle bg-surface-lowest p-6 shadow-2xl z-10"
           >
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <h3 className="text-base font-semibold text-slate-900 font-display">{title}</h3>
+            <div className="flex items-center justify-between border-b border-border-subtle pb-3 mb-4">
+              <h3 className="text-title-md font-semibold text-on-surface font-display">{title}</h3>
               <button
                 onClick={onClose}
-                className="rounded-lg p-1 hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                className="rounded-lg p-1 hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="text-sm text-slate-600">{children}</div>
+            <div className="text-body-md text-on-surface-variant">{children}</div>
           </MotionDiv>
         </div>
       )}

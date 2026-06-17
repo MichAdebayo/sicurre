@@ -3,11 +3,12 @@ import { AnimatePresence } from "framer-motion";
 import LandingRoute from "./routes/landing";
 import LoginRoute from "./routes/login";
 import DashboardRoute from "./routes/dashboard";
-import JournalRoute from "./routes/journal";
-import SmailRoute from "./routes/smail";
-import DatasetsRoute from "./routes/datasets";
+import ThreatsRoute from "./routes/threats";
+import LogsRoute from "./routes/logs";
 import SettingsRoute from "./routes/settings";
-import { Layout } from "./components/common/layout";
+import SupportRoute from "./routes/support";
+import { AppShell } from "./components/common/app-shell";
+import { SidebarPage } from "./components/common/sidebar";
 
 const getInitialLoginState = () => {
   const params = new URLSearchParams(window.location.search);
@@ -25,7 +26,7 @@ const getInitialLoginState = () => {
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(getInitialLoginState);
   const [viewState, setViewState] = useState<"landing" | "login" | "signup">("landing");
-  const [activeTab, setActiveTab] = useState<"dashboard" | "threats" | "smail" | "datasets" | "settings">("dashboard");
+  const [activePage, setActivePage] = useState<SidebarPage>("dashboard");
 
   // Handle successful login
   const handleLoginSuccess = () => {
@@ -50,11 +51,11 @@ export default function App() {
       );
     }
     return (
-      <div className="relative">
+      <div className="relative bg-surface-low">
         {/* Back to landing link on login screen */}
         <button
           onClick={() => setViewState("landing")}
-          className="absolute top-6 left-6 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer z-20 font-medium bg-slate-900/40 px-3.5 py-2 rounded-lg border border-slate-800"
+          className="absolute top-6 left-6 text-xs text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer z-20 font-semibold bg-surface-lowest hover:bg-surface-low px-4 py-2 rounded-lg border border-border-subtle shadow-sm"
         >
           &larr; Retour à l'accueil
         </button>
@@ -64,18 +65,19 @@ export default function App() {
   }
 
   return (
-    <Layout
-      activeTab={activeTab}
-      setActiveTab={setActiveTab}
+    <AppShell
+      currentPage={activePage}
+      onPageChange={setActivePage}
       onLogout={handleLogout}
+      userName={localStorage.getItem("sicurre_user_name") || "Administrateur"}
     >
       <AnimatePresence mode="wait">
-        {activeTab === "dashboard" && <DashboardRoute key="dashboard" />}
-        {activeTab === "threats" && <JournalRoute key="threats" />}
-        {activeTab === "smail" && <SmailRoute key="smail" />}
-        {activeTab === "datasets" && <DatasetsRoute key="datasets" />}
-        {activeTab === "settings" && <SettingsRoute key="settings" />}
+        {activePage === "dashboard" && <DashboardRoute key="dashboard" />}
+        {activePage === "threats" && <ThreatsRoute key="threats" />}
+        {activePage === "logs" && <LogsRoute key="logs" />}
+        {activePage === "settings" && <SettingsRoute key="settings" />}
+        {activePage === "support" && <SupportRoute key="support" />}
       </AnimatePresence>
-    </Layout>
+    </AppShell>
   );
 }

@@ -1,27 +1,53 @@
-import React from "react";
+import { type ButtonHTMLAttributes, forwardRef } from "react";
 import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "danger" | "safe";
+type ButtonVariant = "primary" | "warning" | "ghost" | "outline" | "danger";
+type ButtonSize = "sm" | "md" | "lg";
+
+interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  fullWidth?: boolean;
 }
 
-export function Button({ className, variant = "primary", ...props }: ButtonProps) {
-  return (
-    <button
-      className={twMerge(
-        clsx(
-          "inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-xs font-semibold shadow-md active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50",
-          {
-            "bg-accent hover:bg-accent-dark text-slate-950 hover:shadow-accent/20": variant === "primary",
-            "bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300": variant === "secondary",
-            "bg-red-50 hover:bg-red-100 border border-red-200 text-red-700": variant === "danger",
-            "bg-green-50 hover:bg-green-100 border border-green-200 text-green-700": variant === "safe"
-          }
-        ),
-        className
-      )}
-      {...props}
-    />
-  );
-}
+const variantStyles: Record<ButtonVariant, string> = {
+  primary:
+    "bg-primary text-on-primary hover:bg-navy-dark shadow-sm",
+  warning:
+    "bg-secondary text-on-secondary hover:bg-amber-dark shadow-sm",
+  danger:
+    "bg-error text-on-error hover:bg-on-error-container shadow-sm",
+  ghost:
+    "bg-transparent text-on-surface hover:bg-surface-container",
+  outline:
+    "bg-surface-lowest border border-border-subtle text-on-surface hover:bg-surface-container",
+};
+
+const sizeStyles: Record<ButtonSize, string> = {
+  sm: "px-3 py-1.5 text-body-sm rounded-md gap-1.5",
+  md: "px-5 py-2.5 text-body-md rounded-lg gap-2",
+  lg: "px-8 py-4 text-body-lg rounded-lg gap-2.5",
+};
+
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ variant = "primary", size = "md", fullWidth, className, children, ...props }, ref) => {
+    return (
+      <button
+        ref={ref}
+        className={clsx(
+          "inline-flex items-center justify-center font-semibold transition-all duration-200 cursor-pointer select-none",
+          "active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none",
+          variantStyles[variant],
+          sizeStyles[size],
+          fullWidth && "w-full",
+          className,
+        )}
+        {...props}
+      >
+        {children}
+      </button>
+    );
+  },
+);
+
+Button.displayName = "Button";
