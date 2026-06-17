@@ -6,9 +6,9 @@ import {
   Settings,
   HelpCircle,
   LogOut,
-  Shield,
   Zap,
 } from "lucide-react";
+import sicurreLogo from "../../assets/sicurre.svg";
 
 export type SidebarPage = "dashboard" | "threats" | "logs" | "settings" | "support";
 
@@ -52,9 +52,7 @@ export function Sidebar({
       {/* Logo */}
       <div className="px-5 py-5 border-b border-border-subtle">
         <div className="flex items-center gap-2.5">
-          <div className="p-1.5 rounded-lg bg-primary text-on-primary">
-            <Shield className="w-5 h-5 stroke-[1.5]" />
-          </div>
+          <img src={sicurreLogo} alt="Sicurre" className="w-8 h-8" />
           <div className="flex flex-col">
             <span className="font-display font-bold text-[15px] text-on-surface leading-tight tracking-tight">
               Sicurre

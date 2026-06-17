@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import serverRoomImg from "../assets/server-room.png";
+import sicurreLogo from "../assets/sicurre.svg";
 
 const MotionDiv = motion.div as any;
 const MotionSection = motion.section as any;
@@ -105,9 +106,7 @@ export default function LandingRoute({ onNavigateToLogin, onNavigateToSignUp }: 
       >
         <div className="max-w-7xl mx-auto px-6 lg:px-8 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="p-1.5 rounded-lg bg-primary text-on-primary">
-              <Shield className="w-5 h-5 stroke-[1.5]" />
-            </div>
+            <img src={sicurreLogo} alt="Sicurre" className="w-8 h-8" />
             <span className={`font-display font-bold text-lg tracking-tight ${scrolled ? "text-on-surface" : "text-on-surface"}`}>
               Sicurre
             </span>
@@ -422,9 +421,7 @@ export default function LandingRoute({ onNavigateToLogin, onNavigateToSignUp }: 
             {/* Brand Column */}
             <div className="col-span-2 md:col-span-1 space-y-4">
               <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-primary text-on-primary">
-                  <Shield className="w-4 h-4" />
-                </div>
+                <img src={sicurreLogo} alt="Sicurre" className="w-7 h-7" />
                 <span className="font-display font-bold text-white text-[15px]">Sicurre</span>
               </div>
               <p className="text-[12px] text-white/40 leading-relaxed max-w-[200px]">

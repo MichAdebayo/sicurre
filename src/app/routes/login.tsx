@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Shield, Eye, EyeOff, Mail, Lock, User, Info, ArrowRight } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, Info, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
+import sicurreLogo from "../assets/sicurre.svg";
 import { loginSchema, signUpSchema } from "../lib/schemas";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
@@ -86,8 +87,8 @@ export default function LoginRoute({ onLoginSuccess }: LoginRouteProps) {
         <div className="bg-white rounded-2xl border border-border-subtle shadow-xl shadow-on-surface/[0.04] p-8">
           {/* Brand Identity Header */}
           <div className="flex flex-col items-center text-center mb-8">
-            <div className="p-3 bg-primary/[0.06] border border-primary/15 text-primary rounded-xl mb-4">
-              <Shield className="w-7 h-7 stroke-[1.5]" />
+            <div className="p-3 bg-primary/[0.06] border border-primary/15 rounded-xl mb-4">
+              <img src={sicurreLogo} alt="Sicurre" className="w-8 h-8" />
             </div>
             <h1 className="font-display font-bold text-2xl text-on-surface tracking-tight">
               Sicurre
