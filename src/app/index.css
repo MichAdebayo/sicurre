@@ -1,34 +1,302 @@
 @import "tailwindcss";
 
+/* ─── Sicurre Design System ─────────────────────────────────────────────────
+   Source of truth: docs/brand/brand-identity.md + ui-ideas DESIGN.md
+   Colors: Material-3 inspired tonal system
+   Fonts: Hanken Grotesk (display) · Inter (body) · JetBrains Mono (data)
+   ────────────────────────────────────────────────────────────────────────── */
+
 @theme {
+  /* ── Font Families ── */
   --font-sans: "Inter", system-ui, sans-serif;
-  --font-display: "Sora", "Inter", sans-serif;
+  --font-display: "Hanken Grotesk", "Inter", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 
-  --color-primary: #1B4FCC;
-  --color-primary-dark: #1239A6;
-  --color-primary-light: #EEF3FF;
-  --color-accent: #F59E0B;
-  --color-accent-dark: #D97706;
+  /* ── Core Palette ── */
+  --color-primary: #0038a4;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #1b4fcc;
+  --color-on-primary-container: #c5d0ff;
+  --color-inverse-primary: #b5c4ff;
+  --color-navy-dark: #0f2e7a;
 
-  --color-danger: #D97706;
-  --color-danger-bg: #FFFBEB;
-  --color-safe: #10B981;
-  --color-safe-bg: #ECFDF5;
-  --color-warning: #F59E0B;
-  --color-warning-bg: #FFFBEB;
+  /* ── Secondary (Amber — Attention Required) ── */
+  --color-secondary: #855300;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #fea619;
+  --color-on-secondary-container: #684000;
+  --color-amber-dark: #b45309;
 
-  --color-bg-base: #F8FAFC;
-  --color-surface: #FFFFFF;
-  --color-border-brand: #E2E8F0;
-  --color-text-primary: #0F172A;
-  --color-text-secondary: #475569;
-  --color-text-muted: #94A3B8;
+  /* ── Tertiary (Danger / Critical) ── */
+  --color-tertiary: #792700;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #a03600;
+  --color-on-tertiary-container: #ffc4af;
+
+  /* ── Error ── */
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+
+  /* ── Surfaces ── */
+  --color-background: #faf8ff;
+  --color-on-background: #131b2e;
+  --color-surface: #faf8ff;
+  --color-surface-dim: #d2d9f4;
+  --color-surface-bright: #faf8ff;
+  --color-surface-lowest: #ffffff;
+  --color-surface-low: #f2f3ff;
+  --color-surface-container: #eaedff;
+  --color-surface-high: #e2e7ff;
+  --color-surface-highest: #dae2fd;
+  --color-on-surface: #131b2e;
+  --color-on-surface-variant: #434654;
+  --color-surface-variant: #dae2fd;
+  --color-surface-tint: #2354d1;
+  --color-inverse-surface: #283044;
+  --color-inverse-on-surface: #eef0ff;
+
+  /* ── Semantic Surfaces ── */
+  --color-surface-safe: #f0f4ff;
+  --color-surface-alert: #fff7ed;
+
+  /* ── Outlines & Borders ── */
+  --color-outline: #747685;
+  --color-outline-variant: #c4c5d6;
+  --color-border-subtle: #e2e8f0;
+
+  /* ── Fixed Colors (for elevation-independent tinting) ── */
+  --color-primary-fixed: #dce1ff;
+  --color-primary-fixed-dim: #b5c4ff;
+  --color-on-primary-fixed: #00164e;
+  --color-secondary-fixed: #ffddb8;
+  --color-secondary-fixed-dim: #ffb95f;
+  --color-on-secondary-fixed: #2a1700;
+  --color-tertiary-fixed: #ffdbcf;
+  --color-tertiary-fixed-dim: #ffb59a;
+
+  /* ── Semantic Verdict Colors (from brand-identity.md) ── */
+  --color-safe: #10b981;
+  --color-safe-bg: #ecfdf5;
+  --color-danger: #d97706;
+  --color-danger-bg: #fffbeb;
+  --color-warning: #f59e0b;
+  --color-warning-bg: #fffbeb;
+
+  /* ── Spacing (4px base unit) ── */
+  --spacing-unit: 4px;
+  --spacing-stack-sm: 8px;
+  --spacing-stack-md: 16px;
+  --spacing-stack-lg: 32px;
+  --spacing-gutter: 24px;
+  --spacing-margin-desktop: 40px;
+  --spacing-margin-mobile: 16px;
+  --spacing-container-max: 1280px;
+
+  /* ── Border Radius ── */
+  --radius-sm: 0.25rem;
+  --radius-DEFAULT: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-full: 9999px;
 }
 
+/* ─── Base Layer ──────────────────────────────────────────────────────────── */
+
 @layer base {
-  body {
-    background-color: var(--color-bg-base);
-    color: var(--color-text-primary);
+  html {
+    scroll-behavior: smooth;
   }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-on-surface);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background-color: var(--color-primary-fixed-dim);
+    color: var(--color-on-primary-fixed);
+  }
+}
+
+/* ─── Utility Classes ─────────────────────────────────────────────────────── */
+
+@layer utilities {
+  /* Glassmorphism card */
+  .glass-card {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+  }
+
+  /* Dark glass variant */
+  .glass-card-dark {
+    background: rgba(19, 27, 46, 0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(196, 197, 214, 0.15);
+  }
+
+  /* Typography presets */
+  .text-display-lg {
+    font-family: var(--font-display);
+    font-size: 48px;
+    line-height: 56px;
+    letter-spacing: -0.02em;
+    font-weight: 700;
+  }
+
+  .text-headline-lg {
+    font-family: var(--font-display);
+    font-size: 32px;
+    line-height: 40px;
+    letter-spacing: -0.01em;
+    font-weight: 600;
+  }
+
+  .text-headline-lg-mobile {
+    font-family: var(--font-display);
+    font-size: 24px;
+    line-height: 32px;
+    font-weight: 600;
+  }
+
+  .text-title-md {
+    font-family: var(--font-display);
+    font-size: 20px;
+    line-height: 28px;
+    font-weight: 600;
+  }
+
+  .text-body-lg {
+    font-family: var(--font-sans);
+    font-size: 18px;
+    line-height: 28px;
+    font-weight: 400;
+  }
+
+  .text-body-md {
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 24px;
+    font-weight: 400;
+  }
+
+  .text-body-sm {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 400;
+  }
+
+  .text-label-caps {
+    font-family: var(--font-sans);
+    font-size: 12px;
+    line-height: 16px;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .text-mono-data {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 400;
+  }
+}
+
+/* ─── Animations ──────────────────────────────────────────────────────────── */
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes marquee-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes pulse-subtle {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-fade-up {
+  animation: fade-in-up 0.6s ease-out forwards;
+  opacity: 0;
+}
+
+.animate-marquee {
+  animation: marquee-scroll 40s linear infinite;
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+.stagger-1 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.3s; }
+.stagger-4 { animation-delay: 0.4s; }
+
+/* Respect prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-marquee,
+  .animate-pulse-subtle {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ─── Scrollbar Styling ───────────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-outline-variant);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-outline);
 }

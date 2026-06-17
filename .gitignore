@@ -115,3 +115,5 @@ simplon-coverage-checklist.md
 *.png
 .streamlit/
 node_modules/
+
+ui-ideas/
