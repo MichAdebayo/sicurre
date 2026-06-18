@@ -12,7 +12,6 @@ import {
   UserCheck,
   RotateCcw,
   CheckCircle2,
-  Globe,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import serverRoomImg from "../assets/server-room.png";
@@ -26,7 +25,6 @@ interface LandingRouteProps {
   onNavigateToSignUp: () => void;
 }
 
-/* ── Intersection Observer hook for scroll-triggered animations ── */
 function useInView(threshold = 0.15) {
   const ref = useRef<HTMLDivElement>(null);
   const [isInView, setIsInView] = useState(false);
@@ -58,8 +56,7 @@ function FadeInSection({ children, className = "", delay = 0 }: { children: Reac
   );
 }
 
-/* ── Language Switcher ── */
-function LanguageSwitcher() {
+function LanguageSwitcher({ scrolled }: { scrolled: boolean }) {
   const { i18n } = useTranslation();
   const currentLang = i18n.language;
 
@@ -72,13 +69,16 @@ function LanguageSwitcher() {
   return (
     <button
       onClick={toggleLang}
-      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-low/70 hover:bg-surface-container border border-border-subtle text-[12px] font-bold text-on-surface-variant transition-all cursor-pointer select-none"
+      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[14px] font-medium transition-all cursor-pointer select-none ${
+        scrolled
+          ? "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700"
+          : "bg-white/5 hover:bg-white/10 border-white/10 text-white/80"
+      }`}
       title={currentLang === "fr" ? "Switch to English" : "Passer en français"}
     >
-      <Globe className="w-3.5 h-3.5" />
-      <span>{currentLang === "fr" ? "FR" : "EN"}</span>
-      <span className="text-on-surface-variant/40">|</span>
-      <span className="text-on-surface-variant/50">{currentLang === "fr" ? "EN" : "FR"}</span>
+      <span>{currentLang === "fr" ? "🇫🇷" : "🇬🇧"}</span>
+      <span className="opacity-30">|</span>
+      <span className="opacity-50 grayscale hover:grayscale-0 transition-all">{currentLang === "fr" ? "🇬🇧" : "🇫🇷"}</span>
     </button>
   );
 }
@@ -95,66 +95,74 @@ export default function LandingRoute({ onNavigateToLogin, onNavigateToSignUp }: 
 
   const features = [
     {
-      icon: Link2,
-      title: t("landing.feat_links_title"),
-      desc: t("landing.feat_links_desc"),
-    },
-    {
-      icon: UserCheck,
-      title: t("landing.feat_identity_title"),
-      desc: t("landing.feat_identity_desc"),
+      icon: ShieldCheck,
+      title: t("landing.feat_ai_title"),
+      desc: t("landing.feat_ai_desc"),
     },
     {
       icon: RotateCcw,
       title: t("landing.feat_remediation_title"),
       desc: t("landing.feat_remediation_desc"),
     },
+    {
+      icon: Lock,
+      title: t("landing.feat_dmarc_title"),
+      desc: t("landing.feat_dmarc_desc"),
+    },
   ];
 
   const marqueeItems = [
     { icon: Shield, label: "ARCHITECTURE ZERO-TRUST" },
-    { icon: ShieldAlert, label: "DÉTECTION IA AVANCÉE" },
-    { icon: Lock, label: "INTÉGRATION SAML/SSO" },
-    { icon: Mail, label: "SÉCURITÉ E-MAIL NATIVE" },
+    { icon: ShieldCheck, label: "DÉTECTION IA AVANCÉE" },
+    { icon: Lock, label: "INTÉGRATION GMAIL NATIVE" },
+    { icon: Mail, label: "SÉCURITÉ E-MAIL FR SOUVERAIN" },
     { icon: ShieldCheck, label: "CONFORMITÉ RGPD" },
     { icon: Server, label: "ANALYSE TEMPS RÉEL" },
   ];
 
   return (
-    <div className="min-h-screen font-sans select-none relative overflow-x-hidden">
-      {/* ── Sticky Header ── */}
+    <div className="min-h-screen font-sans select-none relative overflow-x-hidden bg-white text-slate-900">
+      
+      {/* ── Scroll-Dependent Sticky Header ── */}
       <header
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
           scrolled
-            ? "bg-white/90 backdrop-blur-lg border-b border-border-subtle shadow-[0_1px_3px_rgba(0,0,0,0.05)] py-3"
+            ? "bg-white/90 backdrop-blur-lg border-b border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.05)] py-3"
             : "bg-transparent py-5"
         }`}
       >
         <div className="max-w-7xl mx-auto px-6 lg:px-8 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src={sicurreLogo} alt="Sicurre" className="w-10 h-10" />
-            <span className={`font-display font-bold text-xl tracking-tight ${scrolled ? "text-on-surface" : "text-on-surface"}`}>
+            <img src={sicurreLogo} alt="Sicurre Logo" className="w-12 h-12" />
+            <span className={`font-display font-bold text-2xl tracking-tight ${scrolled ? "text-slate-900" : "text-white"}`}>
               Sicurre
             </span>
           </div>
 
-          <nav className="hidden md:flex items-center gap-8 text-[13px] font-medium text-on-surface-variant">
-            <a href="#features" className="hover:text-primary transition-colors">{t("landing.nav_features")}</a>
-            <a href="#pricing" className="hover:text-primary transition-colors">{t("landing.nav_pricing")}</a>
-            <a href="#compliance" className="hover:text-primary transition-colors">{t("landing.nav_resources")}</a>
+          <nav className={`hidden md:flex items-center gap-8 text-[13px] font-semibold transition-colors ${
+            scrolled ? "text-slate-600 hover:text-primary" : "text-white/70 hover:text-white"
+          }`}>
+            <a href="#features" className="transition-colors">{t("landing.nav_features")}</a>
+            <a href="#cta" className="transition-colors">Sécuriser</a>
           </nav>
 
-          <div className="flex items-center gap-3">
-            <LanguageSwitcher />
+          <div className="flex items-center gap-4">
+            <LanguageSwitcher scrolled={scrolled} />
             <button
               onClick={onNavigateToLogin}
-              className="text-[13px] font-semibold text-on-surface-variant hover:text-primary transition-colors cursor-pointer hidden sm:block"
+              className={`text-[13px] font-semibold transition-colors cursor-pointer hidden sm:block ${
+                scrolled ? "text-slate-600 hover:text-primary" : "text-white/80 hover:text-white"
+              }`}
             >
               {t("landing.nav_login")}
             </button>
             <button
               onClick={onNavigateToSignUp}
-              className="px-4 py-2 bg-primary hover:bg-navy-dark text-on-primary rounded-lg text-[13px] font-semibold transition-all active:scale-[0.97] cursor-pointer shadow-sm"
+              className={`px-4.5 py-2 rounded-lg text-[13px] font-bold transition-all active:scale-[0.97] cursor-pointer shadow-sm ${
+                scrolled 
+                  ? "bg-primary hover:bg-navy-dark text-on-primary"
+                  : "bg-white hover:bg-white/90 text-primary"
+              }`}
             >
               {t("landing.nav_cta")}
             </button>
@@ -162,28 +170,59 @@ export default function LandingRoute({ onNavigateToLogin, onNavigateToSignUp }: 
         </div>
       </header>
 
-      {/* ── Hero Section ── */}
-      <section className="relative bg-white pt-28 pb-16 lg:pt-36 lg:pb-24 overflow-hidden">
-        {/* Subtle grid pattern */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,56,164,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,56,164,0.03)_1px,transparent_1px)] bg-[size:4rem_4rem]" />
-        {/* Soft radial glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-[radial-gradient(ellipse,rgba(27,79,204,0.06),transparent_60%)]" />
+      {/* ── 100vh Hero Section (Dark Theme Visual Anchor) ── */}
+      <section className="relative w-full h-screen min-h-[600px] max-h-[850px] flex flex-col justify-between bg-black text-white overflow-hidden">
+        {/* Subtle grid layout */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.012)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.012)_1px,transparent_1px)] bg-[size:4rem_4rem]" />
+        
+        {/* Top Right Silk Wave */}
+        <div className="absolute top-0 right-0 w-[55%] h-[65%] select-none pointer-events-none opacity-40 z-0">
+          <svg className="w-full h-full" viewBox="0 0 600 600" fill="none" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="landing-silk-1" x1="100%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#ffffff" stopOpacity="0.12" />
+                <stop offset="40%" stopColor="#475569" stopOpacity="0.04" />
+                <stop offset="100%" stopColor="#000000" stopOpacity="0.9" />
+              </linearGradient>
+              <linearGradient id="landing-silk-2" x1="100%" y1="0%" x2="30%" y2="80%">
+                <stop offset="0%" stopColor="#ffffff" stopOpacity="0.08" />
+                <stop offset="100%" stopColor="#000000" stopOpacity="0.95" />
+              </linearGradient>
+            </defs>
+            <path d="M250 0 C380 180, 200 380, 600 480 L600 0 Z" fill="url(#landing-silk-1)" />
+            <path d="M380 0 C450 140, 320 280, 600 380 L600 0 Z" fill="url(#landing-silk-2)" opacity="0.6" />
+          </svg>
+        </div>
 
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start relative z-10">
-          {/* Left: Copy */}
-          <div className="lg:col-span-7 space-y-7 pt-6">
+        {/* Bottom Left Silk Wave */}
+        <div className="absolute bottom-0 left-0 w-[50%] h-[60%] select-none pointer-events-none opacity-35 z-0">
+          <svg className="w-full h-full" viewBox="0 0 600 600" fill="none" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="landing-silk-3" x1="0%" y1="100%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#ffffff" stopOpacity="0.1" />
+                <stop offset="50%" stopColor="#475569" stopOpacity="0.03" />
+                <stop offset="100%" stopColor="#000000" stopOpacity="0.9" />
+              </linearGradient>
+            </defs>
+            <path d="M0 200 C180 320, 250 480, 350 600 L0 600 Z" fill="url(#landing-silk-3)" />
+          </svg>
+        </div>
+
+        {/* Hero content grid */}
+        <div className="flex-1 w-full max-w-[1440px] mx-auto px-6 lg:px-12 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center relative z-10 pt-24 pb-4">
+          <div className="lg:col-span-6 space-y-5 flex flex-col justify-center">
             <MotionDiv
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.08 }}
             >
-              <h1 className="font-display font-bold text-[clamp(2rem,5vw,3.25rem)] leading-[1.1] tracking-tight text-on-surface">
+              <h1 className="font-display font-extrabold text-4xl sm:text-5xl lg:text-6xl leading-[1.08] tracking-tight text-white">
                 {t("landing.hero_title_1")}{" "}
-                <br className="hidden lg:block" />
                 {t("landing.hero_title_2")}{" "}
-                <br className="hidden lg:block" />
-                {t("landing.hero_title_3")}{" "}
-                <span className="text-primary italic">{t("landing.hero_title_accent")}</span>
+                <span className="text-white/50 font-normal">{t("landing.hero_title_3")}</span>{" "}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400 font-bold">
+                  {t("landing.hero_title_accent")}
+                </span>
               </h1>
             </MotionDiv>
 
@@ -191,113 +230,82 @@ export default function LandingRoute({ onNavigateToLogin, onNavigateToSignUp }: 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.16 }}
-              className="text-[17px] text-on-surface-variant leading-relaxed max-w-xl"
+              className="text-sm sm:text-base text-slate-300 leading-relaxed max-w-xl font-medium"
             >
               {t("landing.hero_desc")}
             </MotionDiv>
 
-            {/* CTA Buttons */}
+            {/* High contrast white buttons on dark background */}
             <MotionDiv
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.24 }}
-              className="flex flex-col sm:flex-row items-start gap-3 pt-2"
+              className="flex flex-row items-center gap-4 pt-1"
             >
               <button
                 onClick={onNavigateToSignUp}
-                className="flex items-center gap-2 px-7 py-3.5 bg-primary hover:bg-navy-dark text-on-primary font-semibold rounded-lg shadow-md shadow-primary/20 active:scale-[0.97] transition-all cursor-pointer text-[15px]"
+                className="flex items-center gap-2 px-6 py-3 bg-white hover:bg-slate-100 text-slate-950 font-bold rounded-xl shadow-[0_4px_25px_rgba(255,255,255,0.18)] active:scale-[0.97] transition-all cursor-pointer text-[13px]"
               >
                 <span>{t("landing.cta_trial")}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
-              <button
-                onClick={onNavigateToLogin}
-                className="flex items-center gap-2 px-7 py-3.5 bg-white hover:bg-surface-low border border-border-subtle text-on-surface font-semibold rounded-lg active:scale-[0.97] transition-all cursor-pointer text-[15px]"
-              >
-                <span>{t("landing.cta_demo")}</span>
-              </button>
-            </MotionDiv>
-
-            {/* Trust strip */}
-            <MotionDiv
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-              className="flex items-center gap-4 pt-6"
-            >
-              {/* Avatar stack */}
-              <div className="flex -space-x-2">
-                {["#6366f1", "#0ea5e9", "#10b981", "#f59e0b"].map((bg, i) => (
-                  <div
-                    key={i}
-                    className="w-8 h-8 rounded-full ring-2 ring-white flex items-center justify-center text-white text-[10px] font-bold"
-                    style={{ backgroundColor: bg }}
-                  >
-                    {["JD", "ML", "SB", "AK"][i]}
-                  </div>
-                ))}
-              </div>
-              <span className="text-sm text-on-surface-variant">
-                {t("landing.trust_label")} <strong className="text-on-surface">{t("landing.trust_count")}</strong> {t("landing.trust_suffix")}
-              </span>
             </MotionDiv>
           </div>
 
-          {/* Right: Email Gateway Animation */}
-          <div className="lg:col-span-5 flex justify-center lg:justify-end">
+          <div className="lg:col-span-6 flex justify-center lg:justify-end h-full max-h-[380px]">
             <MotionDiv
-              initial={{ opacity: 0, scale: 0.96, y: 24 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
+              initial={{ opacity: 0, filter: "blur(10px)" }}
+              animate={{ opacity: 1, filter: "blur(0px)" }}
+              transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
+              className="w-full h-full flex items-center"
             >
+              {/* Restored 3D Industrial Pneumatic Email Sorting Pipeline Animation */}
               <EmailGatewayAnimation />
             </MotionDiv>
           </div>
         </div>
-      </section>
 
-      {/* ── Feature Marquee ── */}
-      <section className="bg-[#0B1426] border-y border-white/5 py-5 overflow-hidden">
-        <div className="relative flex max-w-full">
-          <div className="animate-marquee flex gap-10 whitespace-nowrap text-white/70 text-[10px] font-bold tracking-[0.15em] uppercase shrink-0">
-            {[...marqueeItems, ...marqueeItems].map((item, idx) => {
-              const Icon = item.icon;
-              return (
-                <span key={idx} className="flex items-center gap-2">
-                  <Icon className="w-4 h-4" />
-                  {item.label}
-                </span>
-              );
-            })}
+        {/* Marquee anchored at hero bottom */}
+        <div className="w-full bg-white/[0.02] border-t border-white/10 py-5 mt-auto relative z-20 backdrop-blur-sm">
+          <div className="relative flex max-w-full overflow-hidden">
+            <div className="animate-marquee flex gap-12 whitespace-nowrap text-white text-[12px] font-bold tracking-[0.15em] uppercase shrink-0">
+              {[...marqueeItems, ...marqueeItems].map((item, idx) => {
+                const Icon = item.icon;
+                return (
+                  <span key={idx} className="flex items-center gap-2.5">
+                    <Icon className="w-4.5 h-4.5 text-[#1B4FCC]" />
+                    {item.label}
+                  </span>
+                );
+              })}
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ── Precision-Engineered Protection ── */}
-      <section id="features" className="bg-white py-20 lg:py-28">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <FadeInSection className="text-center max-w-2xl mx-auto mb-16 space-y-4">
-            <h2 className="font-display font-bold text-[clamp(1.5rem,3vw,2.25rem)] leading-tight tracking-tight text-on-surface">
+      {/* ── Section 2: Security & Protection Features (Light Theme Grid) ── */}
+      <section id="features" className="bg-[#faf8ff] py-20 lg:py-28 relative z-10">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 space-y-16">
+          
+          <FadeInSection className="text-center max-w-2xl mx-auto space-y-4">
+            <span className="text-[11px] font-bold tracking-widest text-primary uppercase">FONCTIONNALITÉS</span>
+            <h2 className="font-display font-bold text-[clamp(1.75rem,3vw,2.5rem)] leading-tight tracking-tight text-slate-900">
               {t("landing.features_title")}
             </h2>
-            <p className="text-on-surface-variant text-[16px] leading-relaxed">
+            <p className="text-slate-600 text-[15px] leading-relaxed">
               {t("landing.features_desc")}
             </p>
           </FadeInSection>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {features.map((feat, idx) => {
-              const Icon = feat.icon;
               return (
-                <FadeInSection key={idx} delay={idx * 0.08}>
-                  <div className="p-7 rounded-2xl bg-white border border-border-subtle hover:border-primary/20 hover:shadow-lg hover:shadow-primary/[0.04] transition-all duration-300 text-left space-y-4 group h-full">
-                    <div className="p-3 bg-surface-low border border-border-subtle text-on-surface rounded-xl w-fit group-hover:bg-primary/[0.06] group-hover:text-primary group-hover:border-primary/15 transition-all duration-300">
-                      <Icon className="w-5 h-5 stroke-[1.5]" />
-                    </div>
-                    <h3 className="text-[17px] font-bold text-on-surface font-display">
+                <FadeInSection key={idx} delay={idx * 0.05}>
+                  <div className="p-8 rounded-2xl bg-white border border-slate-200/80 hover:border-slate-300 transition-all duration-200 text-left space-y-3 h-full">
+                    <h3 className="text-[20px] font-bold text-slate-900 font-display leading-snug tracking-tight">
                       {feat.title}
                     </h3>
-                    <p className="text-sm text-on-surface-variant leading-relaxed">
+                    <p className="text-sm text-slate-600 leading-relaxed font-sans">
                       {feat.desc}
                     </p>
                   </div>
@@ -305,144 +313,74 @@ export default function LandingRoute({ onNavigateToLogin, onNavigateToSignUp }: 
               );
             })}
           </div>
+
         </div>
       </section>
 
-      {/* ── High-Stakes Environment — Dark section with server image ── */}
-      <section className="bg-[#0B1426] text-white py-20 lg:py-28 overflow-hidden">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-          <FadeInSection className="space-y-8">
-            <h2 className="font-display font-bold text-[clamp(1.5rem,3vw,2.25rem)] leading-tight tracking-tight">
-              {t("landing.dark_title")}
-            </h2>
-            <p className="text-white/60 text-[16px] leading-relaxed max-w-lg">
-              {t("landing.dark_desc")}
-            </p>
-            <ul className="space-y-4">
-              {[
-                t("landing.dark_check_1"),
-                t("landing.dark_check_2"),
-                t("landing.dark_check_3"),
-              ].map((item, i) => (
-                <li key={i} className="flex items-start gap-3 text-[15px] text-white/80">
-                  <CheckCircle2 className="w-5 h-5 text-safe shrink-0 mt-0.5" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </FadeInSection>
-
-          <FadeInSection delay={0.15} className="relative">
-            <div className="rounded-2xl overflow-hidden shadow-2xl shadow-black/40 border border-white/[0.06]">
-              <img
-                src={serverRoomImg}
-                alt="Infrastructure sécurisée de centre de données Sicurre"
-                className="w-full h-auto object-cover"
-                loading="lazy"
-              />
-            </div>
-          </FadeInSection>
-        </div>
-      </section>
-
-      {/* ── CTA Section ── */}
-      <section className="bg-primary py-20 lg:py-24 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(0,0,0,0.12),transparent_60%)]" />
+      {/* ── Section 4: Call to Action (Light Theme) ── */}
+      <section id="cta" className="bg-white py-20 lg:py-24 relative overflow-hidden border-t border-slate-200/80">
         <div className="max-w-3xl mx-auto px-6 lg:px-8 text-center space-y-6 relative z-10">
-          <FadeInSection>
-            <h2 className="font-display font-bold text-[clamp(1.75rem,4vw,2.5rem)] leading-tight tracking-tight text-white">
+          
+          <FadeInSection className="space-y-4">
+            <span className="text-[11px] font-bold tracking-widest text-primary uppercase">SÉCURISATION RAPIDE</span>
+            <h2 className="font-display font-bold text-[clamp(1.75rem,4vw,2.5rem)] leading-tight tracking-tight text-slate-900">
               {t("landing.cta_section_title")}
             </h2>
-          </FadeInSection>
-          <FadeInSection delay={0.06}>
-            <p className="text-white/80 text-[16px] leading-relaxed max-w-xl mx-auto">
+            <p className="text-slate-600 text-[15px] leading-relaxed max-w-xl mx-auto">
               {t("landing.cta_section_desc")}
             </p>
           </FadeInSection>
-          <FadeInSection delay={0.12}>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
+
+          {/* Core colors CTA buttons: Navy Blue and slate outlines */}
+          <FadeInSection delay={0.06}>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 pt-4">
               <button
                 onClick={onNavigateToSignUp}
-                className="flex items-center gap-2 px-7 py-3.5 bg-white text-primary hover:bg-surface-low font-bold rounded-lg shadow-lg transition-all active:scale-[0.97] cursor-pointer text-[15px]"
+                className="flex items-center gap-2 px-7 py-3.5 bg-primary text-white hover:bg-navy-dark font-bold rounded-xl shadow-md transition-all active:scale-[0.97] cursor-pointer text-[14px]"
               >
                 <span>{t("landing.cta_section_trial")}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
-              <button
-                onClick={onNavigateToLogin}
-                className="flex items-center gap-2 px-7 py-3.5 bg-white/10 hover:bg-white/15 border border-white/20 text-white font-semibold rounded-lg transition-all active:scale-[0.97] cursor-pointer text-[15px]"
-              >
-                <span>{t("landing.cta_section_demo")}</span>
-              </button>
             </div>
-            <p className="text-white/50 text-[12px] mt-4">
-              {t("landing.cta_no_card")}
-            </p>
+            <div className="mt-4 flex justify-center">
+              <span className="text-slate-900 font-black text-[13px] tracking-wider uppercase bg-slate-100 border border-slate-200 px-4 py-1.5 rounded-full shadow-sm">
+                {t("landing.cta_no_card")}
+              </span>
+            </div>
+          </FadeInSection>
+
+          {/* Safe Checklists */}
+          <FadeInSection delay={0.12} className="pt-8 flex flex-wrap justify-center gap-x-8 gap-y-3 opacity-80 text-[12px] text-slate-600 font-semibold">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4.5 h-4.5 text-emerald-600" />
+              <span>Conforme RGPD (UE)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4.5 h-4.5 text-emerald-600" />
+              <span>Modèle souverain français</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4.5 h-4.5 text-emerald-600" />
+              <span>Intégration instantanée</span>
+            </div>
           </FadeInSection>
         </div>
       </section>
 
       {/* ── Footer ── */}
-      <footer className="bg-[#05080e] text-white/70 border-t border-white/5 py-14">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
-            {/* Brand Column */}
-            <div className="col-span-2 md:col-span-1 space-y-4">
-              <div className="flex items-center gap-2.5">
-                <img src={sicurreLogo} alt="Sicurre" className="w-9 h-9" />
-                <span className="font-display font-bold text-white text-[17px]">Sicurre</span>
-              </div>
-              <p className="text-[12px] text-white/40 leading-relaxed max-w-[200px]">
-                {t("landing.footer_tagline")}
-              </p>
-            </div>
-
-            {/* Product */}
-            <div className="space-y-3">
-              <span className="text-[10px] font-bold text-white tracking-[0.15em] uppercase">{t("landing.footer_product")}</span>
-              <ul className="text-[12px] space-y-2.5">
-                <li><a href="#" className="hover:text-white transition-colors">{t("landing.nav_features")}</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">{t("landing.nav_pricing")}</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">{t("landing.nav_resources")}</a></li>
-              </ul>
-            </div>
-
-            {/* Resources */}
-            <div className="space-y-3">
-              <span className="text-[10px] font-bold text-white tracking-[0.15em] uppercase">{t("landing.footer_resources")}</span>
-              <ul className="text-[12px] space-y-2.5">
-                <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Documentation</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Support</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">API</a></li>
-              </ul>
-            </div>
-
-            {/* Company */}
-            <div className="space-y-3">
-              <span className="text-[10px] font-bold text-white tracking-[0.15em] uppercase">{t("landing.footer_company")}</span>
-              <ul className="text-[12px] space-y-2.5">
-                <li><a href="#" className="hover:text-white transition-colors">À propos</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Confidentialité</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">CGU</a></li>
-              </ul>
-            </div>
-
-            {/* Trust */}
-            <div className="space-y-3">
-              <span className="text-[10px] font-bold text-white tracking-[0.15em] uppercase">{t("landing.footer_trust")}</span>
-              <div className="flex flex-wrap gap-2">
-                <span className="text-[10px] font-bold text-white/60 bg-white/5 border border-white/10 px-2.5 py-1 rounded-md">SOC 2</span>
-                <span className="text-[10px] font-bold text-white/60 bg-white/5 border border-white/10 px-2.5 py-1 rounded-md">RGPD</span>
-              </div>
-            </div>
+      <footer className="bg-[#05080e] text-white/40 border-t border-white/5 py-8 relative z-10">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <img src={sicurreLogo} alt="Sicurre Logo" className="w-8 h-8" />
+            <span className="font-display font-bold text-white text-[16px]">Sicurre</span>
           </div>
-
-          {/* Bottom Bar */}
-          <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row items-center justify-between text-[11px] text-white/30 gap-3">
-            <span>{t("landing.footer_copyright")}</span>
-            <span>{t("landing.footer_slogan")}</span>
+          <div className="flex flex-wrap items-center gap-6 text-[12px] font-medium">
+            <a href="#" className="hover:text-white transition-colors">Mentions légales</a>
+            <a href="#" className="hover:text-white transition-colors">Confidentialité</a>
+            <a href="#" className="hover:text-white transition-colors">Contact</a>
+          </div>
+          <div className="text-[11px] text-white/30">
+            {t("landing.footer_copyright")}
           </div>
         </div>
       </footer>

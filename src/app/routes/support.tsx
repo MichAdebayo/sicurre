@@ -24,7 +24,7 @@ export default function SupportRoute() {
   const faqs = [
     {
       q: "Comment fonctionne l'analyse anti-phishing en temps réel ?",
-      a: "Chaque fois qu'un e-mail arrive dans votre boîte Gmail connectée, une notification webhook déclenche instantanément le Gmail Listener de Sicurre. L'e-mail est traité en moins de 2 secondes par notre modèle CamemBERTav2 fine-tuné et, en cas de menace, déplacé directement vers la corbeille.",
+      a: "Chaque fois qu'un e-mail arrive dans votre boîte Gmail connectée, une notification webhook déclenche instantanément le Gmail Listener de Sicurre. L'e-mail est traité en moins de 2 secondes par notre modèle d'analyse souverain et, en cas de menace, déplacé directement vers la corbeille.",
     },
     {
       q: "Quelles données de mes e-mails sont conservées par Sicurre ?",
@@ -59,7 +59,7 @@ export default function SupportRoute() {
 
   const systemNodes = [
     { name: "Pare-feu Global", status: "Opérationnel", metric: "Uptime", value: "99.99 %" },
-    { name: "Inférence CamemBERT", status: "Opérationnel", metric: "Latence", value: "82 ms" },
+    { name: "Modèle d'Analyse", status: "Opérationnel", metric: "Latence", value: "82 ms" },
     { name: "Collecteur de Logs", status: "Opérationnel", metric: "Débit entrant", value: "14 req/s" },
   ];
 
@@ -183,7 +183,7 @@ export default function SupportRoute() {
               <div className="space-y-1">
                 <h4 className="font-display font-bold text-sm text-on-surface">Protocoles de Sécurité</h4>
                 <p className="text-[12px] text-on-surface-variant/60 leading-relaxed">
-                  Architecture CamemBERTav2 et conformité RGPD.
+                  Modèle souverain et conformité RGPD.
                 </p>
               </div>
             </div>

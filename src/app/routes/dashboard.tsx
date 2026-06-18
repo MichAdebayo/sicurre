@@ -182,7 +182,7 @@ export default function DashboardRoute() {
                 </div>
               </div>
               <p className="text-[12px] text-on-surface-variant/60 text-center mt-5 leading-relaxed max-w-[200px]">
-                Toutes les sondes d'analyse (CamemBERTav2, DMARC, DNS RBL) sont opérationnelles.
+                Toutes les sondes d'analyse (Modèle souverain, DMARC, DNS RBL) sont opérationnelles.
               </p>
             </div>
           </div>

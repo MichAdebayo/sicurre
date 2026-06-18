@@ -25,7 +25,7 @@ export default function LogsRoute() {
       id: "1",
       timestamp: "2026-06-17T00:35:12Z",
       action: "Inférence anti-phishing",
-      actor: "System / CamemBERTav2",
+      actor: "System / Inférence IA",
       status: "success",
       details: "E-mail de support@paypal-verification.fr classifié comme PHISHING (confidence 99.8 %)",
     },

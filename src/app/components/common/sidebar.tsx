@@ -51,10 +51,10 @@ export function Sidebar({
     >
       {/* Logo */}
       <div className="px-5 py-5 border-b border-border-subtle">
-        <div className="flex items-center gap-2.5">
-          <img src={sicurreLogo} alt="Sicurre" className="w-10 h-10" />
+        <div className="flex items-center gap-3">
+          <img src={sicurreLogo} alt="Sicurre" className="w-16 h-16" />
           <div className="flex flex-col">
-            <span className="font-display font-bold text-[17px] text-on-surface leading-tight tracking-tight">
+            <span className="font-display font-bold text-3xl text-on-surface leading-tight tracking-tight">
               Sicurre
             </span>
             <span className="text-[9px] font-bold text-primary/60 uppercase tracking-[0.15em]">
