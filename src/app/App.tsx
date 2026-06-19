@@ -7,6 +7,9 @@ import ThreatsRoute from "./routes/threats";
 import LogsRoute from "./routes/logs";
 import SettingsRoute from "./routes/settings";
 import SupportRoute from "./routes/support";
+import MentionsLegalesRoute from "./routes/mentions-legales";
+import ConfidentialiteRoute from "./routes/confidentialite";
+import ContactRoute from "./routes/contact";
 import { AppShell } from "./components/common/app-shell";
 import { SidebarPage } from "./components/common/sidebar";
 
@@ -25,7 +28,7 @@ const getInitialLoginState = () => {
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(getInitialLoginState);
-  const [viewState, setViewState] = useState<"landing" | "login" | "signup">("landing");
+  const [viewState, setViewState] = useState<"landing" | "login" | "signup" | "mentions-legales" | "confidentialite" | "contact">("landing");
   const [activePage, setActivePage] = useState<SidebarPage>("dashboard");
 
   // Handle successful login
@@ -47,8 +50,20 @@ export default function App() {
         <LandingRoute
           onNavigateToLogin={() => setViewState("login")}
           onNavigateToSignUp={() => setViewState("signup")}
+          onNavigateToMentionsLegales={() => setViewState("mentions-legales")}
+          onNavigateToConfidentialite={() => setViewState("confidentialite")}
+          onNavigateToContact={() => setViewState("contact")}
         />
       );
+    }
+    if (viewState === "mentions-legales") {
+      return <MentionsLegalesRoute onBack={() => setViewState("landing")} />;
+    }
+    if (viewState === "confidentialite") {
+      return <ConfidentialiteRoute onBack={() => setViewState("landing")} />;
+    }
+    if (viewState === "contact") {
+      return <ContactRoute onBack={() => setViewState("landing")} />;
     }
     return (
       <div className="relative bg-surface-low">

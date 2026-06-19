@@ -113,27 +113,35 @@ function EmailEnvelope3D({ color, shadow, type }: { color: string; shadow: strin
     switch (type) {
       case "legit":
         return {
-          paper: "bg-emerald-950/90 border-emerald-500/80",
-          flap: "fill-emerald-800/85 stroke-emerald-500/40",
-          back: "fill-emerald-900/90",
+          paper: "bg-emerald-500 border-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.6)]",
+          flap: "fill-emerald-600 stroke-emerald-300",
+          sideLines: "stroke-emerald-400/60",
+          back: "bg-emerald-500 border-emerald-300 text-white",
+          iconColor: "text-white",
         };
       case "spam":
         return {
-          paper: "bg-amber-950/90 border-amber-500/80",
-          flap: "fill-amber-800/85 stroke-amber-500/40",
-          back: "fill-amber-900/90",
+          paper: "bg-amber-500 border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.6)]",
+          flap: "fill-amber-600 stroke-amber-300",
+          sideLines: "stroke-amber-400/60",
+          back: "bg-amber-500 border-amber-300 text-slate-950",
+          iconColor: "text-slate-950",
         };
       case "phishing":
         return {
-          paper: "bg-amber-950/90 border-[#D97706]",
-          flap: "fill-amber-900/85 stroke-[#D97706]/40",
-          back: "fill-amber-950/90",
+          paper: "bg-red-500 border-red-300 shadow-[0_0_12px_rgba(239,68,68,0.6)]",
+          flap: "fill-red-600 stroke-red-300",
+          sideLines: "stroke-red-400/60",
+          back: "bg-red-500 border-red-300 text-white",
+          iconColor: "text-white",
         };
       default:
         return {
-          paper: "bg-slate-900/95 border-blue-500/70",
-          flap: "fill-slate-800/90 stroke-blue-500/30",
-          back: "fill-slate-850/95",
+          paper: "bg-white border-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.3)]",
+          flap: "fill-blue-50 stroke-blue-400",
+          sideLines: "stroke-blue-200/60",
+          back: "bg-white border-blue-400 text-blue-500",
+          iconColor: "text-blue-500",
         };
     }
   };
@@ -151,26 +159,28 @@ function EmailEnvelope3D({ color, shadow, type }: { color: string; shadow: strin
           {/* Back pocket shape */}
           <path d="M 2 2 L 18 14 L 34 2" className={theme.flap} strokeWidth="1.5" />
           {/* Side folding triangles */}
-          <path d="M 2 26 L 15 14" className="stroke-slate-600/40" strokeWidth="1" />
-          <path d="M 34 26 L 21 14" className="stroke-slate-600/40" strokeWidth="1" />
+          <path d="M 2 26 L 15 14" className={theme.sideLines} strokeWidth="1" />
+          <path d="M 34 26 L 21 14" className={theme.sideLines} strokeWidth="1" />
         </svg>
-        <Mail className="w-3.5 h-3.5 text-white/90 z-10" />
+        <Mail className={`w-3.5 h-3.5 ${theme.iconColor} z-10`} />
       </div>
 
       {/* Back Face */}
       <div
         style={{ transform: "rotateY(180deg) translateZ(3px)" }}
-        className="absolute inset-0 bg-slate-950 border border-slate-800/40 rounded"
-      />
+        className={`absolute inset-0 rounded flex items-center justify-center shadow-inner border transition-all duration-300 ${theme.back}`}
+      >
+        <Mail className="w-3.5 h-3.5" />
+      </div>
 
       {/* Side Edges to give 3D Thickness */}
       <div
         style={{ transform: "rotateY(90deg) translateZ(18px) scaleY(0.78)" }}
-        className="absolute inset-0 w-[6px] bg-slate-800 border-l border-slate-700/50"
+        className="absolute inset-0 w-[6px] bg-slate-200 border-l border-slate-300/50"
       />
       <div
         style={{ transform: "rotateY(-90deg) translateZ(18px) scaleY(0.78)" }}
-        className="absolute inset-0 w-[6px] bg-slate-800 border-r border-slate-700/50"
+        className="absolute inset-0 w-[6px] bg-slate-200 border-r border-slate-300/50"
       />
     </div>
   );
@@ -184,7 +194,7 @@ function IndustrialFunnel3D() {
       className="relative w-24 h-24 flex items-center justify-center"
     >
       {/* Cast Iron Bracket Plate (Base) */}
-      <div className="absolute w-20 h-20 bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-lg shadow-2xl flex items-center justify-center transform-style-3d">
+      <div className="absolute w-20 h-20 bg-gradient-to-br from-slate-700 via-slate-650 to-slate-800 border border-slate-500 rounded-lg shadow-2xl flex items-center justify-center transform-style-3d">
         {/* Rivets at corners */}
         <div className="absolute top-1.5 left-1.5 rivet" />
         <div className="absolute top-1.5 right-1.5 rivet" />
@@ -195,16 +205,16 @@ function IndustrialFunnel3D() {
       {/* Tilted Funnel Body */}
       <div
         style={{ transform: "translateZ(15px)", transformStyle: "preserve-3d" }}
-        className="w-18 h-18 rounded-full bg-gradient-to-r from-slate-700 via-slate-600 to-slate-950 flex items-center justify-center shadow-[inset_0_8px_16px_rgba(0,0,0,0.8),0_12px_28px_rgba(0,0,0,0.7)] border-[4px] border-slate-500/50 relative"
+        className="w-18 h-18 rounded-full bg-gradient-to-r from-slate-450 via-slate-350 to-slate-550 flex items-center justify-center shadow-[inset_0_8px_16px_rgba(0,0,0,0.6),0_12px_28px_rgba(0,0,0,0.5)] border-[4px] border-slate-300/60 relative"
       >
         {/* Inside Deep Throat Glow */}
-        <div className="absolute inset-2.5 rounded-full bg-slate-950 flex items-center justify-center shadow-inner overflow-hidden border border-slate-900">
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-blue-500/20 animate-pulse" />
-          <RefreshCw className="w-6 h-6 text-blue-400/80 animate-spin" style={{ animationDuration: "12s" }} />
+        <div className="absolute inset-2.5 rounded-full bg-slate-900 flex items-center justify-center shadow-inner overflow-hidden border border-slate-700">
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-blue-500/35 animate-pulse" />
+          <RefreshCw className="w-6 h-6 text-blue-400 animate-spin" style={{ animationDuration: "12s" }} />
         </div>
 
         {/* Outer Bezel Rim Reflection */}
-        <div className="absolute -inset-[3px] rounded-full border border-white/10 pointer-events-none" />
+        <div className="absolute -inset-[3px] rounded-full border border-white/20 pointer-events-none" />
       </div>
     </div>
   );
@@ -223,33 +233,29 @@ function HollowMetalBin3D({ color, icon: Icon, controls, label, glowColor }: { c
       <div
         style={{
           transform: "rotateY(90deg) translateZ(40px) scaleX(0.7)",
-          borderColor: `${color}40`,
+          borderColor: `${color}60`,
         }}
-        className="absolute inset-0 bg-slate-950 border rounded"
+        className="absolute inset-0 bg-slate-800/90 border rounded"
       />
 
       {/* 3D Side Walls (Left Panel) */}
       <div
         style={{
           transform: "rotateY(-90deg) translateZ(40px) scaleX(0.7)",
-          borderColor: `${color}40`,
+          borderColor: `${color}60`,
         }}
-        className="absolute inset-0 bg-slate-950 border rounded"
+        className="absolute inset-0 bg-slate-800/90 border rounded"
       />
 
       {/* Back Wall - Deep Dark Inside */}
       <div
         style={{
           transform: "translateZ(-14px)",
-          boxShadow: `inset 0 0 20px ${color}30`,
-          borderColor: `${color}30`,
+          boxShadow: `inset 0 0 20px ${color}40`,
+          borderColor: `${color}45`,
         }}
-        className="absolute inset-0 bg-slate-950 border rounded flex flex-col justify-end p-1 pb-2 items-center"
-      >
-        <span className="text-[9px] font-bold tracking-wider opacity-90" style={{ color }}>
-          {label}
-        </span>
-      </div>
+        className="absolute inset-0 bg-slate-900/90 border rounded flex flex-col justify-end p-1 pb-2 items-center"
+      />
 
       {/* Hollow Interior Glow Light Source */}
       <div
@@ -263,14 +269,14 @@ function HollowMetalBin3D({ color, icon: Icon, controls, label, glowColor }: { c
           transform: "translateZ(14px) rotateX(-2deg)",
           borderColor: color,
           borderWidth: "2px",
-          boxShadow: `0 8px 25px rgba(0, 0, 0, 0.9), 0 0 15px ${color}30`,
+          boxShadow: `0 8px 25px rgba(0, 0, 0, 0.7), 0 0 15px ${color}40`,
         }}
-        className="absolute inset-0 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 rounded flex flex-col items-center justify-between p-2"
+        className="absolute inset-0 bg-gradient-to-b from-slate-600 via-slate-750 to-slate-850 rounded flex flex-col items-center justify-between p-2"
       >
         {/* Metal screen vent detail */}
-        <div className="w-full h-4 rounded bg-slate-950/90 border border-slate-800 relative overflow-hidden flex items-center justify-center">
+        <div className="w-full h-4 rounded bg-slate-900 border border-slate-705 relative overflow-hidden flex items-center justify-center">
           <div className="absolute inset-0 vent-slats opacity-40" />
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/80" />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/70" />
           {/* Glowing dot representing status */}
           <div className="w-1.5 h-1.5 rounded-full absolute" style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}` }} />
         </div>
@@ -288,14 +294,8 @@ function HollowMetalBin3D({ color, icon: Icon, controls, label, glowColor }: { c
         </div>
 
         {/* Lower Steel Lip / Bezel */}
-        <div className="w-[104%] h-1 bg-slate-950 border-t border-slate-800 rounded-full" />
+        <div className="w-[104%] h-1 bg-slate-700 border-t border-slate-550 rounded-full" />
       </div>
-
-      {/* Top Rim collar line glow */}
-      <div
-        style={{ transform: "rotateX(90deg) translateZ(9px)", borderColor: color }}
-        className="absolute inset-x-0 h-4 border-t-2 opacity-50 pointer-events-none"
-      />
     </MotionDiv>
   );
 }
@@ -315,28 +315,28 @@ function ConsoleMainframe3D({ scanning, scanType }: { scanning: boolean; scanTyp
       {/* 3D Right Side Wall with cooling grilles */}
       <div
         style={{ transform: "rotateY(90deg) translateZ(68px) scaleX(0.35)" }}
-        className="absolute inset-y-0 w-32 bg-gradient-to-r from-slate-950 to-slate-900 border-r border-slate-800 vent-slats flex flex-col justify-around p-3"
+        className="absolute inset-y-0 w-32 bg-gradient-to-r from-slate-800 to-slate-700 border-r border-slate-600 vent-slats flex flex-col justify-around p-3"
       >
-        <div className="h-1 bg-slate-950/90 rounded border-b border-white/5" />
-        <div className="h-1 bg-slate-950/90 rounded border-b border-white/5" />
-        <div className="h-1 bg-slate-950/90 rounded border-b border-white/5" />
+        <div className="h-1 bg-slate-900/90 rounded border-b border-white/5" />
+        <div className="h-1 bg-slate-900/90 rounded border-b border-white/5" />
+        <div className="h-1 bg-slate-900/90 rounded border-b border-white/5" />
       </div>
 
       {/* 3D Left Side Wall */}
       <div
         style={{ transform: "rotateY(-90deg) translateZ(68px) scaleX(0.35)" }}
-        className="absolute inset-y-0 w-32 bg-gradient-to-l from-slate-950 to-slate-900 border-l border-slate-800 vent-slats"
+        className="absolute inset-y-0 w-32 bg-gradient-to-l from-slate-800 to-slate-700 border-l border-slate-600 vent-slats"
       />
 
       {/* 3D Top Face */}
       <div
         style={{ transform: "rotateX(90deg) translateZ(86px) scaleY(0.35)" }}
-        className="absolute inset-x-0 h-32 bg-gradient-to-b from-slate-700 to-slate-950 border-t border-slate-600 flex items-center justify-center"
+        className="absolute inset-x-0 h-32 bg-gradient-to-b from-slate-500 to-slate-700 border-t border-slate-400 flex items-center justify-center"
       >
         {/* Large cooling fan vent cover */}
-        <div className="w-16 h-16 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center shadow-inner relative overflow-hidden">
+        <div className="w-16 h-16 rounded-full bg-slate-800 border border-slate-600 flex items-center justify-center shadow-inner relative overflow-hidden">
           <div className="absolute inset-0 vent-slats opacity-30 rotate-45" />
-          <div className="w-6 h-6 rounded-full bg-slate-950 border border-slate-700 flex items-center justify-center">
+          <div className="w-6 h-6 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center">
             <div className="rivet" />
           </div>
         </div>
@@ -345,7 +345,7 @@ function ConsoleMainframe3D({ scanning, scanType }: { scanning: boolean; scanTyp
       {/* Front Face: Steel Bezel and Glass Diagnostic Screen */}
       <div
         style={{ transform: "translateZ(18px)" }}
-        className="absolute inset-0 rounded-2xl bg-gradient-to-b from-[#1B4FCC] via-[#1239A6] to-slate-950 border-[5px] border-[#1B4FCC]/60 steel-bezel relative overflow-hidden flex items-center justify-center"
+        className="absolute inset-0 rounded-2xl bg-gradient-to-b from-[#2563eb] via-[#1d4ed8] to-slate-900 border-[5px] border-[#2563eb]/60 steel-bezel relative overflow-hidden flex items-center justify-center"
       >
         {/* Corner Rivets */}
         <div className="absolute top-1.5 left-1.5 rivet" />
@@ -354,7 +354,7 @@ function ConsoleMainframe3D({ scanning, scanType }: { scanning: boolean; scanTyp
         <div className="absolute bottom-1.5 right-1.5 rivet" />
 
         {/* Screen Display Bezel Area */}
-        <div className="w-[90%] h-[90%] rounded-xl bg-slate-950/90 backdrop-blur-sm border border-[#1B4FCC]/20 shadow-inner flex flex-col items-center justify-center relative overflow-hidden">
+        <div className="w-[90%] h-[90%] rounded-xl bg-slate-950/90 backdrop-blur-sm border border-[#2563eb]/20 shadow-inner flex flex-col items-center justify-center relative overflow-hidden">
           {/* Glass Visor glare shine */}
           <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none z-20" />
           
@@ -363,7 +363,7 @@ function ConsoleMainframe3D({ scanning, scanType }: { scanning: boolean; scanTyp
 
           {/* Internal rotating mechanical cogs inside display */}
           <div className="absolute w-24 h-24 flex items-center justify-center opacity-[0.12] pointer-events-none">
-            <Cpu className="w-16 h-16 text-[#1B4FCC] animate-gear-slow" />
+            <Cpu className="w-16 h-16 text-[#2563eb] animate-gear-slow" />
           </div>
 
           {/* Glowing diagnostics CPU core */}
@@ -374,8 +374,8 @@ function ConsoleMainframe3D({ scanning, scanType }: { scanning: boolean; scanTyp
                   ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.15)]"
                   : scanType === "spam"
                   ? "bg-amber-500/10 border-amber-500/30 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.15)]"
-                  : "bg-[#D97706]/10 border-[#D97706]/30 text-[#D97706] shadow-[0_0_15px_rgba(217,119,6,0.15)]"
-                : "bg-slate-950 border-[#1B4FCC]/30 text-[#1B4FCC]"
+                  : "bg-red-500/10 border-red-500/30 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.15)]"
+                : "bg-slate-950 border-[#2563eb]/30 text-[#2563eb]"
             }`}
           >
             <Cpu className="w-7 h-7" />
@@ -390,28 +390,13 @@ function ConsoleMainframe3D({ scanning, scanType }: { scanning: boolean; scanTyp
                     ? "bg-emerald-400 shadow-[0_0_10px_#10b981,0_0_20px_#10b981]"
                     : scanType === "spam"
                     ? "bg-amber-400 shadow-[0_0_10px_#f59e0b,0_0_20px_#f59e0b]"
-                    : "bg-[#D97706] shadow-[0_0_10px_#D97706,0_0_20px_#D97706]"
+                    : "bg-red-500 shadow-[0_0_10px_#ef4444,0_0_20px_#ef4444]"
                 }`}
               />
             )}
           </AnimatePresence>
 
-          {/* Status Text overlay */}
-          <div className="absolute bottom-2 inset-x-0 text-center select-none pointer-events-none">
-            <span
-              className={`text-[8px] font-mono tracking-widest uppercase transition-colors duration-200 ${
-                scanning
-                  ? scanType === "legit"
-                    ? "text-emerald-400 animate-pulse"
-                    : scanType === "spam"
-                    ? "text-amber-400 animate-pulse"
-                    : "text-[#D97706] animate-pulse"
-                  : "text-slate-600"
-              }`}
-            >
-              {scanning ? `SCANNING_${scanType}` : "SYS_IDLE"}
-            </span>
-          </div>
+
         </div>
       </div>
     </div>
@@ -481,7 +466,7 @@ function FlyingEmail({
       case "spam":
         return { color: "rgba(245, 158, 11, 0.8)", shadow: "rgba(245, 158, 11, 0.5)" };
       case "phishing":
-        return { color: "rgba(217, 119, 6, 0.8)", shadow: "rgba(217, 119, 6, 0.6)" };
+        return { color: "rgba(239, 68, 68, 0.8)", shadow: "rgba(239, 68, 68, 0.6)" };
     }
   };
 
@@ -544,14 +529,21 @@ export function EmailGatewayAnimation() {
 
   useEffect(() => {
     let count = 0;
-    const interval = setInterval(() => {
+    let timeoutId: NodeJS.Timeout;
+
+    const spawnEmail = () => {
       const r = Math.random();
       const type = r < 0.55 ? "legit" : r < 0.82 ? "spam" : "phishing";
       const id = `email-${count++}-${Date.now()}`;
       setMessages((prev) => [...prev, { id, type }]);
-    }, 2400);
 
-    return () => clearInterval(interval);
+      const nextDelay = 1500 + Math.random() * 1200; // random between 1500ms and 2700ms
+      timeoutId = setTimeout(spawnEmail, nextDelay);
+    };
+
+    timeoutId = setTimeout(spawnEmail, 1000);
+
+    return () => clearTimeout(timeoutId);
   }, []);
 
   const handleScanBegin = (type: "legit" | "spam" | "phishing") => {
@@ -571,7 +563,7 @@ export function EmailGatewayAnimation() {
       color = "#f59e0b";
       startY = 190;
     } else if (type === "phishing") {
-      color = "#D97706";
+      color = "#ef4444";
       startY = 296;
     }
 
@@ -615,47 +607,47 @@ export function EmailGatewayAnimation() {
       <style>{styleTag}</style>
 
       {/* Atmospheric focal ambient light sources */}
-      <div className="absolute top-1/2 left-[15%] -translate-y-1/2 w-32 h-32 bg-blue-500/5 blur-[50px] pointer-events-none" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-indigo-500/5 blur-[55px] pointer-events-none" />
-      <div className="absolute top-[22%] left-[85%] -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-emerald-500/5 blur-[40px] pointer-events-none" />
-      <div className="absolute top-[50%] left-[85%] -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-amber-500/5 blur-[40px] pointer-events-none" />
-      <div className="absolute top-[78%] left-[85%] -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-rose-500/5 blur-[40px] pointer-events-none" />
+      <div className="absolute top-1/2 left-[15%] -translate-y-1/2 w-32 h-32 bg-blue-500/10 blur-[50px] pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-indigo-500/10 blur-[55px] pointer-events-none" />
+      <div className="absolute top-[22%] left-[85%] -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-emerald-500/10 blur-[40px] pointer-events-none" />
+      <div className="absolute top-[50%] left-[85%] -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-amber-500/10 blur-[40px] pointer-events-none" />
+      <div className="absolute top-[78%] left-[85%] -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-red-500/10 blur-[40px] pointer-events-none" />
 
       {/* ── 3D Specular-Shaded Pneumatic Cylinders SVG Layer ── */}
       <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
         <defs>
           {/* Metallic polished steel pipe gradient */}
           <linearGradient id="chrome-pipe-body" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#090d16" />
-            <stop offset="20%" stopColor="#334155" />
-            <stop offset="45%" stopColor="#e2e8f0" /> {/* Intense reflection shine */}
-            <stop offset="55%" stopColor="#94a3b8" />
-            <stop offset="80%" stopColor="#475569" />
-            <stop offset="100%" stopColor="#020617" />
+            <stop offset="0%" stopColor="#1e293b" />
+            <stop offset="20%" stopColor="#475569" />
+            <stop offset="45%" stopColor="#f1f5f9" /> {/* Intense reflection shine */}
+            <stop offset="55%" stopColor="#cbd5e1" />
+            <stop offset="80%" stopColor="#64748b" />
+            <stop offset="100%" stopColor="#334155" />
           </linearGradient>
 
           {/* Tilted pipe diagonal linear gradients */}
           <linearGradient id="chrome-pipe-diag-up" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#090d16" />
-            <stop offset="25%" stopColor="#334155" />
-            <stop offset="50%" stopColor="#f1f5f9" />
-            <stop offset="75%" stopColor="#475569" />
-            <stop offset="100%" stopColor="#020617" />
+            <stop offset="0%" stopColor="#1e293b" />
+            <stop offset="25%" stopColor="#475569" />
+            <stop offset="50%" stopColor="#f8fafc" />
+            <stop offset="75%" stopColor="#64748b" />
+            <stop offset="100%" stopColor="#334155" />
           </linearGradient>
 
           <linearGradient id="chrome-pipe-diag-down" x1="0%" y1="100%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#090d16" />
-            <stop offset="25%" stopColor="#334155" />
-            <stop offset="50%" stopColor="#f1f5f9" />
-            <stop offset="75%" stopColor="#475569" />
-            <stop offset="100%" stopColor="#020617" />
+            <stop offset="0%" stopColor="#1e293b" />
+            <stop offset="25%" stopColor="#475569" />
+            <stop offset="50%" stopColor="#f8fafc" />
+            <stop offset="75%" stopColor="#64748b" />
+            <stop offset="100%" stopColor="#334155" />
           </linearGradient>
 
           {/* Coupling clamp chrome finish */}
           <linearGradient id="joint-chrome" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#94a3b8" />
+            <stop offset="0%" stopColor="#cbd5e1" />
             <stop offset="50%" stopColor="#f8fafc" />
-            <stop offset="100%" stopColor="#334155" />
+            <stop offset="100%" stopColor="#475569" />
           </linearGradient>
 
           {/* Pipe dropshadow filter */}
@@ -685,23 +677,23 @@ export function EmailGatewayAnimation() {
         {/* ── Inner Polished Metallic Rail Guides ── */}
         {/* Left -> Central Command */}
         <path d="M 90 190 L 300 190" stroke="url(#chrome-pipe-body)" strokeWidth="18" fill="none" strokeLinecap="round" />
-        <path d="M 90 190 L 300 190" stroke="#1B4FCC" strokeWidth="10" fill="none" strokeLinecap="round" />
-        <path d="M 90 190 L 300 190" stroke="rgba(27, 79, 204, 0.6)" strokeWidth="2" strokeDasharray="6 18" fill="none" className="tube-flow" />
+        <path d="M 90 190 L 300 190" stroke="rgba(59, 130, 246, 0.25)" strokeWidth="8" fill="none" strokeLinecap="round" />
+        <path d="M 90 190 L 300 190" stroke="#3b82f6" strokeWidth="3" strokeDasharray="6 14" fill="none" className="tube-flow" />
 
         {/* Central -> Legit Basket */}
         <path d="M 300 190 C 380 190, 420 84, 510 84" stroke="url(#chrome-pipe-diag-up)" strokeWidth="18" fill="none" strokeLinecap="round" />
-        <path d="M 300 190 C 380 190, 420 84, 510 84" stroke="#1B4FCC" strokeWidth="10" fill="none" strokeLinecap="round" />
-        <path d="M 300 190 C 380 190, 420 84, 510 84" stroke="rgba(16, 185, 129, 0.6)" strokeWidth="2" strokeDasharray="6 18" fill="none" className="tube-flow" />
+        <path d="M 300 190 C 380 190, 420 84, 510 84" stroke="rgba(16, 185, 129, 0.25)" strokeWidth="8" fill="none" strokeLinecap="round" />
+        <path d="M 300 190 C 380 190, 420 84, 510 84" stroke="#10b981" strokeWidth="3" strokeDasharray="6 14" fill="none" className="tube-flow" />
 
         {/* Central -> Spam Basket */}
         <path d="M 300 190 L 510 190" stroke="url(#chrome-pipe-body)" strokeWidth="18" fill="none" strokeLinecap="round" />
-        <path d="M 300 190 L 510 190" stroke="#1B4FCC" strokeWidth="10" fill="none" strokeLinecap="round" />
-        <path d="M 300 190 L 510 190" stroke="rgba(245, 158, 11, 0.6)" strokeWidth="2" strokeDasharray="6 18" fill="none" className="tube-flow" />
+        <path d="M 300 190 L 510 190" stroke="rgba(245, 158, 11, 0.25)" strokeWidth="8" fill="none" strokeLinecap="round" />
+        <path d="M 300 190 L 510 190" stroke="#f59e0b" strokeWidth="3" strokeDasharray="6 14" fill="none" className="tube-flow" />
 
         {/* Central -> Phishing Basket */}
         <path d="M 300 190 C 380 190, 420 296, 510 296" stroke="url(#chrome-pipe-diag-down)" strokeWidth="18" fill="none" strokeLinecap="round" />
-        <path d="M 300 190 C 380 190, 420 296, 510 296" stroke="#1B4FCC" strokeWidth="10" fill="none" strokeLinecap="round" />
-        <path d="M 300 190 C 380 190, 420 296, 510 296" stroke="rgba(217, 119, 6, 0.6)" strokeWidth="2" strokeDasharray="6 18" fill="none" className="tube-flow" />
+        <path d="M 300 190 C 380 190, 420 296, 510 296" stroke="rgba(239, 68, 68, 0.25)" strokeWidth="8" fill="none" strokeLinecap="round" />
+        <path d="M 300 190 C 380 190, 420 296, 510 296" stroke="#ef4444" strokeWidth="3" strokeDasharray="6 14" fill="none" className="tube-flow" />
 
         {/* ── Heavy Flanged Metal Coupler Joints (Anchor rings along pipes) ── */}
         {/* Intake coupler */}
@@ -775,8 +767,8 @@ export function EmailGatewayAnimation() {
         className="absolute -translate-x-1/2 -translate-y-1/2 z-10 w-20 h-20 flex items-center justify-center"
       >
         <HollowMetalBin3D
-          color="#D97706"
-          glowColor="rgba(217,119,6,0.3)"
+          color="#ef4444"
+          glowColor="rgba(239, 68, 68, 0.3)"
           icon={Lock}
           controls={basketPhishingControls}
           label="PHISHING"
