@@ -1,0 +1,418 @@
+"""
+Cloudflare Email Gateway provisioner.
+
+Automates the full setup of inbound email interception for a customer domain:
+  1. Locate the Cloudflare zone for the domain
+  2. Enable Email Routing on the zone
+  3. Register a verified destination address (triggers CF verification email)
+  4. Deploy the Sicurre Email Worker script with secret bindings
+  5. Create a catch-all routing rule that pipes every inbound message to the Worker
+
+All Cloudflare API calls use the token supplied by the user at setup time.
+Secrets are never stored in plain text; only the SHA-256 hash of the worker
+shared secret is persisted so the /v1/email/scan endpoint can validate requests.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import logging
+import secrets
+from dataclasses import dataclass, field
+from typing import Any
+
+import httpx
+
+logger = logging.getLogger(__name__)
+
+CF_BASE = "https://api.cloudflare.com/client/v4"
+
+# ---------------------------------------------------------------------------
+# Embedded Cloudflare Email Worker script
+# ---------------------------------------------------------------------------
+_WORKER_JS = """\
+/**
+ * Sicurre Email Gateway Worker
+ *
+ * Flow:
+ *   1. Extract sender, subject and body from the inbound email
+ *   2. POST to Sicurre scan endpoint (SICURRE_SCAN_URL)
+ *   3. If verdict == "phishing"  → reject the message
+ *   4. Otherwise                 → forward to FORWARD_TO
+ *
+ * Environment bindings (set via Cloudflare Workers secrets):
+ *   SICURRE_SCAN_URL      – e.g. https://api.yourdomain.com/v1/email/scan
+ *   SICURRE_SHARED_SECRET – random secret shared between Worker and API
+ *   FORWARD_TO            – verified destination address
+ */
+export default {
+  async email(message, env, _ctx) {
+    const from    = message.from    || '';
+    const subject = message.headers.get('subject') || message.headers.get('Subject') || '';
+
+    // Read raw email body; cap at 6 000 bytes for the scan API
+    let bodyText = '';
+    try {
+      const rawText = await new Response(message.raw).text();
+      // Strip MIME boundary/header noise so the model gets cleaner text
+      bodyText = rawText
+        .replace(/--[A-Za-z0-9_\\-\\.]+(?:--)?/g, '')
+        .replace(/Content-[^\\n]+\\n/g, '')
+        .replace(/\\r\\n\\r\\n/g, '\\n\\n')
+        .trim()
+        .slice(0, 5_500);
+    } catch (_) { /* fail-open body read */ }
+
+    // ── Call Sicurre scan endpoint ──────────────────────────────────────────
+    let verdict = 'safe';
+    try {
+      const resp = await fetch(env.SICURRE_SCAN_URL, {
+        method : 'POST',
+        headers: {
+          'Content-Type'     : 'application/json',
+          'X-Sicurre-Secret' : env.SICURRE_SHARED_SECRET,
+        },
+        body  : JSON.stringify({
+          subject,
+          sender         : from,
+          text           : bodyText,
+          use_llm        : true,
+          use_virustotal : false,   // skip VT on the intercept path for speed
+        }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        verdict = (data.verdict || 'safe').toLowerCase();
+      }
+    } catch (_) {
+      // Fail-open: scan unavailable → forward the message
+    }
+
+    if (verdict === 'phishing') {
+      message.setReject('Phishing email blocked by Sicurre Anti-Phishing Gateway');
+      return;
+    }
+
+    // Forward clean/spam mail to the verified destination inbox
+    await message.forward(env.FORWARD_TO);
+  },
+};
+"""
+
+
+# ---------------------------------------------------------------------------
+# Result dataclass
+# ---------------------------------------------------------------------------
+@dataclass
+class ProvisioningResult:
+    zone_id: str
+    zone_name: str
+    account_id: str
+    worker_name: str
+    rule_id: str
+    destination_email: str
+    shared_secret_hash: str  # SHA-256 hex – store in DB
+    shared_secret_plain: str = field(repr=False)  # used once then discarded
+    destination_verified: bool = False
+    message: str = (
+        "Provisioning complete. Check inbox for Cloudflare verification email."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Helper
+# ---------------------------------------------------------------------------
+def _sha256(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# CloudflareProvisioner
+# ---------------------------------------------------------------------------
+class CloudflareProvisioner:
+    """
+    Thin async wrapper around the Cloudflare REST API.
+
+    Instantiate with the user-supplied API token; all calls use that token.
+    """
+
+    def __init__(self, api_token: str) -> None:
+        if not api_token:
+            raise ValueError("Cloudflare API token must not be empty")
+        self._token = api_token
+        self._headers = {
+            "Authorization": f"Bearer {api_token}",
+            "Content-Type": "application/json",
+        }
+
+    # ── low-level helpers ───────────────────────────────────────────────────
+
+    async def _get(self, path: str, **kw: Any) -> dict[str, Any]:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            r = await client.get(f"{CF_BASE}{path}", headers=self._headers, **kw)
+        return self._unwrap(r)
+
+    async def _post(
+        self, path: str, body: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            r = await client.post(
+                f"{CF_BASE}{path}", headers=self._headers, json=body or {}
+            )
+        return self._unwrap(r)
+
+    async def _post_multipart(self, path: str, files: dict) -> dict[str, Any]:
+        headers = {"Authorization": f"Bearer {self._token}"}
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.put(f"{CF_BASE}{path}", headers=headers, files=files)
+        return self._unwrap(r)
+
+    async def _delete(self, path: str) -> dict[str, Any]:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            r = await client.delete(f"{CF_BASE}{path}", headers=self._headers)
+        return self._unwrap(r)
+
+    @staticmethod
+    def _unwrap(r: httpx.Response) -> dict[str, Any]:
+        try:
+            data = r.json()
+        except Exception:
+            r.raise_for_status()
+            return {}
+        if not data.get("success", True):
+            errors = data.get("errors", [])
+            msg = "; ".join(e.get("message", str(e)) for e in errors) or r.text
+            raise CloudflareAPIError(msg, status_code=r.status_code)
+        return data
+
+    # ── public API ──────────────────────────────────────────────────────────
+
+    async def verify_token(self) -> bool:
+        """Check the token is valid and has sufficient permissions."""
+        try:
+            await self._get("/user/tokens/verify")
+            return True
+        except CloudflareAPIError:
+            return False
+
+    async def get_zone(self, zone_name: str) -> tuple[str, str]:
+        """Return (zone_id, account_id) for the given domain name."""
+        data = await self._get("/zones", params={"name": zone_name})  # type: ignore[arg-type]
+        # Note: _get doesn't take params directly, pass via query string
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            r = await client.get(
+                f"{CF_BASE}/zones",
+                headers=self._headers,
+                params={"name": zone_name, "per_page": 5},
+            )
+        data = self._unwrap(r)
+        results: list[dict] = data.get("result", [])
+        if not results:
+            raise CloudflareAPIError(
+                f"Zone '{zone_name}' not found. "
+                "Verify the domain is on this Cloudflare account and the token has DNS/Email read access."
+            )
+        zone = results[0]
+        zone_id = zone["id"]
+        account_id = zone["account"]["id"]
+        logger.info("Found zone %s → id=%s  account=%s", zone_name, zone_id, account_id)
+        return zone_id, account_id
+
+    async def enable_email_routing(self, zone_id: str) -> None:
+        """Enable Email Routing for a zone (idempotent)."""
+        try:
+            await self._post(f"/zones/{zone_id}/email/routing/enable")
+            logger.info("Email Routing enabled on zone %s", zone_id)
+        except CloudflareAPIError as exc:
+            # CF returns an error if already enabled; treat as success
+            if "already enabled" in str(exc).lower() or exc.status_code == 400:
+                logger.info(
+                    "Email Routing already enabled on zone %s (skipped)", zone_id
+                )
+            else:
+                raise
+
+    async def create_destination_address(self, account_id: str, email: str) -> str:
+        """
+        Register a destination email address.
+        Cloudflare will send a verification email to that address.
+        Returns the destination address `tag` for tracking.
+        """
+        data = await self._post(
+            f"/accounts/{account_id}/email/routing/addresses",
+            body={"email": email},
+        )
+        result = data.get("result", {})
+        tag = result.get("tag") or result.get("id") or email
+        logger.info("Destination address %s registered (tag=%s)", email, tag)
+        return str(tag)
+
+    async def deploy_email_worker(
+        self,
+        account_id: str,
+        worker_name: str,
+        scan_url: str,
+        shared_secret: str,
+        forward_to: str,
+    ) -> None:
+        """
+        Deploy the Sicurre Email Worker script to Cloudflare Workers.
+
+        The script handles the email event, calls the scan API, and either
+        forwards clean mail or rejects phishing.
+        """
+        metadata = {
+            "body_part": "worker.js",
+            "compatibility_date": "2024-12-01",
+            "bindings": [
+                {"type": "plain_text", "name": "SICURRE_SCAN_URL", "text": scan_url},
+                {
+                    "type": "secret_text",
+                    "name": "SICURRE_SHARED_SECRET",
+                    "text": shared_secret,
+                },
+                {"type": "plain_text", "name": "FORWARD_TO", "text": forward_to},
+            ],
+        }
+        files = {
+            "worker.js": ("worker.js", _WORKER_JS, "application/javascript"),
+            "metadata": ("metadata.json", json.dumps(metadata), "application/json"),
+        }
+        headers = {"Authorization": f"Bearer {self._token}"}
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.put(
+                f"{CF_BASE}/accounts/{account_id}/workers/scripts/{worker_name}",
+                headers=headers,
+                files=files,
+            )
+        self._unwrap(r)
+        logger.info("Worker '%s' deployed to account %s", worker_name, account_id)
+
+    async def create_catchall_email_rule(
+        self,
+        zone_id: str,
+        worker_name: str,
+        rule_name: str = "Sicurre catch-all",
+    ) -> str:
+        """
+        Create an Email Routing catch-all rule that routes all inbound mail
+        to the Sicurre Email Worker.  Returns the rule_id.
+        """
+        body = {
+            "name": rule_name,
+            "enabled": True,
+            "matchers": [{"type": "all"}],
+            "actions": [{"type": "worker", "value": [worker_name]}],
+            "priority": 0,
+        }
+        data = await self._post(f"/zones/{zone_id}/email/routing/rules", body=body)
+        rule_id = (
+            data.get("result", {}).get("id")
+            or data.get("result", {}).get("tag")
+            or "unknown"
+        )
+        logger.info("Email routing rule created (id=%s)", rule_id)
+        return str(rule_id)
+
+    async def delete_email_rule(self, zone_id: str, rule_id: str) -> None:
+        await self._delete(f"/zones/{zone_id}/email/routing/rules/{rule_id}")
+        logger.info("Email routing rule %s deleted", rule_id)
+
+    async def delete_worker(self, account_id: str, worker_name: str) -> None:
+        try:
+            await self._delete(f"/accounts/{account_id}/workers/scripts/{worker_name}")
+            logger.info("Worker '%s' deleted", worker_name)
+        except CloudflareAPIError as exc:
+            if exc.status_code == 404:
+                logger.info("Worker '%s' not found (already deleted)", worker_name)
+            else:
+                raise
+
+    async def get_email_routing_status(self, zone_id: str) -> dict[str, Any]:
+        """Return current Email Routing status for a zone."""
+        data = await self._get(f"/zones/{zone_id}/email/routing")
+        return data.get("result", {})
+
+    # ── full provisioning flow ──────────────────────────────────────────────
+
+    async def provision(
+        self,
+        zone_name: str,
+        destination_email: str,
+        scan_url: str,
+    ) -> ProvisioningResult:
+        """
+        Run the complete provisioning sequence.
+
+        Args:
+            zone_name:         Domain to protect, e.g. ``vinse.app``.
+            destination_email: Where clean mail should be forwarded.
+            scan_url:          Public URL of the Sicurre scan endpoint.
+
+        Returns:
+            ProvisioningResult with all IDs needed for status tracking.
+        """
+        # 1. Resolve zone
+        zone_id, account_id = await self.get_zone(zone_name)
+
+        # 2. Enable Email Routing
+        await self.enable_email_routing(zone_id)
+
+        # 3. Register destination address (user gets CF verification email)
+        await self.create_destination_address(account_id, destination_email)
+
+        # 4. Generate shared secret (plain secret only used here + in Worker bindings)
+        shared_secret = secrets.token_urlsafe(40)
+        shared_secret_hash = _sha256(shared_secret)
+
+        # 5. Deploy Worker
+        worker_name = f"sicurre-gw-{zone_id[:8]}"
+        await self.deploy_email_worker(
+            account_id=account_id,
+            worker_name=worker_name,
+            scan_url=scan_url,
+            shared_secret=shared_secret,
+            forward_to=destination_email,
+        )
+
+        # 6. Create catch-all routing rule
+        rule_id = await self.create_catchall_email_rule(zone_id, worker_name)
+
+        return ProvisioningResult(
+            zone_id=zone_id,
+            zone_name=zone_name,
+            account_id=account_id,
+            worker_name=worker_name,
+            rule_id=rule_id,
+            destination_email=destination_email,
+            shared_secret_hash=shared_secret_hash,
+            shared_secret_plain=shared_secret,
+        )
+
+    async def teardown(
+        self,
+        zone_id: str,
+        account_id: str,
+        worker_name: str,
+        rule_id: str,
+    ) -> None:
+        """Remove the routing rule and Worker for a previously provisioned zone."""
+        if rule_id and rule_id != "unknown":
+            try:
+                await self.delete_email_rule(zone_id, rule_id)
+            except CloudflareAPIError as exc:
+                logger.warning("Could not delete routing rule %s: %s", rule_id, exc)
+
+        await self.delete_worker(account_id, worker_name)
+        logger.info("Teardown complete for zone %s", zone_id)
+
+
+# ---------------------------------------------------------------------------
+# Custom exception
+# ---------------------------------------------------------------------------
+class CloudflareAPIError(Exception):
+    def __init__(self, message: str, status_code: int = 0) -> None:
+        super().__init__(message)
+        self.status_code = status_code

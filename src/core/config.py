@@ -90,6 +90,12 @@ class Settings(BaseSettings):
     inference_api_url: str | None = Field(
         default=None, validation_alias="INFERENCE_API_URL"
     )
+    # Public base URL of this API (used by Cloudflare Workers to call back)
+    # Must be reachable from the internet, e.g. https://api.yourdomain.com
+    public_api_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("PUBLIC_API_URL", "SICURRE_PUBLIC_API_URL"),
+    )
     scheduler_enabled: bool = False
     scheduler_interval_seconds: int = 604800
 

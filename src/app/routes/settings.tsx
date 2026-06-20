@@ -14,10 +14,12 @@ import {
   Fingerprint,
   Smartphone,
   Clock,
+  Cloud,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Toggle } from "../components/ui/toggle";
+import { CloudflareIntegrator } from "../components/common/cloudflare-integrator";
 
 const MotionDiv = motion.div as any;
 
@@ -309,6 +311,24 @@ export default function SettingsRoute() {
                 label="API Log Heartbeats"
                 description="Browser push notifications for integration activity."
               />
+            </div>
+          </div>
+
+          {/* ── Cloudflare Email Integration ───────────────────────────── */}
+          <div className="bg-white rounded-xl border border-border-subtle p-6">
+            <div className="flex items-center justify-between mb-1 pb-4 border-b border-border-subtle">
+              <div className="flex items-center gap-2.5">
+                <Cloud className="w-5 h-5 text-primary" />
+                <div>
+                  <h3 className="font-display font-semibold text-[17px] text-on-surface">Cloudflare Email Intercept</h3>
+                  <p className="text-[11px] text-on-surface-variant mt-0.5">
+                    Scannez chaque email entrant de votre domaine avant livraison — en un clic.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="pt-2">
+              <CloudflareIntegrator />
             </div>
           </div>
         </div>

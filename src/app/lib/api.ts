@@ -75,3 +75,83 @@ export function useUpdateThreatStatus() {
     },
   });
 }
+
+// ── Cloudflare Integration ────────────────────────────────────────────────────
+
+export interface CloudflareStatus {
+  status: "not_configured" | "provisioning" | "pending_verification" | "active" | "error";
+  id?: string;
+  user_email?: string;
+  zone_name?: string;
+  destination_email?: string;
+  worker_name?: string;
+  error_message?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CloudflareSetupPayload {
+  cf_api_token: string;
+  zone_name: string;
+  destination_email: string;
+  user_email: string;
+}
+
+export interface CfTokenVerifyPayload {
+  cf_api_token: string;
+  zone_name: string;
+}
+
+export interface CloudflareTeardownPayload {
+  cf_api_token: string;
+  user_email: string;
+}
+
+const CF_BASE = "/integrations/cloudflare";
+
+export function useCloudflareStatus(userEmail: string) {
+  return useQuery<CloudflareStatus>({
+    queryKey: ["cf-integration", userEmail],
+    queryFn: () => fetchJson<CloudflareStatus>(`${CF_BASE}/status?user_email=${encodeURIComponent(userEmail)}`),
+    refetchInterval: 5000,
+    enabled: !!userEmail,
+  });
+}
+
+export function useVerifyCloudflareToken() {
+  return useMutation({
+    mutationFn: (payload: CfTokenVerifyPayload) =>
+      fetchJson<{ valid: boolean; zone_id?: string; error?: string }>(
+        `${CF_BASE}/verify-token`,
+        { method: "POST", body: JSON.stringify(payload) },
+      ),
+  });
+}
+
+export function useSetupCloudflare() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CloudflareSetupPayload) =>
+      fetchJson<{ integration_id: string; status: string }>(
+        `${CF_BASE}/setup`,
+        { method: "POST", body: JSON.stringify(payload) },
+      ),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["cf-integration", variables.user_email] });
+    },
+  });
+}
+
+export function useTeardownCloudflare() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CloudflareTeardownPayload) =>
+      fetchJson<{ status: string }>(
+        `${CF_BASE}`,
+        { method: "DELETE", body: JSON.stringify(payload) },
+      ),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["cf-integration", variables.user_email] });
+    },
+  });
+}
