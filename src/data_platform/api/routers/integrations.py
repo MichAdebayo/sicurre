@@ -30,10 +30,19 @@ from typing import Any
 from uuid import uuid4
 
 import httpx
-from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    Header,
+    HTTPException,
+    Request,
+    status,
+)
 from pydantic import BaseModel, Field
 
 from core.config import get_settings
+from data_platform.api.auth import AuthUser, ensure_runtime_tables, get_current_user
 from data_platform.services.cloudflare_provisioner import (
     CloudflareAPIError,
     CloudflareProvisioner,
@@ -72,10 +81,13 @@ async def _async_query(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
 
 def _ensure_tables() -> None:
     """Create the cloudflare_integration table if it does not exist yet."""
+    ensure_runtime_tables()
     _query("""
         CREATE TABLE IF NOT EXISTS cloudflare_integration (
             id                  TEXT PRIMARY KEY,
             user_email          TEXT NOT NULL,
+            workspace_id        TEXT NULL,
+            workspace_member_user_id TEXT NULL,
             zone_id             TEXT NOT NULL,
             zone_name           TEXT NOT NULL,
             account_id          TEXT NOT NULL,
@@ -120,9 +132,6 @@ class CloudflareSetupRequest(BaseModel):
     destination_email: str = Field(
         ..., description="Where clean mail is forwarded after scanning"
     )
-    user_email: str = Field(
-        ..., description="Sicurre user email (for record ownership)"
-    )
 
 
 class CloudflareStatusResponse(BaseModel):
@@ -141,7 +150,6 @@ class TeardownRequest(BaseModel):
     cf_api_token: str = Field(
         ..., description="Cloudflare API token (required to remove Workers/rules)"
     )
-    user_email: str
 
 
 # ---------------------------------------------------------------------------
@@ -173,7 +181,7 @@ async def scan_email(
     # Verify the secret against stored hash
     secret_hash = hashlib.sha256(x_sicurre_secret.encode()).hexdigest()
     rows = await _async_query(
-        "SELECT id, user_email, zone_name FROM cloudflare_integration WHERE shared_secret_hash = ? AND status IN ('pending_verification','active') LIMIT 1",
+        "SELECT id, user_email, workspace_id, workspace_member_user_id, zone_name, status FROM cloudflare_integration WHERE shared_secret_hash = ? AND status IN ('pending_verification','active') LIMIT 1",
         (secret_hash,),
     )
     if not rows:
@@ -228,19 +236,21 @@ async def scan_email(
     try:
         await _async_query(
             """
-            INSERT INTO poc_inference_event (
-                id, created_at, user_email, context,
+            INSERT INTO app_inference_event (
+                id, created_at, user_email, workspace_id, workspace_member_user_id, context,
                 subject, sender, snippet,
                 safety_verdict, label_verdict, composite_score, is_phishing,
                 delivered_in_smail, llm_provider, explanation, latency_ms,
                 used_llm, used_virustotal, inference_source,
                 stage_scores_json, stage_labels_json, stage_breakdown_json, expected_label
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 str(uuid4()),
                 now,
                 integration["user_email"],
+                integration.get("workspace_id"),
+                integration.get("workspace_member_user_id"),
                 "cloudflare_intercept",
                 payload.subject[:240],
                 payload.sender[:200],
@@ -289,6 +299,7 @@ async def setup_cloudflare(
     payload: CloudflareSetupRequest,
     background_tasks: BackgroundTasks,
     request: Request,
+    current_user: AuthUser = Depends(get_current_user),
 ) -> dict[str, Any]:
     """
     Full one-shot provisioning:
@@ -301,8 +312,8 @@ async def setup_cloudflare(
 
     # Check for an existing active integration for this zone
     existing = await _async_query(
-        "SELECT id, status FROM cloudflare_integration WHERE user_email = ? AND zone_name = ? LIMIT 1",
-        (payload.user_email, payload.zone_name),
+        "SELECT id, status FROM cloudflare_integration WHERE workspace_id = ? AND zone_name = ? LIMIT 1",
+        (current_user.workspace_id, payload.zone_name),
     )
     if existing and existing[0]["status"] in (
         "active",
@@ -328,13 +339,15 @@ async def setup_cloudflare(
     await _async_query(
         """
         INSERT INTO cloudflare_integration
-            (id, user_email, zone_id, zone_name, account_id, worker_name, rule_id,
+            (id, user_email, workspace_id, workspace_member_user_id, zone_id, zone_name, account_id, worker_name, rule_id,
              destination_email, shared_secret_hash, status, created_at, updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """,
         (
             integration_id,
-            payload.user_email,
+            current_user.email,
+            current_user.workspace_id,
+            current_user.id,
             "",
             payload.zone_name,
             "",
@@ -403,12 +416,14 @@ async def setup_cloudflare(
 
 
 @router.get("/v1/integrations/cloudflare/status")
-async def cloudflare_status(user_email: str) -> dict[str, Any]:
+async def cloudflare_status(
+    current_user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
     """Return the most recent integration record for a user."""
     _ensure_tables()
     rows = await _async_query(
-        "SELECT * FROM cloudflare_integration WHERE user_email = ? ORDER BY created_at DESC LIMIT 1",
-        (user_email,),
+        "SELECT * FROM cloudflare_integration WHERE workspace_id = ? ORDER BY created_at DESC LIMIT 1",
+        (current_user.workspace_id,),
     )
     if not rows:
         return {"status": "not_configured"}
@@ -432,12 +447,15 @@ async def cloudflare_status(user_email: str) -> dict[str, Any]:
 
 
 @router.delete("/v1/integrations/cloudflare")
-async def teardown_cloudflare(payload: TeardownRequest) -> dict[str, Any]:
+async def teardown_cloudflare(
+    payload: TeardownRequest,
+    current_user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
     """Remove the Cloudflare Worker and routing rule then delete the DB record."""
     _ensure_tables()
     rows = await _async_query(
-        "SELECT * FROM cloudflare_integration WHERE user_email = ? ORDER BY created_at DESC LIMIT 1",
-        (payload.user_email,),
+        "SELECT * FROM cloudflare_integration WHERE workspace_id = ? ORDER BY created_at DESC LIMIT 1",
+        (current_user.workspace_id,),
     )
     if not rows:
         raise HTTPException(
@@ -480,7 +498,10 @@ class TokenVerifyRequest(BaseModel):
 
 
 @router.post("/v1/integrations/cloudflare/verify-token")
-async def verify_cloudflare_token(payload: TokenVerifyRequest) -> dict[str, Any]:
+async def verify_cloudflare_token(
+    payload: TokenVerifyRequest,
+    current_user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
     """
     Lightweight check: verify the token is valid and can see the requested zone.
     Called by the UI before the actual setup to give early feedback.

@@ -32,10 +32,11 @@ class Settings(BaseSettings):
     auth_enabled: bool = True
     auth_allow_dev_tokens: bool | None = None
     auth_dev_bearer_tokens: str = "dev-token,dev-rate-limit"
-    better_auth_base_url: str | None = None
+    better_auth_base_url: str | None = "http://127.0.0.1:3005"
     better_auth_session_path: str = "/api/auth/get-session"
     better_auth_timeout_seconds: float = 5.0
     better_auth_cookie_name: str = "better-auth.session_token"
+    platform_admin_emails: str = "admin@sicurre.fr"
     raw_snapshot_storage_backend: str = "local"
     raw_snapshot_local_dir: Path = ROOT_DIR / "data" / "raw" / "api"
     raw_snapshot_prefix: str = "raw-snapshots"
@@ -98,6 +99,20 @@ class Settings(BaseSettings):
     )
     scheduler_enabled: bool = False
     scheduler_interval_seconds: int = 604800
+
+    # Google OAuth credentials configuration
+    google_client_id: str | None = Field(
+        default=None,
+        validation_alias="GOOGLE_CLIENT_ID",
+    )
+    google_client_secret: str | None = Field(
+        default=None,
+        validation_alias="GOOGLE_CLIENT_SECRET",
+    )
+    google_redirect_uri: str | None = Field(
+        default=None,
+        validation_alias="GOOGLE_REDIRECT_URI",
+    )
 
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),
@@ -163,6 +178,14 @@ class Settings(BaseSettings):
         if self.auth_allow_dev_tokens is not None:
             return self.auth_allow_dev_tokens
         return self.environment in {"dev", "test"}
+
+    @property
+    def platform_admin_email_set(self) -> frozenset[str]:
+        return frozenset(
+            email.strip().lower()
+            for email in self.platform_admin_emails.split(",")
+            if email.strip()
+        )
 
 
 @lru_cache(maxsize=1)

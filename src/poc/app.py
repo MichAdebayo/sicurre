@@ -1535,7 +1535,7 @@ def log_inference_event(
     params = result.get("params") or {}
     _auth_exec(
         """
-        INSERT INTO poc_inference_event (
+        INSERT INTO app_inference_event (
             id,
             created_at,
             user_email,
@@ -1590,7 +1590,7 @@ def log_inference_event(
 def reclassify_event(event_id: str, new_verdict: str, by_user: str) -> None:
     """Override the safety verdict for a single event."""
     _auth_exec(
-        "UPDATE poc_inference_event SET override_verdict = ?, override_by = ?, overridden_at = ? WHERE id = ?",
+        "UPDATE app_inference_event SET override_verdict = ?, override_by = ?, overridden_at = ? WHERE id = ?",
         (new_verdict, by_user, datetime.now(timezone.utc).isoformat(), event_id),
     )
 
@@ -1624,7 +1624,7 @@ def get_events(limit: int = 500) -> list[dict[str, Any]]:
             override_verdict,
             override_by,
             overridden_at
-        FROM poc_inference_event
+        FROM app_inference_event
         ORDER BY created_at DESC
         LIMIT ?
         """,

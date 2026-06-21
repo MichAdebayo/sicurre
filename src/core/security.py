@@ -15,6 +15,7 @@ from core.config import Settings, get_settings
 class AuthenticatedPrincipal(BaseModel):
     subject: str
     email: str | None = None
+    display_name: str | None = None
     session_id: str | None = None
     auth_provider: str
 
@@ -59,18 +60,23 @@ def _principal_from_better_auth_payload(
     return AuthenticatedPrincipal(
         subject=str(subject),
         email=user.get("email"),
+        display_name=user.get("name") or user.get("displayName"),
         session_id=(str(session.get("id")) if session.get("id") else None),
         auth_provider="better-auth",
     )
 
 
 async def _validate_with_better_auth(
-    token: str, settings: Settings, session_cookie: str | None = None
+    token: str | None, settings: Settings, session_cookie: str | None = None
 ) -> AuthenticatedPrincipal | None:
     if not settings.better_auth_base_url:
         return None
 
-    cache_key = _token_cache_key(token)
+    cache_source = token or session_cookie
+    if cache_source is None:
+        return None
+
+    cache_key = _token_cache_key(cache_source)
     cached_principal = _auth_cache.get(cache_key)
     if cached_principal is not None:
         return cached_principal
@@ -82,7 +88,9 @@ async def _validate_with_better_auth(
     async with httpx.AsyncClient(
         timeout=settings.better_auth_timeout_seconds
     ) as client:
-        headers = {"Authorization": f"Bearer {token}"}
+        headers: dict[str, str] = {}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
         if session_cookie:
             headers["Cookie"] = f"{settings.better_auth_cookie_name}={session_cookie}"
         response = await client.get(
@@ -136,12 +144,12 @@ async def require_authenticated_principal(
         return principal
 
     token = credentials.credentials if credentials is not None else None
-    if token is None:
+    session_cookie = request.cookies.get(settings.better_auth_cookie_name)
+    if token is None and session_cookie is None:
         raise _unauthorized()
 
-    principal = _validate_with_dev_token(token, settings)
+    principal = _validate_with_dev_token(token, settings) if token is not None else None
     if principal is None:
-        session_cookie = request.cookies.get(settings.better_auth_cookie_name)
         if not settings.allow_dev_tokens and not settings.better_auth_base_url:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

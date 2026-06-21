@@ -104,6 +104,17 @@ def ensure_local_auth_db() -> None:
     LOCAL_DATA_DIR.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(POC_AUTH_DB_PATH))
     try:
+        legacy_event_exists = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'poc_inference_event'"
+        ).fetchone()
+        app_event_exists = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'app_inference_event'"
+        ).fetchone()
+        if legacy_event_exists and not app_event_exists:
+            conn.execute(
+                "ALTER TABLE poc_inference_event RENAME TO app_inference_event"
+            )
+
         conn.execute("""
             CREATE TABLE IF NOT EXISTS poc_user (
                 id TEXT PRIMARY KEY,
@@ -125,7 +136,7 @@ def ensure_local_auth_db() -> None:
             conn.execute("ALTER TABLE poc_user ADD COLUMN session_expires_at TEXT NULL")
 
         conn.execute("""
-            CREATE TABLE IF NOT EXISTS poc_inference_event (
+            CREATE TABLE IF NOT EXISTS app_inference_event (
                 id TEXT PRIMARY KEY,
                 created_at TEXT NOT NULL,
                 user_email TEXT NOT NULL,
@@ -151,34 +162,34 @@ def ensure_local_auth_db() -> None:
             )
             """)
 
-        event_columns = _table_columns(conn, "poc_inference_event")
+        event_columns = _table_columns(conn, "app_inference_event")
         if "latency_ms" not in event_columns:
             conn.execute(
-                "ALTER TABLE poc_inference_event ADD COLUMN latency_ms REAL NOT NULL DEFAULT 0"
+                "ALTER TABLE app_inference_event ADD COLUMN latency_ms REAL NOT NULL DEFAULT 0"
             )
         if "used_llm" not in event_columns:
             conn.execute(
-                "ALTER TABLE poc_inference_event ADD COLUMN used_llm INTEGER NOT NULL DEFAULT 0"
+                "ALTER TABLE app_inference_event ADD COLUMN used_llm INTEGER NOT NULL DEFAULT 0"
             )
         if "used_virustotal" not in event_columns:
             conn.execute(
-                "ALTER TABLE poc_inference_event ADD COLUMN used_virustotal INTEGER NOT NULL DEFAULT 0"
+                "ALTER TABLE app_inference_event ADD COLUMN used_virustotal INTEGER NOT NULL DEFAULT 0"
             )
         if "inference_source" not in event_columns:
             conn.execute(
-                "ALTER TABLE poc_inference_event ADD COLUMN inference_source TEXT NOT NULL DEFAULT 'api'"
+                "ALTER TABLE app_inference_event ADD COLUMN inference_source TEXT NOT NULL DEFAULT 'api'"
             )
         if "override_verdict" not in event_columns:
             conn.execute(
-                "ALTER TABLE poc_inference_event ADD COLUMN override_verdict TEXT NULL"
+                "ALTER TABLE app_inference_event ADD COLUMN override_verdict TEXT NULL"
             )
         if "override_by" not in event_columns:
             conn.execute(
-                "ALTER TABLE poc_inference_event ADD COLUMN override_by TEXT NULL"
+                "ALTER TABLE app_inference_event ADD COLUMN override_by TEXT NULL"
             )
         if "overridden_at" not in event_columns:
             conn.execute(
-                "ALTER TABLE poc_inference_event ADD COLUMN overridden_at TEXT NULL"
+                "ALTER TABLE app_inference_event ADD COLUMN overridden_at TEXT NULL"
             )
         for account in _seed_accounts():
             row = conn.execute(
