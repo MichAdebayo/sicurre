@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
-  ChevronRight,
   ShieldCheck,
   Mail,
   ExternalLink,
@@ -15,6 +14,7 @@ import {
   Eye,
   EyeOff,
   Zap,
+  HelpCircle,
 } from "lucide-react";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
@@ -47,86 +47,143 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-// ── Step indicator ────────────────────────────────────────────────────────────
+// ── Checklist interface ───────────────────────────────────────────────────────
 
-function StepDot({ n, current, done }: { n: number; current: number; done: boolean }) {
-  const active = n === current;
-  return (
-    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold border-2 transition-all ${
-      done    ? "bg-safe border-safe text-white" :
-      active  ? "bg-primary border-primary text-white" :
-                "bg-surface-container border-border-subtle text-on-surface-variant"
-    }`}>
-      {done ? <CheckCircle2 className="w-3.5 h-3.5" /> : n}
-    </div>
-  );
+interface IntegrationStage {
+  id: string;
+  label: string;
+  description: string;
+  status: "idle" | "loading" | "success" | "error";
+  errorMsg?: string;
+}
+
+interface CloudflareIntegratorProps {
+  userEmail: string;
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function CloudflareIntegrator() {
-  const userEmail = localStorage.getItem("sicurre_user_email") || localStorage.getItem("sicurre_user_name") || "user@example.com";
-
-  const { data: cfStatus, isLoading: statusLoading, refetch } = useCloudflareStatus(userEmail);
+export function CloudflareIntegrator({ userEmail }: CloudflareIntegratorProps) {
+  const { data: cfStatus, isLoading: statusLoading, refetch } = useCloudflareStatus();
   const verifyMutation = useVerifyCloudflareToken();
   const setupMutation  = useSetupCloudflare();
   const teardownMutation = useTeardownCloudflare();
 
-  // Wizard form state
-  const [step, setStep]                 = useState(1);
+  // Controlled form state
   const [cfToken, setCfToken]           = useState("");
   const [showToken, setShowToken]       = useState(false);
   const [zoneName, setZoneName]         = useState("");
-  const [destEmail, setDestEmail]       = useState("");
-  const [tokenValid, setTokenValid]     = useState<null | boolean>(null);
-  const [zoneId, setZoneId]             = useState<string | null>(null);
-  const [tokenError, setTokenError]     = useState("");
+  const [showHelp, setShowHelp]         = useState(false);
+
+  // Integration progress state
+  const [isIntegrating, setIsIntegrating] = useState(false);
+  const [stages, setStages] = useState<IntegrationStage[]>([
+    { id: "verify", label: "Vérification des informations d'identification", description: "Vérification du token API Cloudflare et de l'accès au domaine.", status: "idle" },
+    { id: "dns", label: "Configuration des enregistrements DNS", description: "Configuration des enregistrements MX nécessaires pour l'acheminement des e-mails.", status: "idle" },
+    { id: "worker", label: "Déploiement du Worker", description: "Déploiement du Worker Sicurre pour analyser chaque e-mail entrant en temps réel.", status: "idle" },
+    { id: "routing", label: "Liaison du routage & validation finale", description: "Création de la règle catch-all et test final de connectivité de la passerelle.", status: "idle" }
+  ]);
+
+  // Teardown state
   const [teardownToken, setTeardownToken] = useState("");
   const [showTeardown, setShowTeardown] = useState(false);
 
-  // Poll while provisioning
-  const isProvisioning = cfStatus?.status === "provisioning";
+  // Sync background provisioning state with UI progress checklist
   useEffect(() => {
-    if (!isProvisioning) return;
+    if (cfStatus?.status === "provisioning" && !isIntegrating) {
+      setIsIntegrating(true);
+      setStages([
+        { id: "verify", label: "Vérification des informations d'identification", description: "Vérification du token API Cloudflare et de l'accès au domaine.", status: "success" },
+        { id: "dns", label: "Configuration des enregistrements DNS", description: "Configuration des enregistrements MX nécessaires pour l'acheminement des e-mails.", status: "success" },
+        { id: "worker", label: "Déploiement du Worker", description: "Déploiement du Worker Sicurre pour analyser chaque e-mail entrant en temps réel.", status: "success" },
+        { id: "routing", label: "Liaison du routage & validation finale", description: "Création de la règle catch-all et test final de connectivité de la passerelle.", status: "loading" }
+      ]);
+    }
+  }, [cfStatus?.status, isIntegrating]);
+
+  // React to status completion updates during routing step
+  useEffect(() => {
+    let timerId: NodeJS.Timeout | undefined;
+    if (isIntegrating && stages.find(s => s.id === "routing")?.status === "loading") {
+      if (cfStatus?.status === "pending_verification" || cfStatus?.status === "active") {
+        setStages(prev => prev.map(s => s.id === "routing" ? { ...s, status: "success" } : s));
+        timerId = setTimeout(() => {
+          setIsIntegrating(false);
+        }, 1500);
+      } else if (cfStatus?.status === "error") {
+        setStages(prev => prev.map(s => s.id === "routing" ? { ...s, status: "error", errorMsg: cfStatus.error_message || "Échec de la configuration finale." } : s));
+      }
+    }
+    return () => {
+      if (timerId) clearTimeout(timerId);
+    };
+  }, [cfStatus?.status, isIntegrating, stages]);
+
+  // Poll status ONLY when integrating or provisioning in the background
+  useEffect(() => {
+    if (!isIntegrating && cfStatus?.status !== "provisioning") return;
     const id = setInterval(() => refetch(), 3000);
     return () => clearInterval(id);
-  }, [isProvisioning, refetch]);
+  }, [isIntegrating, cfStatus?.status, refetch]);
 
-  // ── Step 1: Validate token + zone ────────────────────────────────────────
+  // ── Integration Orchestration ─────────────────────────────────────────────
 
-  const handleVerifyToken = async () => {
+  const handleIntegrate = async () => {
     if (!cfToken.trim() || !zoneName.trim()) return;
-    setTokenValid(null);
-    setTokenError("");
+
+    setIsIntegrating(true);
+    setStages([
+      { id: "verify", label: "Vérification des informations d'identification", description: "Vérification du token API Cloudflare et de l'accès au domaine.", status: "loading" },
+      { id: "dns", label: "Configuration des enregistrements DNS", description: "Configuration des enregistrements MX nécessaires pour l'acheminement des e-mails.", status: "idle" },
+      { id: "worker", label: "Déploiement du Worker", description: "Déploiement du Worker Sicurre pour analyser chaque e-mail entrant en temps réel.", status: "idle" },
+      { id: "routing", label: "Liaison du routage & validation finale", description: "Création de la règle catch-all et test final de connectivité de la passerelle.", status: "idle" }
+    ]);
+
     try {
-      const result = await verifyMutation.mutateAsync({ cf_api_token: cfToken, zone_name: zoneName });
-      if (result.valid) {
-        setTokenValid(true);
-        setZoneId(result.zone_id);
-      } else {
-        setTokenValid(false);
-        setTokenError(result.error || "Token ou domaine invalide.");
+      // Step 1: Verify token
+      const result = await verifyMutation.mutateAsync({
+        cf_api_token: cfToken,
+        zone_name: zoneName,
+      });
+
+      if (!result.valid) {
+        setStages(prev => prev.map(s => s.id === "verify" ? { ...s, status: "error", errorMsg: result.error || "Token ou domaine invalide." } : s));
+        return;
       }
-    } catch {
-      setTokenValid(false);
-      setTokenError("Erreur réseau lors de la vérification.");
-    }
-  };
 
-  // ── Step 2: Submit setup ──────────────────────────────────────────────────
+      setStages(prev => prev.map(s =>
+        s.id === "verify" ? { ...s, status: "success" } :
+        s.id === "dns" ? { ...s, status: "loading" } : s
+      ));
 
-  const handleSetup = async () => {
-    if (!tokenValid || !destEmail.trim()) return;
-    try {
+      // Step 2: DNS MX Configuration simulation (DNS check happens backend)
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      setStages(prev => prev.map(s =>
+        s.id === "dns" ? { ...s, status: "success" } :
+        s.id === "worker" ? { ...s, status: "loading" } : s
+      ));
+
+      // Step 3: Trigger setup
       await setupMutation.mutateAsync({
         cf_api_token: cfToken,
-        zone_name:    zoneName,
-        destination_email: destEmail,
-        user_email:   userEmail,
+        zone_name: zoneName,
+        destination_email: userEmail,
       });
+
+      setStages(prev => prev.map(s =>
+        s.id === "worker" ? { ...s, status: "success" } :
+        s.id === "routing" ? { ...s, status: "loading" } : s
+      ));
+
+      // Step 4: Routing & validation will update via the useEffect watching status changes
       refetch();
     } catch (err: any) {
-      // error shown via setupMutation.error
+      setStages(prev => prev.map(s => {
+        if (s.status === "loading") {
+          return { ...s, status: "error", errorMsg: err.message || "Une erreur est survenue lors de cette étape." };
+        }
+        return s;
+      }));
     }
   };
 
@@ -135,7 +192,7 @@ export function CloudflareIntegrator() {
   const handleTeardown = async () => {
     if (!teardownToken.trim()) return;
     try {
-      await teardownMutation.mutateAsync({ cf_api_token: teardownToken, user_email: userEmail });
+      await teardownMutation.mutateAsync({ cf_api_token: teardownToken });
       setShowTeardown(false);
       setTeardownToken("");
       refetch();
@@ -144,18 +201,98 @@ export function CloudflareIntegrator() {
     }
   };
 
-  // ── Render based on current status ────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
 
-  if (statusLoading) {
+  // Clean, quiet skeleton loader when status is checking for the first time
+  if (statusLoading && !cfStatus) {
     return (
-      <div className="flex items-center gap-2.5 py-6 text-on-surface-variant text-sm">
-        <Loader2 className="w-4 h-4 animate-spin" />
-        <span>Vérification de l'intégration…</span>
+      <div className="space-y-6">
+        <div className="bg-surface-lowest border border-border-subtle rounded-xl p-5 space-y-4 animate-pulse">
+          <div className="h-6 bg-surface-container rounded-md w-1/3" />
+          <div className="h-4 bg-surface-container rounded-md w-2/3" />
+          <div className="grid grid-cols-1 gap-4">
+            <div className="h-10 bg-surface-container rounded-md" />
+            <div className="h-10 bg-surface-container rounded-md" />
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <div className="h-10 bg-surface-container rounded-md w-32" />
+        </div>
       </div>
     );
   }
 
   const intStatus: CloudflareStatus = cfStatus || { status: "not_configured" };
+
+  // ── INTEGRATING / WIZARD CHECKLIST STATE ────────────────────────────────────
+  if (isIntegrating) {
+    const activeStage = stages.find(s => s.status === "loading" || s.status === "error");
+    const hasError = stages.some(s => s.status === "error");
+
+    return (
+      <MotionDiv initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+        <div className="bg-surface-low/30 border border-border-subtle rounded-xl p-5 space-y-5">
+          <div>
+            <h4 className="font-display font-semibold text-[15px] text-on-surface">Configuration de l'Intégration</h4>
+            <p className="text-xs text-on-surface-variant mt-0.5">
+              Suivi en direct des étapes de provisionnement sur votre compte Cloudflare.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {stages.map((stage) => (
+              <div key={stage.id} className="flex items-start gap-3.5">
+                <div className="mt-0.5 shrink-0">
+                  {stage.status === "idle" && (
+                    <div className="w-5 h-5 rounded-full border border-border-subtle bg-surface-lowest flex items-center justify-center text-[10px] text-on-surface-variant/40 font-bold" />
+                  )}
+                  {stage.status === "loading" && (
+                    <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                  )}
+                  {stage.status === "success" && (
+                    <CheckCircle2 className="w-5 h-5 text-safe" />
+                  )}
+                  {stage.status === "error" && (
+                    <XCircle className="w-5 h-5 text-error" />
+                  )}
+                </div>
+                <div className="space-y-0.5">
+                  <p className={`text-sm font-semibold ${
+                    stage.status === "error" ? "text-error" :
+                    stage.status === "loading" ? "text-primary" :
+                    stage.status === "success" ? "text-on-surface" : "text-on-surface-variant/60"
+                  }`}>
+                    {stage.label}
+                  </p>
+                  <p className="text-xs text-on-surface-variant/70 leading-relaxed">
+                    {stage.description}
+                  </p>
+                  {stage.status === "error" && stage.errorMsg && (
+                    <p className="text-[11px] font-semibold text-error bg-error/[0.04] border border-error/10 rounded px-2.5 py-1.5 mt-2.5 max-w-xl font-mono break-all">
+                      {stage.errorMsg}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {hasError && (
+            <div className="pt-2 border-t border-border-subtle flex gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsIntegrating(false)}
+                className="text-[11px]"
+              >
+                Retourner à la configuration
+              </Button>
+            </div>
+          )}
+        </div>
+      </MotionDiv>
+    );
+  }
 
   // ── ACTIVE STATE ──────────────────────────────────────────────────────────
   if (intStatus.status === "active") {
@@ -223,6 +360,7 @@ export function CloudflareIntegrator() {
             <div className="flex gap-2">
               <Button
                 variant="danger"
+                size="sm"
                 onClick={handleTeardown}
                 disabled={!teardownToken || teardownMutation.isPending}
                 className="gap-1.5 text-[11px]"
@@ -230,7 +368,7 @@ export function CloudflareIntegrator() {
                 {teardownMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                 Confirmer la désactivation
               </Button>
-              <Button variant="secondary" onClick={() => setShowTeardown(false)} className="text-[11px]">
+              <Button variant="outline" size="sm" onClick={() => setShowTeardown(false)} className="text-[11px]">
                 Annuler
               </Button>
             </div>
@@ -276,27 +414,14 @@ export function CloudflareIntegrator() {
           <div className="p-4 border border-error/20 bg-error/[0.03] rounded-xl space-y-3">
             <Input label="Token Cloudflare" type="password" value={teardownToken} onChange={e => setTeardownToken(e.target.value)} placeholder="Votre token CF…" />
             <div className="flex gap-2">
-              <Button variant="danger" onClick={handleTeardown} disabled={!teardownToken || teardownMutation.isPending} className="gap-1.5 text-[11px]">
+              <Button variant="danger" size="sm" onClick={handleTeardown} disabled={!teardownToken || teardownMutation.isPending} className="gap-1.5 text-[11px]">
                 {teardownMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                 Supprimer
               </Button>
-              <Button variant="secondary" onClick={() => setShowTeardown(false)} className="text-[11px]">Annuler</Button>
+              <Button variant="outline" size="sm" onClick={() => setShowTeardown(false)} className="text-[11px]">Annuler</Button>
             </div>
           </div>
         )}
-      </MotionDiv>
-    );
-  }
-
-  // ── PROVISIONING ──────────────────────────────────────────────────────────
-  if (intStatus.status === "provisioning") {
-    return (
-      <MotionDiv initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center py-8 gap-3">
-        <Loader2 className="w-8 h-8 text-primary animate-spin" />
-        <p className="font-semibold text-sm text-on-surface">Provisionnement en cours…</p>
-        <p className="text-xs text-on-surface-variant text-center max-w-xs">
-          Déploiement du Worker Cloudflare et configuration du routage email. Cela prend 10–20 secondes.
-        </p>
       </MotionDiv>
     );
   }
@@ -314,11 +439,11 @@ export function CloudflareIntegrator() {
         </div>
         <p className="text-xs text-on-surface-variant">Vérifiez le token et les permissions, puis réessayez.</p>
         <Button
-          variant="secondary"
+          variant="outline"
+          size="sm"
           onClick={async () => {
-            // Delete the error record so the wizard resets
             if (cfToken) {
-              await teardownMutation.mutateAsync({ cf_api_token: cfToken || "dummy", user_email: userEmail }).catch(() => {});
+              await teardownMutation.mutateAsync({ cf_api_token: cfToken || "dummy" }).catch(() => {});
             }
             refetch();
           }}
@@ -330,136 +455,92 @@ export function CloudflareIntegrator() {
     );
   }
 
-  // ── WIZARD (not_configured) ───────────────────────────────────────────────
+  // ── WIZARD / INPUT FORM STATE (not_configured) ─────────────────────────────
+  const isFormValid = cfToken.trim() !== "" && zoneName.trim() !== "";
+
   return (
     <MotionDiv initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-      {/* Step indicators */}
-      <div className="flex items-center gap-0">
-        {[1, 2, 3].map((n, i) => (
-          <React.Fragment key={n}>
-            <StepDot n={n} current={step} done={n < step} />
-            {i < 2 && (
-              <div className={`flex-1 h-px mx-1 transition-colors ${step > n ? "bg-primary" : "bg-border-subtle"}`} />
-            )}
-          </React.Fragment>
-        ))}
-      </div>
+      <div className="bg-surface-low/30 border border-border-subtle rounded-xl p-5 space-y-4">
+        <div className="flex items-center gap-2 relative">
+          <h4 className="font-display font-semibold text-[15px] text-on-surface">Configurer l'Intégration</h4>
+          <div
+            className="relative inline-block"
+            onMouseEnter={() => setShowHelp(true)}
+            onMouseLeave={() => setShowHelp(false)}
+          >
+            <button
+              type="button"
+              onClick={() => setShowHelp(v => !v)}
+              className="text-on-surface-variant/50 hover:text-primary transition-colors cursor-help p-0.5 rounded-full hover:bg-surface-low/50 flex items-center justify-center outline-none"
+              aria-label="Aide à la configuration"
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+            </button>
+            <AnimatePresence>
+              {showHelp && (
+                <MotionDiv
+                  initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute left-6 -top-2 z-30 w-72 bg-white border border-border-subtle p-4 rounded-xl shadow-lg text-[11px] text-on-surface-variant/80 space-y-1.5 leading-normal"
+                >
+                  <p className="font-bold text-on-surface">Instructions pour générer le token Cloudflare :</p>
+                  <p>1. Connectez-vous à votre compte sur <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noreferrer" className="text-primary underline inline-flex items-center gap-0.5 font-semibold">dash.cloudflare.com <ExternalLink className="w-3 h-3" /></a>.</p>
+                  <p>2. Créez un jeton personnalisé avec les droits d'écriture (Edit) suivants :</p>
+                  <ul className="list-disc pl-4 space-y-0.5 mt-1 font-medium text-on-surface">
+                    <li>Zone › DNS › Modifier</li>
+                    <li>Workers Scripts › Modifier</li>
+                    <li>Email Routing › Modifier</li>
+                  </ul>
+                </MotionDiv>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
 
-      <AnimatePresence mode="wait">
-        {/* ── Step 1: Token + domain ─────────────────────────────────────── */}
-        {step === 1 && (
-          <MotionDiv key="step1" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-4">
-            <div>
-              <h4 className="font-display font-semibold text-[15px] text-on-surface mb-0.5">Token Cloudflare & Domaine</h4>
-              <p className="text-xs text-on-surface-variant">
-                Créez un token restreint sur{" "}
-                <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2 inline-flex items-center gap-0.5">
-                  dash.cloudflare.com <ExternalLink className="w-3 h-3" />
-                </a>{" "}
-                avec les permissions : <strong>Zone › DNS › Edit</strong>, <strong>Workers Scripts › Edit</strong>, <strong>Email Routing › Edit</strong>.
-              </p>
-            </div>
-
+        <div className="grid grid-cols-1 gap-4 pt-2">
+          <div>
             <Input
               label="Token Cloudflare API"
               type={showToken ? "text" : "password"}
               value={cfToken}
-              onChange={e => { setCfToken(e.target.value); setTokenValid(null); }}
-              placeholder="Votre token CF…"
+              onChange={e => setCfToken(e.target.value)}
+              placeholder="Ex: d784a3b8cd9a98ef12..."
               suffix={
                 <button type="button" onClick={() => setShowToken(v => !v)} className="text-on-surface-variant/60 hover:text-on-surface transition-colors cursor-pointer">
                   {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               }
             />
+          </div>
 
+          <div>
             <Input
               label="Domaine à protéger"
               type="text"
               value={zoneName}
-              onChange={e => { setZoneName(e.target.value.trim().toLowerCase()); setTokenValid(null); }}
-              placeholder="vinse.app"
+              onChange={e => setZoneName(e.target.value.trim().toLowerCase())}
+              placeholder="Ex: mon-entreprise.fr"
             />
+          </div>
+        </div>
+      </div>
 
-            {tokenValid === false && (
-              <div className="flex items-center gap-2 text-xs text-error">
-                <XCircle className="w-3.5 h-3.5 shrink-0" /> {tokenError}
-              </div>
-            )}
-            {tokenValid === true && (
-              <div className="flex items-center gap-2 text-xs text-safe">
-                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Token valide · Zone <strong>{zoneName}</strong> trouvée (id: {zoneId})
-              </div>
-            )}
-
-            <div className="flex items-center gap-2 pt-1">
-              {tokenValid !== true && (
-                <Button
-                  variant="secondary"
-                  onClick={handleVerifyToken}
-                  disabled={!cfToken || !zoneName || verifyMutation.isPending}
-                  className="gap-1.5 text-[11px]"
-                >
-                  {verifyMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
-                  Vérifier le token
-                </Button>
-              )}
-              {tokenValid === true && (
-                <Button onClick={() => setStep(2)} className="gap-1.5 text-[11px]">
-                  Continuer <ChevronRight className="w-3.5 h-3.5" />
-                </Button>
-              )}
-            </div>
-          </MotionDiv>
-        )}
-
-        {/* ── Step 2: Destination email ──────────────────────────────────── */}
-        {step === 2 && (
-          <MotionDiv key="step2" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-4">
-            <div>
-              <h4 className="font-display font-semibold text-[15px] text-on-surface mb-0.5">Adresse de livraison</h4>
-              <p className="text-xs text-on-surface-variant">
-                Les emails propres (non-phishing) seront transférés vers cette adresse après scan. Cloudflare vous enverra un email de vérification à cette adresse.
-              </p>
-            </div>
-
-            <Input
-              label="Email de destination"
-              type="email"
-              value={destEmail}
-              onChange={e => setDestEmail(e.target.value)}
-              placeholder="votre@gmail.com"
-            />
-
-            <div className="p-3 bg-primary/[0.04] border border-primary/20 rounded-lg text-xs text-on-surface-variant space-y-1">
-              <p><strong>Ce qui se passera automatiquement :</strong></p>
-              <p>• Email Routing activé sur <strong>{zoneName}</strong></p>
-              <p>• Worker Sicurre déployé sur Cloudflare</p>
-              <p>• Règle catch-all créée (tous emails → Worker → scan → livraison)</p>
-              <p>• Email de vérification CF envoyé à <strong>{destEmail || "votre adresse"}</strong></p>
-            </div>
-
-            {setupMutation.isError && (
-              <div className="flex items-start gap-2 text-xs text-error">
-                <XCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                {(setupMutation.error as Error)?.message}
-              </div>
-            )}
-
-            <div className="flex items-center gap-2 pt-1">
-              <Button variant="secondary" onClick={() => setStep(1)} className="text-[11px]">Retour</Button>
-              <Button
-                onClick={handleSetup}
-                disabled={!destEmail || setupMutation.isPending}
-                className="gap-1.5 text-[11px]"
-              >
-                {setupMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
-                Lancer le provisionnement
-              </Button>
-            </div>
-          </MotionDiv>
-        )}
-      </AnimatePresence>
+      <div className="flex justify-end pt-1">
+        <Button
+          onClick={handleIntegrate}
+          disabled={!isFormValid || verifyMutation.isPending || setupMutation.isPending}
+          className="w-full sm:w-auto gap-2 uppercase tracking-wider text-[12px] font-bold"
+        >
+          {verifyMutation.isPending || setupMutation.isPending ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Zap className="w-4 h-4" />
+          )}
+          Intégrer le domaine
+        </Button>
+      </div>
     </MotionDiv>
   );
 }

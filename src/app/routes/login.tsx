@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Eye, EyeOff, Mail, Lock, User, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
@@ -6,23 +6,32 @@ import sicurreLogo from "../assets/sicurre.svg";
 import { loginSchema, signUpSchema } from "../lib/schemas";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
+import { useLogin, useSignup } from "../lib/api";
 
 const MotionDiv = motion.div as any;
 
 interface LoginRouteProps {
   onLoginSuccess: () => void;
+  initialMode?: "login" | "signup";
 }
 
-export default function LoginRoute({ onLoginSuccess }: LoginRouteProps) {
+export default function LoginRoute({ onLoginSuccess, initialMode = "login" }: LoginRouteProps) {
   const { t } = useTranslation();
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(initialMode === "signup");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState("");
+  const loginMutation = useLogin();
+  const signupMutation = useSignup();
 
-  const handleAuth = (e: React.FormEvent) => {
+  useEffect(() => {
+    setIsSignUp(initialMode === "signup");
+    setAuthError("");
+  }, [initialMode]);
+
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
 
@@ -32,39 +41,28 @@ export default function LoginRoute({ onLoginSuccess }: LoginRouteProps) {
         setAuthError(validation.error.errors[0].message);
         return;
       }
-      localStorage.setItem("sicurre_user_name", name);
-      localStorage.setItem(`sicurre_user_email_${email}`, email);
-      localStorage.setItem(`sicurre_user_password_${email}`, password);
-      localStorage.setItem("sicurre_session_token", "mock-token-registered-12345");
-      onLoginSuccess();
+      try {
+        await signupMutation.mutateAsync({ name, email, password });
+        onLoginSuccess();
+      } catch (error) {
+        setAuthError(error instanceof Error ? error.message : "Inscription impossible.");
+      }
     } else {
       const validation = loginSchema.safeParse({ email, password });
       if (!validation.success) {
         setAuthError(validation.error.errors[0].message);
         return;
       }
-      if (email === "admin@sicurre.fr" && password === "sicurre2026") {
-        localStorage.setItem("sicurre_session_token", "mock-token-12345");
-        localStorage.setItem("sicurre_user_name", "Michael");
+      try {
+        await loginMutation.mutateAsync({ email, password });
         onLoginSuccess();
-      } else if (email === "demo@sicurre.fr" && password === "demo2026") {
-        localStorage.setItem("sicurre_session_token", "mock-token-demo");
-        localStorage.setItem("sicurre_user_name", "Michael-viewer");
-        onLoginSuccess();
-      } else {
-        const storedEmail = localStorage.getItem(`sicurre_user_email_${email}`);
-        const storedPassword = localStorage.getItem(`sicurre_user_password_${email}`);
-        const storedName = localStorage.getItem("sicurre_user_name") || "Utilisateur";
-        if (storedEmail === email && storedPassword === password) {
-          localStorage.setItem("sicurre_session_token", "mock-token-registered-12345");
-          localStorage.setItem("sicurre_user_name", storedName);
-          onLoginSuccess();
-        } else {
-          setAuthError(t("login.error_invalid") || "Identifiants incorrects.");
-        }
+      } catch (error) {
+        setAuthError(error instanceof Error ? error.message : (t("login.error_invalid") || "Identifiants incorrects."));
       }
     }
   };
+
+  const isSubmitting = loginMutation.isPending || signupMutation.isPending;
 
   const handleGoogleLogin = () => {
     window.location.href = "/auth/login/google";
@@ -236,8 +234,8 @@ export default function LoginRoute({ onLoginSuccess }: LoginRouteProps) {
               </div>
             )}
 
-            <Button type="submit" fullWidth className="mt-2 flex items-center justify-center gap-2 !py-2.5 bg-white hover:bg-slate-100 text-black font-semibold rounded-lg transition-colors cursor-pointer shadow-md">
-              <span>{isSignUp ? "Créer mon compte" : "Se connecter"}</span>
+            <Button type="submit" fullWidth disabled={isSubmitting} className="mt-2 flex items-center justify-center gap-2 !py-2.5 bg-white hover:bg-slate-100 text-black font-semibold rounded-lg transition-colors cursor-pointer shadow-md disabled:opacity-70">
+              <span>{isSubmitting ? "Connexion en cours…" : isSignUp ? "Créer mon compte" : "Se connecter"}</span>
               <ArrowRight className="w-4 h-4" />
             </Button>
           </form>

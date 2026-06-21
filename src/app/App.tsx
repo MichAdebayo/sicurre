@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import LandingRoute from "./routes/landing";
 import LoginRoute from "./routes/login";
@@ -12,39 +12,88 @@ import ConfidentialiteRoute from "./routes/confidentialite";
 import ContactRoute from "./routes/contact";
 import { AppShell } from "./components/common/app-shell";
 import { SidebarPage } from "./components/common/sidebar";
+import {
+  clearStoredSession,
+  seedStoredSession,
+  useCurrentSession,
+  useLogout,
+} from "./lib/api";
 
 const getInitialLoginState = () => {
   const params = new URLSearchParams(window.location.search);
-  const token = params.get("session_token");
-  if (token) {
-    localStorage.setItem("sicurre_session_token", token);
-    localStorage.setItem("sicurre_user_name", params.get("username") || "Utilisateur Google");
-    // Clean query parameters from address bar
+  if (params.get("auth_provider") || params.get("email") || params.get("username")) {
+    seedStoredSession({
+      displayName: params.get("username") || "Utilisateur Google",
+      email: params.get("email") || undefined,
+      role: params.get("role") || undefined,
+      authProvider: (params.get("auth_provider") as "password" | "google" | null) || "password",
+    });
     window.history.replaceState({}, document.title, window.location.pathname);
-    return true;
+    return false;
   }
-  return !!localStorage.getItem("sicurre_session_token");
+  return false;
 };
 
 export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(getInitialLoginState);
+  const [hasStoredSession, setHasStoredSession] = useState(getInitialLoginState);
   const [viewState, setViewState] = useState<"landing" | "login" | "signup" | "mentions-legales" | "confidentialite" | "contact">("landing");
   const [activePage, setActivePage] = useState<SidebarPage>("dashboard");
+  const sessionQuery = useCurrentSession(true);
+  const logoutMutation = useLogout();
+  const session = sessionQuery.data;
 
-  // Handle successful login
+  useEffect(() => {
+    if (sessionQuery.isError) {
+      clearStoredSession();
+      setHasStoredSession(false);
+      setViewState("login");
+      setActivePage("dashboard");
+    }
+  }, [sessionQuery.isError]);
+
+  useEffect(() => {
+    if (session) {
+      setHasStoredSession(true);
+    }
+  }, [session]);
+
+  useEffect(() => {
+    if (session?.onboarding_required && activePage !== "settings") {
+      setActivePage("settings");
+    }
+  }, [session?.onboarding_required, activePage]);
+
+  useEffect(() => {
+    if (session && !session.is_platform_admin && activePage === "logs") {
+      setActivePage("dashboard");
+    }
+  }, [session, activePage]);
+
   const handleLoginSuccess = () => {
-    setIsLoggedIn(true);
+    setHasStoredSession(true);
+    setActivePage("dashboard");
   };
 
-  // Handle logout
-  const handleLogout = () => {
-    localStorage.removeItem("sicurre_session_token");
-    localStorage.removeItem("sicurre_user_name");
-    setIsLoggedIn(false);
+  const handleLogout = async () => {
+    try {
+      await logoutMutation.mutateAsync();
+    } catch {
+      clearStoredSession();
+    }
+    setHasStoredSession(false);
     setViewState("landing");
+    setActivePage("dashboard");
   };
 
-  if (!isLoggedIn) {
+  if (sessionQuery.isLoading) {
+    return (
+      <div className="min-h-screen w-screen flex items-center justify-center bg-surface-low text-on-surface">
+        <div className="text-sm font-semibold">Chargement de votre session…</div>
+      </div>
+    );
+  }
+
+  if (!hasStoredSession || !session) {
     if (viewState === "landing") {
       return (
         <LandingRoute
@@ -74,7 +123,7 @@ export default function App() {
         >
           &larr; Retour à l'accueil
         </button>
-        <LoginRoute onLoginSuccess={handleLoginSuccess} />
+        <LoginRoute onLoginSuccess={handleLoginSuccess} initialMode={viewState === "signup" ? "signup" : "login"} />
       </div>
     );
   }
@@ -84,13 +133,15 @@ export default function App() {
       currentPage={activePage}
       onPageChange={setActivePage}
       onLogout={handleLogout}
-      userName={localStorage.getItem("sicurre_user_name") || "Administrateur"}
+      userName={session.display_name}
+      userEmail={session.email}
+      userRole={session.role}
     >
       <AnimatePresence mode="wait">
-        {activePage === "dashboard" && <DashboardRoute key="dashboard" />}
+        {activePage === "dashboard" && <DashboardRoute key="dashboard" session={session} onGoToSettings={() => setActivePage("settings")} />}
         {activePage === "threats" && <ThreatsRoute key="threats" />}
-        {activePage === "logs" && <LogsRoute key="logs" />}
-        {activePage === "settings" && <SettingsRoute key="settings" />}
+        {activePage === "logs" && session.is_platform_admin && <LogsRoute key="logs" />}
+        {activePage === "settings" && <SettingsRoute key="settings" session={session} />}
         {activePage === "support" && <SupportRoute key="support" />}
       </AnimatePresence>
     </AppShell>

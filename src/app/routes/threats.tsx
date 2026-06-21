@@ -28,7 +28,10 @@ export default function ThreatsRoute() {
 
   const filteredThreats = threats
     ? threats.filter((threat) => {
-        const matchesSearch = threat.subject?.toLowerCase().includes(searchQuery.toLowerCase());
+        const query = searchQuery.toLowerCase();
+        const matchesSearch =
+          threat.subject?.toLowerCase().includes(query) ||
+          threat.sender?.toLowerCase().includes(query);
         const matchesFilter = filterVerdict === "all" || threat.verdict === filterVerdict;
         return matchesSearch && matchesFilter;
       })
@@ -178,9 +181,8 @@ export default function ThreatsRoute() {
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="flex flex-col">
-                          <span className="font-semibold text-on-surface truncate max-w-[180px]">expediteur@sicurre-logs.fr</span>
-                          <span className="text-[11px] text-on-surface-variant/50 font-mono">
-                            192.168.1.{Math.floor(Math.random() * 254) + 1}
+                          <span className="font-semibold text-on-surface truncate max-w-[220px]">
+                            {threat.sender || "Expéditeur inconnu"}
                           </span>
                         </div>
                       </td>

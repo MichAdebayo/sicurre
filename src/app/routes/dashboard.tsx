@@ -1,65 +1,41 @@
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import {
-  ShieldAlert,
   ShieldCheck,
-  Zap,
   Mail,
-  Users,
-  ArrowUpRight,
-  ArrowDownRight,
-  AlertTriangle,
-  TrendingUp,
-  Clock,
+  Settings,
 } from "lucide-react";
-import { useKPIStats, useThreatLogs } from "../lib/api";
+import { Button } from "../components/ui/button";
+import { AuthSession, useKPIStats, useThreatLogs } from "../lib/api";
 
 const MotionDiv = motion.div as any;
 
-export default function DashboardRoute() {
+interface DashboardRouteProps {
+  session: AuthSession;
+  onGoToSettings: () => void;
+}
+
+function KPIBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-white rounded-xl border border-border-subtle p-5">
+      <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.12em] mb-2">
+        {label}
+      </p>
+      <p className="font-display font-bold text-[32px] text-on-surface tracking-tight leading-none">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+export default function DashboardRoute({ session, onGoToSettings }: DashboardRouteProps) {
   const { t } = useTranslation();
   const { data: kpis, isLoading: kpisLoading } = useKPIStats();
   const { data: threats, isLoading: threatsLoading } = useThreatLogs();
-  const [activeTab, setActiveTab] = useState<"realtime" | "historical">("realtime");
-
-  const totalThreats = (kpis?.threats_phishing_count || 0) + (kpis?.threats_spam_count || 0);
-
-  const kpiCards = [
-    {
-      label: "Scans Quotidiens",
-      value: kpisLoading ? "—" : (kpis?.raw_records_count?.toLocaleString("fr-FR") || "0"),
-      icon: Mail,
-      iconColor: "text-primary",
-      iconBg: "bg-primary/[0.06]",
-      trend: { value: 12.5, positive: true, label: "depuis hier" },
-    },
-    {
-      label: "Menaces Bloquées",
-      value: kpisLoading ? "—" : totalThreats.toLocaleString("fr-FR"),
-      icon: ShieldAlert,
-      iconColor: "text-error",
-      iconBg: "bg-error/[0.06]",
-      trend: { value: 4.8, positive: false, label: "pic détecté il y a 14m" },
-    },
-    {
-      label: "Utilisateurs Actifs",
-      value: "248",
-      icon: Users,
-      iconColor: "text-primary",
-      iconBg: "bg-primary/[0.06]",
-      trend: { value: 8.2, positive: true, label: "sessions vérifiées" },
-    },
-    {
-      label: "Temps de Réponse",
-      value: "1,2",
-      unit: "ms",
-      icon: Zap,
-      iconColor: "text-safe",
-      iconBg: "bg-safe/[0.06]",
-      trend: { value: 15.3, positive: true, label: "sous le seuil SLA" },
-    },
-  ];
+  const totalScans = kpis?.raw_records_count ?? 0;
+  const phishingCount = kpis?.threats_phishing_count ?? 0;
+  const spamCount = kpis?.threats_spam_count ?? 0;
+  const legitimateCount = kpis?.threats_legitimate_count ?? 0;
 
   const recentAlerts = threats
     ? threats.slice(0, 4).map((t) => ({
@@ -83,7 +59,6 @@ export default function DashboardRoute() {
       transition={{ duration: 0.3 }}
       className="space-y-8"
     >
-      {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border-subtle">
         <div>
           <h1 className="font-display font-bold text-[28px] text-on-surface tracking-tight leading-tight">
@@ -93,161 +68,90 @@ export default function DashboardRoute() {
             Vue d'ensemble en temps réel de votre sécurité e-mail
           </p>
         </div>
-        <div className="flex p-0.5 bg-surface-low rounded-lg border border-border-subtle self-start sm:self-center">
-          {(["realtime", "historical"] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-1.5 text-[13px] font-semibold rounded-md transition-all cursor-pointer ${
-                activeTab === tab
-                  ? "bg-white text-primary shadow-sm"
-                  : "text-on-surface-variant hover:text-on-surface"
-              }`}
-            >
-              {tab === "realtime" ? "Temps Réel" : "Historique"}
-            </button>
-          ))}
-        </div>
+        {session.is_platform_admin && (
+          <div className="rounded-lg border border-border-subtle bg-white px-4 py-3 text-right">
+            <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant">
+              Dataset Items
+            </div>
+            <div className="text-lg font-bold text-on-surface">
+              {(kpis?.dataset_items_count ?? 0).toLocaleString("fr-FR")}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* KPI Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {kpiCards.map((kpi, i) => {
-          const Icon = kpi.icon;
-          return (
-            <MotionDiv
-              key={i}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: i * 0.05 }}
-              className="bg-white rounded-xl border border-border-subtle p-5 hover:shadow-md hover:shadow-on-surface/[0.03] transition-shadow"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.12em]">
-                  {kpi.label}
-                </span>
-                <div className={`p-2 rounded-lg ${kpi.iconBg}`}>
-                  <Icon className={`w-4.5 h-4.5 ${kpi.iconColor} stroke-[1.5]`} />
-                </div>
-              </div>
-              <div className="flex items-baseline gap-1">
-                <span className="font-display font-bold text-[32px] text-on-surface tracking-tight leading-none">
-                  {kpi.value}
-                </span>
-                {kpi.unit && (
-                  <span className="text-sm text-on-surface-variant font-medium">{kpi.unit}</span>
-                )}
-              </div>
-              <div className="flex items-center gap-1.5 mt-2.5">
-                <span className={`inline-flex items-center text-[12px] font-semibold ${kpi.trend.positive ? "text-safe" : "text-error"}`}>
-                  {kpi.trend.positive ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
-                  {kpi.trend.value} %
-                </span>
-                <span className="text-[11px] text-on-surface-variant/60">{kpi.trend.label}</span>
-              </div>
-            </MotionDiv>
-          );
-        })}
-      </div>
-
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column */}
-        <div className="lg:col-span-4 space-y-6">
-          {/* System Integrity Gauge */}
-          <div className="bg-white rounded-xl border border-border-subtle p-6">
-            <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.12em] mb-1">
-              Intégrité Système
-            </p>
-            <div className="flex flex-col items-center py-6">
-              <div className="relative w-36 h-36 flex items-center justify-center">
-                <svg className="w-full h-full transform -rotate-90">
-                  <circle cx="72" cy="72" r="62" className="stroke-surface-container" strokeWidth="8" fill="transparent" />
-                  <circle
-                    cx="72" cy="72" r="62"
-                    className="stroke-safe transition-all duration-1000 ease-out"
-                    strokeWidth="8" fill="transparent"
-                    strokeDasharray={389.6}
-                    strokeDashoffset={389.6 - (389.6 * 99.8) / 100}
-                    strokeLinecap="round"
-                  />
-                </svg>
-                <div className="absolute flex flex-col items-center">
-                  <span className="font-display font-bold text-[28px] text-on-surface leading-none">
-                    99.8%
-                  </span>
-                  <span className="text-[9px] font-bold text-safe uppercase tracking-[0.15em] mt-1">
-                    Optimal
-                  </span>
-                </div>
-              </div>
-              <p className="text-[12px] text-on-surface-variant/60 text-center mt-5 leading-relaxed max-w-[200px]">
-                Toutes les sondes d'analyse (Modèle souverain, DMARC, DNS RBL) sont opérationnelles.
+      {session.onboarding_required ? (
+        <div className="bg-white rounded-xl border border-border-subtle p-8 space-y-4">
+          <div className="flex items-start gap-3">
+            <ShieldCheck className="w-6 h-6 text-primary shrink-0 mt-0.5" />
+            <div>
+              <h2 className="font-display font-semibold text-xl text-on-surface">
+                Connectez d'abord votre domaine
+              </h2>
+              <p className="text-sm text-on-surface-variant mt-1 max-w-2xl">
+                Votre compte existe, mais aucun domaine n'est encore protégé. Commencez par configurer Cloudflare dans les paramètres pour activer l'interception et les premiers scans.
               </p>
             </div>
           </div>
-
-          {/* Verdict Distribution */}
-          <div className="bg-white rounded-xl border border-border-subtle p-6">
-            <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.12em] mb-5">
-              Répartition des Verdicts
-            </p>
-            <div className="space-y-4">
-              <DistributionRow
-                label="Légitime"
-                count={kpis?.threats_legitimate_count || 0}
-                total={kpis?.raw_records_count || 1}
-                colorClass="bg-safe"
-              />
-              <DistributionRow
-                label="Spam"
-                count={kpis?.threats_spam_count || 0}
-                total={kpis?.raw_records_count || 1}
-                colorClass="bg-secondary"
-              />
-              <DistributionRow
-                label="Phishing"
-                count={kpis?.threats_phishing_count || 0}
-                total={kpis?.raw_records_count || 1}
-                colorClass="bg-error"
-              />
-            </div>
-          </div>
+          <Button onClick={onGoToSettings} className="gap-2">
+            <Settings className="w-4 h-4" />
+            Ouvrir l'intégration Cloudflare
+          </Button>
         </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <KPIBlock label="Emails scannés" value={kpisLoading ? "—" : totalScans.toLocaleString("fr-FR")} />
+            <KPIBlock label="Phishing bloqué" value={kpisLoading ? "—" : phishingCount.toLocaleString("fr-FR")} />
+            <KPIBlock label="Spam signalé" value={kpisLoading ? "—" : spamCount.toLocaleString("fr-FR")} />
+            <KPIBlock label="Emails légitimes" value={kpisLoading ? "—" : legitimateCount.toLocaleString("fr-FR")} />
+          </div>
 
-        {/* Right Column */}
-        <div className="lg:col-span-8 space-y-6">
-          {/* Recent Critical Alerts */}
-          <div className="bg-white rounded-xl border border-border-subtle p-6">
-            <div className="flex items-center justify-between mb-5 pb-4 border-b border-border-subtle">
-              <h3 className="font-display font-semibold text-[17px] text-on-surface">
-                Alertes Critiques Récentes
-              </h3>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-4 bg-white rounded-xl border border-border-subtle p-6">
+              <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.12em] mb-5">
+                Répartition des verdicts
+              </p>
+              <div className="space-y-4">
+                <DistributionRow label="Légitime" count={legitimateCount} total={Math.max(totalScans, 1)} colorClass="bg-safe" />
+                <DistributionRow label="Spam" count={spamCount} total={Math.max(totalScans, 1)} colorClass="bg-secondary" />
+                <DistributionRow label="Phishing" count={phishingCount} total={Math.max(totalScans, 1)} colorClass="bg-error" />
+              </div>
             </div>
-            {threatsLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-16 bg-surface-low rounded-xl animate-pulse" />
-                ))}
+
+            <div className="lg:col-span-8 bg-white rounded-xl border border-border-subtle p-6">
+              <div className="flex items-center justify-between mb-5 pb-4 border-b border-border-subtle">
+                <h3 className="font-display font-semibold text-[17px] text-on-surface">
+                  Alertes récentes
+                </h3>
+                <div className="inline-flex items-center gap-2 text-[11px] text-on-surface-variant">
+                  <Mail className="w-3.5 h-3.5" />
+                  Flux temps réel
+                </div>
               </div>
-            ) : recentAlerts.length === 0 ? (
-              <div className="py-8 text-center text-on-surface-variant/50 text-sm">
-                Aucune alerte récente 🎉
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {recentAlerts.map((alert) => (
-                  <div
-                    key={alert.id}
-                    className={`p-4 rounded-xl border transition-colors ${
-                      alert.level >= 5
-                        ? "bg-error/[0.03] border-error/10"
-                        : alert.level >= 3
-                        ? "bg-secondary/[0.03] border-secondary/10"
-                        : "bg-surface-low border-border-subtle"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-4">
+              {threatsLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-16 bg-surface-low rounded-xl animate-pulse" />
+                  ))}
+                </div>
+              ) : recentAlerts.length === 0 ? (
+                <div className="py-8 text-center text-on-surface-variant/70 text-sm">
+                  Aucun événement pour le moment. Les alertes apparaîtront ici dès que Sicurre commencera à scanner vos e-mails.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {recentAlerts.map((alert) => (
+                    <div
+                      key={alert.id}
+                      className={`p-4 rounded-xl border transition-colors ${
+                        alert.level >= 5
+                          ? "bg-error/[0.03] border-error/10"
+                          : alert.level >= 3
+                          ? "bg-secondary/[0.03] border-secondary/10"
+                          : "bg-surface-low border-border-subtle"
+                      }`}
+                    >
                       <div className="space-y-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-[11px] text-on-surface-variant/60">{alert.time}</span>
@@ -265,57 +169,13 @@ export default function DashboardRoute() {
                         <p className="text-[12px] text-on-surface-variant/70 truncate">{alert.desc}</p>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Active Breach Analysis */}
-          <div className="bg-white rounded-xl border border-border-subtle p-6">
-            <div className="flex items-center justify-between mb-5 pb-4 border-b border-border-subtle">
-              <h3 className="font-display font-semibold text-[17px] text-on-surface">
-                Analyse Vectorielle des Risques
-              </h3>
-              <button className="text-[11px] font-bold text-primary uppercase tracking-wider hover:text-navy-dark transition-colors cursor-pointer">
-                Exporter
-              </button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-border-subtle">
-                    <th className="pb-3 pr-4 text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.12em]">Type de Menace</th>
-                    <th className="pb-3 px-4 text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.12em]">Vecteur</th>
-                    <th className="pb-3 px-4 text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.12em]">Mitigation</th>
-                    <th className="pb-3 px-4 text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.12em]">Cible</th>
-                    <th className="pb-3 pl-4 text-right text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.12em]">Probabilité</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-subtle text-sm text-on-surface">
-                  {[
-                    { type: "Spear Phishing", vector: "Direct / Link-injection", status: "Bloqué", statusColor: "error", target: "/inbox/primary", prob: "99 %" },
-                    { type: "Usurpation d'identité", vector: "Lookalike-domain", status: "Quarantaine", statusColor: "secondary", target: "/api/v2/users", prob: "97 %" },
-                    { type: "Spam Publicitaire", vector: "Bulk-sender", status: "Filtré", statusColor: "safe", target: "/inbox/promotions", prob: "85 %" },
-                  ].map((row, i) => (
-                    <tr key={i} className="hover:bg-surface-low/30 transition-colors">
-                      <td className="py-3.5 pr-4 font-bold">{row.type}</td>
-                      <td className="py-3.5 px-4 text-on-surface-variant font-mono text-[12px]">{row.vector}</td>
-                      <td className="py-3.5 px-4">
-                        <span className={`inline-flex text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider bg-${row.statusColor}/10 text-${row.statusColor}`}>
-                          {row.status}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 font-mono text-[12px] text-on-surface-variant">{row.target}</td>
-                      <td className="py-3.5 pl-4 text-right font-mono font-bold">{row.prob}</td>
-                    </tr>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
     </MotionDiv>
   );
 }

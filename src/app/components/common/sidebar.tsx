@@ -19,6 +19,7 @@ interface SidebarProps {
   onLockdown?: () => void;
   userName?: string;
   userEmail?: string;
+  userRole?: string;
   className?: string;
 }
 
@@ -27,16 +28,19 @@ export function Sidebar({
   onPageChange,
   onLogout,
   onLockdown,
-  userName = "Admin",
-  userEmail = "admin@sicurre.fr",
+  userName = "Utilisateur",
+  userEmail = "",
+  userRole = "owner",
   className,
 }: SidebarProps) {
-  const mainNav = [
+  const baseNav = [
     { id: "dashboard", label: "Overview", icon: LayoutDashboard },
     { id: "threats", label: "Threat Intel", icon: ShieldAlert },
-    { id: "logs", label: "Audit Logs", icon: History },
     { id: "settings", label: "Settings", icon: Settings },
   ] as const;
+  const mainNav = userRole === "admin"
+    ? [baseNav[0], baseNav[1], { id: "logs", label: "Audit Logs", icon: History }, baseNav[2]]
+    : baseNav;
 
   const bottomNav = [
     { id: "support", label: "Support", icon: HelpCircle },
@@ -72,7 +76,7 @@ export function Sidebar({
           return (
             <button
               key={item.id}
-              onClick={() => onPageChange(item.id)}
+              onClick={() => onPageChange(item.id as SidebarPage)}
               className={clsx(
                 "w-full flex items-center gap-3 px-3.5 py-2.5 text-[13px] font-semibold rounded-lg transition-all duration-150 cursor-pointer select-none",
                 isActive

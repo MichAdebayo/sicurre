@@ -13,6 +13,7 @@ interface AppShellProps {
   alertType?: "warning" | "critical";
   userName?: string;
   userEmail?: string;
+  userRole?: string;
 }
 
 export function AppShell({
@@ -25,6 +26,7 @@ export function AppShell({
   alertType = "warning",
   userName,
   userEmail,
+  userRole,
 }: AppShellProps) {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#f6f7f9]">
@@ -36,6 +38,7 @@ export function AppShell({
         onLockdown={onLockdown}
         userName={userName}
         userEmail={userEmail}
+        userRole={userRole}
       />
 
       {/* Main Content Area */}
@@ -46,7 +49,7 @@ export function AppShell({
         )}
 
         {/* Top Bar */}
-        <TopBar userName={userName} />
+        <TopBar userName={userName} userRole={userRole} />
 
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto px-8 py-6 max-w-[1200px] w-full">

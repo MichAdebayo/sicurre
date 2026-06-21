@@ -13,8 +13,15 @@ export function TopBar({
   onSearch,
   systemStatus = "operational",
   userName = "SA",
-  userRole = "Admin_Tier_3",
+  userRole = "owner",
 }: TopBarProps) {
+  const roleLabel =
+    userRole === "admin"
+      ? "Sicurre Admin"
+      : userRole === "owner"
+      ? "Workspace Owner"
+      : "Workspace User";
+
   return (
     <header className="h-14 border-b border-border-subtle bg-white px-6 flex items-center justify-between shrink-0">
       {/* Search */}
@@ -65,7 +72,7 @@ export function TopBar({
         <div className="flex items-center gap-2.5">
           <div className="text-right hidden sm:block">
             <div className="text-[9px] font-bold text-primary/70 uppercase tracking-[0.12em]">
-              {userRole}
+              {roleLabel}
             </div>
             <div className="text-[9px] text-on-surface-variant/50 uppercase tracking-wider">
               Session Active
