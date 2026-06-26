@@ -370,11 +370,12 @@ async def setup_cloudflare(
                 scan_url=scan_url,
             )
             ts = datetime.now(timezone.utc).isoformat()
+            initial_status = "active" if result.destination_verified else "pending_verification"
             await _async_query(
                 """
                 UPDATE cloudflare_integration
                 SET zone_id=?, account_id=?, worker_name=?, rule_id=?,
-                    shared_secret_hash=?, status='pending_verification',
+                    destination_email=?, shared_secret_hash=?, status=?,
                     error_message=NULL, updated_at=?
                 WHERE id=?
                 """,
@@ -383,7 +384,9 @@ async def setup_cloudflare(
                     result.account_id,
                     result.worker_name,
                     result.rule_id,
+                    result.destination_email,
                     result.shared_secret_hash,
+                    initial_status,
                     ts,
                     integration_id,
                 ),

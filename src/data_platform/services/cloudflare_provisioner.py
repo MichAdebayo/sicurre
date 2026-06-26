@@ -406,8 +406,54 @@ class CloudflareProvisioner:
         # 2. Enable Email Routing
         await self.enable_email_routing(zone_id)
 
+        target_email = destination_email
+        actual_forward_to = target_email  # fallback
+
+        # Attempt to auto-resolve actual forwarding destination from existing rules before we touch anything
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                r = await client.get(
+                    f"{CF_BASE}/zones/{zone_id}/email/routing/rules",
+                    headers=self._headers,
+                )
+            rules_data = self._unwrap(r)
+            for rule in rules_data.get("result", []):
+                matchers = rule.get("matchers", [])
+                for m in matchers:
+                    if (
+                        m.get("type") == "literal"
+                        and str(m.get("value")).lower() == target_email.lower()
+                    ):
+                        actions = rule.get("actions", [])
+                        for a in actions:
+                            if a.get("type") == "forward" and a.get("value"):
+                                val = a["value"]
+                                if isinstance(val, list) and val:
+                                    actual_forward_to = str(val[0])
+                                    logger.info("Auto-resolved destination email from old rule: %s", actual_forward_to)
+                                    break
+        except Exception as exc:
+            logger.warning("Could not auto-resolve forwarding destination from rules: %s", exc)
+
+        # If it matches target_email itself, check verified destination addresses list for safety
+        if actual_forward_to.lower() == target_email.lower():
+            try:
+                async with httpx.AsyncClient(timeout=20.0) as client:
+                    r = await client.get(
+                        f"{CF_BASE}/accounts/{account_id}/email/routing/addresses",
+                        headers=self._headers,
+                    )
+                addresses_data = self._unwrap(r)
+                for addr in addresses_data.get("result", []):
+                    if addr.get("status") == "verified":
+                        actual_forward_to = str(addr["email"])
+                        logger.info("Auto-resolved destination email from verified list: %s", actual_forward_to)
+                        break
+            except Exception as exc:
+                logger.warning("Could not auto-resolve from verified destination list: %s", exc)
+
         # 3. Register destination address (user gets CF verification email)
-        await self.create_destination_address(account_id, destination_email)
+        await self.create_destination_address(account_id, actual_forward_to)
 
         # 4. Generate shared secret (plain secret only used here + in Worker bindings)
         shared_secret = secrets.token_urlsafe(40)
@@ -420,11 +466,27 @@ class CloudflareProvisioner:
             worker_name=worker_name,
             scan_url=scan_url,
             shared_secret=shared_secret,
-            forward_to=destination_email,
+            forward_to=actual_forward_to,
         )
 
         # 6. Create email routing rule
-        rule_id = await self.create_email_routing_rule(zone_id, worker_name, destination_email)
+        rule_id = await self.create_email_routing_rule(zone_id, worker_name, target_email)
+
+        # Retrieve status of the destination to check verification
+        destination_verified = False
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                r = await client.get(
+                    f"{CF_BASE}/accounts/{account_id}/email/routing/addresses",
+                    headers=self._headers,
+                )
+            addresses_data = self._unwrap(r)
+            for addr in addresses_data.get("result", []):
+                if str(addr.get("email")).lower() == actual_forward_to.lower():
+                    destination_verified = addr.get("status") == "verified"
+                    break
+        except Exception:
+            pass
 
         return ProvisioningResult(
             zone_id=zone_id,
@@ -432,9 +494,10 @@ class CloudflareProvisioner:
             account_id=account_id,
             worker_name=worker_name,
             rule_id=rule_id,
-            destination_email=destination_email,
+            destination_email=actual_forward_to,
             shared_secret_hash=shared_secret_hash,
             shared_secret_plain=shared_secret,
+            destination_verified=destination_verified,
         )
 
     async def teardown(
