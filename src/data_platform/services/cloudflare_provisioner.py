@@ -226,10 +226,14 @@ class CloudflareProvisioner:
             await self._post(f"/zones/{zone_id}/email/routing/enable")
             logger.info("Email Routing enabled on zone %s", zone_id)
         except CloudflareAPIError as exc:
-            # CF returns an error if already enabled; treat as success
-            if "already enabled" in str(exc).lower() or exc.status_code == 400:
+            # CF returns an error if already enabled or if we lack permissions to modify it (but it might be already active); treat as success
+            if (
+                "already enabled" in str(exc).lower()
+                or "authentication error" in str(exc).lower()
+                or exc.status_code in {400, 403}
+            ):
                 logger.info(
-                    "Email Routing already enabled on zone %s (skipped)", zone_id
+                    "Email Routing already enabled or permission restricted on zone %s (skipped)", zone_id
                 )
             else:
                 raise
@@ -240,6 +244,21 @@ class CloudflareProvisioner:
         Cloudflare will send a verification email to that address.
         Returns the destination address `tag` for tracking.
         """
+        try:
+            # Check if already exists in registered list
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                r = await client.get(
+                    f"{CF_BASE}/accounts/{account_id}/email/routing/addresses",
+                    headers=self._headers,
+                )
+            addresses_data = self._unwrap(r)
+            for addr in addresses_data.get("result", []):
+                if str(addr.get("email")).lower() == email.lower():
+                    logger.info("Destination address %s already registered (tag=%s)", email, addr["tag"])
+                    return str(addr["tag"])
+        except Exception as exc:
+            logger.warning("Could not list destination addresses: %s", exc)
+
         data = await self._post(
             f"/accounts/{account_id}/email/routing/addresses",
             body={"email": email},
@@ -264,7 +283,7 @@ class CloudflareProvisioner:
         forwards clean mail or rejects phishing.
         """
         metadata = {
-            "body_part": "worker.js",
+            "main_module": "worker.js",
             "compatibility_date": "2024-12-01",
             "bindings": [
                 {"type": "plain_text", "name": "SICURRE_SCAN_URL", "text": scan_url},
@@ -277,7 +296,7 @@ class CloudflareProvisioner:
             ],
         }
         files = {
-            "worker.js": ("worker.js", _WORKER_JS, "application/javascript"),
+            "worker.js": ("worker.js", _WORKER_JS, "application/javascript+module"),
             "metadata": ("metadata.json", json.dumps(metadata), "application/json"),
         }
         headers = {"Authorization": f"Bearer {self._token}"}
@@ -290,20 +309,47 @@ class CloudflareProvisioner:
         self._unwrap(r)
         logger.info("Worker '%s' deployed to account %s", worker_name, account_id)
 
-    async def create_catchall_email_rule(
+    async def create_email_routing_rule(
         self,
         zone_id: str,
         worker_name: str,
-        rule_name: str = "Sicurre catch-all",
+        target_email: str,
+        rule_name: str = "Sicurre Intercept",
     ) -> str:
         """
-        Create an Email Routing catch-all rule that routes all inbound mail
-        to the Sicurre Email Worker.  Returns the rule_id.
+        Create a specific Email Routing rule that routes inbound mail for target_email
+        to the Sicurre Email Worker, deleting any conflicting existing rules first.
         """
+        headers = {
+            "Authorization": f"Bearer {self._token}",
+            "Content-Type": "application/json",
+        }
+        
+        # 1. Fetch and clean up conflicting rules matching target_email
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                r = await client.get(
+                    f"{CF_BASE}/zones/{zone_id}/email/routing/rules",
+                    headers=headers,
+                )
+            rules_data = self._unwrap(r)
+            for rule in rules_data.get("result", []):
+                matchers = rule.get("matchers", [])
+                for m in matchers:
+                    if (
+                        m.get("type") == "literal"
+                        and str(m.get("value")).lower() == target_email.lower()
+                    ):
+                        logger.info("Deleting conflicting rule %s for %s", rule["id"], target_email)
+                        await self.delete_email_rule(zone_id, rule["id"])
+        except Exception as exc:
+            logger.warning("Could not check/clean conflicting rules: %s", exc)
+
+        # 2. Create the new Worker-based routing rule
         body = {
             "name": rule_name,
             "enabled": True,
-            "matchers": [{"type": "all"}],
+            "matchers": [{"type": "literal", "field": "to", "value": target_email}],
             "actions": [{"type": "worker", "value": [worker_name]}],
             "priority": 0,
         }
@@ -313,7 +359,7 @@ class CloudflareProvisioner:
             or data.get("result", {}).get("tag")
             or "unknown"
         )
-        logger.info("Email routing rule created (id=%s)", rule_id)
+        logger.info("Email routing rule created (id=%s) for %s", rule_id, target_email)
         return str(rule_id)
 
     async def delete_email_rule(self, zone_id: str, rule_id: str) -> None:
@@ -377,8 +423,8 @@ class CloudflareProvisioner:
             forward_to=destination_email,
         )
 
-        # 6. Create catch-all routing rule
-        rule_id = await self.create_catchall_email_rule(zone_id, worker_name)
+        # 6. Create email routing rule
+        rule_id = await self.create_email_routing_rule(zone_id, worker_name, destination_email)
 
         return ProvisioningResult(
             zone_id=zone_id,

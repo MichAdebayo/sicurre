@@ -88,7 +88,7 @@ dev-app:
 	npm run dev
 
 dev:
-	npx --yes concurrently --kill-others "make dev-api" "make dev-app"
+	npx --yes concurrently --kill-others "make dev-api" "make dev-app" "npm run auth:dev"
 
 test-inference:
 	uv run scripts/app/test_inference_api.py

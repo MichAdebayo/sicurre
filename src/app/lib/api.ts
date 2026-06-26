@@ -22,6 +22,14 @@ export interface AuthSession {
   onboarding_required: boolean;
 }
 
+export interface Dataset {
+  id: string;
+  version_tag: string;
+  item_count: number;
+  status: string;
+  published_at: string | null;
+}
+
 export interface SessionSeed {
   displayName?: string;
   email?: string;
@@ -307,6 +315,27 @@ export function useTeardownCloudflare() {
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cf-integration"] });
+    },
+  });
+}
+
+export function useDatasets() {
+  return useQuery<Dataset[]>({
+    queryKey: ["datasets"],
+    queryFn: () => fetchJson<Dataset[]>("/datasets"),
+  });
+}
+
+export function useRunPipeline() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      fetchJson<{ run_id: string }>("/pipeline/run", {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["datasets"] });
+      queryClient.invalidateQueries({ queryKey: ["kpis"] });
     },
   });
 }

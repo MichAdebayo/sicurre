@@ -21,8 +21,10 @@ const sqlitePath =
   path.resolve(process.cwd(), "data/local/sicurre.db");
 
 const trustedOrigins = [
-  process.env.SICURRE_FRONTEND_ORIGIN ?? "http://127.0.0.1:5173",
-].filter(Boolean);
+  process.env.SICURRE_FRONTEND_ORIGIN,
+  "http://127.0.0.1:5173",
+  "http://localhost:5173",
+].filter(Boolean) as string[];
 
 export const auth = betterAuth({
   secret: authSecret,

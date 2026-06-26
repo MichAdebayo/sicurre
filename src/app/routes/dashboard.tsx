@@ -1,12 +1,23 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import {
   ShieldCheck,
   Mail,
   Settings,
+  Database,
+  Play,
+  CheckCircle2,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
-import { AuthSession, useKPIStats, useThreatLogs } from "../lib/api";
+import {
+  AuthSession,
+  useKPIStats,
+  useThreatLogs,
+  useDatasets,
+  useRunPipeline,
+} from "../lib/api";
 
 const MotionDiv = motion.div as any;
 
@@ -32,6 +43,20 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
   const { t } = useTranslation();
   const { data: kpis, isLoading: kpisLoading } = useKPIStats();
   const { data: threats, isLoading: threatsLoading } = useThreatLogs();
+  const datasetsQuery = useDatasets();
+  const runPipelineMutation = useRunPipeline();
+  const [pipelineSuccess, setPipelineSuccess] = useState(false);
+
+  const handleRunPipeline = async () => {
+    try {
+      await runPipelineMutation.mutateAsync();
+      setPipelineSuccess(true);
+      setTimeout(() => setPipelineSuccess(false), 5000);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const totalScans = kpis?.raw_records_count ?? 0;
   const phishingCount = kpis?.threats_phishing_count ?? 0;
   const spamCount = kpis?.threats_spam_count ?? 0;
@@ -50,6 +75,145 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
         desc: t.subject || "Aucun objet",
       }))
     : [];
+
+  if (session.is_platform_admin) {
+    return (
+      <MotionDiv
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -12 }}
+        transition={{ duration: 0.3 }}
+        className="space-y-8"
+      >
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border-subtle">
+          <div>
+            <h1 className="font-display font-bold text-[28px] text-on-surface tracking-tight leading-tight">
+              Console d'Administration
+            </h1>
+            <p className="text-sm text-on-surface-variant mt-1">
+              Pilotez l'entraînement du modèle et supervisez les métriques globales
+            </p>
+          </div>
+          <div className="rounded-lg border border-border-subtle bg-white px-4 py-3 text-right">
+            <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant">
+              Rôle Utilisateur
+            </div>
+            <div className="text-lg font-bold text-primary">
+              Admin Plateforme
+            </div>
+          </div>
+        </div>
+
+        {/* Global KPIs */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <KPIBlock label="Total Scannés (Global)" value={kpisLoading ? "—" : totalScans.toLocaleString("fr-FR")} />
+          <KPIBlock label="Phishing Bloqué" value={kpisLoading ? "—" : phishingCount.toLocaleString("fr-FR")} />
+          <KPIBlock label="Total Dataset Items" value={kpisLoading ? "—" : (kpis?.dataset_items_count ?? 0).toLocaleString("fr-FR")} />
+          <KPIBlock label="Statut Système" value="Actif" />
+        </div>
+
+        {/* Pipeline Controls & Verdicts */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-7 bg-white rounded-xl border border-border-subtle p-6 flex flex-col justify-between">
+            <div>
+              <h3 className="font-display font-semibold text-[17px] text-on-surface mb-2">
+                Pipeline de Données & Entraînement ML
+              </h3>
+              <p className="text-sm text-on-surface-variant mb-6 leading-relaxed">
+                Déclenchez manuellement le cycle de normalisation, d'annotation et d'export du dataset vers Cloudflare R2 et Kaggle pour ré-entraîner le modèle CamemBERTav2.
+              </p>
+            </div>
+            
+            <div className="space-y-4">
+              {pipelineSuccess && (
+                <div className="p-3 bg-safe/10 border border-safe/25 text-safe text-xs font-semibold rounded-lg">
+                  Pipeline lancé avec succès ! L'exécution s'exécute en arrière-plan.
+                </div>
+              )}
+              {runPipelineMutation.isPending ? (
+                <Button disabled className="w-full flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  Lancement du pipeline...
+                </Button>
+              ) : (
+                <Button onClick={handleRunPipeline} className="w-full flex items-center justify-center gap-2">
+                  <Play className="w-4 h-4" />
+                  Lancer le Pipeline de Données (`make run-pipeline`)
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="lg:col-span-5 bg-white rounded-xl border border-border-subtle p-6">
+            <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.12em] mb-5">
+              Répartition des verdicts globaux
+            </p>
+            <div className="space-y-4">
+              <DistributionRow label="Légitime" count={legitimateCount} total={Math.max(totalScans, 1)} colorClass="bg-safe" />
+              <DistributionRow label="Spam" count={spamCount} total={Math.max(totalScans, 1)} colorClass="bg-secondary" />
+              <DistributionRow label="Phishing" count={phishingCount} total={Math.max(totalScans, 1)} colorClass="bg-error" />
+            </div>
+          </div>
+        </div>
+
+        {/* Datasets Table */}
+        <div className="bg-white rounded-xl border border-border-subtle p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-display font-semibold text-[17px] text-on-surface">
+              Historique des Datasets d'Entraînement
+            </h3>
+            <span className="text-[11px] font-bold px-2 py-1 rounded-md bg-primary/10 text-primary uppercase">
+              Provenances
+            </span>
+          </div>
+
+          {datasetsQuery.isLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-10 bg-surface-low rounded-lg animate-pulse" />
+              ))}
+            </div>
+          ) : !datasetsQuery.data || datasetsQuery.data.length === 0 ? (
+            <div className="py-8 text-center text-on-surface-variant/70 text-sm">
+              Aucun dataset enregistré pour le moment.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left">
+                <thead>
+                  <tr className="border-b border-border-subtle text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant/70">
+                    <th className="pb-3 pl-2">Version Tag</th>
+                    <th className="pb-3">Nombre d'Éléments</th>
+                    <th className="pb-3">Statut</th>
+                    <th className="pb-3 pr-2 text-right">Date de Publication</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-subtle/50 text-sm">
+                  {datasetsQuery.data.map((ds) => (
+                    <tr key={ds.id} className="hover:bg-surface-low/30 transition-colors">
+                      <td className="py-3.5 pl-2 font-mono text-[13px] font-semibold text-on-surface">{ds.version_tag}</td>
+                      <td className="py-3.5 font-semibold text-on-surface">{ds.item_count.toLocaleString("fr-FR")}</td>
+                      <td className="py-3.5">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${
+                          ds.status === "frozen" ? "bg-safe/10 text-safe" : "bg-warning/10 text-warning"
+                        }`}>
+                          {ds.status}
+                        </span>
+                      </td>
+                      <td className="py-3.5 pr-2 text-right text-on-surface-variant/80 font-semibold">
+                        {ds.published_at ? new Date(ds.published_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }) : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </MotionDiv>
+    );
+  }
 
   return (
     <MotionDiv

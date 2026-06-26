@@ -135,7 +135,7 @@ export default function App() {
       onLogout={handleLogout}
       userName={session.display_name}
       userEmail={session.email}
-      userRole={session.role}
+      userRole={session.is_platform_admin ? "admin" : session.role}
     >
       <AnimatePresence mode="wait">
         {activePage === "dashboard" && <DashboardRoute key="dashboard" session={session} onGoToSettings={() => setActivePage("settings")} />}

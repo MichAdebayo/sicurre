@@ -11,11 +11,15 @@ loadEnv({ path: path.resolve(process.cwd(), ".env") });
 
 const app = express();
 const port = Number(process.env.SICURRE_BETTER_AUTH_PORT ?? process.env.BETTER_AUTH_PORT ?? 3005);
-const frontendOrigin = process.env.SICURRE_FRONTEND_ORIGIN ?? "http://127.0.0.1:5173";
+const trustedOrigins = [
+  process.env.SICURRE_FRONTEND_ORIGIN,
+  "http://127.0.0.1:5173",
+  "http://localhost:5173",
+].filter(Boolean) as string[];
 
 app.use(
   cors({
-    origin: frontendOrigin,
+    origin: trustedOrigins,
     credentials: true,
   }),
 );
