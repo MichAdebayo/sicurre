@@ -25,7 +25,7 @@ import hashlib
 import json
 import logging
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any
 from uuid import uuid4
 
@@ -191,45 +191,129 @@ async def scan_email(
 
     integration = rows[0]
     settings = get_settings()
+    workspace_id = integration.get("workspace_id")
+    now = datetime.now(timezone.utc).isoformat()
 
-    # ── Call inference API ──────────────────────────────────────────────────
-    inference_url = settings.inference_api_url or "http://localhost:8000/v1/classify"
-    inference_key = settings.inference_api_key or ""
+    # ── Check Whitelist / Blocklist Rules ──────────────────────────────────
+    rules = await _async_query(
+        "SELECT rule_type, pattern FROM app_security_rule WHERE workspace_id = ?",
+        (workspace_id,)
+    )
+    
+    matched_rule_type = None
+    sender_lower = payload.sender.lower()
+    
+    for rule in rules:
+        pattern = rule["pattern"].lower()
+        if "@" in pattern:
+            if pattern.startswith("@"):
+                if sender_lower.endswith(pattern):
+                    matched_rule_type = rule["rule_type"]
+                    break
+            else:
+                if sender_lower == pattern:
+                    matched_rule_type = rule["rule_type"]
+                    break
+        else:
+            if sender_lower.endswith(f"@{pattern}") or sender_lower == pattern:
+                matched_rule_type = rule["rule_type"]
+                break
 
     verdict_label = "legitimate"
     verdict_safety = "safe"
     score = 0.0
     explanation = ""
 
-    try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(
-                inference_url,
-                json={
-                    "subject": payload.subject,
-                    "sender": payload.sender,
-                    "text": payload.text,
-                    "use_llm": payload.use_llm,
-                    "use_virustotal": payload.use_virustotal,
-                },
-                headers={"Authorization": f"Bearer {inference_key}"},
-            )
-        resp.raise_for_status()
-        result = resp.json()
-
-        is_phishing: bool = bool(result.get("is_phishing", False))
-        verdict_safety = "phishing" if is_phishing else "safe"
-        verdict_label = str(
-            result.get("label_verdict") or ("phishing" if is_phishing else "legitimate")
-        ).lower()
-        score = float(result.get("composite_score") or 0.0)
-        explanation = str(result.get("explanation") or "")
-
-    except Exception as exc:
-        # Fail-open: if inference is unavailable, mark as safe and log
-        logger.error("Inference API unavailable during email scan: %s", exc)
+    if matched_rule_type == "whitelist":
         verdict_safety = "safe"
         verdict_label = "legitimate"
+        score = 0.0
+        explanation = "Allowed by custom security whitelist rule."
+    elif matched_rule_type == "blocklist":
+        verdict_safety = "phishing"
+        verdict_label = "phishing"
+        score = 1.0
+        explanation = "Blocked by custom security blocklist rule."
+    else:
+        # ── Call inference API ──────────────────────────────────────────────────
+        inference_url = settings.inference_api_url or "http://localhost:8000/v1/classify"
+        inference_key = settings.inference_api_key or ""
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.post(
+                    inference_url,
+                    json={
+                        "subject": payload.subject,
+                        "sender": payload.sender,
+                        "text": payload.text,
+                        "use_llm": payload.use_llm,
+                        "use_virustotal": payload.use_virustotal,
+                    },
+                    headers={"Authorization": f"Bearer {inference_key}"},
+                )
+            resp.raise_for_status()
+            result = resp.json()
+
+            is_phishing: bool = bool(result.get("is_phishing", False))
+            verdict_safety = "phishing" if is_phishing else "safe"
+            verdict_label = str(
+                result.get("label_verdict") or ("phishing" if is_phishing else "legitimate")
+            ).lower()
+            score = float(result.get("composite_score") or 0.0)
+            explanation = str(result.get("explanation") or "")
+
+        except Exception as exc:
+            # Fail-open: if inference is unavailable, mark as safe and log
+            logger.error("Inference API unavailable during email scan: %s", exc)
+            verdict_safety = "safe"
+            verdict_label = "legitimate"
+
+    # ── Quarantine Handling ────────────────────────────────────────────────
+    # If verdict is phishing, quarantine the email instead of bouncing
+    if verdict_safety == "phishing":
+        q_id = str(uuid4())
+        expires_at = (datetime.now(timezone.utc) + timedelta(days=14)).isoformat() + "Z"
+        try:
+            await _async_query(
+                """
+                INSERT INTO app_quarantine_item (
+                    id, workspace_id, message_id, sender, subject, body_text,
+                    safety_verdict, composite_score, status, created_at, expires_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'held', ?, ?)
+                """,
+                (
+                    q_id,
+                    workspace_id,
+                    str(uuid4()),
+                    payload.sender,
+                    payload.subject,
+                    payload.text,
+                    verdict_safety,
+                    score,
+                    now,
+                    expires_at
+                )
+            )
+            # Log to alert history
+            await _async_query(
+                """
+                INSERT INTO app_alert_history (
+                    id, workspace_id, title, message, is_dismissed, created_at
+                ) VALUES (?, ?, ?, ?, 0, ?)
+                """,
+                (
+                    str(uuid4()),
+                    workspace_id,
+                    "Email Quarantined",
+                    f"Email from {payload.sender} regarding '{payload.subject}' was quarantined.",
+                    now
+                )
+            )
+            # Switch scan endpoint output verdict to "quarantine"
+            verdict_safety = "quarantine"
+        except Exception as exc:
+            logger.warning("Could not quarantine phishing email: %s", exc)
 
     # ── Persist to audit log ────────────────────────────────────────────────
     now = datetime.now(timezone.utc).isoformat()

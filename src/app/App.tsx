@@ -7,6 +7,9 @@ import ThreatsRoute from "./routes/threats";
 import LogsRoute from "./routes/logs";
 import SettingsRoute from "./routes/settings";
 import SupportRoute from "./routes/support";
+import QuarantineRoute from "./routes/quarantine";
+import AlertsRoute from "./routes/alerts";
+import DomainShieldRoute from "./routes/domain-shield";
 import MentionsLegalesRoute from "./routes/mentions-legales";
 import ConfidentialiteRoute from "./routes/confidentialite";
 import ContactRoute from "./routes/contact";
@@ -140,6 +143,9 @@ export default function App() {
       <AnimatePresence mode="wait">
         {activePage === "dashboard" && <DashboardRoute key="dashboard" session={session} onGoToSettings={() => setActivePage("settings")} />}
         {activePage === "threats" && <ThreatsRoute key="threats" />}
+        {activePage === "quarantine" && <QuarantineRoute key="quarantine" />}
+        {activePage === "alerts" && <AlertsRoute key="alerts" />}
+        {activePage === "domain-shield" && <DomainShieldRoute key="domain-shield" />}
         {activePage === "logs" && session.is_platform_admin && <LogsRoute key="logs" />}
         {activePage === "settings" && <SettingsRoute key="settings" session={session} />}
         {activePage === "support" && <SupportRoute key="support" />}

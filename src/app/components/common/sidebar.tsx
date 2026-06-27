@@ -1,4 +1,5 @@
 import { clsx } from "clsx";
+import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard,
   ShieldAlert,
@@ -7,10 +8,22 @@ import {
   HelpCircle,
   LogOut,
   Zap,
+  Inbox,
+  Bell,
+  Shield,
 } from "lucide-react";
 import sicurreLogo from "../../assets/sicurre.svg";
 
-export type SidebarPage = "dashboard" | "threats" | "logs" | "settings" | "support";
+// Supported pages in the sidebar navigation
+export type SidebarPage =
+  | "dashboard"
+  | "threats"
+  | "quarantine"
+  | "alerts"
+  | "domain-shield"
+  | "logs"
+  | "settings"
+  | "support";
 
 interface SidebarProps {
   currentPage: SidebarPage;
@@ -33,17 +46,32 @@ export function Sidebar({
   userRole = "owner",
   className,
 }: SidebarProps) {
+  const { t } = useTranslation();
+
   const baseNav = [
-    { id: "dashboard", label: "Overview", icon: LayoutDashboard },
-    { id: "threats", label: "Threat Intel", icon: ShieldAlert },
-    { id: "settings", label: "Settings", icon: Settings },
+    { id: "dashboard", label: t("sidebar.nav_dashboard"), icon: LayoutDashboard },
+    { id: "threats", label: t("sidebar.nav_threats"), icon: ShieldAlert },
+    { id: "quarantine", label: t("sidebar.nav_quarantine"), icon: Inbox },
+    { id: "alerts", label: t("sidebar.nav_alerts"), icon: Bell },
+    { id: "domain-shield", label: t("sidebar.nav_domain_shield"), icon: Shield },
+    { id: "settings", label: t("sidebar.nav_settings"), icon: Settings },
   ] as const;
+
+  // Insert Audit Logs for admin users before the Settings link
   const mainNav = userRole === "admin"
-    ? [baseNav[0], baseNav[1], { id: "logs", label: "Audit Logs", icon: History }, baseNav[2]]
+    ? [
+        baseNav[0], // dashboard
+        baseNav[1], // threats
+        baseNav[2], // quarantine
+        baseNav[3], // alerts
+        baseNav[4], // domain-shield
+        { id: "logs", label: t("common.threat_log"), icon: History },
+        baseNav[5], // settings
+      ]
     : baseNav;
 
   const bottomNav = [
-    { id: "support", label: "Support", icon: HelpCircle },
+    { id: "support", label: t("sidebar.nav_support"), icon: HelpCircle },
   ] as const;
 
   return (
@@ -62,7 +90,7 @@ export function Sidebar({
               Sicurre
             </span>
             <span className="text-[9px] font-bold text-primary/60 uppercase tracking-[0.15em]">
-              Shield Active
+              {t("sidebar.status_active")}
             </span>
           </div>
         </div>
@@ -121,7 +149,7 @@ export function Sidebar({
             className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 bg-error text-on-error hover:bg-on-error-container font-semibold rounded-lg transition-all active:scale-[0.97] cursor-pointer text-[13px]"
           >
             <Zap className="w-4 h-4" />
-            <span>Emergency Lockdown</span>
+            <span>{t("sidebar.lockdown")}</span>
           </button>
         )}
 
@@ -142,7 +170,7 @@ export function Sidebar({
           </div>
           <button
             onClick={onLogout}
-            title="Se déconnecter"
+            title={t("common.logout")}
             className="p-1.5 rounded-md text-on-surface-variant/50 hover:bg-surface-container hover:text-error transition-colors cursor-pointer"
           >
             <LogOut className="w-4 h-4 stroke-[1.5]" />

@@ -113,6 +113,61 @@ def ensure_runtime_tables() -> None:
                     "ALTER TABLE cloudflare_integration ADD COLUMN workspace_member_user_id TEXT NULL"
                 )
 
+        # ── 1. Security Rules ────────────────────────────────────────────────
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS app_security_rule (
+                id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                rule_type TEXT NOT NULL,
+                pattern TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS ix_app_security_rule_workspace_id ON app_security_rule(workspace_id)")
+
+        # ── 2. Alert Preferences ─────────────────────────────────────────────
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS app_alert_preference (
+                workspace_id TEXT PRIMARY KEY,
+                notify_phishing INTEGER NOT NULL DEFAULT 1,
+                notify_spam INTEGER NOT NULL DEFAULT 1,
+                quiet_hours_enabled INTEGER NOT NULL DEFAULT 0,
+                quiet_hours_start TEXT NOT NULL DEFAULT '22:00',
+                quiet_hours_end TEXT NOT NULL DEFAULT '07:00'
+            )
+        """)
+
+        # ── 3. Alert History ────────────────────────────────────────────────
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS app_alert_history (
+                id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                message TEXT NOT NULL,
+                is_dismissed INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS ix_app_alert_history_workspace_id ON app_alert_history(workspace_id)")
+
+        # ── 4. Quarantine Items ──────────────────────────────────────────────
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS app_quarantine_item (
+                id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                message_id TEXT NOT NULL,
+                sender TEXT NOT NULL,
+                subject TEXT NOT NULL,
+                body_text TEXT NOT NULL,
+                safety_verdict TEXT NOT NULL,
+                composite_score REAL NOT NULL,
+                status TEXT NOT NULL DEFAULT 'held',
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS ix_app_quarantine_item_workspace_id ON app_quarantine_item(workspace_id)")
+
         conn.commit()
     finally:
         conn.close()

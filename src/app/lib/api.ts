@@ -56,6 +56,8 @@ export interface ThreatLog {
   confidence: number;
   status: "active" | "trashed" | "restored";
   received_at: string;
+  latency_ms?: number;
+  explanation?: string;
 }
 
 export interface CloudflareStatus {
@@ -337,5 +339,195 @@ export function useRunPipeline() {
       queryClient.invalidateQueries({ queryKey: ["datasets"] });
       queryClient.invalidateQueries({ queryKey: ["kpis"] });
     },
+  });
+}
+
+// ── Quarantine API Types & Hooks ──────────────────────────────────────────────
+
+export interface QuarantineItem {
+  id: string;
+  message_id: string;
+  sender: string;
+  subject: string;
+  body_text: string;
+  safety_verdict: string;
+  composite_score: number;
+  status: string;
+  created_at: string;
+  expires_at: string;
+}
+
+export function useQuarantineItems() {
+  return useQuery<QuarantineItem[]>({
+    queryKey: ["quarantine"],
+    queryFn: () => fetchJson<QuarantineItem[]>("/quarantine"),
+  });
+}
+
+export function useReleaseQuarantine() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      fetchJson<{ status: string; forwarded_to: string }>(`/quarantine/${id}/release`, {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["quarantine"] });
+      queryClient.invalidateQueries({ queryKey: ["kpis"] });
+    },
+  });
+}
+
+export function useDeleteQuarantine() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      fetchJson<{ status: string }>(`/quarantine/${id}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["quarantine"] });
+    },
+  });
+}
+
+export function useReleaseAndWhitelist() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      fetchJson<{ status: string; whitelisted_pattern: string }>(`/quarantine/${id}/whitelist`, {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["quarantine"] });
+      queryClient.invalidateQueries({ queryKey: ["security-rules"] });
+      queryClient.invalidateQueries({ queryKey: ["kpis"] });
+    },
+  });
+}
+
+// ── Alerts & Preference API Types & Hooks ─────────────────────────────────────
+
+export interface AlertPreferences {
+  notify_phishing: boolean;
+  notify_spam: boolean;
+  quiet_hours_enabled: boolean;
+  quiet_hours_start: string;
+  quiet_hours_end: string;
+}
+
+export function useAlertPreferences() {
+  return useQuery<AlertPreferences>({
+    queryKey: ["alert-preferences"],
+    queryFn: () => fetchJson<AlertPreferences>("/alerts/preferences"),
+  });
+}
+
+export function useUpdateAlertPreferences() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: AlertPreferences) =>
+      fetchJson<{ status: string }>("/alerts/preferences", {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["alert-preferences"] });
+    },
+  });
+}
+
+export interface SecurityRule {
+  id: string;
+  rule_type: "whitelist" | "blocklist";
+  pattern: string;
+  created_at: string;
+}
+
+export function useSecurityRules() {
+  return useQuery<SecurityRule[]>({
+    queryKey: ["security-rules"],
+    queryFn: () => fetchJson<SecurityRule[]>("/alerts/rules"),
+  });
+}
+
+export function useCreateSecurityRule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { rule_type: string; pattern: string }) =>
+      fetchJson<SecurityRule>("/alerts/rules", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["security-rules"] });
+    },
+  });
+}
+
+export function useDeleteSecurityRule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      fetchJson<{ status: string }>(`/alerts/rules/${id}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["security-rules"] });
+    },
+  });
+}
+
+export interface AlertHistoryItem {
+  id: string;
+  title: string;
+  message: string;
+  created_at: string;
+}
+
+export function useAlertHistory() {
+  return useQuery<AlertHistoryItem[]>({
+    queryKey: ["alert-history"],
+    queryFn: () => fetchJson<AlertHistoryItem[]>("/alerts/history"),
+    refetchInterval: 10000,
+  });
+}
+
+export function useDismissAlert() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      fetchJson<{ status: string }>(`/alerts/history/${id}/dismiss`, {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["alert-history"] });
+    },
+  });
+}
+
+// ── Connected Domains & Domain Shield Status Types & Hooks ───────────────────
+
+export function useCloudflareList() {
+  return useQuery<CloudflareStatus[]>({
+    queryKey: ["cloudflare-list"],
+    queryFn: () => fetchJson<CloudflareStatus[]>("/integrations/cloudflare/list"),
+  });
+}
+
+export interface DomainShieldStatus {
+  spf: { valid: boolean; record: string | null; error: string | null };
+  dkim: { valid: boolean; record: string | null; error: string | null };
+  dmarc: { valid: boolean; record: string | null; policy: string; error: string | null };
+  ssl: { valid: boolean; days_remaining: number; auto_renew: boolean; error: string | null };
+  reputation_score: number;
+  score_grade: string;
+}
+
+export function useDomainShieldStatus(domain: string, enabled = true) {
+  return useQuery<DomainShieldStatus>({
+    queryKey: ["domain-shield", domain],
+    queryFn: () => fetchJson<DomainShieldStatus>(`/domain-shield/${domain}/status`),
+    enabled: enabled && !!domain,
   });
 }

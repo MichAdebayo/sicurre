@@ -59,11 +59,12 @@ interface IntegrationStage {
 
 interface CloudflareIntegratorProps {
   userEmail: string;
+  onSuccess?: () => void;
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function CloudflareIntegrator({ userEmail }: CloudflareIntegratorProps) {
+export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegratorProps) {
   const { data: cfStatus, isLoading: statusLoading, refetch } = useCloudflareStatus();
   const verifyMutation = useVerifyCloudflareToken();
   const setupMutation  = useSetupCloudflare();
@@ -109,6 +110,7 @@ export function CloudflareIntegrator({ userEmail }: CloudflareIntegratorProps) {
         setStages(prev => prev.map(s => s.id === "routing" ? { ...s, status: "success" } : s));
         timerId = setTimeout(() => {
           setIsIntegrating(false);
+          onSuccess?.();
         }, 1500);
       } else if (cfStatus?.status === "error") {
         setStages(prev => prev.map(s => s.id === "routing" ? { ...s, status: "error", errorMsg: cfStatus.error_message || "Échec de la configuration finale." } : s));
@@ -117,7 +119,7 @@ export function CloudflareIntegrator({ userEmail }: CloudflareIntegratorProps) {
     return () => {
       if (timerId) clearTimeout(timerId);
     };
-  }, [cfStatus?.status, isIntegrating, stages]);
+  }, [cfStatus?.status, isIntegrating, stages, onSuccess]);
 
   // Poll status ONLY when integrating or provisioning in the background
   useEffect(() => {

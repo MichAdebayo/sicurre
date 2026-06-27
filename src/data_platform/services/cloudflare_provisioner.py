@@ -95,6 +95,11 @@ export default {
       return;
     }
 
+    if (verdict === 'quarantine') {
+      // Quarantined: drop silently (held in Sicurre DB for review)
+      return;
+    }
+
     // Forward clean/spam mail to the verified destination inbox
     await message.forward(env.FORWARD_TO);
   },
