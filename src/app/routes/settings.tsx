@@ -6,18 +6,16 @@ import {
   Save,
   CheckCircle2,
   ShieldCheck,
-  Link,
-  Settings,
-  CreditCard,
   Globe,
   Trash2,
   AlertTriangle,
   Plus,
+  CreditCard,
+  Settings,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { CloudflareIntegrator } from "../components/common/cloudflare-integrator";
-import cloudflareLogo from "../assets/cloudflare-svgrepo-com.svg";
 import {
   AuthSession,
   getStoredAuthProvider,
@@ -39,8 +37,20 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
     session.onboarding_required ? "domains" : "profile"
   );
 
-  const [name, setName] = useState(session.display_name);
+  // Split Display Name into First Name & Last Name
+  const nameParts = session.display_name.trim().split(/\s+/);
+  const initialFirst = nameParts[0] || "";
+  const initialLast = nameParts.slice(1).join(" ") || "";
+
+  const [firstName, setFirstName] = useState(initialFirst);
+  const [lastName, setLastName] = useState(initialLast);
   const [email, setEmail] = useState(session.email);
+
+  // New Profile fields
+  const [title, setTitle] = useState(localStorage.getItem("sicurre_profile_title") || "Founder & CEO");
+  const [company, setCompany] = useState(localStorage.getItem("sicurre_profile_company") || "Vinse");
+  const [role, setRole] = useState(localStorage.getItem("sicurre_profile_role") || "owner");
+
   const [saveStatus, setSaveStatus] = useState(false);
   const [saveError, setSaveError] = useState("");
 
@@ -64,8 +74,20 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
   const changePasswordMutation = useChangePassword();
   const authProvider = getStoredAuthProvider();
 
+  // Apply theme class on mount to ensure light/dark variables resolve
   useEffect(() => {
-    setName(session.display_name);
+    const savedTheme = localStorage.getItem("sicurre_theme") || "light";
+    if (savedTheme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, []);
+
+  useEffect(() => {
+    const parts = session.display_name.trim().split(/\s+/);
+    setFirstName(parts[0] || "");
+    setLastName(parts.slice(1).join(" ") || "");
     setEmail(session.email);
     if (session.onboarding_required) {
       setActiveTab("domains");
@@ -124,7 +146,14 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
     e.preventDefault();
     setSaveError("");
     try {
-      await updateProfileMutation.mutateAsync({ display_name: name });
+      const combinedName = `${firstName.trim()} ${lastName.trim()}`.trim();
+      await updateProfileMutation.mutateAsync({ display_name: combinedName });
+
+      // Save local fields
+      localStorage.setItem("sicurre_profile_title", title);
+      localStorage.setItem("sicurre_profile_company", company);
+      localStorage.setItem("sicurre_profile_role", role);
+
       setSaveStatus(true);
       setTimeout(() => setSaveStatus(false), 3000);
     } catch (error) {
@@ -158,14 +187,14 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.3 }}
-      className="space-y-6"
+      className="space-y-6 animate-in fade-in duration-200"
     >
       {/* Header */}
       <div className="pb-6 border-b border-border-subtle">
         <h1 className="font-display font-bold text-[28px] text-on-surface tracking-tight leading-tight">
           {t("settings.title")}
         </h1>
-        <p className="text-sm text-on-surface-variant mt-1">
+        <p className="text-sm font-semibold text-on-surface-variant mt-1">
           {t("settings.subtitle")}
         </p>
       </div>
@@ -173,7 +202,7 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
       {/* Two-Column Split Layout */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
         {/* Left Column: Navigation Sidebar */}
-        <div className="col-span-12 md:col-span-3 space-y-1.5 bg-white border border-border-subtle rounded-xl p-3.5 shadow-sm">
+        <div className="col-span-12 md:col-span-3 space-y-1.5 bg-surface-lowest border border-border-subtle rounded-xl p-3.5 shadow-sm">
           {tabs.map((tab) => {
             const IconComp = tab.icon;
             const isActive = activeTab === tab.id;
@@ -184,11 +213,10 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
                   setActiveTab(tab.id as any);
                   setShowIntegrator(false);
                 }}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer text-left border-l-2 outline-none ${
-                  isActive
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-bold transition-all cursor-pointer text-left border-l-2 outline-none ${isActive
                     ? "bg-primary/[0.04] text-primary border-primary"
                     : "text-on-surface-variant hover:bg-surface-low hover:text-on-surface border-transparent"
-                }`}
+                  }`}
               >
                 <IconComp className={`w-4.5 h-4.5 ${isActive ? "text-primary" : "text-on-surface-variant/70"}`} />
                 <span>{tab.label}</span>
@@ -201,7 +229,7 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
         <div className="col-span-12 md:col-span-9 space-y-6">
           {/* Profile Tab */}
           {activeTab === "profile" && (
-            <div className="bg-white rounded-xl border border-border-subtle p-6 shadow-sm">
+            <div className="bg-surface-lowest rounded-xl border border-border-subtle p-6 shadow-sm">
               <div className="flex items-center gap-2.5 mb-5 pb-4 border-b border-border-subtle">
                 <User className="w-5 h-5 text-primary" />
                 <h3 className="font-display font-semibold text-[17px] text-on-surface">
@@ -210,22 +238,31 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
               </div>
               <form onSubmit={saveSettings} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Input label={lang === "fr" ? "Nom complet" : "Full Name"} type="text" value={name} onChange={(e) => setName(e.target.value)} />
-                  <Input label={lang === "fr" ? "Adresse e-mail" : "Email Address"} type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled />
+                  <Input label={lang === "fr" ? "Prénom" : "First Name"} type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+                  <Input label={lang === "fr" ? "Nom" : "Last Name"} type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} />
                 </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input label={lang === "fr" ? "Titre / Fonction" : "Current Title"} type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
+                  <Input label={lang === "fr" ? "Nom de l'entreprise" : "Company Name"} type="text" value={company} onChange={(e) => setCompany(e.target.value)} />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input label={lang === "fr" ? "Adresse e-mail" : "Email Address"} type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled />
 
-                <div className="rounded-xl border border-border-subtle bg-surface-low/40 px-4 py-3 text-xs text-on-surface-variant leading-relaxed">
-                  <p>
-                    {lang === "fr" ? "Rôle actuel : " : "Current role: "}{" "}
-                    <span className="font-bold text-on-surface">
-                      {session.is_platform_admin ? "Sicurre Admin" : "Owner"}
-                    </span>
-                  </p>
-                  <p className="mt-1 text-on-surface-variant/70">
-                    {lang === "fr"
-                      ? "Cette session dispose d'un cloisonnement strict et n'affiche que ses propres logs et alertes."
-                      : "Strict workspace isolation is active. This session only handles data belonging to its tenant."}
-                  </p>
+                  {/* Default User Role Dropdown */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-label-caps text-on-surface-variant font-semibold">
+                      {lang === "fr" ? "Rôle de l'utilisateur" : "User Role"}
+                    </label>
+                    <select
+                      value={role}
+                      onChange={(e) => setRole(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-surface-lowest border border-border-subtle rounded-lg text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer h-[44px] font-semibold"
+                    >
+                      <option value="owner">Owner</option>
+                      <option value="admin">Administrator</option>
+                      <option value="member">Member</option>
+                    </select>
+                  </div>
                 </div>
 
                 {saveStatus && (
@@ -237,7 +274,7 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
                 {saveError && <p className="text-xs text-error font-semibold">{saveError}</p>}
 
                 <div className="flex justify-end pt-2">
-                  <Button type="submit" className="gap-2 uppercase tracking-wider text-[11px] font-bold">
+                  <Button type="submit" className="gap-2 uppercase tracking-wider text-[11px] font-bold cursor-pointer">
                     <Save className="w-4 h-4" />
                     {t("common.save")}
                   </Button>
@@ -248,7 +285,7 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
 
           {/* Security Tab */}
           {activeTab === "security" && (
-            <div className="bg-white rounded-xl border border-border-subtle p-6 shadow-sm">
+            <div className="bg-surface-lowest rounded-xl border border-border-subtle p-6 shadow-sm">
               <div className="flex items-center gap-2.5 mb-5 pb-4 border-b border-border-subtle">
                 <ShieldCheck className="w-5 h-5 text-primary" />
                 <h3 className="font-display font-semibold text-[17px] text-on-surface">
@@ -261,7 +298,7 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
                   <p className="text-sm font-semibold text-primary">
                     {lang === "fr" ? "Connexion Google Workspace active" : "Google Workspace login active"}
                   </p>
-                  <p className="text-xs text-on-surface-variant/75 leading-relaxed">
+                  <p className="text-xs text-on-surface-variant font-medium leading-relaxed">
                     {lang === "fr"
                       ? "La gestion de votre mot de passe et MFA s'effectue directement au sein de votre console Google."
                       : "Your credentials and two-factor authentication are verified directly through Google Workspace OAuth."}
@@ -302,7 +339,7 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
                     </div>
                   )}
                   <div className="flex justify-end pt-2">
-                    <Button type="submit" className="uppercase tracking-wider text-[11px] font-bold" disabled={changePasswordMutation.isPending}>
+                    <Button type="submit" className="uppercase tracking-wider text-[11px] font-bold cursor-pointer" disabled={changePasswordMutation.isPending}>
                       {lang === "fr" ? "Mettre à jour" : "Update Password"}
                     </Button>
                   </div>
@@ -313,7 +350,7 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
 
           {/* Preferences Tab */}
           {activeTab === "preferences" && (
-            <div className="bg-white rounded-xl border border-border-subtle p-6 shadow-sm">
+            <div className="bg-surface-lowest rounded-xl border border-border-subtle p-6 shadow-sm">
               <div className="flex items-center gap-2.5 mb-5 pb-4 border-b border-border-subtle">
                 <Settings className="w-5 h-5 text-primary" />
                 <h3 className="font-display font-semibold text-[17px] text-on-surface">
@@ -323,17 +360,17 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
               <div className="space-y-6">
                 <div className="flex items-center justify-between py-2 border-b border-border-subtle/50">
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-sm font-semibold text-on-surface">
+                    <span className="text-sm font-bold text-on-surface">
                       {lang === "fr" ? "Langue de l'interface" : "Interface Language"}
                     </span>
-                    <span className="text-xs text-on-surface-variant/70">
+                    <span className="text-xs font-semibold text-on-surface-variant">
                       {lang === "fr" ? "Sélectionnez la langue d'affichage des menus." : "Choose language toggle for client dashboard."}
                     </span>
                   </div>
                   <select
                     value={lang}
                     onChange={(e) => handleLanguageChange(e.target.value)}
-                    className="px-3.5 py-2 bg-surface-lowest border border-border-subtle rounded-lg text-sm text-on-surface focus:outline-none focus:border-primary outline-none cursor-pointer"
+                    className="px-3.5 py-2 bg-surface-lowest border border-border-subtle rounded-lg text-sm text-on-surface focus:outline-none focus:border-primary outline-none cursor-pointer font-semibold"
                   >
                     <option value="fr">Français</option>
                     <option value="en">English</option>
@@ -342,20 +379,20 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
 
                 <div className="flex items-center justify-between py-2">
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-sm font-semibold text-on-surface">
+                    <span className="text-sm font-bold text-on-surface">
                       {lang === "fr" ? "Thème visuel" : "Visual Theme"}
                     </span>
-                    <span className="text-xs text-on-surface-variant/70">
+                    <span className="text-xs font-semibold text-on-surface-variant">
                       {lang === "fr" ? "Basculez entre l'interface claire et l'interface sombre." : "Switch between light and dark console modes."}
                     </span>
                   </div>
                   <select
                     value={theme}
                     onChange={(e) => handleThemeChange(e.target.value)}
-                    className="px-3.5 py-2 bg-surface-lowest border border-border-subtle rounded-lg text-sm text-on-surface focus:outline-none focus:border-primary outline-none cursor-pointer"
+                    className="px-3.5 py-2 bg-surface-lowest border border-border-subtle rounded-lg text-sm text-on-surface focus:outline-none focus:border-primary outline-none cursor-pointer font-semibold"
                   >
-                    <option value="light">{lang === "fr" ? "Mode Clair" : "Light Mode"}</option>
-                    <option value="dark">{lang === "fr" ? "Mode Sombre" : "Dark Mode"}</option>
+                    <option value="light">{lang === "fr" ? "Mode Clair" : "Light"}</option>
+                    <option value="dark">{lang === "fr" ? "Mode Sombre" : "Dark"}</option>
                   </select>
                 </div>
               </div>
@@ -392,7 +429,7 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
                 </div>
               )}
 
-              <div className="bg-white rounded-xl border border-border-subtle p-6 shadow-sm space-y-6">
+              <div className="bg-surface-lowest rounded-xl border border-border-subtle p-6 shadow-sm space-y-6">
                 <div className="flex justify-between items-center border-b border-border-subtle pb-4">
                   <div className="flex items-center gap-2.5">
                     <Globe className="w-5 h-5 text-primary" />
@@ -400,13 +437,14 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
                       <h3 className="font-display font-semibold text-[17px] text-on-surface">
                         {t("settings.domains_title")}
                       </h3>
-                      <p className="text-xs text-on-surface-variant/60">
+                      {/* Improved subtext colors and size readability */}
+                      <p className="text-sm font-semibold text-on-surface-variant">
                         {t("settings.domains_desc")}
                       </p>
                     </div>
                   </div>
                   {!showIntegrator && (
-                    <Button onClick={() => setShowIntegrator(true)} className="text-xs font-bold gap-1">
+                    <Button onClick={() => setShowIntegrator(true)} className="text-xs font-bold gap-1 cursor-pointer">
                       <Plus className="w-3.5 h-3.5" />
                       {t("settings.add_domain")}
                     </Button>
@@ -419,11 +457,11 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
                       <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
                         {lang === "fr" ? "Nouveau domaine Cloudflare" : "New Cloudflare Integration"}
                       </span>
-                      <Button variant="outline" size="sm" onClick={() => setShowIntegrator(false)} className="text-xs">
+                      <Button variant="outline" size="sm" onClick={() => setShowIntegrator(false)} className="text-xs cursor-pointer">
                         {lang === "fr" ? "Annuler" : "Cancel"}
                       </Button>
                     </div>
-                    <div className="border border-border-subtle rounded-xl p-4 bg-white">
+                    <div className="border border-border-subtle rounded-xl p-4 bg-surface-lowest">
                       <CloudflareIntegrator
                         userEmail={session.email}
                         onSuccess={() => {
@@ -445,7 +483,8 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
                       </div>
                     ) : (
                       <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse text-xs">
+                        {/* Standardized table columns typography layout to match standard sans fonts */}
+                        <table className="w-full text-left border-collapse text-xs font-sans">
                           <thead>
                             <tr className="border-b border-border-subtle bg-surface-low/30 text-on-surface-variant uppercase font-bold">
                               <th className="px-4 py-3">{t("settings.domain_name")}</th>
@@ -454,26 +493,25 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
                               <th className="px-4 py-3 text-right">{t("settings.domain_actions")}</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-border-subtle/50">
+                          <tbody className="divide-y divide-border-subtle/50 font-sans">
                             {domains.map((dom) => (
                               <tr key={dom.id} className="hover:bg-surface-low/20 transition-colors">
                                 <td className="px-4 py-3 font-semibold text-on-surface">{dom.zone_name}</td>
                                 <td className="px-4 py-3">
-                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                    dom.status === "active"
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${dom.status === "active"
                                       ? "bg-safe/10 text-safe"
                                       : dom.status === "error"
-                                      ? "bg-error/10 text-error"
-                                      : "bg-warning/10 text-warning"
-                                  }`}>
+                                        ? "bg-error/10 text-error"
+                                        : "bg-warning/10 text-warning"
+                                    }`}>
                                     {dom.status === "active"
                                       ? t("settings.active_setup")
                                       : dom.status === "error"
-                                      ? t("settings.error_setup")
-                                      : t("settings.verify_setup")}
+                                        ? t("settings.error_setup")
+                                        : t("settings.verify_setup")}
                                   </span>
                                 </td>
-                                <td className="px-4 py-3 font-mono text-on-surface-variant">{dom.destination_email}</td>
+                                <td className="px-4 py-3 font-semibold text-on-surface-variant">{dom.destination_email}</td>
                                 <td className="px-4 py-3 text-right">
                                   <button
                                     onClick={() => dom.id && handleRemoveDomain(dom.id)}
@@ -499,25 +537,25 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
           {activeTab === "billing" && (
             <div className="space-y-6">
               {/* Current usage progress gauge */}
-              <div className="bg-white rounded-xl border border-border-subtle p-6 shadow-sm space-y-4">
+              <div className="bg-surface-lowest rounded-xl border border-border-subtle p-6 shadow-sm space-y-4">
                 <div className="flex items-center gap-2.5 pb-4 border-b border-border-subtle">
                   <CreditCard className="w-5 h-5 text-primary" />
-                  <h3 className="font-display font-semibold text-[17px] text-on-surface">
+                  <h3 className="font-display font-bold text-[19px] text-on-surface">
                     {t("settings.billing_usage")}
                   </h3>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex justify-between text-sm">
-                    <span className="font-semibold text-on-surface">{t("settings.usage_emails")}</span>
-                    <span className="font-mono text-on-surface-variant">
+                    <span className="font-bold text-on-surface">{t("settings.usage_emails")}</span>
+                    <span className="font-bold text-on-surface-variant">
                       86 / 250 {lang === "fr" ? "emails scannés" : "emails analyzed"}
                     </span>
                   </div>
                   <div className="w-full h-2 bg-surface-container rounded-full overflow-hidden">
                     <div className="h-full bg-primary rounded-full" style={{ width: "34.4%" }} />
                   </div>
-                  <p className="text-[11px] text-on-surface-variant/60 leading-normal">
+                  <p className="text-sm font-semibold text-on-surface-variant leading-normal">
                     {lang === "fr"
                       ? "Votre abonnement gratuit se réinitialise le 1er du mois. Upgradez pour augmenter vos quotas."
                       : "Usage resets on the 1st of each month. Upgrade to lift monthly volumetric ingestion limits."}
@@ -526,12 +564,12 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
               </div>
 
               {/* Pricing Cards Grid */}
-              <div className="bg-white rounded-xl border border-border-subtle p-6 shadow-sm space-y-6">
+              <div className="bg-surface-lowest rounded-xl border border-border-subtle p-6 shadow-sm space-y-6">
                 <div>
-                  <h3 className="font-display font-semibold text-[17px] text-on-surface">
+                  <h3 className="font-display font-bold text-[19px] text-on-surface">
                     {t("settings.billing_upgrade")}
                   </h3>
-                  <p className="text-xs text-on-surface-variant/60 mt-0.5">
+                  <p className="text-sm font-semibold text-on-surface-variant mt-1">
                     {lang === "fr"
                       ? "Sélectionnez l'offre adaptée à votre activité de freelance ou PME."
                       : "Choose the package matching your operations count and freelance workflow."}
@@ -539,47 +577,47 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* Free Tier */}
-                  <div className="border border-border-subtle rounded-xl p-5 flex flex-col justify-between hover:border-primary/30 transition-all bg-surface-low/10">
+                  {/* Free Tier (Includes Popular Badge) */}
+                  <div className="border border-primary rounded-xl p-5 flex flex-col justify-between hover:shadow-md transition-all relative overflow-hidden bg-primary/[0.01]">
+                    <div className="absolute top-0 right-0 bg-primary text-on-primary text-[10px] font-bold px-2.5 py-0.5 rounded-bl uppercase">
+                      Popular
+                    </div>
                     <div className="space-y-3">
-                      <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                      <span className="text-xs font-bold text-primary uppercase tracking-wider block">
                         {t("settings.billing_free")}
                       </span>
                       <div className="flex items-baseline gap-1">
                         <span className="font-display font-bold text-3xl text-on-surface">€0</span>
-                        <span className="text-xs text-on-surface-variant">/{t("settings.price_per_month")}</span>
+                        <span className="text-xs font-bold text-on-surface-variant">/{t("settings.price_per_month")}</span>
                       </div>
-                      <p className="text-xs text-on-surface-variant/70 leading-normal">
+                      <p className="text-sm font-medium text-on-surface-variant leading-normal">
                         {t("settings.billing_free_desc")}
                       </p>
-                      <ul className="text-[11px] space-y-1.5 text-on-surface pt-3 border-t border-border-subtle/50">
+                      <ul className="text-xs space-y-2 text-on-surface pt-3 border-t border-border-subtle/50 font-semibold">
                         <li>• 1 Protected Domain</li>
                         <li>• 250 analyzed emails/mo</li>
                         <li>• Gmail auto-trash</li>
                       </ul>
                     </div>
-                    <Button variant="outline" disabled className="w-full text-xs mt-6">
+                    <Button variant="outline" disabled className="w-full text-xs mt-6 font-bold">
                       {lang === "fr" ? "Plan Actuel" : "Current Plan"}
                     </Button>
                   </div>
 
-                  {/* Growth Tier (Recommended) */}
-                  <div className="border border-primary rounded-xl p-5 flex flex-col justify-between hover:shadow-md transition-all relative overflow-hidden bg-primary/[0.01]">
-                    <div className="absolute top-0 right-0 bg-primary text-on-primary text-[9px] font-bold px-2 py-0.5 rounded-bl uppercase">
-                      Popular
-                    </div>
+                  {/* Growth Tier (Coming Soon) */}
+                  <div className="border border-border-subtle rounded-xl p-5 flex flex-col justify-between hover:border-primary/30 transition-all bg-surface-low/10">
                     <div className="space-y-3">
-                      <span className="text-xs font-bold text-primary uppercase tracking-wider">
+                      <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider block">
                         {t("settings.billing_growth")}
                       </span>
                       <div className="flex items-baseline gap-1">
                         <span className="font-display font-bold text-3xl text-on-surface">€19</span>
-                        <span className="text-xs text-on-surface-variant">/{t("settings.price_per_month")}</span>
+                        <span className="text-xs font-bold text-on-surface-variant">/{t("settings.price_per_month")}</span>
                       </div>
-                      <p className="text-xs text-on-surface-variant/70 leading-normal">
+                      <p className="text-sm font-medium text-on-surface-variant leading-normal">
                         {t("settings.billing_growth_desc")}
                       </p>
-                      <ul className="text-[11px] space-y-1.5 text-on-surface pt-3 border-t border-border-subtle/50">
+                      <ul className="text-xs space-y-2 text-on-surface pt-3 border-t border-border-subtle/50 font-semibold">
                         <li>• <strong>Up to 3 domains</strong></li>
                         <li>• 10,000 emails/mo</li>
                         <li>• Live AI priority scans</li>
@@ -587,25 +625,25 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
                         <li>• Quarantine Queue</li>
                       </ul>
                     </div>
-                    <Button variant="primary" className="w-full text-xs mt-6">
-                      {t("settings.upgrade_cta")}
+                    <Button variant="outline" disabled className="w-full text-xs mt-6 font-bold">
+                      {lang === "fr" ? "Bientôt disponible" : "Coming Soon"}
                     </Button>
                   </div>
 
-                  {/* Business Tier */}
+                  {/* Business Tier (Coming Soon) */}
                   <div className="border border-border-subtle rounded-xl p-5 flex flex-col justify-between hover:border-primary/30 transition-all bg-surface-low/10">
                     <div className="space-y-3">
-                      <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                      <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider block">
                         {t("settings.billing_business")}
                       </span>
                       <div className="flex items-baseline gap-1">
                         <span className="font-display font-bold text-3xl text-on-surface">€49</span>
-                        <span className="text-xs text-on-surface-variant">/{t("settings.price_per_month")}</span>
+                        <span className="text-xs font-bold text-on-surface-variant">/{t("settings.price_per_month")}</span>
                       </div>
-                      <p className="text-xs text-on-surface-variant/70 leading-normal">
+                      <p className="text-sm font-medium text-on-surface-variant leading-normal">
                         {t("settings.billing_business_desc")}
                       </p>
-                      <ul className="text-[11px] space-y-1.5 text-on-surface pt-3 border-t border-border-subtle/50">
+                      <ul className="text-xs space-y-2 text-on-surface pt-3 border-t border-border-subtle/50 font-semibold">
                         <li>• <strong>Up to 10 domains</strong></li>
                         <li>• 100,000 emails/mo</li>
                         <li>• Custom white/blacklists</li>
@@ -613,8 +651,8 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
                         <li>• Dedicated slack support</li>
                       </ul>
                     </div>
-                    <Button variant="outline" className="w-full text-xs mt-6">
-                      {lang === "fr" ? "Contacter Ventes" : "Contact Sales"}
+                    <Button variant="outline" disabled className="w-full text-xs mt-6 font-bold">
+                      {lang === "fr" ? "Bientôt disponible" : "Coming Soon"}
                     </Button>
                   </div>
                 </div>

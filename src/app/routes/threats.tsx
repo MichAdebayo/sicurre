@@ -35,6 +35,9 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
   // Latency chart hover state
   const [hoveredLatencyIndex, setHoveredLatencyIndex] = useState<number | null>(null);
   
+  // Confirmation delete modal state
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  
   // Table pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -117,6 +120,7 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
 
   const getLatencyData = (slaLimit: number) => {
     const baseLatency = [850, 1200, 2400, 9500, 10500, 4800, 12000];
+    const baseCounts = [14, 22, 18, 31, 25, 19, 28];
     const days = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
@@ -124,7 +128,8 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
       const label = d.toLocaleDateString(i18n.language === "fr" ? "fr-FR" : "en-US", { weekday: "short", day: "numeric" });
       const latency = baseLatency[6 - i];
       const diffPct = Math.round(((latency - slaLimit) / slaLimit) * 100);
-      days.push({ label, latency, diffPct });
+      const emails_count = baseCounts[6 - i];
+      days.push({ label, latency, diffPct, emails_count });
     }
     return days;
   };
@@ -203,7 +208,7 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
               {i18n.language === "fr" ? "Temps de réponse moyen du moteur de classification IA" : "Average response time of the AI classification engine"}
             </p>
           </div>
-          {/* Spacing gap increased to gap-8 between SLA and Operations legend */}
+          {/* Spacing gap set to gap-8 between SLA and Operations legend */}
           <div className="flex items-center gap-8 text-xs font-bold text-on-surface-variant">
             <div className="flex items-center gap-1.5">
               <span className="w-6 h-px border-t border-dashed border-primary" />
@@ -276,18 +281,22 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
             })}
           </svg>
 
-          {/* Absolute Floating Tooltip Card (Rendered in-place snapping above the hovered point, no date line) */}
+          {/* Absolute Floating Tooltip Card (Rendered in-place snapping above the hovered point, displays Total Emails) */}
           {hoveredLatencyIndex !== null && (
             <div
-              className="absolute z-30 p-2.5 bg-white border border-border-subtle text-on-surface rounded-xl text-[11px] shadow-xl flex flex-col gap-1 w-40 font-sans select-none pointer-events-none animate-in fade-in duration-100 -translate-x-1/2"
+              className="absolute z-30 p-2.5 bg-white border border-border-subtle text-on-surface rounded-xl text-[11px] shadow-xl flex flex-col gap-1.5 w-40 font-sans select-none pointer-events-none animate-in fade-in duration-100 -translate-x-1/2"
               style={{
                 left: `${points[hoveredLatencyIndex].x / 10}%`,
-                top: `${points[hoveredLatencyIndex].y - 65}px`,
+                top: `${points[hoveredLatencyIndex].y - 85}px`,
               }}
             >
               <div className="flex justify-between text-on-surface-variant font-bold">
                 <span>Avg Latency:</span>
                 <span className="font-mono text-primary">{latencyData[hoveredLatencyIndex].latency} ms</span>
+              </div>
+              <div className="flex justify-between text-on-surface-variant font-bold">
+                <span>Total Emails:</span>
+                <span className="font-mono text-primary">{latencyData[hoveredLatencyIndex].emails_count}</span>
               </div>
               <div className="flex justify-between font-bold mt-0.5">
                 <span>SLA Diff:</span>
@@ -390,7 +399,6 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
                   <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[25%] min-w-[170px]">{t("threats.timestamp")}</th>
                   <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[30%] min-w-[180px]">{t("threats.sender")}</th>
                   <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[35%] min-w-[200px]">{t("threats.subject")}</th>
-                  {/* Verdict header label matches translated key */}
                   <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[18%] min-w-[140px]">{t("threats.verdict")}</th>
                   <th className="px-5 py-3 text-right text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-auto">{t("threats.actions")}</th>
                 </tr>
@@ -430,26 +438,15 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
                       </td>
                       <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="inline-flex gap-2 justify-end w-full items-center">
-                          {threat.status === "trashed" ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleUpdateStatus(threat.id, "restored")}
-                              className="text-[11px] gap-1.5 h-8 font-bold"
-                            >
-                              Restore
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              onClick={() => handleUpdateStatus(threat.id, "trashed")}
-                              className="text-[11px] gap-1.5 h-8 font-bold"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                              Delete
-                            </Button>
-                          )}
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => setConfirmDeleteId(threat.id)}
+                            className="text-[11px] gap-1.5 h-8 font-bold"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            Delete
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -491,6 +488,46 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
           </div>
         )}
       </div>
+
+      {/* Center confirmation delete modal with background blur */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 bg-neutral-900/60 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white border border-border-subtle rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4 font-sans text-center select-none">
+            <div className="w-12 h-12 bg-error/10 text-error rounded-full flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="font-display font-bold text-lg text-on-surface">
+                {i18n.language === "fr" ? "Confirmer la suppression" : "Confirm Deletion"}
+              </h3>
+              <p className="text-sm text-on-surface-variant leading-relaxed font-medium">
+                {i18n.language === "fr"
+                  ? "Cette action est destructive. L'e-mail sera définitivement masqué de vos logs, mais restera stocké de manière sécurisée dans la base de données pour l'entraînement du modèle d'IA."
+                  : "This is a destructive action. The email will be removed from your active logs, but remains stored securely in the database for AI training model feedback."}
+              </p>
+            </div>
+            <div className="flex gap-3 justify-center pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setConfirmDeleteId(null)}
+                className="px-4 py-2 font-bold text-sm h-10 cursor-pointer"
+              >
+                {i18n.language === "fr" ? "Annuler" : "Cancel"}
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => {
+                  handleUpdateStatus(confirmDeleteId, "trashed");
+                  setConfirmDeleteId(null);
+                }}
+                className="px-4 py-2 font-bold text-sm h-10 cursor-pointer"
+              >
+                {i18n.language === "fr" ? "Supprimer définitivement" : "Delete Record"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </MotionDiv>
   );
 }

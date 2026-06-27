@@ -190,7 +190,7 @@ async def get_threats(current_user: AuthUser = Depends(get_current_user)):
                 latency_ms,
                 explanation
             FROM app_inference_event
-            WHERE workspace_id = ?
+            WHERE workspace_id = ? AND (is_deleted IS NULL OR is_deleted = 0)
             ORDER BY created_at DESC
             """,
             (current_user.workspace_id,),
@@ -229,9 +229,11 @@ async def update_threat_status(
     if payload.status not in ("active", "trashed", "restored"):
         raise HTTPException(status_code=400, detail="Invalid status value")
     try:
+        is_del = 1 if payload.status == "trashed" else 0
         await async_query_auth_db(
-            "UPDATE app_inference_event SET override_verdict = ?, overridden_at = ? WHERE id = ? AND workspace_id = ?",
+            "UPDATE app_inference_event SET is_deleted = ?, override_verdict = ?, overridden_at = ? WHERE id = ? AND workspace_id = ?",
             (
+                is_del,
                 payload.status,
                 datetime.utcnow().isoformat() + "Z",
                 id,

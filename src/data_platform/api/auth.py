@@ -101,6 +101,10 @@ def ensure_runtime_tables() -> None:
                 conn.execute(
                     "ALTER TABLE app_inference_event ADD COLUMN workspace_member_user_id TEXT NULL"
                 )
+            if "is_deleted" not in event_columns:
+                conn.execute(
+                    "ALTER TABLE app_inference_event ADD COLUMN is_deleted INTEGER DEFAULT 0"
+                )
 
         if "cloudflare_integration" in refreshed_tables:
             cf_columns = _table_columns(conn, "cloudflare_integration")

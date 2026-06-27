@@ -300,3 +300,19 @@
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-outline);
 }
+
+html.dark {
+  --color-background: #0f172a;
+  --color-on-background: #f8fafc;
+  --color-surface: #1e293b;
+  --color-surface-lowest: #0f172a;
+  --color-surface-low: #1e293b;
+  --color-surface-container: #334155;
+  --color-surface-high: #475569;
+  --color-surface-highest: #64748b;
+  --color-on-surface: #f8fafc;
+  --color-on-surface-variant: #94a3b8;
+  --color-surface-variant: #334155;
+  --color-border-subtle: #334155;
+}
+
