@@ -207,7 +207,7 @@ export function TopBar({
           }}
           className="relative p-2 rounded-lg text-on-surface-variant/80 hover:bg-white hover:text-on-surface hover:shadow-sm border border-transparent hover:border-border-subtle transition-all cursor-pointer bg-white/50 backdrop-blur-sm"
         >
-          <Bell className="w-[18px] h-[18px] stroke-[1.5]" />
+          <Bell className="w-[22px] h-[22px] stroke-[1.5]" />
           {unreadCount > 0 && (
             <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-error rounded-full ring-2 ring-white" />
           )}
@@ -270,6 +270,7 @@ export function TopBar({
                     <div
                       key={notif.id}
                       onClick={() => {
+                        setReadIds((prev) => [...prev, notif.id]);
                         if (onPageChange) {
                           onPageChange(notif.page);
                         }

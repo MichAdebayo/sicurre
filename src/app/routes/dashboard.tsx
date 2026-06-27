@@ -9,6 +9,7 @@ import {
   Award,
   TrendingUp,
   Cpu,
+  Info,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { VerdictBadge } from "../components/threats/verdict-badge";
@@ -372,23 +373,28 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
         <>
           {/* Hero Row: KPI blocks + Security Score Grade */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
-            {/* Security Grade Hero */}
+            {/* Security Grade Hero (Large Circle + Info Tooltip) */}
             <div className="md:col-span-4 bg-white rounded-xl border border-border-subtle p-6 flex flex-col items-center justify-center text-center shadow-sm relative overflow-hidden">
               <div className="absolute top-0 left-0 w-full h-1 bg-primary" />
-              <p className="text-[12px] font-extrabold uppercase tracking-wider text-on-surface-variant mb-4 flex items-center gap-1.5">
+              <div className="text-[12px] font-extrabold uppercase tracking-wider text-on-surface-variant mb-4 flex items-center justify-center gap-1.5 w-full">
                 <Award className="w-4 h-4 text-primary" />
-                {t("dashboard.security_score")}
-              </p>
-              <div className="w-24 h-24 rounded-full bg-primary/[0.04] border border-primary/10 flex items-center justify-center font-display font-bold text-5xl text-primary shadow-inner">
+                <span>{t("dashboard.security_score")}</span>
+                
+                {/* Tooltip trigger */}
+                <div className="relative group">
+                  <Info className="w-3.5 h-3.5 text-on-surface-variant/50 cursor-help hover:text-primary transition-colors" />
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 w-44 bg-neutral-900 text-white text-[10px] p-2.5 rounded-xl shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 z-30 normal-case leading-normal font-sans text-center font-normal">
+                    Overall status of your email gateway
+                  </div>
+                </div>
+              </div>
+              <div className="w-32 h-32 rounded-full bg-primary/[0.04] border border-primary/10 flex items-center justify-center font-display font-extrabold text-6xl text-primary shadow-inner">
                 {grade === "L" ? (
-                  <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin text-primary" />
+                  <div className="w-6 h-6 border-2 border-current border-t-transparent rounded-full animate-spin text-primary" />
                 ) : (
                   grade
                 )}
               </div>
-              <p className="text-[13px] text-on-surface-variant mt-4 max-w-[200px] leading-normal font-medium">
-                {t("dashboard.security_score_desc")}
-              </p>
             </div>
 
             {/* General KPI blocks */}
@@ -425,8 +431,8 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
               </div>
             </div>
 
-            {/* Last 7 days chart trend (Refactored for stacked stats & ranges) */}
-            <div className="lg:col-span-7 bg-white rounded-xl border border-border-subtle p-6 shadow-sm flex flex-col justify-between">
+            {/* Last 7 days chart trend (Refactored: absolute tooltip, scroll container, font unified) */}
+            <div className="lg:col-span-7 bg-white rounded-xl border border-border-subtle p-6 shadow-sm flex flex-col justify-between relative min-h-[290px]">
               <div>
                 <div className="flex items-center justify-between pb-4 border-b border-border-subtle mb-4">
                   <div className="flex items-center gap-2">
@@ -466,72 +472,87 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                   </div>
                 </div>
 
-                {/* Stacked interactive bars chart */}
-                <div className="h-32 pt-2 flex items-end justify-between gap-1.5 w-full font-mono text-[9px] text-on-surface-variant select-none">
-                  {trendData.labels.map((label, idx) => {
-                    const safe = trendData.safeCounts[idx];
-                    const phish = trendData.phishingCounts[idx];
-                    const total = safe + phish;
+                {/* Stacked interactive bars chart wrapped in overflow container */}
+                <div className="w-full overflow-x-auto select-none scrollbar-none pb-1">
+                  <div 
+                    className={`h-32 pt-2 flex items-end justify-between gap-2.5 w-full font-sans text-[10px] font-bold text-on-surface-variant select-none ${
+                      dateRange !== "7d" ? "min-w-[650px]" : ""
+                    }`}
+                  >
+                    {trendData.labels.map((label, idx) => {
+                      const safe = trendData.safeCounts[idx];
+                      const phish = trendData.phishingCounts[idx];
+                      const total = safe + phish;
 
-                    // compute bar heights relative to max
-                    const totalPct = maxTrendVal > 0 ? (total / maxTrendVal) * 100 : 0;
-                    const safePct = total > 0 ? (safe / total) * 100 : 0;
-                    const phishPct = total > 0 ? (phish / total) * 100 : 0;
+                      // compute bar heights relative to max
+                      const totalPct = maxTrendVal > 0 ? (total / maxTrendVal) * 100 : 0;
+                      const safePct = total > 0 ? (safe / total) * 100 : 0;
+                      const phishPct = total > 0 ? (phish / total) * 100 : 0;
 
-                    return (
-                      <div
-                        key={idx}
-                        className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end group cursor-pointer"
-                        onMouseEnter={() => setHoveredBarIndex(idx)}
-                        onMouseLeave={() => setHoveredBarIndex(null)}
-                      >
+                      return (
                         <div
-                          className="w-full flex flex-col justify-end rounded-t-md overflow-hidden bg-surface-low border border-border-subtle/50 transition-all duration-300 group-hover:scale-y-105"
-                          style={{ height: `${Math.max(6, totalPct * 0.8)}%` }}
+                          key={idx}
+                          className="flex-1 flex flex-col items-center gap-1 h-full justify-end group cursor-pointer relative"
+                          onMouseEnter={() => setHoveredBarIndex(idx)}
+                          onMouseLeave={() => setHoveredBarIndex(null)}
                         >
-                          {/* Phishing stack (Top) */}
-                          {phish > 0 && (
-                            <div
-                              className="bg-error w-full transition-all"
-                              style={{ height: `${phishPct}%` }}
-                              title={`${t("threats.badge_phishing")}: ${phish}`}
-                            />
-                          )}
-                          {/* Legitimate stack (Bottom) */}
-                          {safe > 0 && (
-                            <div
-                              className="bg-safe w-full transition-all"
-                              style={{ height: `${safePct}%` }}
-                              title={`${t("threats.badge_legitimate")}: ${safe}`}
-                            />
-                          )}
+                          {/* Daily total value displayed above the bar */}
+                          <span className="font-extrabold text-[10px] text-primary/80 mb-0.5 group-hover:text-primary transition-colors">
+                            {total}
+                          </span>
+
+                          <div
+                            className="w-full flex flex-col justify-end rounded-t-md overflow-hidden bg-surface-low border border-border-subtle/50 transition-all duration-300 group-hover:scale-y-105"
+                            style={{ height: `${Math.max(6, totalPct * 0.75)}%` }}
+                          >
+                            {/* Phishing stack (Top) */}
+                            {phish > 0 && (
+                              <div
+                                className="bg-error w-full transition-all"
+                                style={{ height: `${phishPct}%` }}
+                                title={`${t("threats.badge_phishing")}: ${phish}`}
+                              />
+                            )}
+                            {/* Legitimate stack (Bottom) */}
+                            {safe > 0 && (
+                              <div
+                                className="bg-safe w-full transition-all"
+                                style={{ height: `${safePct}%` }}
+                                title={`${t("threats.badge_legitimate")}: ${safe}`}
+                              />
+                            )}
+                          </div>
+                          <span className="text-[9px] uppercase tracking-wider text-on-surface-variant truncate w-full text-center font-bold">
+                            {label}
+                          </span>
                         </div>
-                        <span className="text-[9px] uppercase tracking-wider text-on-surface-variant truncate w-full text-center">
-                          {label}
-                        </span>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {/* Tooltip Overlay */}
+                {/* Absolute Floating Tooltip Card (Does not expand the layout card!) */}
                 {hoveredBarIndex !== null && (
-                  <div className="mt-4 p-3 bg-surface-low border border-border-subtle rounded-xl flex items-center justify-between text-xs animate-in fade-in duration-100">
-                    <div>
-                      <span className="font-extrabold text-on-surface">{trendData.labels[hoveredBarIndex]}</span>
-                      <span className="text-on-surface-variant ml-2 font-medium">
-                        (Total: {(trendData.safeCounts[hoveredBarIndex] + trendData.phishingCounts[hoveredBarIndex]).toLocaleString()})
+                  <div className="absolute top-16 right-6 z-30 p-2.5 bg-neutral-900/95 backdrop-blur-md border border-neutral-800 text-white rounded-xl text-[11px] shadow-lg flex flex-col gap-1.5 w-44 font-sans select-none pointer-events-none animate-in fade-in duration-100">
+                    <div className="font-extrabold text-neutral-100 border-b border-neutral-800/60 pb-1.5 mb-1 flex justify-between items-center">
+                      <span>{trendData.labels[hoveredBarIndex]}</span>
+                      <span className="text-[10px] text-neutral-400 font-mono">
+                        Total: {trendData.safeCounts[hoveredBarIndex] + trendData.phishingCounts[hoveredBarIndex]}
                       </span>
                     </div>
-                    <div className="flex gap-4">
-                      <span className="flex items-center gap-1.5 font-extrabold text-safe">
-                        <span className="w-2 h-2 rounded-full bg-safe" />
-                        {t("threats.badge_legitimate")}: {trendData.safeCounts[hoveredBarIndex].toLocaleString()}
+                    <div className="flex items-center justify-between gap-2 font-bold text-emerald-400">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        {t("threats.badge_legitimate")}
                       </span>
-                      <span className="flex items-center gap-1.5 font-extrabold text-error">
-                        <span className="w-2 h-2 rounded-full bg-error" />
-                        {t("threats.badge_phishing")}: {trendData.phishingCounts[hoveredBarIndex].toLocaleString()}
+                      <span>{trendData.safeCounts[hoveredBarIndex]}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 font-bold text-error">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-error" />
+                        {t("threats.badge_phishing")}
                       </span>
+                      <span>{trendData.phishingCounts[hoveredBarIndex]}</span>
                     </div>
                   </div>
                 )}
@@ -539,18 +560,23 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
             </div>
           </div>
 
-          {/* Expanded full-width Recent Activity feed */}
+          {/* Expanded full-width Recent Activity live feed */}
           <div className="grid grid-cols-1 gap-6">
             <div className="bg-white rounded-xl border border-border-subtle p-6 shadow-sm">
               <div className="flex items-center justify-between mb-5 pb-4 border-b border-border-subtle">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
+                  {/* Live pulsing green node blinker */}
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-safe" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-safe" />
+                  </span>
                   <h3 className="font-display font-bold text-[17px] text-on-surface">
-                    {t("dashboard.recent_activity")}
+                    Live Feed
                   </h3>
                 </div>
                 <div className="inline-flex items-center gap-2 text-[12px] font-bold text-primary">
                   <Mail className="w-4 h-4" />
-                  <span>{i18n.language === "fr" ? "Flux temps réel" : "Real-time feed"}</span>
+                  <span>{i18n.language === "fr" ? "Flux Live" : "Live Stream"}</span>
                 </div>
               </div>
               {threatsLoading ? (
