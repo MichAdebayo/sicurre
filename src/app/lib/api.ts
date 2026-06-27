@@ -20,6 +20,7 @@ export interface AuthSession {
   has_cloudflare_integration: boolean;
   threat_count: number;
   onboarding_required: boolean;
+  sla_latency_ms: number;
 }
 
 export interface Dataset {

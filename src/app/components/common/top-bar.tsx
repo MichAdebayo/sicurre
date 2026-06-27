@@ -2,14 +2,10 @@ import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Bell,
-  Search,
   Cpu,
   ShieldAlert,
-  AlertTriangle,
   Globe,
   Inbox,
-  X,
-  Check,
 } from "lucide-react";
 import { SidebarPage } from "./sidebar";
 import {
@@ -20,14 +16,12 @@ import {
 } from "../../lib/api";
 
 interface TopBarProps {
-  onSearch?: (query: string) => void;
   userName?: string;
   userRole?: string;
   onPageChange?: (page: SidebarPage) => void;
 }
 
 export function TopBar({
-  onSearch,
   userName = "SA",
   userRole = "owner",
   onPageChange,
@@ -84,21 +78,7 @@ export function TopBar({
     });
   }
 
-  // 2. Dark Web leak simulation (Vinse breach alert matches user domain context)
-  if (activeDomain) {
-    notificationsList.push({
-      id: "breach_detected",
-      title: i18n.language === "fr" ? `Fuite détectée · ${activeDomain}` : `Breach detected · ${activeDomain}`,
-      desc: `${userName.toLowerCase().replace(/\s+/g, "")}@${activeDomain} found in "DataCombo2026"`,
-      time: "4h ago",
-      badge: "Dark web",
-      category: "Critical" as const,
-      page: "alerts" as const,
-      unread: true,
-    });
-  }
-
-  // 3. SSL Expiry Alert
+  // 2. SSL Expiry Alert
   if (shieldStatus && shieldStatus.ssl.valid && shieldStatus.ssl.days_remaining < 30) {
     notificationsList.push({
       id: "ssl_expiring",
@@ -112,7 +92,7 @@ export function TopBar({
     });
   }
 
-  // 4. DMARC policy warning
+  // 3. DMARC policy warning
   if (shieldStatus && (!shieldStatus.dmarc.valid || shieldStatus.dmarc.policy === "none")) {
     notificationsList.push({
       id: "dmarc_none",
@@ -126,7 +106,7 @@ export function TopBar({
     });
   }
 
-  // 5. Quarantine waiting emails
+  // 4. Quarantine waiting emails
   if (quarantineItems && quarantineItems.length > 0) {
     notificationsList.push({
       id: "quarantine_held",
@@ -140,7 +120,7 @@ export function TopBar({
     });
   }
 
-  // 6. Generic system notification fallback
+  // 5. Generic system notification fallback
   if (notificationsList.length === 0) {
     notificationsList.push({
       id: "system_ok",
@@ -168,23 +148,20 @@ export function TopBar({
   };
 
   const getCategoryIconContainer = (badge: string) => {
-    let bg = "bg-red-500/10";
-    let icon = <ShieldAlert className="w-4 h-4 text-red-400" />;
+    let bg = "bg-error/10";
+    let icon = <ShieldAlert className="w-4 h-4 text-error" />;
     if (badge === "Threat log") {
-      bg = "bg-red-500/10";
-      icon = <ShieldAlert className="w-4 h-4 text-red-400" />;
-    } else if (badge === "Dark web") {
-      bg = "bg-purple-500/10";
-      icon = <AlertTriangle className="w-4 h-4 text-purple-400" />;
+      bg = "bg-error/10";
+      icon = <ShieldAlert className="w-4 h-4 text-error" />;
     } else if (badge === "Domain shield") {
       bg = "bg-amber-500/10";
-      icon = <Globe className="w-4 h-4 text-amber-400" />;
+      icon = <Globe className="w-4 h-4 text-amber-700" />;
     } else if (badge === "Quarantine") {
-      bg = "bg-blue-500/10";
-      icon = <Inbox className="w-4 h-4 text-blue-400" />;
+      bg = "bg-primary/10";
+      icon = <Inbox className="w-4 h-4 text-primary" />;
     } else {
-      bg = "bg-neutral-500/10";
-      icon = <Cpu className="w-4 h-4 text-neutral-400" />;
+      bg = "bg-surface-low";
+      icon = <Cpu className="w-4 h-4 text-on-surface-variant" />;
     }
     return (
       <div className={`p-2 rounded-xl shrink-0 ${bg}`}>
@@ -194,23 +171,16 @@ export function TopBar({
   };
 
   const getBadgeStyle = (badge: string) => {
-    if (badge === "Threat log") return "bg-red-500/10 text-red-400 border border-red-500/20";
-    if (badge === "Dark web") return "bg-purple-500/10 text-purple-400 border border-purple-500/20";
-    if (badge === "Domain shield") return "bg-amber-500/10 text-amber-400 border border-amber-500/20";
-    return "bg-blue-500/10 text-blue-400 border border-blue-500/20";
+    if (badge === "Threat log") return "bg-error/10 text-error border border-error/20";
+    if (badge === "Domain shield") return "bg-amber-500/10 text-amber-700 border border-amber-500/20";
+    return "bg-primary/10 text-primary border border-primary/20";
   };
 
   return (
-    <header className="h-14 bg-transparent px-6 flex items-center justify-between shrink-0 relative z-40">
-      {/* Search */}
-      <div className="relative w-80">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/30" />
-        <input
-          type="text"
-          placeholder={i18n.language === "fr" ? "Rechercher des paramètres de sécurité..." : "Search security parameters..."}
-          onChange={(e) => onSearch?.(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 bg-white/70 backdrop-blur-md border border-border-subtle rounded-lg text-[13px] text-on-surface placeholder:text-on-surface-variant/35 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/15 transition-all shadow-sm"
-        />
+    <header className="h-14 bg-transparent px-0 flex items-center justify-between shrink-0 relative z-40">
+      {/* Title Placeholder / Brand Space to balance the header layout */}
+      <div className="font-display font-semibold text-sm text-on-surface-variant opacity-80">
+        {activeDomain ? `${activeDomain} Workspace` : "Sicurre Console"}
       </div>
 
       {/* Right Actions */}
@@ -222,8 +192,8 @@ export function TopBar({
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-safe" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-safe" />
             </span>
-            <span className="text-[9px] font-bold text-on-surface-variant/50 tracking-[0.12em] uppercase flex items-center gap-1">
-              <Cpu className="w-3 h-3" />
+            <span className="text-[9px] font-bold text-on-surface-variant/80 tracking-[0.12em] uppercase flex items-center gap-1">
+              <Cpu className="w-3 h-3 text-primary" />
               {i18n.language === "fr" ? "Système Actif" : "System Operational"}
             </span>
           </div>
@@ -235,7 +205,7 @@ export function TopBar({
             e.stopPropagation();
             setIsOpen(!isOpen);
           }}
-          className="relative p-2 rounded-lg text-on-surface-variant/60 hover:bg-white hover:text-on-surface hover:shadow-sm border border-transparent hover:border-border-subtle transition-all cursor-pointer bg-white/50 backdrop-blur-sm"
+          className="relative p-2 rounded-lg text-on-surface-variant/80 hover:bg-white hover:text-on-surface hover:shadow-sm border border-transparent hover:border-border-subtle transition-all cursor-pointer bg-white/50 backdrop-blur-sm"
         >
           <Bell className="w-[18px] h-[18px] stroke-[1.5]" />
           {unreadCount > 0 && (
@@ -247,21 +217,21 @@ export function TopBar({
         {isOpen && (
           <div
             onClick={(e) => e.stopPropagation()}
-            className="absolute right-0 top-11 w-96 bg-[#171717] border border-neutral-800 rounded-2xl shadow-2xl p-4 text-white z-50 animate-in fade-in slide-in-from-top-1 duration-150 font-sans"
+            className="absolute right-0 top-11 w-96 bg-white border border-border-subtle rounded-2xl shadow-xl p-4 text-on-surface z-50 animate-in fade-in slide-in-from-top-1 duration-150 font-sans"
           >
             {/* Popover Header */}
-            <div className="flex items-center justify-between pb-3.5 border-b border-neutral-800/80">
+            <div className="flex items-center justify-between pb-3.5 border-b border-border-subtle">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-sm">Notifications</span>
+                <span className="font-bold text-sm text-on-surface">Notifications</span>
                 {unreadCount > 0 && (
-                  <span className="text-[10px] font-bold bg-error/15 text-error px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-bold bg-error/10 text-error px-2 py-0.5 rounded-full">
                     {unreadCount} unread
                   </span>
                 )}
               </div>
               <button
                 onClick={markAllRead}
-                className="text-[11px] font-semibold text-primary hover:text-primary-hover transition-colors cursor-pointer"
+                className="text-[11px] font-bold text-primary hover:text-primary-hover transition-colors cursor-pointer"
               >
                 Mark all read
               </button>
@@ -275,10 +245,10 @@ export function TopBar({
                   <button
                     key={filter}
                     onClick={() => setActiveFilter(filter)}
-                    className={`px-3 py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer ${
+                    className={`px-3 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
                       isActive
-                        ? "bg-neutral-800 text-white border-neutral-700 shadow-sm"
-                        : "bg-transparent text-neutral-400 hover:text-neutral-200 border-transparent"
+                        ? "bg-surface-low text-primary border-primary/20 shadow-sm"
+                        : "bg-transparent text-on-surface-variant hover:text-on-surface border-transparent"
                     }`}
                   >
                     {filter}
@@ -290,7 +260,7 @@ export function TopBar({
             {/* Notification items list */}
             <div className="space-y-1.5 max-h-[340px] overflow-y-auto pt-1 select-none pr-1">
               {filteredNotifs.length === 0 ? (
-                <div className="text-center py-8 text-xs text-neutral-500">
+                <div className="text-center py-8 text-xs text-on-surface-variant">
                   No notifications matching filter
                 </div>
               ) : (
@@ -305,7 +275,7 @@ export function TopBar({
                         }
                         setIsOpen(false);
                       }}
-                      className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-neutral-800/50 transition-colors cursor-pointer border border-transparent hover:border-neutral-800"
+                      className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-surface-low transition-colors cursor-pointer border border-transparent hover:border-border-subtle"
                     >
                       {/* Icon */}
                       {getCategoryIconContainer(notif.badge)}
@@ -313,14 +283,14 @@ export function TopBar({
                       {/* Content */}
                       <div className="flex-1 min-w-0 space-y-0.5">
                         <div className="flex items-baseline justify-between gap-2">
-                          <span className="font-bold text-xs text-neutral-100 truncate block">
+                          <span className="font-bold text-xs text-on-surface truncate block">
                             {notif.title}
                           </span>
-                          <span className="text-[10px] text-neutral-500 font-mono shrink-0">
+                          <span className="text-[10px] text-on-surface-variant/70 font-mono shrink-0">
                             {notif.time}
                           </span>
                         </div>
-                        <p className="text-[11px] text-neutral-400 leading-normal truncate">
+                        <p className="text-[11px] text-on-surface-variant leading-normal truncate">
                           {notif.desc}
                         </p>
                         <div className="flex items-center justify-between pt-1">

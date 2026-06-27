@@ -52,6 +52,7 @@ async def _workspace_has_cloudflare_integration(workspace_id: str) -> bool:
 async def _session_payload(user: AuthUser) -> dict:
     threat_count = await _workspace_threat_count(user.workspace_id)
     has_integration = await _workspace_has_cloudflare_integration(user.workspace_id)
+    settings = get_settings()
     return {
         "id": user.id,
         "email": user.email,
@@ -65,6 +66,7 @@ async def _session_payload(user: AuthUser) -> dict:
         "onboarding_required": not user.is_platform_admin
         and not has_integration
         and threat_count == 0,
+        "sla_latency_ms": settings.sla_latency_ms,
     }
 
 

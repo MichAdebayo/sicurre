@@ -48,13 +48,16 @@ export function AppShell({
           <AlertBanner message={alertMessage} type={alertType} />
         )}
 
-        {/* Top Bar */}
-        <TopBar userName={userName} userRole={userRole} onPageChange={onPageChange} />
+        {/* Centered Layout Wrapper */}
+        <div className="max-w-[1200px] w-full mx-auto px-8 flex-1 flex flex-col min-h-0 overflow-hidden">
+          {/* Top Bar */}
+          <TopBar userName={userName} userRole={userRole} onPageChange={onPageChange} />
 
-        {/* Page Content */}
-        <main className="flex-1 overflow-y-auto px-8 py-6 max-w-[1200px] w-full">
-          {children}
-        </main>
+          {/* Page Content */}
+          <main className="flex-1 overflow-y-auto py-6">
+            {children}
+          </main>
+        </div>
       </div>
     </div>
   );

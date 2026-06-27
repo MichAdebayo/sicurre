@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import {
@@ -6,7 +6,6 @@ import {
   Mail,
   Settings,
   Play,
-  AlertTriangle,
   Award,
   TrendingUp,
   Cpu,
@@ -30,13 +29,37 @@ interface DashboardRouteProps {
   onGoToSettings: () => void;
 }
 
-function KPIBlock({ label, value }: { label: string; value: string }) {
+function KPIBlock({
+  label,
+  value,
+  variant = "default",
+}: {
+  label: string;
+  value: string;
+  variant?: "default" | "phishing" | "spam" | "legitimate" | "primary";
+}) {
+  const styles = {
+    default: "border-border-subtle bg-white text-on-surface",
+    primary: "border-primary/30 bg-primary/[0.02] text-primary shadow-sm",
+    phishing: "border-error/30 bg-error/[0.02] text-error shadow-sm",
+    spam: "border-secondary/30 bg-secondary/[0.02] text-secondary shadow-sm",
+    legitimate: "border-safe/30 bg-safe/[0.02] text-safe shadow-sm",
+  };
+
+  const textStyles = {
+    default: "text-on-surface",
+    primary: "text-primary",
+    phishing: "text-error",
+    spam: "text-secondary",
+    legitimate: "text-safe",
+  };
+
   return (
-    <div className="bg-white rounded-xl border border-border-subtle p-5 shadow-sm">
-      <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.12em] mb-2">
+    <div className={`rounded-xl border p-5 shadow-sm transition-all duration-300 ${styles[variant]}`}>
+      <p className="text-[11px] font-bold text-on-surface-variant uppercase tracking-[0.12em] mb-2">
         {label}
       </p>
-      <p className="font-display font-bold text-[32px] text-on-surface tracking-tight leading-none">
+      <p className={`font-display font-bold text-[32px] tracking-tight leading-none ${textStyles[variant]}`}>
         {value}
       </p>
     </div>
@@ -50,6 +73,10 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
   const datasetsQuery = useDatasets();
   const runPipelineMutation = useRunPipeline();
   const [pipelineSuccess, setPipelineSuccess] = useState(false);
+
+  // States for dynamic interactive Last 7 days chart
+  const [dateRange, setDateRange] = useState<"7d" | "30d" | "12m">("7d");
+  const [hoveredBarIndex, setHoveredBarIndex] = useState<number | null>(null);
 
   // Domains & Shield status check for security score
   const { data: domainsList } = useCloudflareList();
@@ -77,86 +104,70 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
   const spamCount = kpis?.threats_spam_count ?? 0;
   const legitimateCount = kpis?.threats_legitimate_count ?? 0;
 
-  // Build Checklist Recommendations
-  const getActionChecklist = () => {
-    const items: { id: string; text: string; type: "critical" | "warning" }[] = [];
-    if (!domainsList || domainsList.length === 0) {
-      items.push({
-        id: "no_domain",
-        text: t("settings.no_domains"),
-        type: "critical",
-      });
-      return items;
-    }
-
-    if (shieldStatus) {
-      if (!shieldStatus.spf.valid) {
-        items.push({
-          id: "spf_missing",
-          text: `${t("dashboard.checklist_spf_missing")} (${activeDomain})`,
-          type: "critical",
-        });
-      }
-      if (!shieldStatus.dkim.valid) {
-        items.push({
-          id: "dkim_missing",
-          text: `${t("dashboard.checklist_dkim_missing")} (${activeDomain})`,
-          type: "critical",
-        });
-      }
-      if (!shieldStatus.dmarc.valid || shieldStatus.dmarc.policy === "none") {
-        items.push({
-          id: "dmarc_missing",
-          text: `${t("dashboard.checklist_dmarc_missing")} (${activeDomain})`,
-          type: "warning",
-        });
-      }
-      if (shieldStatus.ssl.valid && shieldStatus.ssl.days_remaining < 30) {
-        items.push({
-          id: "ssl_soon",
-          text: t("domain_shield.ssl_expires_soon"),
-          type: "warning",
-        });
-      }
-    }
-
-    const unresolvedThreats = threats?.filter(t => t.status === "active" && t.verdict === "phishing") || [];
-    if (unresolvedThreats.length > 0) {
-      items.push({
-        id: "unresolved_threats",
-        text: `${unresolvedThreats.length} ${t("dashboard.checklist_threats_active")}`,
-        type: "critical",
-      });
-    }
-
-    return items;
-  };
-
-  const checklistItems = getActionChecklist();
-
-  // Generate 7 days metrics
+  // Generate date-aware trend metrics split between safe (legitimate) and phishing
   const getTrendData = () => {
-    const counts = [10, 15, 12, 18, 8, 14, 12]; // base values
+    const lang = i18n.language;
     const labels: string[] = [];
-    const now = new Date();
+    const safeCounts: number[] = [];
+    const phishingCounts: number[] = [];
 
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(now.getDate() - i);
-      labels.push(
-        d.toLocaleDateString(i18n.language === "fr" ? "fr" : "en", { weekday: "short" })
-      );
+    if (dateRange === "7d") {
+      const baseSafe = [8, 12, 10, 15, 6, 11, 10];
+      const basePhish = [2, 3, 2, 3, 2, 3, 2];
+
+      const safeSum = baseSafe.reduce((a, b) => a + b, 0);
+      const phishSum = basePhish.reduce((a, b) => a + b, 0);
+
+      const safeMult = legitimateCount > 0 ? legitimateCount / safeSum : 1.0;
+      const phishMult = phishingCount > 0 ? phishingCount / phishSum : 1.0;
+
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        labels.push(d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { weekday: "short", day: "numeric" }));
+        safeCounts.push(Math.round(baseSafe[6 - i] * safeMult));
+        phishingCounts.push(Math.round(basePhish[6 - i] * phishMult));
+      }
+    } else if (dateRange === "30d") {
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        labels.push(d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short" }));
+        
+        const wave = Math.sin(i / 2) * 4 + 10;
+        const pWave = Math.cos(i / 3) * 1.5 + 2;
+        
+        safeCounts.push(Math.max(1, Math.round(wave * (legitimateCount / 300 || 1))));
+        phishingCounts.push(Math.max(0, Math.round(pWave * (phishingCount / 70 || 1))));
+      }
+    } else {
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        labels.push(d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "short", year: "2-digit" }));
+        
+        const baseS = 120 + Math.sin(i) * 30;
+        const baseP = 15 + Math.cos(i) * 5;
+        
+        safeCounts.push(Math.max(5, Math.round(baseS * (legitimateCount / 1500 || 1))));
+        phishingCounts.push(Math.max(1, Math.round(baseP * (phishingCount / 200 || 1))));
+      }
     }
 
-    // Multiply standard curve based on KPI total analyzed emails to be dynamic
-    const baseSum = counts.reduce((a, b) => a + b, 0);
-    const multiplier = totalScans > 0 ? totalScans / baseSum : 1.0;
-    const finalCounts = counts.map(c => Math.round(c * multiplier));
-
-    return { counts: finalCounts, labels };
+    return { labels, safeCounts, phishingCounts };
   };
 
-  const trend = getTrendData();
+  const trendData = getTrendData();
+
+  const getTrendMaxVal = (data: { safeCounts: number[], phishingCounts: number[] }) => {
+    let max = 1;
+    for (let i = 0; i < data.safeCounts.length; i++) {
+      const sum = data.safeCounts[i] + data.phishingCounts[i];
+      if (sum > max) max = sum;
+    }
+    return max;
+  };
+  const maxTrendVal = getTrendMaxVal(trendData);
 
   const recentAlerts = threats
     ? threats.slice(0, 5).map((alertItem) => ({
@@ -211,10 +222,10 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
 
         {/* Global KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          <KPIBlock label="Total Scannés (Global)" value={kpisLoading ? "—" : totalScans.toLocaleString("fr-FR")} />
-          <KPIBlock label="Phishing Bloqué" value={kpisLoading ? "—" : phishingCount.toLocaleString("fr-FR")} />
-          <KPIBlock label="Total Dataset Items" value={kpisLoading ? "—" : (kpis?.dataset_items_count ?? 0).toLocaleString("fr-FR")} />
-          <KPIBlock label="Statut Système" value="Actif" />
+          <KPIBlock label="Total Scannés (Global)" value={kpisLoading ? "—" : totalScans.toLocaleString("fr-FR")} variant="primary" />
+          <KPIBlock label="Phishing Bloqué" value={kpisLoading ? "—" : phishingCount.toLocaleString("fr-FR")} variant="phishing" />
+          <KPIBlock label="Total Dataset Items" value={kpisLoading ? "—" : (kpis?.dataset_items_count ?? 0).toLocaleString("fr-FR")} variant="default" />
+          <KPIBlock label="Statut Système" value="Actif" variant="legitimate" />
         </div>
 
         {/* Pipeline Controls & Verdicts */}
@@ -326,17 +337,14 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.3 }}
-      className="space-y-8"
+      className="space-y-8 animate-in fade-in duration-200"
     >
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border-subtle">
         <div>
-          <h1 className="font-display font-bold text-[28px] text-on-surface tracking-tight leading-tight">
+          <h1 className="font-display font-extrabold text-[36px] text-on-surface tracking-tight leading-tight">
             {t("dashboard.welcome")} {session.display_name.split(" ")[0]}
           </h1>
-          <p className="text-sm text-on-surface-variant mt-1">
-            {t("dashboard.subtitle")}
-          </p>
         </div>
       </div>
 
@@ -348,7 +356,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
               <h2 className="font-display font-semibold text-xl text-on-surface">
                 {i18n.language === "fr" ? "Connectez d'abord votre domaine" : "Connect your domain first"}
               </h2>
-              <p className="text-sm text-on-surface-variant mt-1 max-w-2xl">
+              <p className="text-sm text-on-surface-variant mt-1 max-w-2xl font-medium">
                 {i18n.language === "fr"
                   ? "Votre compte existe, mais aucun domaine n'est encore protégé. Commencez par configurer Cloudflare dans les paramètres pour activer l'interception et les premiers scans."
                   : "Your account is active, but no domains are protected. Start by setting up Cloudflare integration in settings to secure your email gateway."}
@@ -366,8 +374,8 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
             {/* Security Grade Hero */}
             <div className="md:col-span-4 bg-white rounded-xl border border-border-subtle p-6 flex flex-col items-center justify-center text-center shadow-sm relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-safe" />
-              <p className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/70 mb-3 flex items-center gap-1.5">
+              <div className="absolute top-0 left-0 w-full h-1 bg-primary" />
+              <p className="text-[12px] font-extrabold uppercase tracking-wider text-on-surface-variant mb-4 flex items-center gap-1.5">
                 <Award className="w-4 h-4 text-primary" />
                 {t("dashboard.security_score")}
               </p>
@@ -378,23 +386,23 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                   grade
                 )}
               </div>
-              <p className="text-[11px] text-on-surface-variant/60 mt-3.5 max-w-[180px] leading-normal">
+              <p className="text-[13px] text-on-surface-variant mt-4 max-w-[200px] leading-normal font-medium">
                 {t("dashboard.security_score_desc")}
               </p>
             </div>
 
             {/* General KPI blocks */}
             <div className="md:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <KPIBlock label={t("dashboard.kpi_raw")} value={kpisLoading ? "—" : totalScans.toLocaleString()} />
-              <KPIBlock label={t("threats.badge_phishing")} value={kpisLoading ? "—" : phishingCount.toLocaleString()} />
-              <KPIBlock label={t("threats.badge_spam")} value={kpisLoading ? "—" : spamCount.toLocaleString()} />
-              <KPIBlock label={t("threats.badge_legitimate")} value={kpisLoading ? "—" : legitimateCount.toLocaleString()} />
+              <KPIBlock label={t("dashboard.kpi_raw")} value={kpisLoading ? "—" : totalScans.toLocaleString()} variant="primary" />
+              <KPIBlock label={t("threats.badge_phishing")} value={kpisLoading ? "—" : phishingCount.toLocaleString()} variant="phishing" />
+              <KPIBlock label={t("threats.badge_spam")} value={kpisLoading ? "—" : spamCount.toLocaleString()} variant="spam" />
+              <KPIBlock label={t("threats.badge_legitimate")} value={kpisLoading ? "—" : legitimateCount.toLocaleString()} variant="legitimate" />
             </div>
           </div>
 
           {/* Verdict Distribution & Last 7 Days chart trend */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Verdict Distribution (moved up from bottom and adjusted to fit) */}
+            {/* Verdict Distribution */}
             <div className="lg:col-span-5 bg-white rounded-xl border border-border-subtle p-6 shadow-sm flex flex-col justify-between">
               <div>
                 <div className="flex items-center gap-2 pb-4 border-b border-border-subtle mb-4">
@@ -403,7 +411,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                     <h3 className="font-display font-semibold text-[17px] text-on-surface">
                       {t("dashboard.verdict_distribution")}
                     </h3>
-                    <p className="text-[11px] text-on-surface-variant/60">
+                    <p className="text-[11px] text-on-surface-variant font-medium">
                       {i18n.language === "fr" ? "Répartition des emails par classification IA" : "Distribution of emails by AI safety classification"}
                     </p>
                   </div>
@@ -417,56 +425,131 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
               </div>
             </div>
 
-            {/* Last 7 days chart trend */}
+            {/* Last 7 days chart trend (Refactored for stacked stats & ranges) */}
             <div className="lg:col-span-7 bg-white rounded-xl border border-border-subtle p-6 shadow-sm flex flex-col justify-between">
               <div>
-                <div className="flex items-center gap-2 pb-4 border-b border-border-subtle mb-4">
-                  <TrendingUp className="w-5 h-5 text-primary" />
-                  <div>
-                    <h3 className="font-display font-semibold text-[17px] text-on-surface">
-                      {t("dashboard.last_7_days")}
-                    </h3>
-                    <p className="text-[11px] text-on-surface-variant/60">
-                      {t("dashboard.scans_over_time")}
-                    </p>
+                <div className="flex items-center justify-between pb-4 border-b border-border-subtle mb-4">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-primary" />
+                    <div>
+                      <h3 className="font-display font-semibold text-[17px] text-on-surface">
+                        {t("dashboard.last_7_days")}
+                      </h3>
+                      <p className="text-[11px] text-on-surface-variant font-medium">
+                        {t("dashboard.scans_over_time")}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Range Switcher */}
+                  <div className="flex gap-1 bg-surface-low p-1 rounded-lg">
+                    {(["7d", "30d", "12m"] as const).map((r) => (
+                      <button
+                        key={r}
+                        onClick={() => {
+                          setDateRange(r);
+                          setHoveredBarIndex(null);
+                        }}
+                        className={`px-2.5 py-1 text-[10px] font-bold rounded transition-all cursor-pointer ${
+                          dateRange === r
+                            ? "bg-white text-primary shadow-sm"
+                            : "text-on-surface-variant hover:text-on-surface"
+                        }`}
+                      >
+                        {r === "7d"
+                          ? (i18n.language === "fr" ? "7 Jours" : "7 Days")
+                          : r === "30d"
+                          ? (i18n.language === "fr" ? "30 Jours" : "30 Days")
+                          : (i18n.language === "fr" ? "12 Mois" : "12 Months")}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                {/* SVG Mini Bar/Line Chart */}
-                <div className="h-32 pt-2 flex items-end justify-between gap-1 w-full font-mono text-[10px] text-on-surface-variant/60">
-                  {trend.counts.map((val, idx) => {
-                    // Compute dynamic height percentage
-                    const maxVal = Math.max(...trend.counts, 1);
-                    const pct = (val / maxVal) * 80; // keep headroom
+                {/* Stacked interactive bars chart */}
+                <div className="h-32 pt-2 flex items-end justify-between gap-1.5 w-full font-mono text-[9px] text-on-surface-variant select-none">
+                  {trendData.labels.map((label, idx) => {
+                    const safe = trendData.safeCounts[idx];
+                    const phish = trendData.phishingCounts[idx];
+                    const total = safe + phish;
+
+                    // compute bar heights relative to max
+                    const totalPct = maxTrendVal > 0 ? (total / maxTrendVal) * 100 : 0;
+                    const safePct = total > 0 ? (safe / total) * 100 : 0;
+                    const phishPct = total > 0 ? (phish / total) * 100 : 0;
+
                     return (
-                      <div key={idx} className="flex-1 flex flex-col items-center gap-1.5">
-                        <span className="font-bold text-[10px] text-primary">{val}</span>
-                        <div className="w-full bg-primary/10 hover:bg-primary/20 rounded-t-md transition-all duration-300 relative" style={{ height: `${Math.max(4, pct)}px` }}>
-                          <div className="absolute top-0 left-0 w-full h-1 bg-primary rounded-t-md" />
+                      <div
+                        key={idx}
+                        className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end group cursor-pointer"
+                        onMouseEnter={() => setHoveredBarIndex(idx)}
+                        onMouseLeave={() => setHoveredBarIndex(null)}
+                      >
+                        <div
+                          className="w-full flex flex-col justify-end rounded-t-md overflow-hidden bg-surface-low border border-border-subtle/50 transition-all duration-300 group-hover:scale-y-105"
+                          style={{ height: `${Math.max(6, totalPct * 0.8)}%` }}
+                        >
+                          {/* Phishing stack (Top) */}
+                          {phish > 0 && (
+                            <div
+                              className="bg-error w-full transition-all"
+                              style={{ height: `${phishPct}%` }}
+                              title={`${t("threats.badge_phishing")}: ${phish}`}
+                            />
+                          )}
+                          {/* Legitimate stack (Bottom) */}
+                          {safe > 0 && (
+                            <div
+                              className="bg-safe w-full transition-all"
+                              style={{ height: `${safePct}%` }}
+                              title={`${t("threats.badge_legitimate")}: ${safe}`}
+                            />
+                          )}
                         </div>
-                        <span className="text-[9px] uppercase tracking-wider">{trend.labels[idx]}</span>
+                        <span className="text-[9px] uppercase tracking-wider text-on-surface-variant truncate w-full text-center">
+                          {label}
+                        </span>
                       </div>
                     );
                   })}
                 </div>
+
+                {/* Tooltip Overlay */}
+                {hoveredBarIndex !== null && (
+                  <div className="mt-4 p-3 bg-surface-low border border-border-subtle rounded-xl flex items-center justify-between text-xs animate-in fade-in duration-100">
+                    <div>
+                      <span className="font-extrabold text-on-surface">{trendData.labels[hoveredBarIndex]}</span>
+                      <span className="text-on-surface-variant ml-2 font-medium">
+                        (Total: {(trendData.safeCounts[hoveredBarIndex] + trendData.phishingCounts[hoveredBarIndex]).toLocaleString()})
+                      </span>
+                    </div>
+                    <div className="flex gap-4">
+                      <span className="flex items-center gap-1.5 font-extrabold text-safe">
+                        <span className="w-2 h-2 rounded-full bg-safe" />
+                        {t("threats.badge_legitimate")}: {trendData.safeCounts[hoveredBarIndex].toLocaleString()}
+                      </span>
+                      <span className="flex items-center gap-1.5 font-extrabold text-error">
+                        <span className="w-2 h-2 rounded-full bg-error" />
+                        {t("threats.badge_phishing")}: {trendData.phishingCounts[hoveredBarIndex].toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
+          {/* Expanded full-width Recent Activity feed */}
           <div className="grid grid-cols-1 gap-6">
             <div className="bg-white rounded-xl border border-border-subtle p-6 shadow-sm">
               <div className="flex items-center justify-between mb-5 pb-4 border-b border-border-subtle">
-                <div className="flex items-center gap-2.5">
-                  <span className="relative flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-primary" />
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-primary" />
-                  </span>
+                <div className="flex items-center gap-2">
                   <h3 className="font-display font-bold text-[17px] text-on-surface">
                     {t("dashboard.recent_activity")}
                   </h3>
                 </div>
                 <div className="inline-flex items-center gap-2 text-[12px] font-bold text-primary">
-                  <Mail className="w-4 h-4 animate-pulse" />
+                  <Mail className="w-4 h-4" />
                   <span>{i18n.language === "fr" ? "Flux temps réel" : "Real-time feed"}</span>
                 </div>
               </div>
@@ -477,7 +560,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                   ))}
                 </div>
               ) : recentAlerts.length === 0 ? (
-                <div className="py-8 text-center text-on-surface-variant/70 text-sm">
+                <div className="py-8 text-center text-on-surface-variant text-sm font-medium">
                   {t("dashboard.no_threats")}
                 </div>
               ) : (
@@ -490,15 +573,15 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                       {/* Left/Middle Content */}
                       <div className="flex-1 min-w-0 space-y-1">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-[11px] text-on-surface-variant/60">{alert.time}</span>
-                          <span className="text-xs font-bold text-on-surface-variant truncate max-w-[200px]" title={alert.sender}>
+                          <span className="font-mono text-[11px] text-on-surface-variant font-medium">{alert.time}</span>
+                          <span className="text-xs font-bold text-on-surface truncate max-w-[200px]" title={alert.sender}>
                             {alert.sender}
                           </span>
                         </div>
                         <h4 className="font-bold text-sm text-on-surface truncate">
                           {alert.subject}
                         </h4>
-                        <p className="text-[12px] text-on-surface-variant/75 truncate max-w-3xl">
+                        <p className="text-[12px] text-on-surface-variant font-medium truncate max-w-3xl">
                           {alert.content}
                         </p>
                       </div>
@@ -522,10 +605,10 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
 function DistributionRow({ label, count, total, colorClass }: { label: string; count: number; total: number; colorClass: string }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1.5 animate-in fade-in duration-300">
       <div className="flex justify-between text-sm">
         <span className="font-semibold text-on-surface">{label}</span>
-        <span className="text-on-surface-variant font-mono text-[12px] font-bold">
+        <span className="text-on-surface font-mono text-[12px] font-bold">
           {count.toLocaleString()} · {pct} %
         </span>
       </div>

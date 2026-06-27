@@ -27,7 +27,7 @@ export function VerdictBadge({ verdict, confidence }: VerdictBadgeProps) {
   return (
     <div
       className={clsx(
-        "inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-body-sm font-semibold transition-all select-none",
+        "inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-body-sm font-semibold transition-all select-none whitespace-nowrap",
         badgeStyles,
       )}
     >

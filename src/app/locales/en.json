@@ -81,7 +81,7 @@
     "phishing": "Phishing",
     "spam": "Spam",
     "legitimate": "Legitimate",
-    "timestamp": "Timestamp",
+    "timestamp": "Date",
     "sender": "Sender",
     "actions": "Actions",
     "latency": "Latency",

@@ -142,7 +142,7 @@ export default function App() {
     >
       <AnimatePresence mode="wait">
         {activePage === "dashboard" && <DashboardRoute key="dashboard" session={session} onGoToSettings={() => setActivePage("settings")} />}
-        {activePage === "threats" && <ThreatsRoute key="threats" />}
+        {activePage === "threats" && <ThreatsRoute key="threats" session={session} />}
         {activePage === "quarantine" && <QuarantineRoute key="quarantine" />}
         {activePage === "alerts" && <AlertsRoute key="alerts" />}
         {activePage === "domain-shield" && <DomainShieldRoute key="domain-shield" />}

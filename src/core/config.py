@@ -99,6 +99,7 @@ class Settings(BaseSettings):
     )
     scheduler_enabled: bool = False
     scheduler_interval_seconds: int = 604800
+    sla_latency_ms: int = 10000
 
     # Google OAuth credentials configuration
     google_client_id: str | None = Field(
