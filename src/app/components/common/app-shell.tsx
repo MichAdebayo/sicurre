@@ -48,13 +48,15 @@ export function AppShell({
           <AlertBanner message={alertMessage} type={alertType} />
         )}
 
-        {/* Centered Layout Wrapper */}
-        <div className="max-w-[1200px] w-full mx-auto px-8 flex-1 flex flex-col min-h-0 overflow-hidden">
+        {/* Balanced Content Wrapper */}
+        <div className="w-full flex-1 flex flex-col min-h-0 overflow-hidden">
           {/* Top Bar */}
-          <TopBar userName={userName} userRole={userRole} onPageChange={onPageChange} />
+          <div className="px-8">
+            <TopBar userName={userName} userRole={userRole} onPageChange={onPageChange} />
+          </div>
 
           {/* Page Content */}
-          <main className="flex-1 overflow-y-auto pt-8 pb-6 px-6">
+          <main className="flex-1 overflow-y-auto pt-8 pb-6 pl-8 pr-12">
             {children}
           </main>
         </div>

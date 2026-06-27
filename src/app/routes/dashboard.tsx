@@ -134,10 +134,10 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
         const d = new Date();
         d.setDate(d.getDate() - i);
         labels.push(d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short" }));
-
+        
         const wave = Math.sin(i / 2) * 4 + 10;
         const pWave = Math.cos(i / 3) * 1.5 + 2;
-
+        
         safeCounts.push(Math.max(1, Math.round(wave * (legitimateCount / 300 || 1))));
         phishingCounts.push(Math.max(0, Math.round(pWave * (phishingCount / 70 || 1))));
       }
@@ -146,10 +146,10 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
         const d = new Date();
         d.setMonth(d.getMonth() - i);
         labels.push(d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "short", year: "2-digit" }));
-
+        
         const baseS = 120 + Math.sin(i) * 30;
         const baseP = 15 + Math.cos(i) * 5;
-
+        
         safeCounts.push(Math.max(5, Math.round(baseS * (legitimateCount / 1500 || 1))));
         phishingCounts.push(Math.max(1, Math.round(baseP * (phishingCount / 200 || 1))));
       }
@@ -172,14 +172,14 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
 
   const recentAlerts = threats
     ? threats.slice(0, 5).map((alertItem) => ({
-      id: alertItem.id,
-      time: new Date(alertItem.received_at).toLocaleTimeString(i18n.language === "fr" ? "fr-FR" : "en-US", { hour: "2-digit", minute: "2-digit" }),
-      subject: alertItem.subject || t("threats.no_subject"),
-      sender: alertItem.sender,
-      content: alertItem.body_preview || "",
-      verdict: alertItem.verdict,
-      confidence: alertItem.confidence,
-    }))
+        id: alertItem.id,
+        time: new Date(alertItem.received_at).toLocaleTimeString(i18n.language === "fr" ? "fr-FR" : "en-US", { hour: "2-digit", minute: "2-digit" }),
+        subject: alertItem.subject || t("threats.no_subject"),
+        sender: alertItem.sender,
+        content: alertItem.body_preview || "",
+        verdict: alertItem.verdict,
+        confidence: alertItem.confidence,
+      }))
     : [];
 
   const securityScoreGrade = () => {
@@ -240,7 +240,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                 Déclenchez manuellement le cycle de normalisation, d'annotation et d'export du dataset vers Cloudflare R2 et Kaggle pour ré-entraîner le modèle CamemBERTav2.
               </p>
             </div>
-
+            
             <div className="space-y-4">
               {pipelineSuccess && (
                 <div className="p-3 bg-safe/10 border border-safe/25 text-safe text-xs font-semibold rounded-lg">
@@ -311,8 +311,9 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                       <td className="py-3.5 pl-2 font-mono text-[13px] font-semibold text-on-surface">{ds.version_tag}</td>
                       <td className="py-3.5 font-semibold text-on-surface">{ds.item_count.toLocaleString("fr-FR")}</td>
                       <td className="py-3.5">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${ds.status === "frozen" ? "bg-safe/10 text-safe" : "bg-warning/10 text-warning"
-                          }`}>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${
+                          ds.status === "frozen" ? "bg-safe/10 text-safe" : "bg-warning/10 text-warning"
+                        }`}>
                           {ds.status}
                         </span>
                       </td>
@@ -378,7 +379,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
               <div className="text-[12px] font-extrabold uppercase tracking-wider text-on-surface-variant mb-5 flex items-center justify-center gap-1.5 w-full">
                 <Award className="w-4 h-4 text-primary" />
                 <span>{t("dashboard.security_score")}</span>
-
+                
                 {/* Tooltip trigger with high z-index and border styling */}
                 <div className="relative group">
                   <Info className="w-3.5 h-3.5 text-on-surface-variant/50 cursor-help hover:text-primary transition-colors" />
@@ -405,7 +406,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
             </div>
           </div>
 
-          {/* Verdict Distribution & Last 7 Days chart trend */}
+          {/* Verdict Distribution & Trend Analysis chart */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Verdict Distribution */}
             <div className="lg:col-span-5 bg-white rounded-xl border border-border-subtle p-6 shadow-sm flex flex-col justify-between">
@@ -422,7 +423,8 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                   </div>
                 </div>
 
-                <div className="space-y-4 pt-1">
+                {/* Vertical gaps spacing expanded to distribute elements more evenly in space */}
+                <div className="space-y-7 pt-4 pb-2">
                   <DistributionRow label={t("threats.badge_legitimate")} count={legitimateCount} total={Math.max(totalScans, 1)} colorClass="bg-safe" />
                   <DistributionRow label={t("threats.badge_spam")} count={spamCount} total={Math.max(totalScans, 1)} colorClass="bg-secondary" />
                   <DistributionRow label={t("threats.badge_phishing")} count={phishingCount} total={Math.max(totalScans, 1)} colorClass="bg-error" />
@@ -430,7 +432,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
               </div>
             </div>
 
-            {/* Last 7 days chart trend (Height Increased, Title renamed, light-adapted tooltip) */}
+            {/* Trend Analysis chart trend (Height Increased, Title renamed, light-adapted tooltip breakdown only) */}
             <div className="lg:col-span-7 bg-white rounded-xl border border-border-subtle p-6 shadow-sm flex flex-col justify-between relative min-h-[350px]">
               <div>
                 <div className="flex items-center justify-between pb-4 border-b border-border-subtle mb-4">
@@ -455,26 +457,28 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                           setDateRange(r);
                           setHoveredBarIndex(null);
                         }}
-                        className={`px-2.5 py-1 text-[10px] font-bold rounded transition-all cursor-pointer ${dateRange === r
-                          ? "bg-white text-primary shadow-sm"
-                          : "text-on-surface-variant hover:text-on-surface"
-                          }`}
+                        className={`px-2.5 py-1 text-[10px] font-bold rounded transition-all cursor-pointer ${
+                          dateRange === r
+                            ? "bg-white text-primary shadow-sm"
+                            : "text-on-surface-variant hover:text-on-surface"
+                        }`}
                       >
                         {r === "7d"
                           ? (i18n.language === "fr" ? "7 Jours" : "7 Days")
                           : r === "30d"
-                            ? (i18n.language === "fr" ? "30 Jours" : "30 Days")
-                            : (i18n.language === "fr" ? "12 Mois" : "12 Months")}
+                          ? (i18n.language === "fr" ? "30 Jours" : "30 Days")
+                          : (i18n.language === "fr" ? "12 Mois" : "12 Months")}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Stacked interactive bars chart wrapped in overflow container (Height increased to h-48) */}
+                {/* Stacked interactive bars chart wrapped in overflow container (Height increased to h-56) */}
                 <div className="w-full overflow-x-auto select-none scrollbar-none pb-1">
-                  <div
-                    className={`h-48 pt-2 flex items-end justify-between gap-2.5 w-full font-sans text-[10px] font-bold text-on-surface-variant select-none ${dateRange !== "7d" ? "min-w-[650px]" : ""
-                      }`}
+                  <div 
+                    className={`h-56 pt-2 flex items-end justify-between gap-2.5 w-full font-sans text-[10px] font-bold text-on-surface-variant select-none ${
+                      dateRange !== "7d" ? "min-w-[650px]" : ""
+                    }`}
                   >
                     {trendData.labels.map((label, idx) => {
                       const safe = trendData.safeCounts[idx];
@@ -498,6 +502,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                             {total}
                           </span>
 
+                          {/* Removed standard HTML browser titles */}
                           <div
                             className="w-full flex flex-col justify-end rounded-t-md overflow-hidden bg-surface-low border border-border-subtle/50 transition-all duration-300 group-hover:scale-y-105"
                             style={{ height: `${Math.max(6, totalPct * 0.78)}%` }}
@@ -526,16 +531,10 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                   </div>
                 </div>
 
-                {/* Absolute Floating Tooltip Card (Premium Light Mode adapted card) */}
+                {/* Absolute Floating Tooltip Card (Only displays breakdown counts, no date/totals) */}
                 {hoveredBarIndex !== null && (
                   <div className="absolute top-16 right-6 z-35 p-3 bg-white border border-border-subtle text-on-surface rounded-xl text-[11px] shadow-xl flex flex-col gap-1.5 w-44 font-sans select-none pointer-events-none animate-in fade-in duration-100">
-                    <div className="font-extrabold text-on-surface border-b border-border-subtle pb-1.5 mb-1 flex justify-between items-center">
-                      <span>{trendData.labels[hoveredBarIndex]}</span>
-                      <span className="text-[10px] text-on-surface-variant font-mono">
-                        Total: {trendData.safeCounts[hoveredBarIndex] + trendData.phishingCounts[hoveredBarIndex]}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2 font-bold text-safe">
+                    <div className="flex items-center justify-between gap-2 font-bold text-safe border-b border-border-subtle/40 pb-1.5 mb-0.5">
                       <span className="flex items-center gap-1.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-safe" />
                         {t("threats.badge_legitimate")}
@@ -565,13 +564,14 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-safe" />
                     <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-safe" />
                   </span>
-                  <h3 className="font-display font-bold text-[17px] text-on-surface animate-pulse">
-                    {i18n.language === "fr" ? "Emails Récemment Scannés" : "Live Activity"}
+                  {/* Text size increased to match Live Feed titles */}
+                  <h3 className="font-display font-bold text-[19px] text-on-surface">
+                    {i18n.language === "fr" ? "Emails Récemment Scannés" : "Recent Emails Scanned"}
                   </h3>
                 </div>
                 <div className="inline-flex items-center gap-2 text-[12px] font-bold text-primary">
                   <Mail className="w-4 h-4" />
-                  <span>{i18n.language === "fr" ? "Flux Live" : "Recent Emails Scanned"}</span>
+                  <span>{i18n.language === "fr" ? "Flux Live" : "Recent Scans"}</span>
                 </div>
               </div>
               {threatsLoading ? (

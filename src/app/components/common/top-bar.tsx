@@ -29,7 +29,38 @@ export function TopBar({
   const { t, i18n } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<"All" | "Critical" | "Domain" | "System">("All");
-  const [readIds, setReadIds] = useState<string[]>([]);
+
+  // Persistent notification read IDs using localStorage
+  const [readIds, setReadIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem("sicurre_read_notif_ids");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("sicurre_read_notif_ids", JSON.stringify(readIds));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [readIds]);
+
+  const timeSince = (dateStr: string) => {
+    if (!dateStr) return i18n.language === "fr" ? "à l'instant" : "just now";
+    const now = new Date();
+    const diff = now.getTime() - new Date(dateStr).getTime();
+    if (isNaN(diff) || diff < 0) return i18n.language === "fr" ? "à l'instant" : "just now";
+    
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return i18n.language === "fr" ? "à l'instant" : "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return new Date(dateStr).toLocaleDateString(i18n.language === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short" });
+  };
 
   // Load real-time workspace data to build dynamic actionable notifications
   const { data: threats } = useThreatLogs();
@@ -70,7 +101,7 @@ export function TopBar({
       id: "phish_blocked_" + latest.id,
       title: i18n.language === "fr" ? "Email de phishing bloqué" : "Phishing email blocked",
       desc: `${latest.sender} · ${latest.subject}`,
-      time: "just now",
+      time: timeSince(latest.received_at),
       badge: "Threat log",
       category: "Critical" as const,
       page: "threats" as const,
@@ -112,7 +143,7 @@ export function TopBar({
       id: "quarantine_held",
       title: i18n.language === "fr" ? `${quarantineItems.length} emails en quarantaine` : `${quarantineItems.length} emails waiting in quarantine`,
       desc: `Held from: ${quarantineItems.map(i => i.sender.split("@")[0]).slice(0, 2).join(", ")}...`,
-      time: "14h ago",
+      time: quarantineItems && quarantineItems.length > 0 ? timeSince(quarantineItems[0].created_at) : "14h ago",
       badge: "Quarantine",
       category: "System" as const,
       page: "quarantine" as const,

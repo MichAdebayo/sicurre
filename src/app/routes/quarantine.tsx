@@ -43,14 +43,23 @@ export default function QuarantineRoute() {
   const [actionError, setActionError] = useState("");
 
   const getRemainingTime = (expiresAtStr: string) => {
+    if (!expiresAtStr) return "14 d";
     const expiry = new Date(expiresAtStr).getTime();
+    if (isNaN(expiry)) {
+      return "14 d";
+    }
     const now = new Date().getTime();
     const diff = expiry - now;
     if (diff <= 0) return t("quarantine.expired") || "Expired";
 
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    return `${days} ${t("quarantine.days")} ${hours} ${t("quarantine.hours")}`;
+    
+    if (isNaN(days) || isNaN(hours)) {
+      return "14 d";
+    }
+    
+    return `${days} d ${hours} h`;
   };
 
   const handleRelease = async (id: string) => {
@@ -183,7 +192,7 @@ export default function QuarantineRoute() {
             {paginatedItems.map((item) => (
               <div
                 key={item.id}
-                className="bg-white border border-border-subtle rounded-2xl p-5 hover:shadow-md hover:border-primary/20 transition-all flex flex-col justify-between h-44 cursor-default group relative shadow-sm"
+                className="bg-white border border-border-subtle rounded-2xl p-5 hover:-translate-y-1 hover:shadow-md hover:border-primary/20 transition-all duration-200 flex flex-col justify-between h-44 cursor-default group relative shadow-sm"
               >
                 <div>
                   <div className="flex items-center justify-between gap-2">
@@ -206,10 +215,13 @@ export default function QuarantineRoute() {
                     {getRemainingTime(item.expires_at)}
                   </span>
                   
+                  {/* Eyeball icon color changes only when the modal is open or active */}
                   <Button
-                    variant="outline"
+                    variant={selectedItem?.id === item.id ? "primary" : "outline"}
                     size="sm"
-                    className="text-xs px-2.5 cursor-pointer h-8 group-hover:bg-primary group-hover:text-on-primary group-hover:border-primary transition-all duration-300"
+                    className={`text-xs px-2.5 cursor-pointer h-8 transition-colors ${
+                      selectedItem?.id === item.id ? "" : "text-on-surface-variant hover:text-primary hover:border-primary"
+                    }`}
                     onClick={() => setSelectedItem(item)}
                   >
                     <Eye className="w-4 h-4" />
@@ -219,8 +231,8 @@ export default function QuarantineRoute() {
             ))}
           </div>
 
-          {/* Grid pagination control buttons */}
-          {totalPages > 1 && (
+          {/* Grid pagination control buttons (rendered unconditionally for page 1 of 1) */}
+          {totalPages >= 1 && (
             <div className="flex items-center justify-between px-2 py-4 border-t border-border-subtle/50 font-sans select-none pt-6 mt-2">
               <span className="text-xs text-on-surface-variant font-bold">
                 {i18n.language === "fr"

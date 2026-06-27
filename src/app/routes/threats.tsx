@@ -6,12 +6,10 @@ import {
   Download,
   Trash2,
   AlertTriangle,
-  Calendar,
 } from "lucide-react";
 import {
   useThreatLogs,
   useUpdateThreatStatus,
-  ThreatLog,
   AuthSession,
 } from "../lib/api";
 import { VerdictBadge } from "../components/threats/verdict-badge";
@@ -194,7 +192,7 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
         </div>
       )}
 
-      {/* Latency Analysis Card (Width constrained to w-[96%]) */}
+      {/* Latency Analysis Card */}
       <div className="bg-white rounded-xl border border-border-subtle p-6 shadow-sm relative min-h-[320px]">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
           <div>
@@ -205,7 +203,8 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
               {i18n.language === "fr" ? "Temps de réponse moyen du moteur de classification IA" : "Average response time of the AI classification engine"}
             </p>
           </div>
-          <div className="flex items-center gap-4 text-xs font-bold text-on-surface-variant">
+          {/* Spacing gap increased to gap-8 between SLA and Operations legend */}
+          <div className="flex items-center gap-8 text-xs font-bold text-on-surface-variant">
             <div className="flex items-center gap-1.5">
               <span className="w-6 h-px border-t border-dashed border-primary" />
               <span>SLA ({slaMs} ms)</span>
@@ -217,7 +216,7 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
           </div>
         </div>
 
-        {/* Unified Font X/Y Axis Chart (Width constrained) */}
+        {/* Unified Font X/Y Axis Chart */}
         <div className="w-[96%] mx-auto h-56 pt-2 relative">
           <svg className="w-full h-full overflow-visible" viewBox="0 0 1000 220" preserveAspectRatio="none">
             {/* Grid */}
@@ -276,6 +275,30 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
               );
             })}
           </svg>
+
+          {/* Absolute Floating Tooltip Card (Rendered in-place snapping above the hovered point, no date line) */}
+          {hoveredLatencyIndex !== null && (
+            <div
+              className="absolute z-30 p-2.5 bg-white border border-border-subtle text-on-surface rounded-xl text-[11px] shadow-xl flex flex-col gap-1 w-40 font-sans select-none pointer-events-none animate-in fade-in duration-100 -translate-x-1/2"
+              style={{
+                left: `${points[hoveredLatencyIndex].x / 10}%`,
+                top: `${points[hoveredLatencyIndex].y - 65}px`,
+              }}
+            >
+              <div className="flex justify-between text-on-surface-variant font-bold">
+                <span>Avg Latency:</span>
+                <span className="font-mono text-primary">{latencyData[hoveredLatencyIndex].latency} ms</span>
+              </div>
+              <div className="flex justify-between font-bold mt-0.5">
+                <span>SLA Diff:</span>
+                {latencyData[hoveredLatencyIndex].diffPct > 0 ? (
+                  <span className="text-error">+{latencyData[hoveredLatencyIndex].diffPct}%</span>
+                ) : (
+                  <span className="text-safe">{latencyData[hoveredLatencyIndex].diffPct}%</span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* X-axis date labels */}
@@ -286,30 +309,9 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
             </div>
           ))}
         </div>
-
-        {/* Absolute Floating Tooltip Card (Premium light-mode contrast card) */}
-        {hoveredLatencyIndex !== null && (
-          <div className="absolute top-16 right-6 z-30 p-3 bg-white border border-border-subtle text-on-surface rounded-xl text-[11px] shadow-xl flex flex-col gap-1 w-48 font-sans select-none pointer-events-none animate-in fade-in duration-100">
-            <div className="font-extrabold text-on-surface border-b border-border-subtle pb-1.5 mb-1.5">
-              {latencyData[hoveredLatencyIndex].label}
-            </div>
-            <div className="flex justify-between text-on-surface-variant font-semibold">
-              <span>Avg Speed:</span>
-              <span className="font-mono">{latencyData[hoveredLatencyIndex].latency} ms</span>
-            </div>
-            <div className="flex justify-between font-bold mt-0.5">
-              <span>SLA Target:</span>
-              {latencyData[hoveredLatencyIndex].diffPct > 0 ? (
-                <span className="text-error">+{latencyData[hoveredLatencyIndex].diffPct}% above</span>
-              ) : (
-                <span className="text-safe">{latencyData[hoveredLatencyIndex].diffPct}% below</span>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Filters (With date filter select dropdown) */}
+      {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
           {/* Text search */}
@@ -363,7 +365,7 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
         </div>
       </div>
 
-      {/* Threats Table (Spans full width unconditionally; no inline latency, no eyeballs, delete action only) */}
+      {/* Threats Table (Spans full width unconditionally) */}
       <div className="bg-white rounded-xl border border-border-subtle overflow-hidden shadow-sm">
         {isLoading ? (
           <div className="p-6 space-y-3">
@@ -388,6 +390,7 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
                   <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[25%] min-w-[170px]">{t("threats.timestamp")}</th>
                   <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[30%] min-w-[180px]">{t("threats.sender")}</th>
                   <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[35%] min-w-[200px]">{t("threats.subject")}</th>
+                  {/* Verdict header label matches translated key */}
                   <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[18%] min-w-[140px]">{t("threats.verdict")}</th>
                   <th className="px-5 py-3 text-right text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-auto">{t("threats.actions")}</th>
                 </tr>
