@@ -54,7 +54,7 @@ export function AppShell({
           <TopBar userName={userName} userRole={userRole} onPageChange={onPageChange} />
 
           {/* Page Content */}
-          <main className="flex-1 overflow-y-auto pt-8 pb-6">
+          <main className="flex-1 overflow-y-auto pt-8 pb-6 px-6">
             {children}
           </main>
         </div>

@@ -1,20 +1,16 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   Search,
   Download,
-  RotateCcw,
   Trash2,
   AlertTriangle,
-  Eye,
-  X,
-  Clock,
+  Calendar,
 } from "lucide-react";
 import {
   useThreatLogs,
   useUpdateThreatStatus,
-  useCreateSecurityRule,
   ThreatLog,
   AuthSession,
 } from "../lib/api";
@@ -31,16 +27,17 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
   const { t, i18n } = useTranslation();
   const { data: threats, isLoading, error, refetch } = useThreatLogs();
   const updateStatusMutation = useUpdateThreatStatus();
-  const whitelistMutation = useCreateSecurityRule();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterVerdict, setFilterVerdict] = useState<string>("all");
-  const [selectedThreat, setSelectedThreat] = useState<ThreatLog | null>(null);
   
-  // Latency chart states
+  // Date range filters ("all", "today", "7d", "month")
+  const [dateFilter, setDateFilter] = useState<"all" | "today" | "7d" | "month">("all");
+  
+  // Latency chart hover state
   const [hoveredLatencyIndex, setHoveredLatencyIndex] = useState<number | null>(null);
   
-  // Log Pagination states
+  // Table pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -54,16 +51,37 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
       await updateStatusMutation.mutateAsync({ id, status: newStatus });
       setActionSuccess(
         newStatus === "trashed"
-          ? (i18n.language === "fr" ? "Menace confirmée et mise à la corbeille." : "Threat confirmed and trashed.")
-          : (i18n.language === "fr" ? "Email restauré avec succès." : "Email restored successfully.")
+          ? (i18n.language === "fr" ? "Menace mise à la corbeille." : "Threat moved to trash.")
+          : (i18n.language === "fr" ? "Menace restaurée." : "Threat restored.")
       );
-      if (selectedThreat?.id === id) {
-        setSelectedThreat(prev => prev ? { ...prev, status: newStatus } : null);
-      }
       refetch();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to update threat status.");
+      setActionError(err instanceof Error ? err.message : "Failed to update status.");
     }
+  };
+
+  // Date filtering logic
+  const matchesDateFilter = (receivedAtStr: string) => {
+    if (dateFilter === "all") return true;
+    const receivedTime = new Date(receivedAtStr).getTime();
+    const now = new Date().getTime();
+    
+    if (dateFilter === "today") {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      return receivedTime >= todayStart.getTime();
+    }
+    if (dateFilter === "7d") {
+      const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+      return receivedTime >= sevenDaysAgo;
+    }
+    if (dateFilter === "month") {
+      const thisMonthStart = new Date();
+      thisMonthStart.setDate(1);
+      thisMonthStart.setHours(0, 0, 0, 0);
+      return receivedTime >= thisMonthStart.getTime();
+    }
+    return true;
   };
 
   const filteredThreats = threats
@@ -73,43 +91,27 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
           threat.subject?.toLowerCase().includes(query) ||
           threat.sender?.toLowerCase().includes(query);
         const matchesFilter = filterVerdict === "all" || threat.verdict === filterVerdict;
-        return matchesSearch && matchesFilter;
+        const matchesDate = matchesDateFilter(threat.received_at);
+        return matchesSearch && matchesFilter && matchesDate;
       })
     : [];
 
   const handleExportCSV = () => {
     if (!threats || threats.length === 0) return;
-    const headers = "Date,Sender,Subject,Verdict,Confidence,Status,Latency(ms)\n";
+    const headers = "Date,Sender,Subject,Verdict,Confidence,Status\n";
     const rows = threats
       .map(
         (t) =>
-          `"${t.received_at}","${t.sender}","${t.subject}","${t.verdict}","${t.confidence}","${t.status}","${t.latency_ms || 0}"`
+          `"${t.received_at}","${t.sender}","${t.subject}","${t.verdict}","${t.confidence}","${t.status}"`
       )
       .join("\n");
     const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", `sicurre_threat_report_${new Date().toISOString().slice(0,10)}.csv`);
+    link.setAttribute("download", `sicurre_historical_report_${new Date().toISOString().slice(0,10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
-
-  const renderSafeHtml = (rawText: string) => {
-    const escaped = rawText
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-    return escaped.replace(/\n/g, "<br />");
-  };
-
-  const getReasoningText = (threat: ThreatLog) => {
-    if (threat.explanation) return threat.explanation;
-    if (threat.verdict === "phishing") return t("threats.explain_phishing");
-    if (threat.verdict === "spam") return t("threats.explain_spam");
-    return t("threats.explain_legitimate");
   };
 
   // Dynamic SLA limit config
@@ -132,10 +134,10 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
   const latencyData = getLatencyData(slaMs);
   const maxLatencyVal = Math.max(...latencyData.map((d) => d.latency), slaMs, 14000);
 
-  // SVG Coordinates
+  // SVG coordinates
   const points = latencyData.map((d, idx) => {
     const x = (idx / 6) * 1000;
-    const y = 180 - (d.latency / maxLatencyVal) * 140; // scaled inside vertical bounds (15 to 180)
+    const y = 180 - (d.latency / maxLatencyVal) * 140;
     return { x, y };
   });
   const pathD = `M ${points.map((p) => `${p.x} ${p.y}`).join(" L ")}`;
@@ -167,7 +169,9 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
             </h1>
           </div>
           <p className="text-sm text-on-surface-variant mt-1 font-medium">
-            {t("threats.subtitle")}
+            {i18n.language === "fr" 
+              ? "Historique global des classifications d'e-mails"
+              : "Global historical log of analyzed email classifications"}
           </p>
         </div>
         <button
@@ -190,7 +194,7 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
         </div>
       )}
 
-      {/* Latency Analysis Card */}
+      {/* Latency Analysis Card (Width constrained to w-[96%]) */}
       <div className="bg-white rounded-xl border border-border-subtle p-6 shadow-sm relative min-h-[320px]">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
           <div>
@@ -213,8 +217,8 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
           </div>
         </div>
 
-        {/* Unified Font X/Y Axis Chart Height Increased */}
-        <div className="h-56 pt-2 relative">
+        {/* Unified Font X/Y Axis Chart (Width constrained) */}
+        <div className="w-[96%] mx-auto h-56 pt-2 relative">
           <svg className="w-full h-full overflow-visible" viewBox="0 0 1000 220" preserveAspectRatio="none">
             {/* Grid */}
             {[35, 70, 105, 140, 175].map((y) => (
@@ -252,7 +256,7 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
               />
             ))}
 
-            {/* Horizontal tracking hover sectors (full heights, no exact circle target needed) */}
+            {/* Horizontal tracking hover sectors */}
             {points.map((p, idx) => {
               const half = 1000 / 12;
               const startX = idx === 0 ? 0 : p.x - half;
@@ -275,7 +279,7 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
         </div>
 
         {/* X-axis date labels */}
-        <div className="flex justify-between mt-2 pt-2.5 border-t border-border-subtle/50 text-[10px] font-bold text-on-surface-variant font-sans px-1 select-none">
+        <div className="w-[96%] mx-auto flex justify-between mt-2 pt-2.5 border-t border-border-subtle/50 text-[10px] font-bold text-on-surface-variant font-sans px-1 select-none">
           {latencyData.map((d, idx) => (
             <div key={idx} className="text-center w-16 uppercase tracking-wider font-extrabold">
               {d.label}
@@ -283,13 +287,13 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
           ))}
         </div>
 
-        {/* Absolute Floating Tooltip Card (Does not shift inline page layout!) */}
+        {/* Absolute Floating Tooltip Card (Premium light-mode contrast card) */}
         {hoveredLatencyIndex !== null && (
-          <div className="absolute top-16 right-6 z-30 p-2.5 bg-neutral-900/95 backdrop-blur-md border border-neutral-800 text-white rounded-xl text-[11px] shadow-lg flex flex-col gap-1 w-48 font-sans select-none pointer-events-none animate-in fade-in duration-100">
-            <div className="font-extrabold text-neutral-100 border-b border-neutral-800/60 pb-1.5 mb-1.5">
+          <div className="absolute top-16 right-6 z-30 p-3 bg-white border border-border-subtle text-on-surface rounded-xl text-[11px] shadow-xl flex flex-col gap-1 w-48 font-sans select-none pointer-events-none animate-in fade-in duration-100">
+            <div className="font-extrabold text-on-surface border-b border-border-subtle pb-1.5 mb-1.5">
               {latencyData[hoveredLatencyIndex].label}
             </div>
-            <div className="flex justify-between text-neutral-300 font-semibold">
+            <div className="flex justify-between text-on-surface-variant font-semibold">
               <span>Avg Speed:</span>
               <span className="font-mono">{latencyData[hoveredLatencyIndex].latency} ms</span>
             </div>
@@ -298,36 +302,54 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
               {latencyData[hoveredLatencyIndex].diffPct > 0 ? (
                 <span className="text-error">+{latencyData[hoveredLatencyIndex].diffPct}% above</span>
               ) : (
-                <span className="text-emerald-400">{latencyData[hoveredLatencyIndex].diffPct}% below</span>
+                <span className="text-safe">{latencyData[hoveredLatencyIndex].diffPct}% below</span>
               )}
             </div>
           </div>
         )}
       </div>
 
-      {/* Filters */}
+      {/* Filters (With date filter select dropdown) */}
       <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/30" />
-          <input
-            type="text"
-            placeholder={t("common.search")}
-            value={searchQuery}
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          {/* Text search */}
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/30" />
+            <input
+              type="text"
+              placeholder={t("common.search")}
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full pl-10 pr-4 py-2 bg-white border border-border-subtle rounded-lg text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:border-primary shadow-sm"
+            />
+          </div>
+
+          {/* Date range filter dropdown */}
+          <select
+            value={dateFilter}
             onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setCurrentPage(1); // Reset page index on query type
+              setDateFilter(e.target.value as any);
+              setCurrentPage(1);
             }}
-            className="w-full pl-10 pr-4 py-2 bg-white border border-border-subtle rounded-lg text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:border-primary shadow-sm"
-          />
+            className="px-3 py-2 bg-white border border-border-subtle rounded-lg text-sm font-semibold text-on-surface focus:outline-none focus:border-primary cursor-pointer shadow-sm"
+          >
+            <option value="all">{i18n.language === "fr" ? "Toutes les dates" : "All Time"}</option>
+            <option value="today">{i18n.language === "fr" ? "Aujourd'hui" : "Today"}</option>
+            <option value="7d">{i18n.language === "fr" ? "7 derniers jours" : "Last 7 Days"}</option>
+            <option value="month">{i18n.language === "fr" ? "Ce mois" : "This Month"}</option>
+          </select>
         </div>
+
         <div className="flex gap-2 w-full sm:w-auto">
           {(["all", "phishing", "spam", "legitimate"] as const).map((v) => (
             <button
               key={v}
               onClick={() => {
                 setFilterVerdict(v);
-                setSelectedThreat(null);
-                setCurrentPage(1); // Reset page on filter switch
+                setCurrentPage(1);
               }}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
                 filterVerdict === v
@@ -341,253 +363,130 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
         </div>
       </div>
 
-      {/* Grid: Data Table + Safe Preview detail pane */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Threats Table */}
-        <div className={`${selectedThreat ? "lg:col-span-8" : "lg:col-span-12"} bg-white rounded-xl border border-border-subtle overflow-hidden shadow-sm transition-all duration-300`}>
-          {isLoading ? (
-            <div className="p-6 space-y-3">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-14 bg-surface-low rounded-xl animate-pulse" />
-              ))}
-            </div>
-          ) : error ? (
-            <div className="py-16 text-center flex flex-col items-center justify-center">
-              <AlertTriangle className="w-10 h-10 text-error/40 mb-3" />
-              <p className="font-semibold text-sm text-on-surface">{t("common.error_occurred")}</p>
-            </div>
-          ) : paginatedThreats.length === 0 ? (
-            <div className="py-16 text-center text-on-surface-variant/50 text-sm">
-              {i18n.language === "fr" ? "Aucune menace répertoriée." : "No threat records found."}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-border-subtle bg-surface-low/40">
-                    <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[22%] min-w-[170px]">{t("threats.timestamp")}</th>
-                    <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[28%] min-w-[180px]">{t("threats.sender")}</th>
-                    <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[32%] min-w-[200px]">{t("threats.subject")}</th>
-                    <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[18%] min-w-[140px]">{t("threats.verdict")}</th>
-                    <th className="px-5 py-3 text-right text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-auto">{t("threats.actions")}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-subtle">
-                  {paginatedThreats.map((threat, idx) => (
-                    <MotionDiv
-                      key={threat.id}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.25, delay: idx * 0.02 }}
-                      className="contents"
-                    >
-                      <tr
-                        className={`hover:bg-surface-low/20 transition-all text-sm ${
-                          selectedThreat?.id === threat.id ? "bg-primary/[0.03] font-medium" : ""
-                        }`}
-                      >
-                        <td className="px-5 py-3.5">
-                          <div className="flex flex-col">
-                            <span className="font-mono text-[12px] text-on-surface-variant font-bold">
-                              {new Date(threat.received_at).toLocaleString(i18n.language === "fr" ? "fr-FR" : "en-US", {
-                                day: "numeric",
-                                month: "short",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                            </span>
-                            {threat.latency_ms !== undefined && (
-                              <span className="text-[10px] text-primary font-mono mt-0.5 flex items-center gap-0.5 font-bold">
-                                <Clock className="w-2.5 h-2.5" />
-                                {threat.latency_ms} ms
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <span className="font-bold text-on-surface truncate max-w-[150px] block select-all">
-                            {threat.sender || t("threats.unknown_sender")}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <span className="text-on-surface truncate block max-w-[180px] select-all font-semibold" title={threat.subject}>
-                            {threat.subject || t("threats.no_subject")}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <VerdictBadge verdict={threat.verdict} confidence={threat.confidence} />
-                        </td>
-                        <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
-                          {/* Items centering fix: aligns Private label & Actions vertically */}
-                          <div className="inline-flex gap-2 justify-end w-full items-center">
-                            {/* Privacy guard: preview action strictly locked to phishing threats */}
-                            {threat.verdict === "phishing" ? (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-xs px-2 cursor-pointer h-8"
-                                onClick={() => setSelectedThreat(threat)}
-                              >
-                                <Eye className="w-3.5 h-3.5" />
-                              </Button>
-                            ) : (
-                              <span className="text-[11px] text-on-surface-variant/50 select-none pr-2 font-bold uppercase tracking-wider inline-flex items-center h-8">
-                                Private
-                              </span>
-                            )}
-                            {threat.status === "trashed" ? (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleUpdateStatus(threat.id, "restored")}
-                                className="text-[11px] gap-1.5 h-8"
-                              >
-                                <RotateCcw className="w-3 h-3" />
-                                {t("threats.action_restore")}
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="danger"
-                                size="sm"
-                                onClick={() => handleUpdateStatus(threat.id, "trashed")}
-                                className="text-[11px] gap-1.5 h-8 animate-in fade-in"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                                {t("threats.action_trash").replace("Mettre à la", "").replace("Move to", "").trim()}
-                              </Button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    </MotionDiv>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+      {/* Threats Table (Spans full width unconditionally; no inline latency, no eyeballs, delete action only) */}
+      <div className="bg-white rounded-xl border border-border-subtle overflow-hidden shadow-sm">
+        {isLoading ? (
+          <div className="p-6 space-y-3">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-14 bg-surface-low rounded-xl animate-pulse" />
+            ))}
+          </div>
+        ) : error ? (
+          <div className="py-16 text-center flex flex-col items-center justify-center">
+            <AlertTriangle className="w-10 h-10 text-error/40 mb-3" />
+            <p className="font-semibold text-sm text-on-surface">{t("common.error_occurred")}</p>
+          </div>
+        ) : paginatedThreats.length === 0 ? (
+          <div className="py-16 text-center text-on-surface-variant/50 text-sm">
+            {i18n.language === "fr" ? "Aucune menace répertoriée." : "No threat records found."}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-border-subtle bg-surface-low/40">
+                  <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[25%] min-w-[170px]">{t("threats.timestamp")}</th>
+                  <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[30%] min-w-[180px]">{t("threats.sender")}</th>
+                  <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[35%] min-w-[200px]">{t("threats.subject")}</th>
+                  <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[18%] min-w-[140px]">{t("threats.verdict")}</th>
+                  <th className="px-5 py-3 text-right text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-auto">{t("threats.actions")}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-subtle">
+                {paginatedThreats.map((threat, idx) => (
+                  <MotionDiv
+                    key={threat.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.25, delay: idx * 0.02 }}
+                    className="contents"
+                  >
+                    <tr className="hover:bg-surface-low/20 transition-all text-sm">
+                      <td className="px-5 py-3.5">
+                        <span className="font-mono text-[12px] text-on-surface-variant font-bold">
+                          {new Date(threat.received_at).toLocaleString(i18n.language === "fr" ? "fr-FR" : "en-US", {
+                            day: "numeric",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className="font-bold text-on-surface truncate max-w-[180px] block select-all">
+                          {threat.sender || t("threats.unknown_sender")}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className="text-on-surface truncate block max-w-[220px] select-all font-semibold" title={threat.subject}>
+                          {threat.subject || t("threats.no_subject")}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <VerdictBadge verdict={threat.verdict} confidence={threat.confidence} />
+                      </td>
+                      <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="inline-flex gap-2 justify-end w-full items-center">
+                          {threat.status === "trashed" ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleUpdateStatus(threat.id, "restored")}
+                              className="text-[11px] gap-1.5 h-8 font-bold"
+                            >
+                              Restore
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              onClick={() => handleUpdateStatus(threat.id, "trashed")}
+                              className="text-[11px] gap-1.5 h-8 font-bold"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              Delete
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  </MotionDiv>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-          {/* Audit Log Historical Pagination controls */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-5 py-4 border-t border-border-subtle bg-surface-low/10 select-none font-sans">
-              <span className="text-xs text-on-surface-variant font-bold">
-                {i18n.language === "fr" 
-                  ? `Page ${activePage} sur ${totalPages} (${totalItems} éléments)`
-                  : `Page ${activePage} of ${totalPages} (${totalItems} items)`}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={activePage === 1}
-                  onClick={() => {
-                    setCurrentPage(prev => Math.max(1, prev - 1));
-                    setSelectedThreat(null);
-                  }}
-                  className="text-xs py-1 px-3.5 cursor-pointer font-bold h-8"
-                >
-                  {i18n.language === "fr" ? "Précédent" : "Previous"}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={activePage === totalPages}
-                  onClick={() => {
-                    setCurrentPage(prev => Math.min(totalPages, prev + 1));
-                    setSelectedThreat(null);
-                  }}
-                  className="text-xs py-1 px-3.5 cursor-pointer font-bold h-8"
-                >
-                  {i18n.language === "fr" ? "Suivant" : "Next"}
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right Hand: Safe Preview Sidebar Detail Panel */}
-        <AnimatePresence mode="wait">
-          {selectedThreat && (
-            <div className="lg:col-span-4 bg-white rounded-xl border border-border-subtle p-6 shadow-sm min-h-[400px] flex flex-col justify-between transition-all duration-300">
-              <MotionDiv
-                key={selectedThreat.id}
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.98 }}
-                className="space-y-6 flex-1 flex flex-col justify-between"
+        {/* Log table pagination controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-5 py-4 border-t border-border-subtle bg-surface-low/10 select-none font-sans">
+            <span className="text-xs text-on-surface-variant font-bold">
+              {i18n.language === "fr" 
+                ? `Page ${activePage} sur ${totalPages} (${totalItems} éléments)`
+                : `Page ${activePage} of ${totalPages} (${totalItems} items)`}
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={activePage === 1}
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                className="text-xs py-1 px-3.5 cursor-pointer font-bold h-8"
               >
-                <div>
-                  <div className="flex justify-between items-start border-b border-border-subtle pb-4">
-                    <div>
-                      <h3 className="font-display font-bold text-[17px] text-on-surface">
-                        {t("threats.details")}
-                      </h3>
-                      <p className="text-[11px] text-primary mt-0.5 font-mono font-bold">
-                        Speed: {selectedThreat.latency_ms || 0} ms
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setSelectedThreat(null)}
-                      className="p-1 rounded-md hover:bg-surface-low transition-colors cursor-pointer"
-                    >
-                      <X className="w-4 h-4 text-on-surface-variant" />
-                    </button>
-                  </div>
-
-                  <div className="space-y-3.5 pt-4 text-xs">
-                    <div>
-                      <span className="font-bold text-on-surface-variant block uppercase tracking-wider text-[10px]">
-                        From
-                      </span>
-                      <span className="text-on-surface font-semibold select-all block mt-0.5">
-                        {selectedThreat.sender}
-                      </span>
-                    </div>
-
-                    <div>
-                      <span className="font-bold text-on-surface-variant block uppercase tracking-wider text-[10px]">
-                        Subject
-                      </span>
-                      <span className="text-on-surface font-semibold block mt-0.5">
-                        {selectedThreat.subject || t("threats.no_subject")}
-                      </span>
-                    </div>
-
-                    <div>
-                      <span className="font-bold text-on-surface-variant block uppercase tracking-wider text-[10px]">
-                        {t("threats.reasoning")}
-                      </span>
-                      <p className="text-xs text-on-surface-variant bg-surface-low/50 border border-border-subtle p-3 rounded-lg mt-1 font-semibold leading-relaxed">
-                        {getReasoningText(selectedThreat)}
-                      </p>
-                    </div>
-
-                    {/* Safe Preview Body container */}
-                    <div className="pt-1">
-                      <span className="font-bold text-on-surface-variant block uppercase tracking-wider text-[10px] mb-1.5">
-                        {t("threats.safe_preview")}
-                      </span>
-                      <iframe
-                        title="Threat Safe Preview Frame"
-                        srcDoc={`<!DOCTYPE html><html><head><style>body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #374151; font-size: 12px; line-height: 1.6; margin: 10px; word-break: break-word; } a { color: #2563eb; pointer-events: none !important; text-decoration: underline; } img { display: none !important; }</style></head><body>${renderSafeHtml(selectedThreat.body_preview || "")}</body></html>`}
-                        sandbox=""
-                        className="w-full h-[200px] bg-surface-low border border-border-subtle rounded-xl select-text"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Privacy Guard: Details pane is strictly read-only per security guidelines */}
-                <div className="pt-4 border-t border-border-subtle mt-4 text-center">
-                  <p className="text-[10.5px] text-on-surface-variant font-bold">
-                    {i18n.language === "fr" 
-                      ? "Les actions sur les menaces s'effectuent depuis la quarantaine." 
-                      : "Remediation tasks live inside the quarantine page."}
-                  </p>
-                </div>
-              </MotionDiv>
+                {i18n.language === "fr" ? "Précédent" : "Previous"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={activePage === totalPages}
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                className="text-xs py-1 px-3.5 cursor-pointer font-bold h-8"
+              >
+                {i18n.language === "fr" ? "Suivant" : "Next"}
+              </Button>
             </div>
-          )}
-        </AnimatePresence>
+          </div>
+        )}
       </div>
     </MotionDiv>
   );

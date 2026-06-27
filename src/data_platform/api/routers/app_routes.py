@@ -449,6 +449,10 @@ async def release_quarantine_item(id: str, current_user: AuthUser = Depends(get_
         "UPDATE app_quarantine_item SET status = 'released' WHERE id = ?",
         (id,)
     )
+    await async_query_auth_db(
+        "UPDATE app_inference_event SET safety_verdict = 'legitimate' WHERE workspace_id = ? AND sender = ? AND subject = ?",
+        (current_user.workspace_id, item["sender"], item["subject"])
+    )
     
     dest_rows = await async_query_auth_db(
         "SELECT destination_email FROM cloudflare_integration WHERE workspace_id = ? LIMIT 1",
@@ -495,6 +499,10 @@ async def release_and_whitelist_item(id: str, current_user: AuthUser = Depends(g
     await async_query_auth_db(
         "UPDATE app_quarantine_item SET status = 'released' WHERE id = ?",
         (id,)
+    )
+    await async_query_auth_db(
+        "UPDATE app_inference_event SET safety_verdict = 'legitimate' WHERE workspace_id = ? AND sender = ? AND subject = ?",
+        (current_user.workspace_id, item["sender"], item["subject"])
     )
     
     rule_id = str(uuid.uuid4())
