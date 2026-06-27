@@ -36,7 +36,7 @@
     "lockdown": "Verrouillage d'urgence"
   },
   "dashboard": {
-    "welcome": "Ravi de vous revoir,",
+    "welcome": "Bienvenue,",
     "subtitle": "Voici l'état actuel de votre boîte de messagerie.",
     "kpi_raw": "Emails analysés",
     "kpi_normalized": "Messages normalisés",

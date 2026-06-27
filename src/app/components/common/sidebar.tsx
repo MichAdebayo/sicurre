@@ -89,9 +89,6 @@ export function Sidebar({
             <span className="font-display font-bold text-3xl text-on-surface leading-tight tracking-tight">
               Sicurre
             </span>
-            <span className="text-[9px] font-bold text-primary/60 uppercase tracking-[0.15em]">
-              {t("sidebar.status_active")}
-            </span>
           </div>
         </div>
       </div>

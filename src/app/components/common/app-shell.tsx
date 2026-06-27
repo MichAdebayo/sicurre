@@ -49,7 +49,7 @@ export function AppShell({
         )}
 
         {/* Top Bar */}
-        <TopBar userName={userName} userRole={userRole} />
+        <TopBar userName={userName} userRole={userRole} onPageChange={onPageChange} />
 
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto px-8 py-6 max-w-[1200px] w-full">

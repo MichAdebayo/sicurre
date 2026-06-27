@@ -36,7 +36,7 @@
     "lockdown": "Emergency Lockdown"
   },
   "dashboard": {
-    "welcome": "Welcome back,",
+    "welcome": "Welcome,",
     "subtitle": "Here is the current state of your inbox.",
     "kpi_raw": "Emails analyzed",
     "kpi_normalized": "Normalized messages",

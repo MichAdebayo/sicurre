@@ -8,11 +8,11 @@ import {
   Play,
   AlertTriangle,
   Award,
-  ListTodo,
-  CheckCircle,
   TrendingUp,
+  Cpu,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
+import { VerdictBadge } from "../components/threats/verdict-badge";
 import {
   AuthSession,
   useKPIStats,
@@ -159,17 +159,14 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
   const trend = getTrendData();
 
   const recentAlerts = threats
-    ? threats.slice(0, 4).map((alertItem) => ({
+    ? threats.slice(0, 5).map((alertItem) => ({
         id: alertItem.id,
-        time: new Date(alertItem.received_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
-        level: alertItem.verdict === "phishing" ? 5 : alertItem.verdict === "spam" ? 3 : 1,
-        title:
-          alertItem.verdict === "phishing"
-            ? (i18n.language === "fr" ? "Phishing Intercepté" : "Phishing Intercepted")
-            : alertItem.verdict === "spam"
-            ? (i18n.language === "fr" ? "Spam Filtré" : "Spam Filtered")
-            : (i18n.language === "fr" ? "Email Validé" : "Safe Email"),
-        desc: alertItem.subject || t("threats.no_subject"),
+        time: new Date(alertItem.received_at).toLocaleTimeString(i18n.language === "fr" ? "fr-FR" : "en-US", { hour: "2-digit", minute: "2-digit" }),
+        subject: alertItem.subject || t("threats.no_subject"),
+        sender: alertItem.sender,
+        content: alertItem.body_preview || "",
+        verdict: alertItem.verdict,
+        confidence: alertItem.confidence,
       }))
     : [];
 
@@ -335,7 +332,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border-subtle">
         <div>
           <h1 className="font-display font-bold text-[28px] text-on-surface tracking-tight leading-tight">
-            {t("dashboard.welcome")} {session.display_name}
+            {t("dashboard.welcome")} {session.display_name.split(" ")[0]}
           </h1>
           <p className="text-sm text-on-surface-variant mt-1">
             {t("dashboard.subtitle")}
@@ -395,56 +392,29 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
             </div>
           </div>
 
-          {/* Action Items checklist & Last 7 Days chart trend */}
+          {/* Verdict Distribution & Last 7 Days chart trend */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Action Checklist */}
+            {/* Verdict Distribution (moved up from bottom and adjusted to fit) */}
             <div className="lg:col-span-5 bg-white rounded-xl border border-border-subtle p-6 shadow-sm flex flex-col justify-between">
               <div>
                 <div className="flex items-center gap-2 pb-4 border-b border-border-subtle mb-4">
-                  <ListTodo className="w-5 h-5 text-primary" />
+                  <Cpu className="w-5 h-5 text-primary" />
                   <div>
                     <h3 className="font-display font-semibold text-[17px] text-on-surface">
-                      {t("dashboard.action_items")}
+                      {t("dashboard.verdict_distribution")}
                     </h3>
                     <p className="text-[11px] text-on-surface-variant/60">
-                      {t("dashboard.action_checklist_desc")}
+                      {i18n.language === "fr" ? "Répartition des emails par classification IA" : "Distribution of emails by AI safety classification"}
                     </p>
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  {checklistItems.length === 0 ? (
-                    <div className="py-6 text-center text-xs text-safe font-semibold flex items-center justify-center gap-2">
-                      <CheckCircle className="w-5 h-5" />
-                      <span>{t("dashboard.all_clear")}</span>
-                    </div>
-                  ) : (
-                    checklistItems.map((item, idx) => (
-                      <div
-                        key={item.id}
-                        className={`flex items-start gap-2.5 p-3 rounded-xl border ${
-                          item.type === "critical"
-                            ? "bg-error/[0.02] border-error/10"
-                            : "bg-warning/[0.02] border-warning/10"
-                        }`}
-                      >
-                        <AlertTriangle className={`w-4 h-4 mt-0.5 shrink-0 ${
-                          item.type === "critical" ? "text-error" : "text-warning"
-                        }`} />
-                        <span className="text-xs font-semibold text-on-surface">
-                          {item.text}
-                        </span>
-                      </div>
-                    ))
-                  )}
+                <div className="space-y-4 pt-1">
+                  <DistributionRow label={t("threats.badge_legitimate")} count={legitimateCount} total={Math.max(totalScans, 1)} colorClass="bg-safe" />
+                  <DistributionRow label={t("threats.badge_spam")} count={spamCount} total={Math.max(totalScans, 1)} colorClass="bg-secondary" />
+                  <DistributionRow label={t("threats.badge_phishing")} count={phishingCount} total={Math.max(totalScans, 1)} colorClass="bg-error" />
                 </div>
               </div>
-
-              {checklistItems.length > 0 && (
-                <Button onClick={onGoToSettings} variant="outline" size="sm" className="w-full text-xs mt-4">
-                  {i18n.language === "fr" ? "Résoudre les problèmes" : "Resolve configuration details"}
-                </Button>
-              )}
             </div>
 
             {/* Last 7 days chart trend */}
@@ -483,26 +453,21 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-4 bg-white rounded-xl border border-border-subtle p-6 shadow-sm">
-              <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.12em] mb-5">
-                {t("dashboard.verdict_distribution")}
-              </p>
-              <div className="space-y-4">
-                <DistributionRow label={t("threats.badge_legitimate")} count={legitimateCount} total={Math.max(totalScans, 1)} colorClass="bg-safe" />
-                <DistributionRow label={t("threats.badge_spam")} count={spamCount} total={Math.max(totalScans, 1)} colorClass="bg-secondary" />
-                <DistributionRow label={t("threats.badge_phishing")} count={phishingCount} total={Math.max(totalScans, 1)} colorClass="bg-error" />
-              </div>
-            </div>
-
-            <div className="lg:col-span-8 bg-white rounded-xl border border-border-subtle p-6 shadow-sm">
+          <div className="grid grid-cols-1 gap-6">
+            <div className="bg-white rounded-xl border border-border-subtle p-6 shadow-sm">
               <div className="flex items-center justify-between mb-5 pb-4 border-b border-border-subtle">
-                <h3 className="font-display font-semibold text-[17px] text-on-surface">
-                  {t("dashboard.recent_activity")}
-                </h3>
-                <div className="inline-flex items-center gap-2 text-[11px] text-on-surface-variant">
-                  <Mail className="w-3.5 h-3.5" />
-                  {i18n.language === "fr" ? "Flux temps réel" : "Real-time feed"}
+                <div className="flex items-center gap-2.5">
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-primary" />
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-primary" />
+                  </span>
+                  <h3 className="font-display font-bold text-[17px] text-on-surface">
+                    {t("dashboard.recent_activity")}
+                  </h3>
+                </div>
+                <div className="inline-flex items-center gap-2 text-[12px] font-bold text-primary">
+                  <Mail className="w-4 h-4 animate-pulse" />
+                  <span>{i18n.language === "fr" ? "Flux temps réel" : "Real-time feed"}</span>
                 </div>
               </div>
               {threatsLoading ? (
@@ -520,29 +485,27 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                   {recentAlerts.map((alert) => (
                     <div
                       key={alert.id}
-                      className={`p-4 rounded-xl border transition-colors ${
-                        alert.level >= 5
-                          ? "bg-error/[0.03] border-error/10"
-                          : alert.level >= 3
-                          ? "bg-secondary/[0.03] border-secondary/10"
-                          : "bg-surface-low border-border-subtle"
-                      }`}
+                      className="p-4 rounded-xl border border-border-subtle bg-surface-low/30 hover:bg-surface-low/60 transition-colors flex items-center justify-between gap-4"
                     >
-                      <div className="space-y-1 min-w-0">
+                      {/* Left/Middle Content */}
+                      <div className="flex-1 min-w-0 space-y-1">
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-[11px] text-on-surface-variant/60">{alert.time}</span>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
-                            alert.level >= 5
-                              ? "bg-error/10 text-error"
-                              : alert.level >= 3
-                              ? "bg-secondary/10 text-secondary"
-                              : "bg-safe/10 text-safe"
-                          }`}>
-                            Level {alert.level}
+                          <span className="text-xs font-bold text-on-surface-variant truncate max-w-[200px]" title={alert.sender}>
+                            {alert.sender}
                           </span>
                         </div>
-                        <p className="font-bold text-sm text-on-surface">{alert.title}</p>
-                        <p className="text-[12px] text-on-surface-variant/70 truncate">{alert.desc}</p>
+                        <h4 className="font-bold text-sm text-on-surface truncate">
+                          {alert.subject}
+                        </h4>
+                        <p className="text-[12px] text-on-surface-variant/75 truncate max-w-3xl">
+                          {alert.content}
+                        </p>
+                      </div>
+
+                      {/* Right Classification Badge */}
+                      <div className="shrink-0 pl-2">
+                        <VerdictBadge verdict={alert.verdict} confidence={alert.confidence} />
                       </div>
                     </div>
                   ))}
