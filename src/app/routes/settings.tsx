@@ -596,7 +596,7 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
                       <ul className="text-xs space-y-2 text-on-surface pt-3 border-t border-border-subtle/50 font-semibold">
                         <li>• 1 Protected Domain</li>
                         <li>• 250 analyzed emails/mo</li>
-                        <li>• Gmail auto-trash</li>
+                        <li>• Phishing email auto-trash</li>
                       </ul>
                     </div>
                     <Button variant="outline" disabled className="w-full text-xs mt-6 font-bold">
