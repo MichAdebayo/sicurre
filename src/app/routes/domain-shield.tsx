@@ -562,32 +562,59 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                 const isStepCompleted = activeStepIndex > idx;
                 const isStepIdle = activeStepIndex < idx;
 
+                const severity = (() => {
+                  if (step.id === "dmarc") {
+                    if (!step.valid) return "error";
+                    if (shieldStatus?.dmarc?.policy === "none") return "warning";
+                    return "success";
+                  }
+                  if (step.id === "reputation") {
+                    const s = shieldStatus?.reputation_score || 100;
+                    if (s < 70) return "error";
+                    if (s < 90) return "warning";
+                    return "success";
+                  }
+                  return step.valid ? "success" : "error";
+                })();
+
                 let cardClass = "border-border-subtle bg-surface-lowest opacity-75";
                 let statusBadge = null;
 
                 if (isStepRunning) {
-                  cardClass = "border-primary bg-[#d0e4ff]/10 shadow-[0_0_12px_rgba(74,144,217,0.15)] ring-1 ring-primary/20 scale-[1.02] opacity-100";
+                  cardClass = "border-[#2e6bb5] bg-[#d0e4ff]/10 shadow-[0_0_12px_rgba(46,107,181,0.15)] ring-1 ring-[#2e6bb5]/20 scale-[1.02] opacity-100";
                   statusBadge = (
                     <span className="flex items-center gap-1.5 text-[10px] font-bold text-[#2e6bb5] uppercase">
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#2e6bb5]" />
                       {isFR ? "Analyse..." : "Analyzing..."}
                     </span>
                   );
                 } else if (isStepCompleted) {
-                  cardClass = step.valid 
-                    ? "border-emerald-200 bg-emerald-50/[0.08] opacity-100" 
-                    : "border-amber-200 bg-amber-50/[0.08] opacity-100";
-                  statusBadge = step.valid ? (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#047857] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                      <Check className="w-3.5 h-3.5" />
-                      {isFR ? "Conforme" : "Pass"}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#b45309] bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                      {isFR ? "Alerte" : "Warning"}
-                    </span>
-                  );
+                  if (severity === "success") {
+                    cardClass = "border-emerald-200 bg-emerald-50/[0.08] opacity-100";
+                    statusBadge = (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#047857] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                        <Check className="w-3.5 h-3.5" />
+                        {isFR ? "Conforme" : "Pass"}
+                      </span>
+                    );
+                  } else if (severity === "warning") {
+                    cardClass = "border-amber-200 bg-amber-50/[0.08] opacity-100";
+                    statusBadge = (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#b45309] bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        {isFR ? "Partiel" : "Warning"}
+                      </span>
+                    );
+                  } else {
+                    // error
+                    cardClass = "border-red-200 bg-red-50/[0.08] opacity-100";
+                    statusBadge = (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-md border border-red-200">
+                        <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                        {isFR ? "Manquant" : "Missing"}
+                      </span>
+                    );
+                  }
                 } else {
                   // idle
                   statusBadge = (
@@ -615,14 +642,6 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
 
                     <div className="mt-4 pt-3 border-t border-border-subtle/50 flex items-center justify-between gap-1 overflow-hidden">
                       {statusBadge}
-                      {isStepCompleted && step.record && (
-                        <span
-                          className="text-[9.5px] font-mono text-on-surface-variant/70 font-bold truncate max-w-[80px]"
-                          title={step.record}
-                        >
-                          {step.record}
-                        </span>
-                      )}
                     </div>
                   </div>
                 );
@@ -737,16 +756,23 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   </h3>
                 </div>
 
-                <p className="text-xs text-on-surface-variant leading-relaxed">
-                  {isFR
-                    ? "Corrigez et provisionnez automatiquement vos enregistrements DNS manquants (SPF, DKIM, DMARC) via l'API Cloudflare."
-                    : "Automatically generate and sync missing DNS records (SPF, DKIM, DMARC) directly using the Cloudflare token API wizard."}
-                </p>
+                <div>
+                  <p className="text-xs text-on-surface-variant leading-relaxed">
+                    {isFR
+                      ? "Corrigez et provisionnez automatiquement vos enregistrements DNS manquants (SPF, DKIM, DMARC) via l'API Cloudflare."
+                      : "Automatically generate and sync missing DNS records (SPF, DKIM, DMARC) directly using the Cloudflare token API wizard."}
+                  </p>
+                  <p className="text-[10px] text-[#b45309] font-bold mt-1.5 italic">
+                    {isFR
+                      ? "* Seuls les enregistrements manquants ou incorrects (rouges) seront ajoutés sans écraser vos autres configurations DNS existantes."
+                      : "* Only missing or invalid records (red) will be configured. Your other DNS settings will not be overwritten."}
+                  </p>
+                </div>
 
                 {(!shieldStatus.spf.valid || !shieldStatus.dkim.valid || !shieldStatus.dmarc.valid) ? (
                   <div className="p-3 bg-amber-500/[0.04] border border-amber-500/20 rounded-xl flex items-start gap-2.5">
                     <AlertTriangle className="w-4.5 h-4.5 text-amber-500 shrink-0 mt-0.5" />
-                    <div className="text-[11.5px] text-amber-600 font-semibold leading-relaxed">
+                    <div className="text-[11.5px] text-[#b45309] font-semibold leading-relaxed">
                       {isFR
                         ? "Des enregistrements obligatoires sont incorrects ou manquants dans votre zone."
                         : "Missing or invalid validation entries resolved for the active domain."}
@@ -764,52 +790,60 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                 )}
 
                 {/* Target configuration breakdown list */}
-                <div className="bg-surface-low border border-border-subtle rounded-xl p-3.5 space-y-2 text-xs">
-                  <div className="font-bold text-[10px] uppercase tracking-wider text-on-surface-variant mb-1 flex items-center justify-between">
-                    <span>{isFR ? "Enregistrements Cibles" : "Target Records Setup"}</span>
-                    <span className="text-[9.5px] font-mono lowercase text-on-surface-variant/60 font-semibold">@{selectedDomain}</span>
-                  </div>
-                  <div className="space-y-2">
-                    {/* SPF Record */}
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between font-bold">
-                        <span className="text-on-surface">SPF (TXT @)</span>
-                        <span className={shieldStatus.spf.valid ? "text-[#047857] text-[10.5px]" : "text-[#b45309] text-[10.5px] font-bold"}>
-                          {shieldStatus.spf.valid ? (isFR ? "Conforme" : "Pass") : (isFR ? "Manquant / Incorrect" : "Missing / Incorrect")}
-                        </span>
-                      </div>
-                      <div className="text-[10px] font-mono bg-surface-lowest px-2.5 py-1.5 rounded border border-border-subtle/80 text-on-surface-variant truncate select-all" title="v=spf1 include:spf.cloudflare.com include:sicurre.com ~all">
-                        v=spf1 include:spf.cloudflare.com include:sicurre.com ~all
-                      </div>
+                {(!shieldStatus.spf.valid || !shieldStatus.dkim.valid || !shieldStatus.dmarc.valid) && (
+                  <div className="bg-surface-low border border-border-subtle rounded-xl p-3.5 space-y-2 text-xs">
+                    <div className="font-bold text-[10px] uppercase tracking-wider text-on-surface-variant mb-1 flex items-center justify-between">
+                      <span>{isFR ? "Enregistrements à configurer" : "Records to Configure"}</span>
+                      <span className="text-[9.5px] font-mono lowercase text-on-surface-variant/60 font-semibold">@{selectedDomain}</span>
                     </div>
+                    <div className="space-y-2">
+                      {/* SPF Record */}
+                      {!shieldStatus.spf.valid && (
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between font-bold">
+                            <span className="text-on-surface">SPF (TXT @)</span>
+                            <span className="text-[#b45309] text-[10.5px] font-bold">
+                              {isFR ? "Manquant / Incorrect" : "Missing / Incorrect"}
+                            </span>
+                          </div>
+                          <div className="text-[10px] font-mono bg-surface-lowest px-2.5 py-1.5 rounded border border-border-subtle/80 text-on-surface truncate select-all" title="v=spf1 include:spf.cloudflare.com include:sicurre.com ~all">
+                            v=spf1 include:spf.cloudflare.com include:sicurre.com ~all
+                          </div>
+                        </div>
+                      )}
 
-                    {/* DKIM Record */}
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between font-bold">
-                        <span className="text-on-surface">DKIM (TXT cloudflare._domainkey)</span>
-                        <span className={shieldStatus.dkim.valid ? "text-[#047857] text-[10.5px]" : "text-[#b45309] text-[10.5px] font-bold"}>
-                          {shieldStatus.dkim.valid ? (isFR ? "Conforme" : "Pass") : (isFR ? "Manquant / Incorrect" : "Missing / Incorrect")}
-                        </span>
-                      </div>
-                      <div className="text-[10px] font-mono bg-surface-lowest px-2.5 py-1.5 rounded border border-border-subtle/80 text-on-surface-variant truncate select-all" title="v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1+z7s...">
-                        v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1+z7s...
-                      </div>
-                    </div>
+                      {/* DKIM Record */}
+                      {!shieldStatus.dkim.valid && (
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between font-bold">
+                            <span className="text-on-surface">DKIM (TXT cloudflare._domainkey)</span>
+                            <span className="text-[#b45309] text-[10.5px] font-bold">
+                              {isFR ? "Manquant / Incorrect" : "Missing / Incorrect"}
+                            </span>
+                          </div>
+                          <div className="text-[10px] font-mono bg-surface-lowest px-2.5 py-1.5 rounded border border-border-subtle/80 text-on-surface truncate select-all" title="v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1+z7s...">
+                            v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1+z7s...
+                          </div>
+                        </div>
+                      )}
 
-                    {/* DMARC Record */}
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between font-bold">
-                        <span className="text-on-surface">DMARC (TXT _dmarc)</span>
-                        <span className={shieldStatus.dmarc.valid ? "text-[#047857] text-[10.5px]" : "text-[#b45309] text-[10.5px] font-bold"}>
-                          {shieldStatus.dmarc.valid ? (isFR ? "Conforme" : "Pass") : (isFR ? "Manquant / Incorrect" : "Missing / Incorrect")}
-                        </span>
-                      </div>
-                      <div className="text-[10px] font-mono bg-surface-lowest px-2.5 py-1.5 rounded border border-border-subtle/80 text-on-surface-variant truncate select-all" title="v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc@sicurre.com">
-                        v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc@sicurre.com
-                      </div>
+                      {/* DMARC Record */}
+                      {!shieldStatus.dmarc.valid && (
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between font-bold">
+                            <span className="text-on-surface">DMARC (TXT _dmarc)</span>
+                            <span className="text-[#b45309] text-[10.5px] font-bold">
+                              {isFR ? "Manquant / Incorrect" : "Missing / Incorrect"}
+                            </span>
+                          </div>
+                          <div className="text-[10px] font-mono bg-surface-lowest px-2.5 py-1.5 rounded border border-border-subtle/80 text-on-surface truncate select-all" title="v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc@sicurre.com">
+                            v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc@sicurre.com
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
+                )}
 
                 {showAutoFix && (
                   <div className="space-y-3 pt-2">
@@ -829,16 +863,16 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     ) : (
                       <div className="p-4 bg-surface-low border border-border-subtle rounded-xl space-y-2 text-xs font-semibold">
                         {autoFixProgress === "verify" && (
-                          <span className="flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5 animate-spin text-primary" /> Vérification du token Cloudflare...</span>
+                          <span className="flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5 animate-spin text-[#2e6bb5]" /> {isFR ? "Vérification du token Cloudflare..." : "Verifying Cloudflare token..."}</span>
                         )}
                         {autoFixProgress === "dns" && (
-                          <span className="flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5 animate-spin text-primary" /> Écriture des enregistrements SPF/DKIM/DMARC...</span>
+                          <span className="flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5 animate-spin text-[#2e6bb5]" /> {isFR ? "Écriture des enregistrements DNS manquants..." : "Writing missing DNS records..."}</span>
                         )}
                         {autoFixProgress === "routing" && (
-                          <span className="flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5 animate-spin text-primary" /> Test de propagation et synchronisation...</span>
+                          <span className="flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5 animate-spin text-[#2e6bb5]" /> {isFR ? "Synchronisation de la redirection d'email..." : "Syncing email routing..."}</span>
                         )}
                         {autoFixProgress === "success" && (
-                          <span className="flex items-center gap-2 text-safe"><CheckCircle2 className="w-4 h-4" /> DNS configuré et validé avec succès !</span>
+                          <span className="flex items-center gap-2 text-safe"><CheckCircle2 className="w-4 h-4" /> {isFR ? "Enregistrements DNS configurés avec succès !" : "DNS records successfully provisioned!"}</span>
                         )}
                         {autoFixProgress === "error" && (
                           <span className="flex items-center gap-2 text-error"><ShieldAlert className="w-4 h-4" /> {autoFixErrorMsg}</span>
@@ -873,15 +907,17 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     </Button>
                   </>
                 ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowAutoFix(true)}
-                    className="w-full flex items-center justify-center gap-1.5 cursor-pointer bg-white text-xs font-semibold"
-                  >
-                    <Zap className="w-3.5 h-3.5" />
-                    <span>{isFR ? "Lancer l'Auto-Configuration" : "Launch DNS Setup Wizard"}</span>
-                  </Button>
+                  (!shieldStatus.spf.valid || !shieldStatus.dkim.valid || !shieldStatus.dmarc.valid) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowAutoFix(true)}
+                      className="w-full flex items-center justify-center gap-1.5 cursor-pointer bg-white text-xs font-semibold hover:bg-[#2e6bb5] hover:text-white hover:border-[#2e6bb5] transition-all h-[38px] shadow-sm"
+                    >
+                      <Zap className="w-3.5 h-3.5" />
+                      <span>{isFR ? "Lancer l'Auto-Configuration" : "Launch DNS Setup Wizard"}</span>
+                    </Button>
+                  )
                 )}
               </div>
             </div>
@@ -937,7 +973,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     Required DNS Setup (TXT)
                   </span>
                   <div className="flex gap-2 items-center">
-                    <code className="flex-1 block p-3.5 bg-primary/[0.02] border border-primary/20 text-primary rounded-xl font-mono text-[11px] truncate select-all">
+                    <code className="flex-1 block p-3.5 bg-surface-low/50 border border-border-subtle text-on-surface rounded-xl font-mono text-[11px] truncate select-all">
                       v=spf1 include:spf.cloudflare.com include:sicurre.com ~all
                     </code>
                     <Button
@@ -1000,7 +1036,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     Required DNS Setup (TXT)
                   </span>
                   <div className="flex gap-2 items-center">
-                    <code className="flex-1 block p-3.5 bg-primary/[0.02] border border-primary/20 text-primary rounded-xl font-mono text-[11px] truncate select-all">
+                    <code className="flex-1 block p-3.5 bg-surface-low/50 border border-border-subtle text-on-surface rounded-xl font-mono text-[11px] truncate select-all">
                       v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1+z7s...
                     </code>
                     <Button
@@ -1066,7 +1102,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     Required DNS Setup (TXT)
                   </span>
                   <div className="flex gap-2 items-center">
-                    <code className="flex-1 block p-3.5 bg-primary/[0.02] border border-primary/20 text-primary rounded-xl font-mono text-[11px] truncate select-all">
+                    <code className="flex-1 block p-3.5 bg-surface-low/50 border border-border-subtle text-on-surface rounded-xl font-mono text-[11px] truncate select-all">
                       v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc@sicurre.com
                     </code>
                     <Button
@@ -1151,13 +1187,29 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   </div>
                 </div>
                 <div className="flex flex-col sm:items-end gap-1.5 min-w-[200px]">
-                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#047857] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 w-fit">
-                    <Check className="w-3.5 h-3.5" />
-                    {t("domain_shield.blacklist_clean")}
-                  </span>
-                  <span className="text-[10px] font-bold text-on-surface-variant text-left sm:text-right">
-                    {isFR ? "Aucun blocage signalé" : "No blocklists triggered"}
-                  </span>
+                  {shieldStatus?.blacklists?.listed ? (
+                    <>
+                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-50 px-2.5 py-1 rounded-full border border-red-200 w-fit animate-pulse">
+                        <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                        {isFR ? "Listé / Bloqué" : "Listed / Blocked"}
+                      </span>
+                      <span className="text-[10px] font-bold text-red-600 text-left sm:text-right">
+                        {isFR 
+                          ? `Listes : ${shieldStatus.blacklists.matched.join(", ")}` 
+                          : `Feeds: ${shieldStatus.blacklists.matched.join(", ")}`}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#047857] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 w-fit">
+                        <Check className="w-3.5 h-3.5" />
+                        {t("domain_shield.blacklist_clean")}
+                      </span>
+                      <span className="text-[10px] font-bold text-on-surface-variant text-left sm:text-right">
+                        {isFR ? "Aucun blocage signalé" : "No blocklists triggered"}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
 

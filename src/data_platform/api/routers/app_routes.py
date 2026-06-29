@@ -698,12 +698,33 @@ def _get_ssl_expiry_days(domain: str) -> int:
         pass
     return -1
 
+async def _check_domain_blacklists(domain: str) -> list[str]:
+    import dns.resolver
+    blacklists = {
+        "dbl.spamhaus.org": "Spamhaus DBL",
+        "multi.surbl.org": "SURBL List"
+    }
+    listed_on = []
+    for rbl, name in blacklists.items():
+        try:
+            # Query domain.dnsbl
+            query_host = f"{domain}.{rbl}"
+            await asyncio.to_thread(dns.resolver.resolve, query_host, "A")
+            listed_on.append(name)
+        except Exception:
+            pass
+    return listed_on
+
+
 @router.get("/v1/domain-shield/{domain}/status")
 async def check_domain_shield_status(
     domain: str,
     refresh: bool = False,
     current_user: AuthUser = Depends(get_current_user)
 ):
+    # Run dynamic blacklist check
+    blacklists_listed = await _check_domain_blacklists(domain)
+
     # Try fetching from DB cache first
     if not refresh:
         cached_rows = await async_query_auth_db(
@@ -712,13 +733,34 @@ async def check_domain_shield_status(
         )
         if cached_rows:
             row = cached_rows[0]
+            score = int(row["reputation_score"])
+            if blacklists_listed:
+                score = max(30, score - 30 * len(blacklists_listed))
+            
+            # Recalculate score grade if score drops due to blacklists
+            if score >= 90:
+                grade = "A"
+            elif score >= 80:
+                grade = "B"
+            elif score >= 70:
+                grade = "C"
+            elif score >= 60:
+                grade = "D"
+            else:
+                grade = "F"
+
             return {
                 "spf": {"valid": bool(row["spf_valid"]), "record": row["spf_record"], "error": None if row["spf_valid"] else "Not configured"},
                 "dkim": {"valid": bool(row["dkim_valid"]), "record": row["dkim_record"], "error": None if row["dkim_valid"] else "Not configured"},
                 "dmarc": {"valid": bool(row["dmarc_valid"]), "record": row["dmarc_record"], "policy": row["dmarc_policy"] or "none", "error": None if row["dmarc_valid"] else "Not configured"},
                 "ssl": {"valid": bool(row["ssl_valid"]), "days_remaining": int(row["ssl_days_remaining"]), "auto_renew": True, "error": None},
-                "reputation_score": int(row["reputation_score"]),
-                "score_grade": row["score_grade"]
+                "reputation_score": score,
+                "score_grade": grade,
+                "blacklists": {
+                    "listed": len(blacklists_listed) > 0,
+                    "matched": blacklists_listed,
+                    "error": None
+                }
             }
 
     import dns.resolver
@@ -728,7 +770,12 @@ async def check_domain_shield_status(
         "dmarc": {"valid": False, "record": None, "policy": "none", "error": "Not configured"},
         "ssl": {"valid": False, "days_remaining": 0, "auto_renew": False, "error": "Not configured"},
         "reputation_score": 100,
-        "score_grade": "A"
+        "score_grade": "A",
+        "blacklists": {
+            "listed": len(blacklists_listed) > 0,
+            "matched": blacklists_listed,
+            "error": None
+        }
     }
     
     # 1. Query SPF
@@ -802,6 +849,8 @@ async def check_domain_shield_status(
         status["ssl"]["auto_renew"] = True
         status["ssl"]["error"] = None
 
+    if blacklists_listed:
+        status["reputation_score"] -= 30 * len(blacklists_listed)
     status["reputation_score"] = max(30, status["reputation_score"])
     score = status["reputation_score"]
     if score >= 90:

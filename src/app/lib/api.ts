@@ -523,6 +523,7 @@ export interface DomainShieldStatus {
   ssl: { valid: boolean; days_remaining: number; auto_renew: boolean; error: string | null };
   reputation_score: number;
   score_grade: string;
+  blacklists?: { listed: boolean; matched: string[]; error: string | null };
 }
 
 export function useDomainShieldStatus(domain: string, enabled = true) {
