@@ -24,6 +24,7 @@ import {
   Lock as LockIcon,
   Server,
   Activity,
+  MousePointerClick,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -92,8 +93,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
-  // State for Interactive Visualizer Flow ("normal" | "attack")
-  const [visualizerFlow, setVisualizerFlow] = useState<"normal" | "attack">("normal");
+
 
   // State for Mock DNS Resolver Stepped Progress
   const [isTerminalRunning, setIsTerminalRunning] = useState(false);
@@ -376,284 +376,10 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                 </div>
               </div>
 
-              <p className="text-sm font-semibold text-on-surface-variant mt-6 leading-relaxed max-w-[280px]">
-                {isFR
-                  ? "Votre domaine est configuré de manière optimale contre l'usurpation d'identité sortante."
-                  : "Continuous auditing confirms your domains are hardened against spoofers and outgoing phishing relays."}
-              </p>
             </div>
 
-            {/* Right: Interactive Security Flow Diagram */}
-            <div className="lg:col-span-7 bg-surface-lowest rounded-2xl border border-border-subtle p-8 flex flex-col justify-between shadow-sm relative overflow-hidden">
-              <div className="flex justify-between items-center pb-3 border-b border-border-subtle">
-                <h3 className="font-display font-bold text-xl text-on-surface">
-                  {isFR ? "Visualisateur de flux de sécurité" : "Live Security Flow Visualizer"}
-                </h3>
-                <div className="flex bg-surface-low p-1 rounded-lg border border-border-subtle text-xs font-semibold">
-                  <button
-                    onClick={() => setVisualizerFlow("normal")}
-                    className={`px-3 py-1 rounded-md transition-all cursor-pointer border-none outline-none ${
-                      visualizerFlow === "normal" ? "bg-white text-on-surface shadow-sm font-bold" : "text-on-surface-variant/75"
-                    }`}
-                  >
-                    {isFR ? "Flux Normal" : "Normal Flow"}
-                  </button>
-                  <button
-                    onClick={() => setVisualizerFlow("attack")}
-                    className={`px-3 py-1 rounded-md transition-all cursor-pointer border-none outline-none ${
-                      visualizerFlow === "attack" ? "bg-white text-on-surface shadow-sm font-bold" : "text-on-surface-variant/75"
-                    }`}
-                  >
-                    {isFR ? "Simul. Attaque" : "Attack Flow"}
-                  </button>
-                </div>
-              </div>
-
-              {/* Node Graph Visualizer */}
-              <div className="h-[210px] w-full relative flex items-center justify-between px-4 select-none">
-                
-                {/* Visualizer Nodes */}
-                <div className="flex flex-col items-center gap-1.5 z-10">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center border transition-all duration-300 ${
-                    visualizerFlow === "normal" 
-                      ? "bg-safe/10 border-safe/30 text-safe shadow-[0_0_12px_rgba(16,185,129,0.2)]" 
-                      : "bg-error/10 border-error/30 text-error shadow-[0_0_12px_rgba(239,68,68,0.2)] animate-pulse"
-                  }`}>
-                    <Server className="w-6 h-6" />
-                  </div>
-                  <span className="text-[10px] font-bold text-on-surface-variant">
-                    {visualizerFlow === "normal" ? "Authorized Server" : "Hacker Server"}
-                  </span>
-                </div>
-
-                <div className="flex-1 h-[2px] relative overflow-hidden bg-border-subtle/50 mx-2">
-                  <div className={`absolute top-0 bottom-0 left-0 w-1/2 rounded-full transition-colors duration-300 ${
-                    visualizerFlow === "normal" ? "bg-safe" : "bg-error"
-                  } ${visualizerFlow === "normal" ? "animate-pulse" : "animate-bounce"}`} style={{ width: "100%" }} />
-                </div>
-
-                <div className="flex flex-col items-center gap-1.5 z-10">
-                  <div className={`w-14 h-14 rounded-full flex items-center justify-center border transition-all duration-300 ${
-                    visualizerFlow === "normal"
-                      ? "bg-primary/10 border-primary/30 text-primary shadow-[0_0_15px_rgba(27,79,204,0.2)]"
-                      : "bg-warning/10 border-warning/30 text-warning shadow-[0_0_15px_rgba(245,158,11,0.2)]"
-                  }`}>
-                    <ShieldCheck className="w-8 h-8" />
-                  </div>
-                  <span className="text-[10px] font-bold text-on-surface-variant">
-                    SPF / DKIM Filter
-                  </span>
-                </div>
-
-                <div className="flex-1 h-[2px] relative overflow-hidden bg-border-subtle/50 mx-2">
-                  <div className={`absolute top-0 bottom-0 left-0 w-1/2 rounded-full transition-colors duration-300 ${
-                    visualizerFlow === "normal" ? "bg-safe" : "bg-error"
-                  }`} style={{ width: "100%" }} />
-                </div>
-
-                <div className="flex flex-col items-center gap-1.5 z-10">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center border transition-all duration-300 ${
-                    visualizerFlow === "normal"
-                      ? "bg-safe/10 border-safe/30 text-safe shadow-[0_0_12px_rgba(16,185,129,0.2)]"
-                      : "bg-surface-low border-border-subtle text-on-surface-variant/40"
-                  }`}>
-                    <LockIcon className="w-6 h-6" />
-                  </div>
-                  <span className="text-[10px] font-bold text-on-surface-variant">
-                    {visualizerFlow === "normal" ? "Secure Inbox" : "Blocked / Trash"}
-                  </span>
-                </div>
-              </div>
-
-              <div className="text-[11.5px] text-on-surface-variant leading-relaxed text-center px-4">
-                {visualizerFlow === "normal"
-                  ? (isFR 
-                      ? "Flux d'email authentifié : SPF & DKIM valides. L'email est validé par le DMARC et délivré à la boîte." 
-                      : "Authorized mail flow: SPF & DKIM aligned. The email passes DMARC checks and is delivered safely.")
-                  : (isFR 
-                      ? "Flux d'attaque usurpée : L'IP de l'attaquant ne correspond pas. SPF/DKIM échouent, le DMARC rejette immédiatement."
-                      : "Spoofed flow block: Attacker IP is unauthorized. SPF & DKIM checks fail, and DMARC immediately rejects the email.")}
-              </div>
-            </div>
-          </div>
-
-          {/* Custom DNS Diagnostics Panel */}
-          <div className="bg-surface-lowest rounded-2xl border border-border-subtle p-6 shadow-sm space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border-subtle/80">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-primary/10 rounded-lg text-[#2e6bb5]">
-                  <Activity className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-display font-bold text-[18px] text-on-surface">
-                    {isFR ? "Audit et Intégrité DNS" : "DNS Audit & Integrity Status"}
-                  </h3>
-                  <p className="text-xs text-on-surface-variant mt-0.5 font-medium">
-                    {isFR ? "Vérification en temps réel de vos configurations de messagerie" : "Real-time verification of email security records"}
-                  </p>
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (typeof window !== "undefined") {
-                    sessionStorage.removeItem(`diagnosed_${selectedDomain}`);
-                  }
-                  runStepDiagnostics();
-                }}
-                disabled={isTerminalRunning || isShieldLoading}
-                className="gap-2 cursor-pointer bg-white text-xs font-bold border-border-subtle hover:bg-surface-low/30 text-on-surface transition-all h-[36px]"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isTerminalRunning ? "animate-spin text-[#2e6bb5]" : "text-on-surface-variant"}`} />
-                {isFR ? "Relancer l'audit de sécurité" : "Re-diagnose Domain"}
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
-              {[
-                {
-                  id: "spf",
-                  labelFR: "Enregistrement SPF",
-                  labelEN: "SPF Record",
-                  descFR: "Serveurs autorisés",
-                  descEN: "Authorized relays",
-                  valid: shieldStatus?.spf?.valid,
-                  record: shieldStatus?.spf?.record,
-                },
-                {
-                  id: "dkim",
-                  labelFR: "Signature DKIM",
-                  labelEN: "DKIM Signature",
-                  descFR: "Clé d'authentification",
-                  descEN: "Auth signatures",
-                  valid: shieldStatus?.dkim?.valid,
-                  record: shieldStatus?.dkim?.record,
-                },
-                {
-                  id: "dmarc",
-                  labelFR: "Politique DMARC",
-                  labelEN: "DMARC Policy",
-                  descFR: "Consignes de filtrage",
-                  descEN: "Filtering instructions",
-                  valid: shieldStatus?.dmarc?.valid,
-                  record: shieldStatus?.dmarc?.record,
-                },
-                {
-                  id: "ssl",
-                  labelFR: "Certificat SSL",
-                  labelEN: "SSL Certificate",
-                  descFR: "Chiffrement HTTPS",
-                  descEN: "HTTPS encryption",
-                  valid: shieldStatus?.ssl?.valid,
-                  record: shieldStatus?.ssl?.valid ? (isFR ? "Chiffrement actif" : "Encryption active") : null,
-                },
-                {
-                  id: "reputation",
-                  labelFR: "Scan Réputation",
-                  labelEN: "IP Reputation",
-                  descFR: "Listes noires / Menaces",
-                  descEN: "Blocklists audit",
-                  valid: shieldStatus?.reputation_score >= 70,
-                  record: shieldStatus?.reputation_score ? `${shieldStatus.reputation_score}/100` : null,
-                },
-              ].map((step, idx) => {
-                const isStepRunning = activeStepIndex === idx;
-                const isStepCompleted = activeStepIndex > idx;
-                const isStepIdle = activeStepIndex < idx;
-
-                const severity = (() => {
-                  if (step.id === "dmarc") {
-                    if (!step.valid) return "error";
-                    if (shieldStatus?.dmarc?.policy === "none") return "warning";
-                    return "success";
-                  }
-                  if (step.id === "reputation") {
-                    const s = shieldStatus?.reputation_score || 100;
-                    if (s < 70) return "error";
-                    if (s < 90) return "warning";
-                    return "success";
-                  }
-                  return step.valid ? "success" : "error";
-                })();
-
-                let cardClass = "border-border-subtle bg-surface-lowest opacity-75";
-                let statusBadge = null;
-
-                if (isStepRunning) {
-                  cardClass = "border-[#2e6bb5] bg-[#d0e4ff]/10 shadow-[0_0_12px_rgba(46,107,181,0.15)] ring-1 ring-[#2e6bb5]/20 scale-[1.02] opacity-100";
-                  statusBadge = (
-                    <span className="flex items-center gap-1.5 text-[10px] font-bold text-[#2e6bb5] uppercase">
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#2e6bb5]" />
-                      {isFR ? "Analyse..." : "Analyzing..."}
-                    </span>
-                  );
-                } else if (isStepCompleted) {
-                  if (severity === "success") {
-                    cardClass = "border-emerald-200 bg-emerald-50/[0.08] opacity-100";
-                    statusBadge = (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#047857] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                        <Check className="w-3.5 h-3.5" />
-                        {isFR ? "Conforme" : "Pass"}
-                      </span>
-                    );
-                  } else if (severity === "warning") {
-                    cardClass = "border-amber-200 bg-amber-50/[0.08] opacity-100";
-                    statusBadge = (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#b45309] bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                        {isFR ? "Partiel" : "Warning"}
-                      </span>
-                    );
-                  } else {
-                    // error
-                    cardClass = "border-red-200 bg-red-50/[0.08] opacity-100";
-                    statusBadge = (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-md border border-red-200">
-                        <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
-                        {isFR ? "Manquant" : "Missing"}
-                      </span>
-                    );
-                  }
-                } else {
-                  // idle
-                  statusBadge = (
-                    <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase">
-                      {isFR ? "En attente" : "Pending"}
-                    </span>
-                  );
-                }
-
-                return (
-                  <div
-                    key={step.id}
-                    className={`border rounded-xl p-4 flex flex-col justify-between min-h-[140px] transition-all duration-300 ${cardClass}`}
-                  >
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold font-display text-on-surface">
-                          {isFR ? step.labelFR : step.labelEN}
-                        </span>
-                      </div>
-                      <p className="text-[10.5px] text-on-surface-variant font-semibold leading-snug">
-                        {isFR ? step.descFR : step.descEN}
-                      </p>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-border-subtle/50 flex items-center justify-between gap-1 overflow-hidden">
-                      {statusBadge}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* DMARC Simulator and Cloudflare Wizard row */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            
-            {/* Left: Interactive Spoof Simulator Sandbox */}
-            <div className="lg:col-span-6 bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+            {/* Right: Interactive Spoof Simulator Sandbox */}
+            <div className="lg:col-span-7 bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden">
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <Play className="w-5 h-5 text-primary" />
@@ -724,7 +450,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                       variant="outline"
                       size="sm"
                       onClick={() => setSpoofStep("idle")}
-                      className="w-fit self-end cursor-pointer bg-white"
+                      className="w-fit self-end cursor-pointer bg-white text-xs font-bold"
                     >
                       {isFR ? "Recommencer" : "Reset Test"}
                     </Button>
@@ -733,7 +459,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   <Button
                     onClick={startSpoofSimulation}
                     disabled={spoofStep === "sending"}
-                    className="w-full flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full flex items-center justify-center gap-2 cursor-pointer bg-[#2e6bb5] text-white hover:bg-[#23589b] border-none text-xs font-bold rounded-lg transition-all h-[38px] shadow-sm"
                   >
                     <Send className="w-4 h-4" />
                     <span>
@@ -745,8 +471,176 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                 )}
               </div>
             </div>
+          </div>
 
-            {/* Right: Cloudflare Inline Auto-Fix Wizard */}
+          {/* Row 2: Audit et Intégrité DNS (5 Cards side-by-side) */}
+          <div className="bg-surface-lowest rounded-2xl border border-border-subtle p-6 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border-subtle/80">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-primary/10 rounded-lg text-[#2e6bb5]">
+                  <Activity className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-display font-bold text-[18px] text-on-surface">
+                    {isFR ? "Audit et Intégrité DNS" : "DNS Audit & Integrity Status"}
+                  </h3>
+                  <p className="text-xs text-on-surface-variant mt-0.5 font-medium">
+                    {isFR ? "Vérification en temps réel de vos configurations de messagerie" : "Real-time verification of email security records"}
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    sessionStorage.removeItem(`diagnosed_${selectedDomain}`);
+                  }
+                  runStepDiagnostics();
+                }}
+                disabled={isTerminalRunning || isShieldLoading}
+                className="gap-2 cursor-pointer bg-white text-xs font-bold border-border-subtle hover:bg-surface-low/30 text-on-surface transition-all h-[36px]"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isTerminalRunning ? "animate-spin text-[#2e6bb5]" : "text-on-surface-variant"}`} />
+                {isFR ? "Relancer l'audit de sécurité" : "Re-diagnose Domain"}
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+              {[
+                {
+                  id: "spf",
+                  labelFR: "Enregistrement SPF",
+                  labelEN: "SPF Record",
+                  descFR: "Serveurs autorisés",
+                  descEN: "Authorized relays",
+                  valid: shieldStatus?.spf?.valid,
+                },
+                {
+                  id: "dkim",
+                  labelFR: "Signature DKIM",
+                  labelEN: "DKIM Signature",
+                  descFR: "Clé d'authentification",
+                  descEN: "Auth signatures",
+                  valid: shieldStatus?.dkim?.valid,
+                },
+                {
+                  id: "dmarc",
+                  labelFR: "Politique DMARC",
+                  labelEN: "DMARC Policy",
+                  descFR: "Consignes de filtrage",
+                  descEN: "Filtering instructions",
+                  valid: shieldStatus?.dmarc?.valid,
+                },
+                {
+                  id: "ssl",
+                  labelFR: "Certificat SSL",
+                  labelEN: "SSL Certificate",
+                  descFR: "Chiffrement HTTPS",
+                  descEN: "HTTPS encryption",
+                  valid: shieldStatus?.ssl?.valid,
+                },
+                {
+                  id: "reputation",
+                  labelFR: "Scan Réputation",
+                  labelEN: "IP Reputation",
+                  descFR: "Listes noires / Menaces",
+                  descEN: "Blocklists audit",
+                  valid: shieldStatus?.reputation_score >= 70,
+                },
+              ].map((step, idx) => {
+                const isStepRunning = activeStepIndex === idx;
+                const isStepCompleted = activeStepIndex > idx;
+                const isStepIdle = activeStepIndex < idx;
+
+                const severity = (() => {
+                  if (step.id === "dmarc") {
+                    if (!step.valid) return "error";
+                    if (shieldStatus?.dmarc?.policy === "none") return "warning";
+                    return "success";
+                  }
+                  if (step.id === "reputation") {
+                    const s = shieldStatus?.reputation_score || 100;
+                    if (s < 70) return "error";
+                    if (s < 90) return "warning";
+                    return "success";
+                  }
+                  return step.valid ? "success" : "error";
+                })();
+
+                let cardClass = "border-border-subtle bg-surface-lowest opacity-75";
+                let statusBadge = null;
+
+                if (isStepRunning) {
+                  cardClass = "border-[#2e6bb5] bg-[#d0e4ff]/10 shadow-[0_0_12px_rgba(46,107,181,0.15)] ring-1 ring-[#2e6bb5]/20 scale-[1.02] opacity-100";
+                  statusBadge = (
+                    <span className="flex items-center gap-1.5 text-[10px] font-bold text-[#2e6bb5] uppercase">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#2e6bb5]" />
+                      {isFR ? "Analyse..." : "Analyzing..."}
+                    </span>
+                  );
+                } else if (isStepCompleted) {
+                  if (severity === "success") {
+                    cardClass = "border-emerald-200 bg-emerald-50/[0.08] opacity-100";
+                    statusBadge = (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#047857] bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200">
+                        <Check className="w-3.5 h-3.5" />
+                        {isFR ? "Conforme" : "Pass"}
+                      </span>
+                    );
+                  } else if (severity === "warning") {
+                    cardClass = "border-amber-200 bg-amber-50/[0.08] opacity-100";
+                    statusBadge = (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#b45309] bg-amber-50 px-2.5 py-0.5 rounded-md border border-amber-200">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        {isFR ? "Partiel" : "Warning"}
+                      </span>
+                    );
+                  } else {
+                    cardClass = "border-red-200 bg-red-50/[0.08] opacity-100";
+                    statusBadge = (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-2.5 py-0.5 rounded-md border border-red-200">
+                        <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                        {isFR ? "Manquant" : "Missing"}
+                      </span>
+                    );
+                  }
+                } else {
+                  statusBadge = (
+                    <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase">
+                      {isFR ? "En attente" : "Pending"}
+                    </span>
+                  );
+                }
+
+                return (
+                  <div
+                    key={step.id}
+                    className={`border rounded-xl p-4 flex flex-col justify-between min-h-[140px] transition-all duration-300 ${cardClass}`}
+                  >
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold font-display text-on-surface">
+                          {isFR ? step.labelFR : step.labelEN}
+                        </span>
+                      </div>
+                      <p className="text-[10.5px] text-on-surface-variant font-semibold leading-snug">
+                        {isFR ? step.descFR : step.descEN}
+                      </p>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-border-subtle/50 flex items-center justify-between gap-1 overflow-hidden">
+                      {statusBadge}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Row 3: Auto-Fix & Reputation Monitoring side-by-side */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+            {/* Left: Cloudflare Inline Auto-Fix Wizard */}
             <div className="lg:col-span-6 bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm flex flex-col justify-between">
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
@@ -761,11 +655,6 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     {isFR
                       ? "Corrigez et provisionnez automatiquement vos enregistrements DNS manquants (SPF, DKIM, DMARC) via l'API Cloudflare."
                       : "Automatically generate and sync missing DNS records (SPF, DKIM, DMARC) directly using the Cloudflare token API wizard."}
-                  </p>
-                  <p className="text-[10px] text-[#b45309] font-bold mt-1.5 italic">
-                    {isFR
-                      ? "* Seuls les enregistrements manquants ou incorrects (rouges) seront ajoutés sans écraser vos autres configurations DNS existantes."
-                      : "* Only missing or invalid records (red) will be configured. Your other DNS settings will not be overwritten."}
                   </p>
                 </div>
 
@@ -901,7 +790,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                       size="sm"
                       onClick={handleRunAutoFix}
                       disabled={autoFixProgress !== "idle" || !cfToken.trim()}
-                      className="cursor-pointer font-semibold text-xs bg-primary"
+                      className="cursor-pointer font-bold text-xs bg-[#2e6bb5] hover:bg-[#23589b] text-white border-none rounded-lg"
                     >
                       {isFR ? "Valider et Corriger" : "Validate & Deploy"}
                     </Button>
@@ -909,12 +798,11 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                 ) : (
                   (!shieldStatus.spf.valid || !shieldStatus.dkim.valid || !shieldStatus.dmarc.valid) && (
                     <Button
-                      variant="outline"
                       size="sm"
                       onClick={() => setShowAutoFix(true)}
-                      className="w-full flex items-center justify-center gap-1.5 cursor-pointer bg-white text-xs font-semibold hover:bg-[#2e6bb5] hover:text-white hover:border-[#2e6bb5] transition-all h-[38px] shadow-sm"
+                      className="w-full flex items-center justify-center gap-1.5 cursor-pointer bg-[#2e6bb5] hover:bg-[#23589b] text-white border-none text-xs font-bold rounded-lg transition-all h-[38px] shadow-sm"
                     >
-                      <Zap className="w-3.5 h-3.5" />
+                      <MousePointerClick className="w-3.5 h-3.5" />
                       <span>{isFR ? "Lancer l'Auto-Configuration" : "Launch DNS Setup Wizard"}</span>
                     </Button>
                   )
@@ -922,7 +810,127 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
               </div>
             </div>
 
+            {/* Right: Secondary Stats Panel: Row-Level Lists */}
+            <div className="lg:col-span-6 bg-surface-lowest border border-border-subtle overflow-hidden shadow-sm flex flex-col justify-between">
+              <div className="px-6 py-4 bg-surface-low/30 border-b border-border-subtle">
+                <h4 className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                  {isFR ? "Surveillance & Sécurité du Domaine" : "Domain Security & Monitoring"}
+                </h4>
+              </div>
+              
+              <div className="divide-y divide-border-subtle flex-1 flex flex-col justify-center">
+                {/* Row 1: SSL Status */}
+                <div className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-surface-low/10 transition-colors">
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 bg-primary/[0.06] rounded-xl text-[#2e6bb5] shrink-0">
+                      <Lock className="w-5.5 h-5.5 stroke-[1.5]" />
+                    </div>
+                    <div>
+                      <h5 className="font-semibold text-[15px] text-on-surface">
+                        {t("domain_shield.ssl_expiry")}
+                      </h5>
+                      <p className="text-xs text-on-surface-variant font-semibold mt-1">
+                        {isFR
+                          ? "Vérification de la validité et de l'autorité de votre certificat de chiffrement SSL."
+                          : "Verifying the validity and authority of your SSL web server certificate."}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:items-end gap-1.5 min-w-[200px]">
+                    {shieldStatus.ssl.valid ? (
+                      <>
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#047857] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                          <Check className="w-3.5 h-3.5" />
+                          {t("domain_shield.ssl_countdown", { days: shieldStatus.ssl.days_remaining })}
+                        </span>
+                        <span className="text-[10px] font-bold text-on-surface-variant">
+                          {t("domain_shield.ssl_renew_active")}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-error bg-error-container/20 px-2.5 py-1 rounded-full border border-error-container">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        Non résolu
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Row 2: Blacklist Status */}
+                <div className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-surface-low/10 transition-colors">
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 bg-primary/[0.06] rounded-xl text-[#2e6bb5] shrink-0">
+                      <Skull className="w-5.5 h-5.5 stroke-[1.5]" />
+                    </div>
+                    <div>
+                      <h5 className="font-semibold text-[15px] text-on-surface">
+                        {isFR ? "Surveillance de Réputation du Domaine" : "Domain Reputation Monitor"}
+                      </h5>
+                      <p className="text-xs text-on-surface-variant font-semibold mt-1">
+                        {isFR
+                          ? "Vérification continue auprès des listes noires de spam (Spamhaus, SURBL) pour assurer la délivrabilité globale de vos emails."
+                          : "Continual checking across spam reputation databases (Spamhaus, SURBL) to protect global deliverability."}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:items-end gap-1.5 min-w-[200px]">
+                    {shieldStatus?.blacklists?.listed ? (
+                      <>
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-50 px-2.5 py-1 rounded-full border border-red-200 w-fit animate-pulse">
+                          <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                          {isFR ? "Listé / Bloqué" : "Listed / Blocked"}
+                        </span>
+                        <span className="text-[10px] font-bold text-red-600 text-left sm:text-right">
+                          {isFR 
+                            ? `Listes : ${shieldStatus.blacklists.matched.join(", ")}` 
+                            : `Feeds: ${shieldStatus.blacklists.matched.join(", ")}`}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#047857] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 w-fit">
+                          <Check className="w-3.5 h-3.5" />
+                          {t("domain_shield.blacklist_clean")}
+                        </span>
+                        <span className="text-[10px] font-bold text-on-surface-variant text-left sm:text-right">
+                          {isFR ? "Aucun blocage" : "No blocks"}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Row 3: DMARC Reports Activity */}
+                <div className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-surface-low/10 transition-colors">
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 bg-primary/[0.06] rounded-xl text-[#2e6bb5] shrink-0">
+                      <Activity className="w-5.5 h-5.5 stroke-[1.5]" />
+                    </div>
+                    <div>
+                      <h5 className="font-semibold text-[15px] text-on-surface">
+                        {isFR ? "Rapports d'activité DMARC (7j)" : "DMARC Block Activity (7d)"}
+                      </h5>
+                      <p className="text-xs text-on-surface-variant font-semibold mt-1">
+                        {isFR
+                          ? "Rapports agrégés montrant les serveurs non autorisés qui ont tenté de falsifier votre domaine."
+                          : "Aggregated reports checking unauthorized servers attempting to forge mail as your domain."}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:items-end gap-1.5 min-w-[200px]">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#2e6bb5] bg-[#d0e4ff]/30 px-2.5 py-1 rounded-full border border-primary-container/20 w-fit">
+                      <Activity className="w-3.5 h-3.5" />
+                      {isFR ? "28 bloqués" : "28 blocked"}
+                    </span>
+                    <span className="text-[10px] font-bold text-[#2e6bb5]">
+                      {isFR ? "Protection active" : "Protection active"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
+
 
           {/* DNS Record Verification Matrix */}
           <div className="space-y-6">
@@ -1123,125 +1131,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
             </div>
           </div>
 
-          {/* Secondary Stats Panel: Row-Level Lists */}
-          <div className="bg-surface-lowest rounded-2xl border border-border-subtle overflow-hidden shadow-sm">
-            <div className="px-6 py-4 bg-surface-low/30 border-b border-border-subtle">
-              <h4 className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-                {isFR ? "Surveillance & Sécurité du Domaine" : "Domain Security & Monitoring"}
-              </h4>
-            </div>
-            
-            <div className="divide-y divide-border-subtle">
-              {/* Row 1: SSL Status */}
-              <div className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-surface-low/10 transition-colors">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 bg-primary/[0.06] rounded-xl text-[#2e6bb5] shrink-0">
-                    <Lock className="w-5.5 h-5.5 stroke-[1.5]" />
-                  </div>
-                  <div>
-                    <h5 className="font-semibold text-[15px] text-on-surface">
-                      {t("domain_shield.ssl_expiry")}
-                    </h5>
-                    <p className="text-xs text-on-surface-variant font-semibold mt-1">
-                      {isFR
-                        ? "Vérification de la validité et de l'autorité de votre certificat de chiffrement SSL."
-                        : "Verifying the validity and authority of your SSL web server certificate."}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex flex-col sm:items-end gap-1.5 min-w-[200px]">
-                  {shieldStatus.ssl.valid ? (
-                    <>
-                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#047857] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                        <Check className="w-3.5 h-3.5" />
-                        {t("domain_shield.ssl_countdown", { days: shieldStatus.ssl.days_remaining })}
-                      </span>
-                      <span className="text-[10px] font-bold text-on-surface-variant">
-                        {t("domain_shield.ssl_renew_active")}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-error bg-error-container/20 px-2.5 py-1 rounded-full border border-error-container">
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                      Non résolu
-                    </span>
-                  )}
-                </div>
-              </div>
 
-              {/* Row 2: Blacklist Status */}
-              <div className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-surface-low/10 transition-colors">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 bg-primary/[0.06] rounded-xl text-[#2e6bb5] shrink-0">
-                    <Skull className="w-5.5 h-5.5 stroke-[1.5]" />
-                  </div>
-                  <div>
-                    <h5 className="font-semibold text-[15px] text-on-surface">
-                      {t("domain_shield.blacklist_monitor")}
-                    </h5>
-                    <p className="text-xs text-on-surface-variant font-semibold mt-1">
-                      {isFR
-                        ? "Surveillance en temps réel sur 50+ listes noires d'indésirables et de menaces (reputation IP)."
-                        : "Real-time tracking of IP and domain across 50+ major spam and threat blocklists."}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex flex-col sm:items-end gap-1.5 min-w-[200px]">
-                  {shieldStatus?.blacklists?.listed ? (
-                    <>
-                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-50 px-2.5 py-1 rounded-full border border-red-200 w-fit animate-pulse">
-                        <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
-                        {isFR ? "Listé / Bloqué" : "Listed / Blocked"}
-                      </span>
-                      <span className="text-[10px] font-bold text-red-600 text-left sm:text-right">
-                        {isFR 
-                          ? `Listes : ${shieldStatus.blacklists.matched.join(", ")}` 
-                          : `Feeds: ${shieldStatus.blacklists.matched.join(", ")}`}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#047857] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 w-fit">
-                        <Check className="w-3.5 h-3.5" />
-                        {t("domain_shield.blacklist_clean")}
-                      </span>
-                      <span className="text-[10px] font-bold text-on-surface-variant text-left sm:text-right">
-                        {isFR ? "Aucun blocage signalé" : "No blocklists triggered"}
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Row 3: DMARC Reports Activity */}
-              <div className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-surface-low/10 transition-colors">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 bg-primary/[0.06] rounded-xl text-[#2e6bb5] shrink-0">
-                    <Activity className="w-5.5 h-5.5 stroke-[1.5]" />
-                  </div>
-                  <div>
-                    <h5 className="font-semibold text-[15px] text-on-surface">
-                      {isFR ? "Rapports d'activité DMARC (7j)" : "DMARC Block Activity (7d)"}
-                    </h5>
-                    <p className="text-xs text-on-surface-variant font-semibold mt-1">
-                      {isFR
-                        ? "Rapports agrégés montrant les serveurs non autorisés qui ont tenté de falsifier votre domaine."
-                        : "Aggregated reports checking unauthorized servers attempting to forge mail as your domain."}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex flex-col sm:items-end gap-1.5 min-w-[200px]">
-                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#2e6bb5] bg-[#d0e4ff]/30 px-2.5 py-1 rounded-full border border-primary-container/20 w-fit">
-                    <Activity className="w-3.5 h-3.5" />
-                    {isFR ? "28 bloqués" : "28 blocked"}
-                  </span>
-                  <span className="text-[10px] font-bold text-[#2e6bb5]">
-                    {isFR ? "Protection active" : "Protection active"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
         </>
       )}
     </MotionDiv>

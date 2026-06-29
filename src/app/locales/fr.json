@@ -166,7 +166,7 @@
     "ssl_renew_active": "Renouvellement automatique : Actif",
     "ssl_expires_soon": "Attention : Le certificat SSL expire dans moins de 30 jours !",
     "blacklist_monitor": "Surveillance des Listes Noires IP/Domaine",
-    "blacklist_clean": "Sain (Non listé dans plus de 50 flux de menaces)",
+    "blacklist_clean": "Sain",
     "blacklist_listed": "Inscrit dans une liste noire ! Inspectez vos DNS.",
     "dns_spf": "Enregistrement SPF",
     "dns_dkim": "Statut du Sélecteur DKIM",
