@@ -691,7 +691,7 @@ export function EmailGatewayAnimation() {
         {/* Left -> Central Command */}
         <path d="M 90 190 L 300 190" stroke="url(#chrome-pipe-body)" strokeWidth="18" fill="none" strokeLinecap="round" />
         <path d="M 90 190 L 300 190" stroke="rgba(59, 130, 246, 0.25)" strokeWidth="8" fill="none" strokeLinecap="round" />
-        <path d="M 90 190 L 300 190" stroke="#3b82f6" strokeWidth="3" strokeDasharray="6 14" fill="none" className="tube-flow" />
+        <path d="M 90 190 L 300 190" stroke="#4a90d9" strokeWidth="3" strokeDasharray="6 14" fill="none" className="tube-flow" />
 
         {/* Central -> Legit Basket */}
         <path d="M 300 190 C 380 190, 420 84, 510 84" stroke="url(#chrome-pipe-diag-up)" strokeWidth="18" fill="none" strokeLinecap="round" />

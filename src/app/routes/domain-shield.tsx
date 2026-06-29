@@ -347,7 +347,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     cx="50"
                     cy="50"
                     r="40"
-                    stroke="var(--color-primary, #1B4FCC)"
+                    stroke="var(--color-primary, #4a90d9)"
                     strokeWidth="7"
                     fill="transparent"
                     strokeDasharray={251.2}

@@ -13,12 +13,12 @@
   --font-mono: "JetBrains Mono", monospace;
 
   /* ── Core Palette ── */
-  --color-primary: #0038a4;
+  --color-primary: #4a90d9;
   --color-on-primary: #ffffff;
-  --color-primary-container: #1b4fcc;
-  --color-on-primary-container: #c5d0ff;
-  --color-inverse-primary: #b5c4ff;
-  --color-navy-dark: #0f2e7a;
+  --color-primary-container: #2e6bb5;
+  --color-on-primary-container: #d0e4ff;
+  --color-inverse-primary: #a3c9f0;
+  --color-navy-dark: #1a4f8a;
 
   /* ── Secondary (Amber — Attention Required) ── */
   --color-secondary: #855300;
@@ -53,7 +53,7 @@
   --color-on-surface: #131b2e;
   --color-on-surface-variant: #434654;
   --color-surface-variant: #dae2fd;
-  --color-surface-tint: #2354d1;
+  --color-surface-tint: #4a90d9;
   --color-inverse-surface: #283044;
   --color-inverse-on-surface: #eef0ff;
 
@@ -67,9 +67,9 @@
   --color-border-subtle: #e2e8f0;
 
   /* ── Fixed Colors (for elevation-independent tinting) ── */
-  --color-primary-fixed: #dce1ff;
-  --color-primary-fixed-dim: #b5c4ff;
-  --color-on-primary-fixed: #00164e;
+  --color-primary-fixed: #e0efff;
+  --color-primary-fixed-dim: #a3c9f0;
+  --color-on-primary-fixed: #0c2d4d;
   --color-secondary-fixed: #ffddb8;
   --color-secondary-fixed-dim: #ffb95f;
   --color-on-secondary-fixed: #2a1700;
