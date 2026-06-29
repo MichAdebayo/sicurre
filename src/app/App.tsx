@@ -145,7 +145,7 @@ export default function App() {
         {activePage === "threats" && <ThreatsRoute key="threats" session={session} />}
         {activePage === "quarantine" && <QuarantineRoute key="quarantine" />}
         {activePage === "alerts" && <AlertsRoute key="alerts" />}
-        {activePage === "domain-shield" && <DomainShieldRoute key="domain-shield" />}
+        {activePage === "domain-shield" && <DomainShieldRoute key="domain-shield" session={session} />}
         {activePage === "logs" && session.is_platform_admin && <LogsRoute key="logs" />}
         {activePage === "settings" && <SettingsRoute key="settings" session={session} />}
         {activePage === "support" && <SupportRoute key="support" />}

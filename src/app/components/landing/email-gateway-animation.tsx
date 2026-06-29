@@ -309,6 +309,7 @@ function ConsoleMainframe3D({ scanning, scanType }: { scanning: boolean; scanTyp
         top: "50%",
         transform: "rotateX(15deg) rotateY(-18deg) rotateZ(0deg) translateZ(45px)",
         transformStyle: "preserve-3d",
+        filter: "drop-shadow(0 0 30px rgba(37, 99, 235, 0.25))",
       }}
       className="absolute -translate-x-1/2 -translate-y-1/2 z-20 w-36 h-44 flex items-center justify-center"
     >
@@ -344,8 +345,11 @@ function ConsoleMainframe3D({ scanning, scanType }: { scanning: boolean; scanTyp
 
       {/* Front Face: Steel Bezel and Glass Diagnostic Screen */}
       <div
-        style={{ transform: "translateZ(18px)" }}
-        className="absolute inset-0 rounded-2xl bg-gradient-to-b from-[#2563eb] via-[#1d4ed8] to-slate-900 border-[5px] border-[#2563eb]/60 steel-bezel relative overflow-hidden flex items-center justify-center"
+        style={{
+          transform: "translateZ(18px)",
+          boxShadow: "0 0 40px rgba(37, 99, 235, 0.3), inset 0 2px 3px rgba(255,255,255,0.25), inset 0 -2px 3px rgba(0,0,0,0.5), 0 12px 24px rgba(0,0,0,0.6)",
+        }}
+        className="absolute inset-0 rounded-2xl bg-gradient-to-b from-[#2563eb] via-[#1d4ed8] to-[#0f172a] border-[5px] border-[#2563eb]/60 relative overflow-hidden flex items-center justify-center"
       >
         {/* Corner Rivets */}
         <div className="absolute top-1.5 left-1.5 rivet" />
@@ -606,12 +610,21 @@ export function EmailGatewayAnimation() {
     <div className="relative w-full h-[380px] max-w-[600px] bg-transparent overflow-hidden select-none perspective-container">
       <style>{styleTag}</style>
 
-      {/* Atmospheric focal ambient light sources */}
-      <div className="absolute top-1/2 left-[15%] -translate-y-1/2 w-32 h-32 bg-blue-500/10 blur-[50px] pointer-events-none" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-indigo-500/10 blur-[55px] pointer-events-none" />
-      <div className="absolute top-[22%] left-[85%] -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-emerald-500/10 blur-[40px] pointer-events-none" />
-      <div className="absolute top-[50%] left-[85%] -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-amber-500/10 blur-[40px] pointer-events-none" />
-      <div className="absolute top-[78%] left-[85%] -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-red-500/10 blur-[40px] pointer-events-none" />
+      {/* ── Floor reflection underneath the machine ── */}
+      <div
+        className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[80%] h-[25%] pointer-events-none"
+        style={{
+          background: "radial-gradient(ellipse 100% 100% at 50% 0%, rgba(37,99,235,0.06) 0%, transparent 70%)",
+          filter: "blur(10px)",
+        }}
+      />
+
+      {/* Atmospheric focal ambient light sources — boosted for contrast against dark bg */}
+      <div className="absolute top-1/2 left-[15%] -translate-y-1/2 w-36 h-36 bg-blue-500/15 blur-[55px] pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-56 bg-indigo-500/12 blur-[60px] pointer-events-none" />
+      <div className="absolute top-[22%] left-[85%] -translate-x-1/2 -translate-y-1/2 w-36 h-36 bg-emerald-500/15 blur-[45px] pointer-events-none" />
+      <div className="absolute top-[50%] left-[85%] -translate-x-1/2 -translate-y-1/2 w-36 h-36 bg-amber-500/15 blur-[45px] pointer-events-none" />
+      <div className="absolute top-[78%] left-[85%] -translate-x-1/2 -translate-y-1/2 w-36 h-36 bg-red-500/15 blur-[45px] pointer-events-none" />
 
       {/* ── 3D Specular-Shaded Pneumatic Cylinders SVG Layer ── */}
       <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
