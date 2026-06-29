@@ -699,7 +699,28 @@ def _get_ssl_expiry_days(domain: str) -> int:
     return -1
 
 @router.get("/v1/domain-shield/{domain}/status")
-async def check_domain_shield_status(domain: str, current_user: AuthUser = Depends(get_current_user)):
+async def check_domain_shield_status(
+    domain: str,
+    refresh: bool = False,
+    current_user: AuthUser = Depends(get_current_user)
+):
+    # Try fetching from DB cache first
+    if not refresh:
+        cached_rows = await async_query_auth_db(
+            "SELECT * FROM app_domain_shield_status WHERE domain = ? LIMIT 1",
+            (domain,)
+        )
+        if cached_rows:
+            row = cached_rows[0]
+            return {
+                "spf": {"valid": bool(row["spf_valid"]), "record": row["spf_record"], "error": None if row["spf_valid"] else "Not configured"},
+                "dkim": {"valid": bool(row["dkim_valid"]), "record": row["dkim_record"], "error": None if row["dkim_valid"] else "Not configured"},
+                "dmarc": {"valid": bool(row["dmarc_valid"]), "record": row["dmarc_record"], "policy": row["dmarc_policy"] or "none", "error": None if row["dmarc_valid"] else "Not configured"},
+                "ssl": {"valid": bool(row["ssl_valid"]), "days_remaining": int(row["ssl_days_remaining"]), "auto_renew": True, "error": None},
+                "reputation_score": int(row["reputation_score"]),
+                "score_grade": row["score_grade"]
+            }
+
     import dns.resolver
     status = {
         "spf": {"valid": False, "record": None, "error": "Not configured"},
@@ -776,7 +797,6 @@ async def check_domain_shield_status(domain: str, current_user: AuthUser = Depen
         status["ssl"]["auto_renew"] = True
         status["ssl"]["error"] = None
     else:
-        # Fallback simulation for local/testing environments
         status["ssl"]["valid"] = True
         status["ssl"]["days_remaining"] = 85
         status["ssl"]["auto_renew"] = True
@@ -794,5 +814,110 @@ async def check_domain_shield_status(domain: str, current_user: AuthUser = Depen
         status["score_grade"] = "D"
     else:
         status["score_grade"] = "F"
+
+    # Save to status & handle SCD Type 2 history
+    now_str = datetime.now(timezone.utc).isoformat() + "Z"
+    
+    # Check current active record in history
+    hist_rows = await async_query_auth_db(
+        "SELECT * FROM app_domain_shield_history WHERE domain = ? AND is_current = 1 LIMIT 1",
+        (domain,)
+    )
+    
+    has_changed = True
+    if hist_rows:
+        h = hist_rows[0]
+        # Check if identical
+        if (
+            h["reputation_score"] == status["reputation_score"]
+            and h["score_grade"] == status["score_grade"]
+            and h["spf_valid"] == int(status["spf"]["valid"])
+            and h["dkim_valid"] == int(status["dkim"]["valid"])
+            and h["dmarc_valid"] == int(status["dmarc"]["valid"])
+            and h["ssl_valid"] == int(status["ssl"]["valid"])
+        ):
+            has_changed = False
+            
+        # Trigger Loops DNS alert if score decreased compared to previous history record
+        if status["reputation_score"] < h["reputation_score"]:
+            settings = get_settings()
+            anomalies = []
+            if not status["spf"]["valid"]:
+                anomalies.append("- SPF manquant ou invalide")
+            if not status["dkim"]["valid"]:
+                anomalies.append("- Signature DKIM absente ou non alignée")
+            if not status["dmarc"]["valid"]:
+                anomalies.append("- Politique DMARC absente (vulnérabilité critique d'usurpation)")
+            
+            anomaly_details = "\n".join(anomalies) if anomalies else "- Détérioration globale des métriques DNS"
+            first_name = current_user.display_name.split(" ")[0] if current_user.display_name else "Utilisateur"
+            
+            from core.loops import send_loops_transactional
+            await send_loops_transactional(
+                email=current_user.email,
+                transactional_id=settings.loops_dns_shield_alert_transaction_id,
+                data_variables={
+                    "firstName": first_name,
+                    "domainName": domain,
+                    "dnsAnomalyDetails": anomaly_details,
+                    "domainShieldUrl": f"{settings.public_api_url or 'http://localhost:5173'}/",
+                }
+            )
+
+    if has_changed:
+        # Close previous active record
+        await async_query_auth_db(
+            "UPDATE app_domain_shield_history SET is_current = 0, end_date = ? WHERE domain = ? AND is_current = 1",
+            (now_str, domain)
+        )
+        # Create new history entry
+        new_hist_id = str(uuid.uuid4())
+        await async_query_auth_db(
+            """
+            INSERT INTO app_domain_shield_history (
+                id, workspace_id, domain, reputation_score, score_grade,
+                spf_valid, dkim_valid, dmarc_valid, ssl_valid, start_date, is_current
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            """,
+            (
+                new_hist_id,
+                current_user.workspace_id,
+                domain,
+                status["reputation_score"],
+                status["score_grade"],
+                int(status["spf"]["valid"]),
+                int(status["dkim"]["valid"]),
+                int(status["dmarc"]["valid"]),
+                int(status["ssl"]["valid"]),
+                now_str
+            )
+        )
+
+    # Insert or replace latest status cache
+    await async_query_auth_db(
+        """
+        INSERT OR REPLACE INTO app_domain_shield_status (
+            domain, workspace_id, spf_valid, spf_record, dkim_valid, dkim_record,
+            dmarc_valid, dmarc_record, dmarc_policy, ssl_valid, ssl_days_remaining,
+            reputation_score, score_grade, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            domain,
+            current_user.workspace_id,
+            int(status["spf"]["valid"]),
+            status["spf"]["record"],
+            int(status["dkim"]["valid"]),
+            status["dkim"]["record"],
+            int(status["dmarc"]["valid"]),
+            status["dmarc"]["record"],
+            status["dmarc"]["policy"],
+            int(status["ssl"]["valid"]),
+            status["ssl"]["days_remaining"],
+            status["reputation_score"],
+            status["score_grade"],
+            now_str
+        )
+    )
         
     return status

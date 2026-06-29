@@ -170,7 +170,41 @@ def ensure_runtime_tables() -> None:
                 expires_at TEXT NOT NULL
             )
         """)
-        conn.execute("CREATE INDEX IF NOT EXISTS ix_app_quarantine_item_workspace_id ON app_quarantine_item(workspace_id)")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS app_domain_shield_status (
+                domain TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                spf_valid INTEGER NOT NULL,
+                spf_record TEXT,
+                dkim_valid INTEGER NOT NULL,
+                dkim_record TEXT,
+                dmarc_valid INTEGER NOT NULL,
+                dmarc_record TEXT,
+                dmarc_policy TEXT,
+                ssl_valid INTEGER NOT NULL,
+                ssl_days_remaining INTEGER NOT NULL,
+                reputation_score INTEGER NOT NULL,
+                score_grade TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS app_domain_shield_history (
+                id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                domain TEXT NOT NULL,
+                reputation_score INTEGER NOT NULL,
+                score_grade TEXT NOT NULL,
+                spf_valid INTEGER NOT NULL,
+                dkim_valid INTEGER NOT NULL,
+                dmarc_valid INTEGER NOT NULL,
+                ssl_valid INTEGER NOT NULL,
+                start_date TEXT NOT NULL,
+                end_date TEXT,
+                is_current INTEGER NOT NULL DEFAULT 1
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS ix_app_domain_shield_history_domain ON app_domain_shield_history(domain)")
 
         conn.commit()
     finally:

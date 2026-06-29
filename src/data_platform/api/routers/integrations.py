@@ -42,6 +42,7 @@ from fastapi import (
 from pydantic import BaseModel, Field
 
 from core.config import get_settings
+from core.loops import send_loops_transactional
 from data_platform.api.auth import AuthUser, ensure_runtime_tables, get_current_user
 from data_platform.services.cloudflare_provisioner import (
     CloudflareAPIError,
@@ -312,6 +313,32 @@ async def scan_email(
             )
             # Switch scan endpoint output verdict to "quarantine"
             verdict_safety = "quarantine"
+
+            # Fetch user name for Loops greeting
+            user_rows = await _async_query(
+                'SELECT name FROM "user" WHERE email = ? LIMIT 1',
+                (integration.get("user_email").lower(),)
+            )
+            first_name = "Utilisateur"
+            if user_rows and user_rows[0].get("name"):
+                first_name = user_rows[0]["name"].split(" ")[0]
+
+            date_str = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
+            
+            # Send alert email via Loops
+            await send_loops_transactional(
+                email=integration.get("user_email"),
+                transactional_id=settings.loops_threat_quarantined_transaction_id,
+                data_variables={
+                    "firstName": first_name,
+                    "domainName": integration.get("zone_name") or "votre domaine",
+                    "senderEmail": payload.sender,
+                    "emailSubject": payload.subject,
+                    "riskScore": int(score * 100),
+                    "interceptedAt": date_str,
+                    "quarantineUrl": f"{settings.public_api_url or 'http://localhost:5173'}/",
+                }
+            )
         except Exception as exc:
             logger.warning("Could not quarantine phishing email: %s", exc)
 

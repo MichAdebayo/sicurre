@@ -115,6 +115,15 @@ class Settings(BaseSettings):
         validation_alias="GOOGLE_REDIRECT_URI",
     )
 
+    # Loops Email API Configuration
+    loops_api_key: str | None = Field(default=None, validation_alias="LOOPS_API_KEY")
+    loops_sign_up_transaction_id: str | None = Field(default=None, validation_alias="LOOPS_SIGN_UP_TRANSACTION_ID")
+    loops_reset_password_transaction_id: str | None = Field(default=None, validation_alias="LOOPS_RESET_PASSWORD_TRANSACTION_ID")
+    loops_threat_quarantined_transaction_id: str | None = Field(default=None, validation_alias="LOOPS_THREAT_QUARANTINED_TRANSACTION_ID")
+    loops_dns_shield_alert_transaction_id: str | None = Field(default=None, validation_alias="LOOPS_DNS_SHIELD_ALERT_TRANSACTION_ID")
+    loops_emergency_lockdown_transaction_id: str | None = Field(default=None, validation_alias="LOOPS_EMERGECNY_LOCKDOWN_TRANSACTION_ID")
+    loops_quota_warning_transaction_id: str | None = Field(default=None, validation_alias="LOOPS_QUOTA_WARNING_TRANSACTION_ID")
+
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),
         env_file_encoding="utf-8",

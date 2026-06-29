@@ -31,6 +31,7 @@ import {
   useCloudflareList,
   useDomainShieldStatus,
   useSetupCloudflare,
+  useRefreshDomainShieldStatus,
   AuthSession,
 } from "../lib/api";
 
@@ -66,6 +67,19 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
     refetch: reloadShield,
   } = useDomainShieldStatus(selectedDomain, !!selectedDomain);
 
+  const refreshShieldMutation = useRefreshDomainShieldStatus();
+  const isShieldLoading = shieldLoading || refreshShieldMutation.isPending;
+
+  const handleManualRefresh = async () => {
+    if (!selectedDomain) return;
+    try {
+      await refreshShieldMutation.mutateAsync(selectedDomain);
+      runDnsDiagnostics();
+    } catch (err) {
+      console.error("Failed to refresh domain status:", err);
+    }
+  };
+
   // Clipboard copy handlers
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
@@ -82,6 +96,8 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
   const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
   const [isTerminalRunning, setIsTerminalRunning] = useState(false);
   const terminalEndRef = useRef<HTMLDivElement>(null);
+  const diagnosticIntervalRef = useRef<any>(null);
+  const lastScannedDomainRef = useRef<string>("");
 
   useEffect(() => {
     if (terminalEndRef.current) {
@@ -89,8 +105,21 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
     }
   }, [terminalLogs]);
 
+  useEffect(() => {
+    return () => {
+      if (diagnosticIntervalRef.current) {
+        clearInterval(diagnosticIntervalRef.current);
+      }
+    };
+  }, []);
+
   const runDnsDiagnostics = () => {
-    if (isTerminalRunning || !selectedDomain || !shieldStatus) return;
+    if (!selectedDomain || !shieldStatus) return;
+
+    if (diagnosticIntervalRef.current) {
+      clearInterval(diagnosticIntervalRef.current);
+    }
+
     setIsTerminalRunning(true);
     setTerminalLogs([]);
 
@@ -99,44 +128,53 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
       `[info] Initializing DNS Resolver check for zone: ${selectedDomain}...`,
       `[info] Resolving authoritative NS records for ${selectedDomain}...`,
       `Checking SPF record alignment...`,
-      shieldStatus.spf.valid
-        ? `➔ SPF record resolved successfully: "${shieldStatus.spf.record}" [VALID]`
+      shieldStatus?.spf?.valid
+        ? `➔ SPF record resolved successfully: "${shieldStatus?.spf?.record}" [VALID]`
         : `➔ [WARNING] SPF record is missing or invalid in DNS zone!`,
       `Checking DKIM selector signatures (cloudflare._domainkey)...`,
-      shieldStatus.dkim.valid
-        ? `➔ DKIM record resolved: "${shieldStatus.dkim.record?.substring(0, 40)}..." [VALID]`
+      shieldStatus?.dkim?.valid
+        ? `➔ DKIM record resolved: "${shieldStatus?.dkim?.record?.substring(0, 40)}..." [VALID]`
         : `➔ [WARNING] DKIM key signature validation failed or record missing!`,
       `Checking DMARC protection policy (_dmarc)...`,
-      shieldStatus.dmarc.valid
-        ? `➔ DMARC record resolved: "${shieldStatus.dmarc.record}" [VALID] (Policy: ${shieldStatus.dmarc.policy})`
+      shieldStatus?.dmarc?.valid
+        ? `➔ DMARC record resolved: "${shieldStatus?.dmarc?.record}" [VALID] (Policy: ${shieldStatus?.dmarc?.policy})`
         : `➔ [CRITICAL] DMARC record is missing! Domain is vulnerable to spoofing!`,
       `[info] Auditing SSL Certificate & expiration time...`,
-      shieldStatus.ssl.valid
-        ? `➔ SSL Certificate: VALID (${shieldStatus.ssl.days_remaining} days remaining)`
+      shieldStatus?.ssl?.valid
+        ? `➔ SSL Certificate: VALID (${shieldStatus?.ssl?.days_remaining} days remaining)`
         : `➔ [WARNING] SSL validation checks failed!`,
       `[info] Scanning 50+ public reputation blocklists...`,
-      `➔ Reputation Score: ${shieldStatus.reputation_score}/100 Grade: ${shieldStatus.score_grade}`,
-      `Diagnostic completed. Rating: ${shieldStatus.score_grade}.`
+      `➔ Reputation Score: ${shieldStatus?.reputation_score}/100 Grade: ${shieldStatus?.score_grade}`,
+      `Diagnostic completed. Rating: ${shieldStatus?.score_grade}.`
     ];
 
     let currentLogIndex = 0;
-    const interval = setInterval(() => {
+    diagnosticIntervalRef.current = setInterval(() => {
       if (currentLogIndex < logs.length) {
-        setTerminalLogs((prev) => [...prev, logs[currentLogIndex]]);
+        const nextLog = logs[currentLogIndex];
+        if (nextLog) {
+          setTerminalLogs((prev) => [...prev, nextLog]);
+        }
         currentLogIndex++;
       } else {
-        clearInterval(interval);
+        if (diagnosticIntervalRef.current) {
+          clearInterval(diagnosticIntervalRef.current);
+          diagnosticIntervalRef.current = null;
+        }
         setIsTerminalRunning(false);
       }
     }, 380);
   };
 
-  // Run diagnostics automatically when status loads
+  // Run diagnostics automatically when status loads/changes for domain
   useEffect(() => {
-    if (shieldStatus && selectedDomain && !shieldLoading) {
-      runDnsDiagnostics();
+    if (shieldStatus && selectedDomain && !isShieldLoading) {
+      if (lastScannedDomainRef.current !== selectedDomain) {
+        lastScannedDomainRef.current = selectedDomain;
+        runDnsDiagnostics();
+      }
     }
-  }, [shieldStatus, selectedDomain]);
+  }, [shieldStatus, selectedDomain, isShieldLoading]);
 
   // State for Email Spoofing Simulator Sandbox
   const [spoofStep, setSpoofStep] = useState<"idle" | "sending" | "analyzing" | "result">("idle");
@@ -276,14 +314,11 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                reloadShield();
-                runDnsDiagnostics();
-              }}
-              disabled={shieldLoading}
+              onClick={handleManualRefresh}
+              disabled={isShieldLoading}
               className="p-2 min-h-[38px] flex items-center justify-center cursor-pointer bg-white"
             >
-              <RefreshCw className={`w-4 h-4 ${shieldLoading ? "animate-spin text-primary" : ""}`} />
+              <RefreshCw className={`w-4 h-4 ${isShieldLoading ? "animate-spin text-primary" : ""}`} />
             </Button>
           )}
         </div>
@@ -297,7 +332,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
             Please integrate a domain via Cloudflare in the settings section to enable continuous domain health auditing.
           </p>
         </div>
-      ) : shieldLoading ? (
+      ) : isShieldLoading ? (
         <div className="space-y-6">
           <div className="h-44 bg-surface-low rounded-2xl animate-pulse" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -486,11 +521,11 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
             <div className="p-5 font-mono text-[12px] text-white/80 space-y-2.5 min-h-[140px] max-h-[220px] overflow-y-auto">
               {terminalLogs.map((log, idx) => (
                 <div key={idx} className={
-                  log.includes("[CRITICAL]") 
+                  log?.includes("[CRITICAL]") 
                     ? "text-red-400" 
-                    : log.includes("[WARNING]") 
+                    : log?.includes("[WARNING]") 
                     ? "text-amber-400" 
-                    : log.includes("VALID") 
+                    : log?.includes("VALID") 
                     ? "text-emerald-400" 
                     : "text-white/70"
                 }>
@@ -543,7 +578,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
 
                     <div className="bg-slate-950 p-4 rounded-xl border border-white/5 font-mono text-[11px] text-white/70 space-y-2 min-h-[100px]">
                       {spoofLogs.map((log, idx) => (
-                        <div key={idx} className={log.includes("ÉCHEC") || log.includes("FAIL") ? "text-amber-400" : "text-white/60"}>
+                        <div key={idx} className={log?.includes("ÉCHEC") || log?.includes("FAIL") ? "text-amber-400" : "text-white/60"}>
                           {log}
                         </div>
                       ))}

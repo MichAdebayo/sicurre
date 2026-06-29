@@ -37,6 +37,69 @@ export const auth = betterAuth({
     autoSignIn: true,
     minPasswordLength: 8,
     maxPasswordLength: 128,
+    sendResetPassword: async ({ user, url }) => {
+      const apiKey = process.env.LOOPS_API_KEY;
+      const transactionalId = process.env.LOOPS_RESET_PASSWORD_TRANSACTION_ID;
+      if (!apiKey || !transactionalId) {
+        console.warn(`[Loops] Missing key or Transaction ID for password reset to ${user.email}`);
+        return;
+      }
+      try {
+        const res = await fetch("https://api.loops.so/v1/transactional", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            transactionalId,
+            email: user.email,
+            dataVariables: {
+              firstName: user.name.split(" ")[0] || "Utilisateur",
+              resetUrl: url,
+            },
+          }),
+        });
+        if (!res.ok) {
+          console.error(`[Loops] Password reset mail error: ${res.status} - ${await res.text()}`);
+        }
+      } catch (err) {
+        console.error(`[Loops] Password reset exception:`, err);
+      }
+    },
+  },
+  emailVerification: {
+    sendOnSignUp: true,
+    sendVerificationEmail: async ({ user, url }) => {
+      const apiKey = process.env.LOOPS_API_KEY;
+      const transactionalId = process.env.LOOPS_SIGN_UP_TRANSACTION_ID;
+      if (!apiKey || !transactionalId) {
+        console.warn(`[Loops] Missing key or Transaction ID for sign up verification to ${user.email}`);
+        return;
+      }
+      try {
+        const res = await fetch("https://api.loops.so/v1/transactional", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            transactionalId,
+            email: user.email,
+            dataVariables: {
+              firstName: user.name.split(" ")[0] || "Utilisateur",
+              verificationUrl: url,
+            },
+          }),
+        });
+        if (!res.ok) {
+          console.error(`[Loops] Verification mail error: ${res.status} - ${await res.text()}`);
+        }
+      } catch (err) {
+        console.error(`[Loops] Verification mail exception:`, err);
+      }
+    },
   },
   session: {
     expiresIn: 60 * 60 * 24 * 7,

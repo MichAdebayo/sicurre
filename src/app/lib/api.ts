@@ -530,5 +530,17 @@ export function useDomainShieldStatus(domain: string, enabled = true) {
     queryKey: ["domain-shield", domain],
     queryFn: () => fetchJson<DomainShieldStatus>(`/domain-shield/${domain}/status`),
     enabled: enabled && !!domain,
+    staleTime: 1000 * 60 * 60, // Consider data fresh for 1 hour to prevent unnecessary refetches
+  });
+}
+
+export function useRefreshDomainShieldStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (domain: string) =>
+      fetchJson<DomainShieldStatus>(`/domain-shield/${domain}/status?refresh=true`),
+    onSuccess: (data, domain) => {
+      queryClient.setQueryData(["domain-shield", domain], data);
+    },
   });
 }
