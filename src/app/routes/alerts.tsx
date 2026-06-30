@@ -28,7 +28,7 @@ import {
 const MotionDiv = motion.div as any;
 
 export default function AlertsRoute() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   // Queries & Mutations
   const { data: preferences, isLoading: prefsLoading } = useAlertPreferences();
@@ -341,7 +341,9 @@ export default function AlertsRoute() {
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${
                           rule.rule_type === "whitelist" ? "bg-safe/10 text-safe" : "bg-error/10 text-error"
                         }`}>
-                          {rule.rule_type === "whitelist" ? "Allow" : "Block"}
+                          {rule.rule_type === "whitelist"
+                            ? (i18n.language === "fr" ? "Autoriser" : "Allow")
+                            : (i18n.language === "fr" ? "Bloquer" : "Block")}
                         </span>
                         <span className="text-sm font-semibold text-on-surface select-all">
                           {rule.pattern}

@@ -105,53 +105,77 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
   const spamCount = kpis?.threats_spam_count ?? 0;
   const legitimateCount = kpis?.threats_legitimate_count ?? 0;
 
-  // Generate date-aware trend metrics split between safe (legitimate) and phishing
+  // Generate date-aware trend metrics split between safe (legitimate) and phishing using DB data only
   const getTrendData = () => {
     const lang = i18n.language;
     const labels: string[] = [];
     const safeCounts: number[] = [];
     const phishingCounts: number[] = [];
 
+    const threatsList = threats || [];
+
     if (dateRange === "7d") {
-      const baseSafe = [8, 12, 10, 15, 6, 11, 10];
-      const basePhish = [2, 3, 2, 3, 2, 3, 2];
-
-      const safeSum = baseSafe.reduce((a, b) => a + b, 0);
-      const phishSum = basePhish.reduce((a, b) => a + b, 0);
-
-      const safeMult = legitimateCount > 0 ? legitimateCount / safeSum : 1.0;
-      const phishMult = phishingCount > 0 ? phishingCount / phishSum : 1.0;
-
+      // Last 7 days
       for (let i = 6; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
+        
+        const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+        const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+
+        const dailyThreats = threatsList.filter((t) => {
+          const rDate = new Date(t.received_at);
+          return rDate >= startOfDay && rDate <= endOfDay;
+        });
+
+        const safe = dailyThreats.filter((t) => t.verdict === "legitimate").length;
+        const phish = dailyThreats.filter((t) => t.verdict === "phishing" || t.verdict === "spam").length;
+
         labels.push(d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { weekday: "short", day: "numeric" }));
-        safeCounts.push(Math.round(baseSafe[6 - i] * safeMult));
-        phishingCounts.push(Math.round(basePhish[6 - i] * phishMult));
+        safeCounts.push(safe);
+        phishingCounts.push(phish);
       }
     } else if (dateRange === "30d") {
+      // Last 30 days
       for (let i = 29; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
+        
+        const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+        const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+
+        const dailyThreats = threatsList.filter((t) => {
+          const rDate = new Date(t.received_at);
+          return rDate >= startOfDay && rDate <= endOfDay;
+        });
+
+        const safe = dailyThreats.filter((t) => t.verdict === "legitimate").length;
+        const phish = dailyThreats.filter((t) => t.verdict === "phishing" || t.verdict === "spam").length;
+
         labels.push(d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short" }));
-        
-        const wave = Math.sin(i / 2) * 4 + 10;
-        const pWave = Math.cos(i / 3) * 1.5 + 2;
-        
-        safeCounts.push(Math.max(1, Math.round(wave * (legitimateCount / 300 || 1))));
-        phishingCounts.push(Math.max(0, Math.round(pWave * (phishingCount / 70 || 1))));
+        safeCounts.push(safe);
+        phishingCounts.push(phish);
       }
     } else {
+      // Last 12 months
       for (let i = 11; i >= 0; i--) {
         const d = new Date();
         d.setMonth(d.getMonth() - i);
+        
+        const startOfMonth = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
+        const endOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+
+        const monthlyThreats = threatsList.filter((t) => {
+          const rDate = new Date(t.received_at);
+          return rDate >= startOfMonth && rDate <= endOfMonth;
+        });
+
+        const safe = monthlyThreats.filter((t) => t.verdict === "legitimate").length;
+        const phish = monthlyThreats.filter((t) => t.verdict === "phishing" || t.verdict === "spam").length;
+
         labels.push(d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "short", year: "2-digit" }));
-        
-        const baseS = 120 + Math.sin(i) * 30;
-        const baseP = 15 + Math.cos(i) * 5;
-        
-        safeCounts.push(Math.max(5, Math.round(baseS * (legitimateCount / 1500 || 1))));
-        phishingCounts.push(Math.max(1, Math.round(baseP * (phishingCount / 200 || 1))));
+        safeCounts.push(safe);
+        phishingCounts.push(phish);
       }
     }
 

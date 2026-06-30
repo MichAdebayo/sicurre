@@ -25,6 +25,7 @@ import {
   Server,
   Activity,
   MousePointerClick,
+  Mouse,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -86,6 +87,22 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
 
   // Clipboard copy handlers
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const getRecommendedDmarcRecord = () => {
+    const activeRecord = shieldStatus?.dmarc?.record || "";
+    if (!activeRecord) {
+      return "v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc@sicurre.com";
+    }
+    if (activeRecord.includes("dmarc@sicurre.com")) {
+      return activeRecord;
+    }
+    if (activeRecord.includes("rua=")) {
+      return activeRecord.replace(/(rua=[^;]+)/, "$1,mailto:dmarc@sicurre.com");
+    } else {
+      const base = activeRecord.endsWith(";") ? activeRecord.trim() : `${activeRecord.trim()};`;
+      return `${base} rua=mailto:dmarc@sicurre.com`;
+    }
+  };
 
   const handleCopy = (key: string, text: string) => {
     navigator.clipboard.writeText(text);
@@ -398,7 +415,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   <div className="bg-surface-low border border-border-subtle rounded-xl p-4 space-y-2">
                     <div className="flex justify-between text-[11px] text-on-surface-variant font-bold uppercase">
                       <span>{isFR ? "Enveloppe du Mail Test" : "Simulated Mail Envelope"}</span>
-                      <span className="text-error font-extrabold">Forged Header</span>
+                      <span className="text-error font-extrabold">{isFR ? "En-tête Falsifié" : "Forged Header"}</span>
                     </div>
                     <div className="text-xs space-y-1 font-mono">
                       <div><span className="text-on-surface-variant">From:</span> info@{selectedDomain}</div>
@@ -530,7 +547,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   labelEN: "DMARC Policy",
                   descFR: "Consignes de filtrage",
                   descEN: "Filtering instructions",
-                  valid: shieldStatus?.dmarc?.valid,
+                  valid: shieldStatus?.dmarc?.valid && (shieldStatus?.dmarc?.record || "").includes("dmarc@sicurre.com"),
                 },
                 {
                   id: "ssl",
@@ -546,7 +563,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   labelEN: "IP Reputation",
                   descFR: "Listes noires / Menaces",
                   descEN: "Blocklists audit",
-                  valid: shieldStatus?.reputation_score >= 70,
+                  valid: !shieldStatus?.blacklists?.listed,
                 },
               ].map((step, idx) => {
                 const isStepRunning = activeStepIndex === idx;
@@ -555,15 +572,13 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
 
                 const severity = (() => {
                   if (step.id === "dmarc") {
-                    if (!step.valid) return "error";
+                    if (!shieldStatus?.dmarc?.valid) return "error";
                     if (shieldStatus?.dmarc?.policy === "none") return "warning";
+                    if (!(shieldStatus?.dmarc?.record || "").includes("dmarc@sicurre.com")) return "warning";
                     return "success";
                   }
                   if (step.id === "reputation") {
-                    const s = shieldStatus?.reputation_score || 100;
-                    if (s < 70) return "error";
-                    if (s < 90) return "warning";
-                    return "success";
+                    return shieldStatus?.blacklists?.listed ? "error" : "success";
                   }
                   return step.valid ? "success" : "error";
                 })();
@@ -644,7 +659,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
             <div className="lg:col-span-6 bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm flex flex-col justify-between">
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-amber-500 animate-pulse" />
+                  <Mouse className="w-5 h-5 text-[#2e6bb5] animate-pulse" />
                   <h3 className="font-display font-bold text-[18px] text-on-surface">
                     {isFR ? "Auto-Fix Cloudflare 1-Clic" : "1-Click Cloudflare Auto-Fix"}
                   </h3>
@@ -658,16 +673,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   </p>
                 </div>
 
-                {(!shieldStatus.spf.valid || !shieldStatus.dkim.valid || !shieldStatus.dmarc.valid) ? (
-                  <div className="p-3 bg-amber-500/[0.04] border border-amber-500/20 rounded-xl flex items-start gap-2.5">
-                    <AlertTriangle className="w-4.5 h-4.5 text-amber-500 shrink-0 mt-0.5" />
-                    <div className="text-[11.5px] text-[#b45309] font-semibold leading-relaxed">
-                      {isFR
-                        ? "Des enregistrements obligatoires sont incorrects ou manquants dans votre zone."
-                        : "Missing or invalid validation entries resolved for the active domain."}
-                    </div>
-                  </div>
-                ) : (
+                {(shieldStatus.spf.valid && shieldStatus.dkim.valid && shieldStatus.dmarc.valid) && (
                   <div className="p-3 bg-safe/[0.04] border border-safe/20 rounded-xl flex items-start gap-2.5">
                     <ShieldCheck className="w-4.5 h-4.5 text-safe shrink-0 mt-0.5" />
                     <div className="text-[11.5px] text-safe font-semibold leading-relaxed">
@@ -680,54 +686,51 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
 
                 {/* Target configuration breakdown list */}
                 {(!shieldStatus.spf.valid || !shieldStatus.dkim.valid || !shieldStatus.dmarc.valid) && (
-                  <div className="bg-surface-low border border-border-subtle rounded-xl p-3.5 space-y-2 text-xs">
+                  <div className="bg-surface-low border border-border-subtle rounded-xl p-3.5 space-y-2.5 text-xs">
                     <div className="font-bold text-[10px] uppercase tracking-wider text-on-surface-variant mb-1 flex items-center justify-between">
-                      <span>{isFR ? "Enregistrements à configurer" : "Records to Configure"}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span>{isFR ? "Enregistrements à configurer" : "Records to Configure"}</span>
+                        
+                        {/* Tooltip safety info */}
+                        <div className="relative group">
+                          <Info className="w-3.5 h-3.5 text-amber-500 cursor-help hover:text-amber-600 transition-colors" />
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-56 bg-white border border-border-subtle text-on-surface text-[10px] p-2 rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 z-50 normal-case leading-normal font-sans text-center font-bold">
+                            {isFR
+                              ? "Des enregistrements obligatoires sont incorrects ou manquants dans votre zone."
+                              : "Required validation entries are missing or invalid in your zone."}
+                          </div>
+                        </div>
+                      </div>
                       <span className="text-[9.5px] font-mono lowercase text-on-surface-variant/60 font-semibold">@{selectedDomain}</span>
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 pt-0.5">
                       {/* SPF Record */}
                       {!shieldStatus.spf.valid && (
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between font-bold">
-                            <span className="text-on-surface">SPF (TXT @)</span>
-                            <span className="text-[#b45309] text-[10.5px] font-bold">
-                              {isFR ? "Manquant / Incorrect" : "Missing / Incorrect"}
-                            </span>
-                          </div>
-                          <div className="text-[10px] font-mono bg-surface-lowest px-2.5 py-1.5 rounded border border-border-subtle/80 text-on-surface truncate select-all" title="v=spf1 include:spf.cloudflare.com include:sicurre.com ~all">
-                            v=spf1 include:spf.cloudflare.com include:sicurre.com ~all
-                          </div>
+                        <div className="flex items-center justify-between font-semibold border-b border-border-subtle/50 pb-1.5 last:border-b-0">
+                          <span className="text-on-surface">SPF (TXT @)</span>
+                          <span className="text-[#b45309] text-[11px] font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200/50">
+                            {isFR ? "Manquant / Incorrect" : "Missing / Incorrect"}
+                          </span>
                         </div>
                       )}
 
                       {/* DKIM Record */}
                       {!shieldStatus.dkim.valid && (
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between font-bold">
-                            <span className="text-on-surface">DKIM (TXT cloudflare._domainkey)</span>
-                            <span className="text-[#b45309] text-[10.5px] font-bold">
-                              {isFR ? "Manquant / Incorrect" : "Missing / Incorrect"}
-                            </span>
-                          </div>
-                          <div className="text-[10px] font-mono bg-surface-lowest px-2.5 py-1.5 rounded border border-border-subtle/80 text-on-surface truncate select-all" title="v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1+z7s...">
-                            v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1+z7s...
-                          </div>
+                        <div className="flex items-center justify-between font-semibold border-b border-border-subtle/50 pb-1.5 last:border-b-0">
+                          <span className="text-on-surface">DKIM (TXT cloudflare._domainkey)</span>
+                          <span className="text-[#b45309] text-[11px] font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200/50">
+                            {isFR ? "Manquant / Incorrect" : "Missing / Incorrect"}
+                          </span>
                         </div>
                       )}
 
                       {/* DMARC Record */}
                       {!shieldStatus.dmarc.valid && (
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between font-bold">
-                            <span className="text-on-surface">DMARC (TXT _dmarc)</span>
-                            <span className="text-[#b45309] text-[10.5px] font-bold">
-                              {isFR ? "Manquant / Incorrect" : "Missing / Incorrect"}
-                            </span>
-                          </div>
-                          <div className="text-[10px] font-mono bg-surface-lowest px-2.5 py-1.5 rounded border border-border-subtle/80 text-on-surface truncate select-all" title="v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc@sicurre.com">
-                            v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc@sicurre.com
-                          </div>
+                        <div className="flex items-center justify-between font-semibold last:border-b-0">
+                          <span className="text-on-surface">DMARC (TXT _dmarc)</span>
+                          <span className="text-[#b45309] text-[11px] font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200/50">
+                            {isFR ? "Manquant / Incorrect" : "Missing / Incorrect"}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -1110,13 +1113,13 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     Required DNS Setup (TXT)
                   </span>
                   <div className="flex gap-2 items-center">
-                    <code className="flex-1 block p-3.5 bg-surface-low/50 border border-border-subtle text-on-surface rounded-xl font-mono text-[11px] truncate select-all">
-                      v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc@sicurre.com
+                    <code className="flex-1 block p-3.5 bg-surface-low/50 border border-border-subtle text-on-surface rounded-xl font-mono text-[11px] truncate select-all" title={getRecommendedDmarcRecord()}>
+                      {getRecommendedDmarcRecord()}
                     </code>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleCopy("dmarc", "v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc@sicurre.com")}
+                      onClick={() => handleCopy("dmarc", getRecommendedDmarcRecord())}
                       className="px-3 h-10 cursor-pointer text-xs gap-1 font-bold rounded-xl bg-white"
                     >
                       {copiedKey === "dmarc" ? (

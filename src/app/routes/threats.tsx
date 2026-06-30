@@ -119,16 +119,27 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
   const slaMs = session?.sla_latency_ms || 10000;
 
   const getLatencyData = (slaLimit: number) => {
-    const baseLatency = [850, 1200, 2400, 9500, 10500, 4800, 12000];
-    const baseCounts = [14, 22, 18, 31, 25, 19, 28];
+    const threatsList = threats || [];
     const days = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const label = d.toLocaleDateString(i18n.language === "fr" ? "fr-FR" : "en-US", { weekday: "short", day: "numeric" });
-      const latency = baseLatency[6 - i];
-      const diffPct = Math.round(((latency - slaLimit) / slaLimit) * 100);
-      const emails_count = baseCounts[6 - i];
+      
+      const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+      const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+
+      const dailyThreats = threatsList.filter((t) => {
+        const rDate = new Date(t.received_at);
+        return rDate >= startOfDay && rDate <= endOfDay;
+      });
+
+      const emails_count = dailyThreats.length;
+      const latency = emails_count > 0
+        ? Math.round(dailyThreats.reduce((sum, t) => sum + (t.latency_ms || 0), 0) / emails_count)
+        : 0;
+
+      const diffPct = latency > 0 ? Math.round(((latency - slaLimit) / slaLimit) * 100) : 0;
       days.push({ label, latency, diffPct, emails_count });
     }
     return days;
