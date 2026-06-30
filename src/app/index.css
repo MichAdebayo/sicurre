@@ -210,6 +210,74 @@
     line-height: 20px;
     font-weight: 400;
   }
+
+  /* ── Unified Sicurre Typography Scale ── */
+  .app-h1 {
+    font-family: var(--font-display);
+    font-size: 28px;
+    line-height: 36px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--color-on-surface);
+  }
+
+  .app-h2 {
+    font-family: var(--font-display);
+    font-size: 18px;
+    line-height: 26px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--color-on-surface);
+  }
+
+  .app-h3 {
+    font-family: var(--font-display);
+    font-size: 15px;
+    line-height: 22px;
+    font-weight: 700;
+    color: var(--color-on-surface);
+  }
+
+  .app-body-large {
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 22px;
+    font-weight: 500;
+    color: var(--color-on-surface);
+  }
+
+  .app-body-normal {
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 20px;
+    font-weight: 500;
+    color: var(--color-on-surface);
+  }
+
+  .app-body-sub {
+    font-family: var(--font-sans);
+    font-size: 12px;
+    line-height: 18px;
+    font-weight: 500;
+    color: var(--color-on-surface-variant);
+  }
+
+  .app-label-tiny {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    line-height: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-on-surface-variant);
+  }
+
+  .app-mono-data {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 16px;
+    font-weight: 500;
+  }
 }
 
 /* ─── Animations ──────────────────────────────────────────────────────────── */

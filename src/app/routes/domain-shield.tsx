@@ -272,10 +272,10 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border-subtle">
         <div>
-          <h1 className="font-display font-extrabold text-[32px] text-on-surface tracking-tight leading-tight">
+          <h1 className="app-h1">
             {isFR ? "Commandement du Bouclier" : "Domain Shield Command Center"}
           </h1>
-          <p className="text-sm font-semibold text-on-surface-variant mt-1">
+          <p className="app-body-sub mt-1">
             {isFR
               ? "Supervision de la légitimité DNS, de l'authentification et de la réputation de livraison"
               : "Continuous audit of DNS authentication, deliverability reputation, and outgoing spoofing protection"}
@@ -693,11 +693,11 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                         
                         {/* Tooltip safety info */}
                         <div className="relative group">
-                          <Info className="w-3.5 h-3.5 text-amber-500 cursor-help hover:text-amber-600 transition-colors" />
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-56 bg-white border border-border-subtle text-on-surface text-[10px] p-2 rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 z-50 normal-case leading-normal font-sans text-center font-bold">
+                          <Info className="w-3.5 h-3.5 text-[#2e6bb5] cursor-help hover:text-primary transition-colors" />
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-64 bg-white border border-border-subtle text-on-surface text-[10px] p-2.5 rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 z-50 normal-case leading-normal font-sans text-center font-bold">
                             {isFR
-                              ? "Des enregistrements obligatoires sont incorrects ou manquants dans votre zone."
-                              : "Required validation entries are missing or invalid in your zone."}
+                              ? "La configuration correcte des protocoles SPF, DKIM et DMARC protège votre domaine contre l'usurpation d'identité et garantit que vos e-mails légitimes ne finissent pas dans le dossier Spam."
+                              : "Properly configuring SPF, DKIM, and DMARC protocols safeguards your domain from email spoofing and ensures your emails avoid spam folders."}
                           </div>
                         </div>
                       </div>
@@ -834,8 +834,8 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                       </h5>
                       <p className="text-xs text-on-surface-variant font-semibold mt-1">
                         {isFR
-                          ? "Vérification de la validité et de l'autorité de votre certificat de chiffrement SSL."
-                          : "Verifying the validity and authority of your SSL web server certificate."}
+                          ? "Contrôle de validité et chiffrement actif du certificat SSL."
+                          : "Verifying validity and encryption status of your SSL certificate."}
                       </p>
                     </div>
                   </div>
@@ -871,8 +871,8 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                       </h5>
                       <p className="text-xs text-on-surface-variant font-semibold mt-1">
                         {isFR
-                          ? "Vérification continue auprès des listes noires de spam (Spamhaus, SURBL) pour assurer la délivrabilité globale de vos emails."
-                          : "Continual checking across spam reputation databases (Spamhaus, SURBL) to protect global deliverability."}
+                          ? "Audit continu auprès des listes noires (Spamhaus, RBL) pour garantir la délivrabilité."
+                          : "Continual checks against blocklists (Spamhaus, RBLs) to secure deliverability."}
                       </p>
                     </div>
                   </div>
@@ -915,8 +915,8 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                       </h5>
                       <p className="text-xs text-on-surface-variant font-semibold mt-1">
                         {isFR
-                          ? "Rapports agrégés montrant les serveurs non autorisés qui ont tenté de falsifier votre domaine."
-                          : "Aggregated reports checking unauthorized servers attempting to forge mail as your domain."}
+                          ? "Rapports d'activité des serveurs non autorisés ayant tenté d'usurper votre domaine."
+                          : "Activity reports from unauthorized mail servers attempting domain spoofing."}
                       </p>
                     </div>
                   </div>

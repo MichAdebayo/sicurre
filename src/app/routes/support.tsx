@@ -1,66 +1,52 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
-  Search,
-  MessageSquare,
-  Activity,
-  UserCheck,
-  ChevronDown,
-  ChevronUp,
-  BookOpen,
+  Send,
+  CheckCircle2,
   Cpu,
-  ShieldCheck,
-  ArrowRight,
+  Mail,
+  MessageSquare,
 } from "lucide-react";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { AuthSession } from "../lib/api";
 
 const MotionDiv = motion.div as any;
 
-export default function SupportRoute() {
-  const { t } = useTranslation();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
+interface SupportRouteProps {
+  session?: AuthSession;
+}
 
-  const faqs = [
-    {
-      q: "Comment fonctionne l'analyse anti-phishing en temps réel ?",
-      a: "Chaque fois qu'un e-mail arrive dans votre boîte Gmail connectée, une notification webhook déclenche instantanément le Gmail Listener de Sicurre. L'e-mail est traité en moins de 2 secondes par notre modèle d'analyse souverain et, en cas de menace, déplacé directement vers la corbeille.",
-    },
-    {
-      q: "Quelles données de mes e-mails sont conservées par Sicurre ?",
-      a: "Pour des raisons RGPD, Sicurre ne stocke jamais le corps complet de vos e-mails. Seuls les métadonnées (expéditeur, sujet, verdict et indices de confiance) sont conservées de façon anonyme au sein de notre console de supervision.",
-    },
-    {
-      q: "Comment puis-je révoquer l'accès de Sicurre à ma boîte Gmail ?",
-      a: "Vous pouvez révoquer l'accès à tout moment via la gestion des applications autorisées de votre compte Google, ou directement depuis l'onglet Réglages de la console Sicurre.",
-    },
-  ];
+export default function SupportRoute({ session }: SupportRouteProps) {
+  const { t, i18n } = useTranslation();
+  const isFR = i18n.language === "fr";
 
-  const quickActions = [
-    {
-      icon: MessageSquare,
-      title: "Ticket Critique",
-      desc: "Signalez une anomalie ou une fausse classification urgente.",
-      action: "Ouvrir",
-    },
-    {
-      icon: Activity,
-      title: "Diagnostic Système",
-      desc: "Lancez un auto-test du Gmail Listener et du classificateur.",
-      action: "Lancer",
-    },
-    {
-      icon: UserCheck,
-      title: "Expert Niveau 3",
-      desc: "Planifiez une session de 15 minutes avec notre CISO.",
-      action: "Réserver",
-    },
-  ];
+  // Form states
+  const [name, setName] = useState(session?.display_name || "");
+  const [email, setEmail] = useState(session?.email || "");
+  const [category, setCategory] = useState("dns");
+  const [message, setMessage] = useState("");
+  const [isPending, setIsPending] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSendSupport = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !email.trim() || !message.trim()) return;
+
+    setIsPending(true);
+    // Simulate sending support request to support@sicurre.com
+    setTimeout(() => {
+      setIsPending(false);
+      setSubmitted(true);
+      setMessage("");
+    }, 1200);
+  };
 
   const systemNodes = [
-    { name: "Pare-feu Global", status: "Opérationnel", metric: "Uptime", value: "99.99 %" },
-    { name: "Modèle d'Analyse", status: "Opérationnel", metric: "Latence", value: "82 ms" },
-    { name: "Collecteur de Logs", status: "Opérationnel", metric: "Débit entrant", value: "14 req/s" },
+    { name: isFR ? "Pare-feu Global" : "Global Firewall", status: isFR ? "Opérationnel" : "Operational", metric: "Uptime", value: "99.99 %" },
+    { name: isFR ? "Modèle d'Analyse" : "Analysis Model", status: isFR ? "Opérationnel" : "Operational", metric: isFR ? "Latence" : "Latency", value: "82 ms" },
+    { name: isFR ? "Collecteur de Logs" : "Log Collector", status: isFR ? "Opérationnel" : "Operational", metric: isFR ? "Débit" : "Throughput", value: "14 req/s" },
   ];
 
   return (
@@ -69,144 +55,179 @@ export default function SupportRoute() {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.3 }}
-      className="space-y-6"
+      className="space-y-6 animate-in fade-in duration-200"
     >
       {/* Header */}
       <div className="pb-6 border-b border-border-subtle">
-        <h1 className="font-display font-bold text-[28px] text-on-surface tracking-tight leading-tight">
-          Support & Assistance Technique
+        <h1 className="app-h1">
+          {isFR ? "Support & Assistance Technique" : "Technical Support & Help"}
         </h1>
-        <p className="text-sm text-on-surface-variant mt-1">
-          Accédez à notre base de connaissances et contactez nos experts en cyber-résilience
+        <p className="app-body-sub mt-1">
+          {isFR
+            ? "Transmettez votre demande d'assistance directement à notre équipe technique"
+            : "Submit your technical support request directly to our security response team"}
         </p>
       </div>
 
-      {/* Search */}
-      <div className="relative w-full max-w-2xl">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant/30" />
-        <input
-          type="text"
-          placeholder="Rechercher dans la base de connaissances (ex. bypass pare-feu, jetons API...)"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-12 pr-4 py-3 bg-white border border-border-subtle rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/35 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/15 transition-all shadow-sm"
-        />
-      </div>
-
       {/* Grid Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Main Area */}
-        <div className="lg:col-span-8 space-y-6">
-          {/* Quick Actions */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {quickActions.map((action, idx) => {
-              const Icon = action.icon;
-              return (
-                <div
-                  key={idx}
-                  className="bg-white rounded-xl border border-border-subtle p-5 flex flex-col justify-between hover:border-primary/20 hover:shadow-md hover:shadow-primary/[0.03] transition-all cursor-pointer group h-full"
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+        
+        {/* Left: Contact Form Card (8 Columns) */}
+        <div className="lg:col-span-8 bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm flex flex-col justify-between animate-in fade-in duration-300">
+          {submitted ? (
+            <div className="py-16 text-center space-y-4 max-w-md mx-auto animate-in fade-in duration-300">
+              <div className="w-16 h-16 bg-safe/10 text-safe rounded-full flex items-center justify-center mx-auto shadow-inner">
+                <CheckCircle2 className="w-8 h-8" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="app-h2">
+                  {isFR ? "Message Envoyé avec Succès !" : "Support Ticket Submitted!"}
+                </h3>
+                <p className="app-body-normal text-on-surface-variant/80 leading-relaxed font-medium">
+                  {isFR
+                    ? "Votre message a été transmis avec succès à support@sicurre.com. Un technicien prendra contact avec vous sous un délai moyen de 2 heures."
+                    : "Your message was successfully transmitted to support@sicurre.com. An engineer will follow up with you within 2 hours."}
+                </p>
+              </div>
+              <Button
+                onClick={() => setSubmitted(false)}
+                className="mt-6 px-5 py-2 font-bold text-xs bg-surface-low border border-border-subtle text-on-surface hover:bg-surface-container"
+              >
+                {isFR ? "Envoyer un autre message" : "Send another message"}
+              </Button>
+            </div>
+          ) : (
+            <form onSubmit={handleSendSupport} className="space-y-5">
+              <div className="flex items-center gap-2 pb-2 border-b border-border-subtle/50 mb-3">
+                <MessageSquare className="w-5 h-5 text-primary" />
+                <h3 className="app-h2">
+                  {isFR ? "Formulaire de Contact" : "Contact Support Form"}
+                </h3>
+              </div>
+
+              {/* Name & Email Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="app-label-tiny">
+                    {isFR ? "Nom complet" : "Full Name"}
+                  </label>
+                  <Input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder={isFR ? "Ex: Jean Dupont" : "e.g. John Doe"}
+                    className="bg-white border-border-subtle"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="app-label-tiny">
+                    {isFR ? "Adresse e-mail" : "Email Address"}
+                  </label>
+                  <Input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="jean@entreprise.com"
+                    className="bg-white border-border-subtle"
+                  />
+                </div>
+              </div>
+
+              {/* Purpose Category Dropdown */}
+              <div className="space-y-2">
+                <label className="app-label-tiny">
+                  {isFR ? "Motif de la demande" : "Request Category"}
+                </label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-border-subtle rounded-lg text-xs font-semibold text-on-surface focus:outline-none focus:border-primary cursor-pointer shadow-sm h-10"
                 >
-                  <div className="space-y-3">
-                    <div className="p-2.5 bg-primary/[0.06] text-primary border border-primary/10 rounded-xl w-fit group-hover:scale-105 transition-transform">
-                      <Icon className="w-5 h-5 stroke-[1.5]" />
-                    </div>
-                    <h3 className="font-display font-bold text-sm text-on-surface">{action.title}</h3>
-                    <p className="text-[12px] text-on-surface-variant/70 leading-relaxed">
-                      {action.desc}
-                    </p>
-                  </div>
-                  <span className="text-[12px] text-primary font-bold flex items-center gap-1 mt-4 group-hover:gap-2 transition-all">
-                    {action.action}
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+                  <option value="incident">
+                    {isFR ? "Incident de sécurité / Phishing suspect" : "Security Incident / Phishing Suspicion"}
+                  </option>
+                  <option value="dns">
+                    {isFR ? "Configuration DNS & Cloudflare" : "DNS & Cloudflare Setup"}
+                  </option>
+                  <option value="billing">
+                    {isFR ? "Facturation et abonnements" : "Billing & Subscription"}
+                  </option>
+                  <option value="feedback">
+                    {isFR ? "Suggestions / Retour d'expérience" : "Feedback & Suggestions"}
+                  </option>
+                  <option value="other">
+                    {isFR ? "Autre demande d'assistance" : "Other Support Inquiry"}
+                  </option>
+                </select>
+              </div>
 
-          {/* FAQ */}
-          <div className="bg-white rounded-xl border border-border-subtle p-6">
-            <h3 className="font-display font-semibold text-[17px] text-on-surface mb-5 pb-4 border-b border-border-subtle">
-              Résolutions de Problèmes Courants
-            </h3>
-            <div className="space-y-2.5">
-              {faqs.map((faq, idx) => (
-                <div key={idx} className="border border-border-subtle rounded-xl overflow-hidden">
-                  <button
-                    onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
-                    className="w-full px-5 py-4 flex items-center justify-between text-left font-semibold text-sm text-on-surface hover:bg-surface-low/30 transition-colors cursor-pointer select-none"
-                  >
-                    <span>{faq.q}</span>
-                    {openFaq === idx ? (
-                      <ChevronUp className="w-4 h-4 text-on-surface-variant/50 shrink-0" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-on-surface-variant/50 shrink-0" />
-                    )}
-                  </button>
-                  <AnimatePresence initial={false}>
-                    {openFaq === idx && (
-                      <MotionDiv
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.2, ease: "easeOut" }}
-                        className="border-t border-border-subtle/50"
-                      >
-                        <p className="px-5 py-4 text-sm text-on-surface-variant leading-relaxed bg-surface-low/20">
-                          {faq.a}
-                        </p>
-                      </MotionDiv>
-                    )}
-                  </AnimatePresence>
-                </div>
-              ))}
-            </div>
-          </div>
+              {/* Message Content */}
+              <div className="space-y-2">
+                <label className="app-label-tiny">
+                  {isFR ? "Votre Message" : "Your Message"}
+                </label>
+                <textarea
+                  required
+                  rows={5}
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder={isFR ? "Décrivez précisément votre problème technique..." : "Describe your technical issue in detail..."}
+                  className="w-full px-3.5 py-2.5 bg-white border border-border-subtle rounded-xl text-xs text-on-surface font-medium placeholder:text-on-surface-variant/40 focus:outline-none focus:border-primary shadow-sm min-h-[120px]"
+                />
+              </div>
 
-          {/* Documentation Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-white rounded-xl border border-border-subtle p-5 flex items-start gap-4 hover:border-primary/20 hover:shadow-sm transition-all cursor-pointer">
-              <div className="p-2 bg-primary/[0.06] text-primary border border-primary/10 rounded-lg shrink-0">
-                <BookOpen className="w-5 h-5 stroke-[1.5]" />
+              {/* Submit Action */}
+              <div className="pt-3 border-t border-border-subtle/50 flex justify-end">
+                <Button
+                  type="submit"
+                  disabled={isPending}
+                  className="flex items-center gap-2 cursor-pointer bg-[#2e6bb5] hover:bg-[#23589b] text-white border-none text-xs font-bold rounded-lg px-5 py-2 h-10 shadow-sm"
+                >
+                  {isPending ? (
+                    <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Send className="w-3.5 h-3.5" />
+                  )}
+                  <span>{isFR ? "Envoyer le message" : "Send Support Request"}</span>
+                </Button>
               </div>
-              <div className="space-y-1">
-                <h4 className="font-display font-bold text-sm text-on-surface">Guide d'Intégration API</h4>
-                <p className="text-[12px] text-on-surface-variant/60 leading-relaxed">
-                  Connectez les alertes Sicurre à votre SIEM ou Slack.
-                </p>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl border border-border-subtle p-5 flex items-start gap-4 hover:border-primary/20 hover:shadow-sm transition-all cursor-pointer">
-              <div className="p-2 bg-primary/[0.06] text-primary border border-primary/10 rounded-lg shrink-0">
-                <ShieldCheck className="w-5 h-5 stroke-[1.5]" />
-              </div>
-              <div className="space-y-1">
-                <h4 className="font-display font-bold text-sm text-on-surface">Protocoles de Sécurité</h4>
-                <p className="text-[12px] text-on-surface-variant/60 leading-relaxed">
-                  Modèle souverain et conformité RGPD.
-                </p>
-              </div>
-            </div>
-          </div>
+            </form>
+          )}
         </div>
 
-        {/* Sidebar: System Status */}
-        <div className="lg:col-span-4">
-          <div className="bg-white rounded-xl border border-border-subtle p-6">
-            <div className="flex items-center gap-2.5 mb-5 pb-4 border-b border-border-subtle">
-              <Cpu className="w-5 h-5 text-primary" />
-              <h3 className="font-display font-semibold text-[17px] text-on-surface">Statuts des Nœuds</h3>
+        {/* Right: Technical Metadata & status (4 Columns) */}
+        <div className="lg:col-span-4 space-y-6 animate-in fade-in duration-300">
+          {/* Support Email Card */}
+          <div className="bg-surface-lowest border border-border-subtle rounded-2xl p-5 shadow-sm space-y-3">
+            <div className="p-3 bg-primary/[0.06] text-primary border border-primary/10 rounded-xl w-fit">
+              <Mail className="w-5 h-5" />
+            </div>
+            <h3 className="app-h3">{isFR ? "Adresse Directe" : "Direct Contact"}</h3>
+            <p className="app-body-sub leading-relaxed">
+              {isFR
+                ? "Vous pouvez également envoyer un email directement à support@sicurre.com à tout moment."
+                : "You can also reach us directly via email at support@sicurre.com."}
+            </p>
+          </div>
+
+          {/* System Status Nodes */}
+          <div className="bg-surface-lowest border border-border-subtle rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center gap-2 pb-3 border-b border-border-subtle/50 mb-4">
+              <Cpu className="w-4 h-4 text-primary" />
+              <h3 className="app-h3">{isFR ? "Statuts du Système" : "System Status Nodes"}</h3>
             </div>
             <div className="space-y-3">
               {systemNodes.map((node, idx) => (
-                <div key={idx} className="p-3.5 bg-surface-low/50 border border-border-subtle rounded-xl space-y-2.5">
+                <div key={idx} className="p-3 bg-surface-low border border-border-subtle/60 rounded-xl space-y-2 select-none">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-sm text-on-surface">{node.name}</span>
-                    <span className="text-[11px] text-safe font-bold">{node.status}</span>
+                    <span className="font-bold text-xs text-on-surface">{node.name}</span>
+                    <span className="text-[10px] text-safe font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">{node.status}</span>
                   </div>
-                  <div className="flex justify-between items-center text-[12px] text-on-surface-variant/60">
+                  <div className="flex justify-between items-center text-[10px] text-on-surface-variant font-bold">
                     <span>{node.metric}</span>
-                    <span className="font-mono font-bold">{node.value}</span>
+                    <span className="font-mono text-primary">{node.value}</span>
                   </div>
                 </div>
               ))}

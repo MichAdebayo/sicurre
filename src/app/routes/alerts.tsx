@@ -141,10 +141,10 @@ export default function AlertsRoute() {
       {/* Header */}
       <div className="pb-6 border-b border-border-subtle flex items-center justify-between">
         <div>
-          <h1 className="font-display font-bold text-[28px] text-on-surface tracking-tight leading-tight">
+          <h1 className="app-h1">
             {t("alerts.title")}
           </h1>
-          <p className="text-sm text-on-surface-variant mt-1">
+          <p className="app-body-sub mt-1">
             {t("alerts.subtitle")}
           </p>
         </div>
@@ -286,7 +286,7 @@ export default function AlertsRoute() {
             </div>
 
             <form onSubmit={handleCreateRule} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end bg-surface-low/30 rounded-xl p-4 border border-border-subtle/50">
-              <div className="sm:col-span-4">
+              <div className="sm:col-span-5">
                 <label className="text-[11px] font-bold text-on-surface-variant uppercase block mb-1.5">
                   {t("alerts.rule_type")}
                 </label>
@@ -299,7 +299,7 @@ export default function AlertsRoute() {
                   <option value="blocklist">{t("alerts.blocklist")}</option>
                 </select>
               </div>
-              <div className="sm:col-span-6">
+              <div className="sm:col-span-5">
                 <label className="text-[11px] font-bold text-on-surface-variant uppercase block mb-1.5">
                   {t("alerts.pattern")}
                 </label>

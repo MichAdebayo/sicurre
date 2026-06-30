@@ -121,26 +121,75 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
   const getLatencyData = (slaLimit: number) => {
     const threatsList = threats || [];
     const days = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const label = d.toLocaleDateString(i18n.language === "fr" ? "fr-FR" : "en-US", { weekday: "short", day: "numeric" });
-      
-      const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
-      const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+    
+    if (dateFilter === "today") {
+      // 6 hourly blocks of 4 hours
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date();
+        d.setHours(d.getHours() - i * 4);
+        const label = d.toLocaleTimeString(i18n.language === "fr" ? "fr-FR" : "en-US", { hour: "2-digit", minute: "2-digit" });
+        
+        const startOfPeriod = new Date(d.getTime() - 4 * 60 * 60 * 1000);
+        const endOfPeriod = d;
 
-      const dailyThreats = threatsList.filter((t) => {
-        const rDate = new Date(t.received_at);
-        return rDate >= startOfDay && rDate <= endOfDay;
-      });
+        const periodThreats = threatsList.filter((t) => {
+          const rDate = new Date(t.received_at);
+          return rDate >= startOfPeriod && rDate <= endOfPeriod;
+        });
 
-      const emails_count = dailyThreats.length;
-      const latency = emails_count > 0
-        ? Math.round(dailyThreats.reduce((sum, t) => sum + (t.latency_ms || 0), 0) / emails_count)
-        : 0;
+        const emails_count = periodThreats.length;
+        const latency = emails_count > 0
+          ? Math.round(periodThreats.reduce((sum, t) => sum + (t.latency_ms || 0), 0) / emails_count)
+          : 0;
 
-      const diffPct = latency > 0 ? Math.round(((latency - slaLimit) / slaLimit) * 100) : 0;
-      days.push({ label, latency, diffPct, emails_count });
+        const diffPct = latency > 0 ? Math.round(((latency - slaLimit) / slaLimit) * 100) : 0;
+        days.push({ label, latency, diffPct, emails_count });
+      }
+    } else if (dateFilter === "7d") {
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const label = d.toLocaleDateString(i18n.language === "fr" ? "fr-FR" : "en-US", { weekday: "short", day: "numeric" });
+        
+        const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+        const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+
+        const dailyThreats = threatsList.filter((t) => {
+          const rDate = new Date(t.received_at);
+          return rDate >= startOfDay && rDate <= endOfDay;
+        });
+
+        const emails_count = dailyThreats.length;
+        const latency = emails_count > 0
+          ? Math.round(dailyThreats.reduce((sum, t) => sum + (t.latency_ms || 0), 0) / emails_count)
+          : 0;
+
+        const diffPct = latency > 0 ? Math.round(((latency - slaLimit) / slaLimit) * 100) : 0;
+        days.push({ label, latency, diffPct, emails_count });
+      }
+    } else {
+      // 8 points for month/all (30 days total in blocks of 4 days)
+      for (let i = 28; i >= 0; i -= 4) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const label = d.toLocaleDateString(i18n.language === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric" });
+        
+        const startOfPeriod = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 3, 0, 0, 0, 0);
+        const endOfPeriod = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+
+        const periodThreats = threatsList.filter((t) => {
+          const rDate = new Date(t.received_at);
+          return rDate >= startOfPeriod && rDate <= endOfPeriod;
+        });
+
+        const emails_count = periodThreats.length;
+        const latency = emails_count > 0
+          ? Math.round(periodThreats.reduce((sum, t) => sum + (t.latency_ms || 0), 0) / emails_count)
+          : 0;
+
+        const diffPct = latency > 0 ? Math.round(((latency - slaLimit) / slaLimit) * 100) : 0;
+        days.push({ label, latency, diffPct, emails_count });
+      }
     }
     return days;
   };
@@ -150,7 +199,7 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
 
   // SVG coordinates
   const points = latencyData.map((d, idx) => {
-    const x = (idx / 6) * 1000;
+    const x = (idx / (latencyData.length - 1 || 1)) * 1000;
     const y = 180 - (d.latency / maxLatencyVal) * 140;
     return { x, y };
   });
@@ -178,23 +227,40 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border-subtle">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="font-display font-bold text-[28px] text-on-surface tracking-tight leading-tight">
+            <h1 className="app-h1">
               {t("threats.title")}
             </h1>
           </div>
-          <p className="text-sm text-on-surface-variant mt-1 font-medium">
+          <p className="app-body-sub mt-1">
             {i18n.language === "fr" 
               ? "Historique global des classifications d'e-mails"
               : "Global historical log of analyzed email classifications"}
           </p>
         </div>
-        <button
-          onClick={handleExportCSV}
-          className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-surface-low border border-border-subtle text-[13px] font-semibold rounded-lg transition-colors cursor-pointer self-start sm:self-center shadow-sm"
-        >
-          <Download className="w-4 h-4 text-on-surface-variant" />
-          <span>{t("threats.export_report")}</span>
-        </button>
+        <div className="flex items-center gap-3 self-start sm:self-center">
+          {/* Date range filter dropdown */}
+          <select
+            value={dateFilter}
+            onChange={(e) => {
+              setDateFilter(e.target.value as any);
+              setCurrentPage(1);
+            }}
+            className="px-3 py-2 bg-white border border-border-subtle rounded-lg text-xs font-bold text-on-surface focus:outline-none focus:border-primary cursor-pointer shadow-sm h-9"
+          >
+            <option value="all">{i18n.language === "fr" ? "Toutes les dates" : "All Time"}</option>
+            <option value="today">{i18n.language === "fr" ? "Aujourd'hui" : "Today"}</option>
+            <option value="7d">{i18n.language === "fr" ? "7 derniers jours" : "Last 7 Days"}</option>
+            <option value="month">{i18n.language === "fr" ? "Ce mois" : "This Month"}</option>
+          </select>
+
+          <button
+            onClick={handleExportCSV}
+            className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-surface-low border border-border-subtle text-[13px] font-semibold rounded-lg transition-colors cursor-pointer shadow-sm h-9"
+          >
+            <Download className="w-4 h-4 text-on-surface-variant" />
+            <span>{t("threats.export_report")}</span>
+          </button>
+        </div>
       </div>
 
       {actionSuccess && (
@@ -348,21 +414,6 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
               className="w-full pl-10 pr-4 py-2 bg-white border border-border-subtle rounded-lg text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:border-primary shadow-sm"
             />
           </div>
-
-          {/* Date range filter dropdown */}
-          <select
-            value={dateFilter}
-            onChange={(e) => {
-              setDateFilter(e.target.value as any);
-              setCurrentPage(1);
-            }}
-            className="px-3 py-2 bg-white border border-border-subtle rounded-lg text-sm font-semibold text-on-surface focus:outline-none focus:border-primary cursor-pointer shadow-sm"
-          >
-            <option value="all">{i18n.language === "fr" ? "Toutes les dates" : "All Time"}</option>
-            <option value="today">{i18n.language === "fr" ? "Aujourd'hui" : "Today"}</option>
-            <option value="7d">{i18n.language === "fr" ? "7 derniers jours" : "Last 7 Days"}</option>
-            <option value="month">{i18n.language === "fr" ? "Ce mois" : "This Month"}</option>
-          </select>
         </div>
 
         <div className="flex gap-2 w-full sm:w-auto">

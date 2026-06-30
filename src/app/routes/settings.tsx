@@ -191,10 +191,10 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
     >
       {/* Header */}
       <div className="pb-6 border-b border-border-subtle">
-        <h1 className="font-display font-bold text-[28px] text-on-surface tracking-tight leading-tight">
+        <h1 className="app-h1">
           {t("settings.title")}
         </h1>
-        <p className="text-sm font-semibold text-on-surface-variant mt-1">
+        <p className="app-body-sub mt-1">
           {t("settings.subtitle")}
         </p>
       </div>

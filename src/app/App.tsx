@@ -148,7 +148,7 @@ export default function App() {
         {activePage === "domain-shield" && <DomainShieldRoute key="domain-shield" session={session} />}
         {activePage === "logs" && session.is_platform_admin && <LogsRoute key="logs" />}
         {activePage === "settings" && <SettingsRoute key="settings" session={session} />}
-        {activePage === "support" && <SupportRoute key="support" />}
+        {activePage === "support" && <SupportRoute key="support" session={session} />}
       </AnimatePresence>
     </AppShell>
   );

@@ -143,7 +143,7 @@ export default function QuarantineRoute() {
     >
       {/* Header */}
       <div className="pb-6 border-b border-border-subtle">
-        <h1 className="font-display font-bold text-[28px] text-on-surface tracking-tight leading-tight flex items-center gap-3">
+        <h1 className="app-h1 flex items-center gap-3">
           {t("quarantine.title")}
           {phishingItems.length > 0 && (
             <span className="inline-flex items-center bg-error/10 text-error text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
@@ -151,7 +151,7 @@ export default function QuarantineRoute() {
             </span>
           )}
         </h1>
-        <p className="text-sm text-on-surface-variant mt-1 font-medium">
+        <p className="app-body-sub mt-1">
           {t("quarantine.subtitle")}
         </p>
       </div>

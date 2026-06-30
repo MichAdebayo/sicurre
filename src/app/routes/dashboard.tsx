@@ -367,7 +367,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border-subtle">
         <div>
-          <h1 className="font-display font-extrabold text-[36px] text-on-surface tracking-tight leading-tight">
+          <h1 className="app-h1">
             {t("dashboard.welcome")} {session.display_name.split(" ")[0]}
           </h1>
         </div>
@@ -522,7 +522,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                           onMouseLeave={() => setHoveredBarIndex(null)}
                         >
                           {/* Daily total value displayed above the bar */}
-                          <span className="font-extrabold text-[10px] text-primary/80 mb-0.5 group-hover:text-primary transition-colors">
+                          <span className="font-extrabold text-[12px] text-primary/80 mb-0.5 group-hover:text-primary transition-colors">
                             {total}
                           </span>
 
@@ -546,7 +546,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                               />
                             )}
                           </div>
-                          <span className="text-[9px] uppercase tracking-wider text-on-surface-variant truncate w-full text-center font-bold">
+                          <span className="text-[10px] uppercase tracking-wider text-on-surface-variant truncate w-full text-center font-bold">
                             {label}
                           </span>
                         </div>
