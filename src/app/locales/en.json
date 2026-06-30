@@ -27,10 +27,10 @@
     "status_inactive": "Inactive",
     "connected_as": "Signed in as",
     "nav_dashboard": "Dashboard",
-    "nav_threats": "Threat feed",
-    "nav_quarantine": "Quarantine",
-    "nav_alerts": "Alerts & rules",
-    "nav_domain_shield": "Domain shield",
+    "nav_threats": "Threat Feed",
+    "nav_quarantine": "Quarantine Zone",
+    "nav_alerts": "Alerts & Rules",
+    "nav_domain_shield": "Domain Shield",
     "nav_settings": "Settings",
     "nav_support": "Support",
     "lockdown": "Emergency Lockdown"
@@ -98,7 +98,7 @@
     "explain_legitimate": "Classified as safe and passed to inbox."
   },
   "quarantine": {
-    "title": "Quarantine zone",
+    "title": "Quarantine Zone",
     "subtitle": "Safe holding area for suspicious emails. Items auto-purge after 14 days.",
     "sender": "Sender",
     "subject": "Subject",
@@ -120,7 +120,7 @@
     "quarantined_count": "You have {{count}} emails in quarantine."
   },
   "alerts": {
-    "title": "Alerts & rules",
+    "title": "Alerts & Rules",
     "subtitle": "Configure email alerts, quiet hours, and custom whitelist/blocklist filters.",
     "section_preferences": "Notification Preferences",
     "notify_phishing": "Notify me immediately of phishing detections",
@@ -149,7 +149,7 @@
     "preferences_saved": "Alert preferences saved successfully."
   },
   "domain_shield": {
-    "title": "Domain shield",
+    "title": "Domain Shield",
     "subtitle": "Monitor your email authentication protocols and domain security health.",
     "domain_selector": "Select Protected Domain",
     "reputation": "Domain Reputation",

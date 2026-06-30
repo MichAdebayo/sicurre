@@ -26,11 +26,11 @@
     "status_active": "Bouclier actif",
     "status_inactive": "Inactif",
     "connected_as": "Connecté en tant que",
-    "nav_dashboard": "Tableau de bord",
-    "nav_threats": "Flux de menaces",
-    "nav_quarantine": "Quarantaine",
-    "nav_alerts": "Alertes & règles",
-    "nav_domain_shield": "Bouclier de domaine",
+    "nav_dashboard": "Tableau de Bord",
+    "nav_threats": "Flux de Menaces",
+    "nav_quarantine": "Zone de Quarantaine",
+    "nav_alerts": "Alertes & Règles",
+    "nav_domain_shield": "Bouclier de Domaine",
     "nav_settings": "Paramètres",
     "nav_support": "Support",
     "lockdown": "Verrouillage d'urgence"
@@ -98,7 +98,7 @@
     "explain_legitimate": "Classé comme sûr et distribué dans la boîte de réception."
   },
   "quarantine": {
-    "title": "Zone de quarantaine",
+    "title": "Zone de Quarantaine",
     "subtitle": "Espace sécurisé pour les emails suspects. Purge automatique après 14 jours.",
     "sender": "Expéditeur",
     "subject": "Objet",
@@ -120,7 +120,7 @@
     "quarantined_count": "Vous avez {{count}} emails en quarantaine."
   },
   "alerts": {
-    "title": "Alertes & règles",
+    "title": "Alertes & Règles",
     "subtitle": "Configurez vos alertes email, plages de silence et filtres d'expéditeurs personnalisés.",
     "section_preferences": "Préférences de Notification",
     "notify_phishing": "M'alerter immédiatement en cas de phishing détecté",
@@ -149,7 +149,7 @@
     "preferences_saved": "Préférences enregistrées avec succès."
   },
   "domain_shield": {
-    "title": "Bouclier de domaine",
+    "title": "Bouclier de Domaine",
     "subtitle": "Contrôlez vos protocoles de sécurité email et la réputation de vos domaines.",
     "domain_selector": "Sélectionner le domaine protégé",
     "reputation": "Réputation du Domaine",

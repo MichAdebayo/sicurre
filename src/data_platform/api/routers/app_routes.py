@@ -183,7 +183,7 @@ async def get_threats(current_user: AuthUser = Depends(get_current_user)):
                 subject,
                 sender,
                 snippet AS body_preview,
-                safety_verdict AS verdict,
+                CASE WHEN safety_verdict = 'safe' THEN 'legitimate' ELSE safety_verdict END AS verdict,
                 composite_score AS confidence,
                 created_at AS received_at,
                 COALESCE(override_verdict, 'active') AS status,
@@ -241,7 +241,7 @@ async def update_threat_status(
             ),
         )
         rows = await async_query_auth_db(
-            "SELECT id, id AS message_id, subject, sender, snippet AS body_preview, safety_verdict AS verdict, composite_score AS confidence, created_at AS received_at, override_verdict AS status FROM app_inference_event WHERE id = ? AND workspace_id = ?",
+            "SELECT id, id AS message_id, subject, sender, snippet AS body_preview, CASE WHEN safety_verdict = 'safe' THEN 'legitimate' ELSE safety_verdict END AS verdict, composite_score AS confidence, created_at AS received_at, override_verdict AS status FROM app_inference_event WHERE id = ? AND workspace_id = ?",
             (id, current_user.workspace_id),
         )
         if not rows:

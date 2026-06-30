@@ -30,13 +30,10 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
   const [filterVerdict, setFilterVerdict] = useState<string>("all");
   
   // Date range filters ("all", "today", "7d", "month")
-  const [dateFilter, setDateFilter] = useState<"all" | "today" | "7d" | "month">("all");
+  const [dateFilter, setDateFilter] = useState<"today" | "7d" | "month" | "last_month">("7d");
   
   // Latency chart hover state
   const [hoveredLatencyIndex, setHoveredLatencyIndex] = useState<number | null>(null);
-  
-  // Confirmation delete modal state
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   
   // Table pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -75,24 +72,26 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
 
   // Date filtering logic
   const matchesDateFilter = (receivedAtStr: string) => {
-    if (dateFilter === "all") return true;
-    const receivedTime = new Date(receivedAtStr).getTime();
-    const now = new Date().getTime();
-    
+    const received = new Date(receivedAtStr);
+    const now = new Date();
+
     if (dateFilter === "today") {
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      return receivedTime >= todayStart.getTime();
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      return received >= start;
     }
     if (dateFilter === "7d") {
-      const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
-      return receivedTime >= sevenDaysAgo;
+      const start = new Date();
+      start.setDate(now.getDate() - 7);
+      return received >= start;
     }
     if (dateFilter === "month") {
-      const thisMonthStart = new Date();
-      thisMonthStart.setDate(1);
-      thisMonthStart.setHours(0, 0, 0, 0);
-      return receivedTime >= thisMonthStart.getTime();
+      const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+      return received >= start;
+    }
+    if (dateFilter === "last_month") {
+      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
+      const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+      return received >= start && received <= end;
     }
     return true;
   };
@@ -136,25 +135,26 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
   const getLatencyData = (slaLimit: number) => {
     const threatsList = threats || [];
     const days = [];
+    const now = new Date();
     
     if (dateFilter === "today") {
-      // 6 hourly blocks of 4 hours
-      for (let i = 5; i >= 0; i--) {
+      // 24 hourly points (from 23 hours ago to current hour)
+      for (let i = 23; i >= 0; i--) {
         const d = new Date();
-        d.setHours(d.getHours() - i * 4);
+        d.setHours(d.getHours() - i, 0, 0, 0);
         const label = d.toLocaleTimeString(i18n.language === "fr" ? "fr-FR" : "en-US", { hour: "2-digit", minute: "2-digit" });
         
-        const startOfPeriod = new Date(d.getTime() - 4 * 60 * 60 * 1000);
-        const endOfPeriod = d;
+        const startOfHour = d;
+        const endOfHour = new Date(d.getTime() + 59 * 60 * 1000 + 59 * 1000 + 999);
 
-        const periodThreats = threatsList.filter((t) => {
+        const hourlyThreats = threatsList.filter((t) => {
           const rDate = new Date(t.received_at);
-          return rDate >= startOfPeriod && rDate <= endOfPeriod;
+          return rDate >= startOfHour && rDate <= endOfHour;
         });
 
-        const emails_count = periodThreats.length;
+        const emails_count = hourlyThreats.length;
         const latency = emails_count > 0
-          ? Math.round(periodThreats.reduce((sum, t) => sum + (t.latency_ms || 0), 0) / emails_count)
+          ? Math.round(hourlyThreats.reduce((sum, t) => sum + (t.latency_ms || 0), 0) / emails_count)
           : 0;
 
         const diffPct = latency > 0 ? Math.round(((latency - slaLimit) / slaLimit) * 100) : 0;
@@ -182,11 +182,36 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
         const diffPct = latency > 0 ? Math.round(((latency - slaLimit) / slaLimit) * 100) : 0;
         days.push({ label, latency, diffPct, emails_count });
       }
-    } else {
-      // 30 daily points
-      for (let i = 29; i >= 0; i--) {
+    } else if (dateFilter === "month") {
+      const currentDay = now.getDate();
+      for (let i = currentDay - 1; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
+        const label = d.toLocaleDateString(i18n.language === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric" });
+        
+        const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+        const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+
+        const dailyThreats = threatsList.filter((t) => {
+          const rDate = new Date(t.received_at);
+          return rDate >= startOfDay && rDate <= endOfDay;
+        });
+
+        const emails_count = dailyThreats.length;
+        const latency = emails_count > 0
+          ? Math.round(dailyThreats.reduce((sum, t) => sum + (t.latency_ms || 0), 0) / emails_count)
+          : 0;
+
+        const diffPct = latency > 0 ? Math.round(((latency - slaLimit) / slaLimit) * 100) : 0;
+        days.push({ label, latency, diffPct, emails_count });
+      }
+    } else {
+      // last_month
+      const y = now.getFullYear();
+      const m = now.getMonth();
+      const daysInPrevMonth = new Date(y, m, 0).getDate();
+      for (let i = daysInPrevMonth - 1; i >= 0; i--) {
+        const d = new Date(y, m - 1, daysInPrevMonth - i);
         const label = d.toLocaleDateString(i18n.language === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric" });
         
         const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
@@ -262,10 +287,10 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
             }}
             className="px-3 py-2 bg-white border border-border-subtle rounded-lg text-xs font-bold text-on-surface focus:outline-none focus:border-primary cursor-pointer shadow-sm h-9"
           >
-            <option value="all">{i18n.language === "fr" ? "Toutes les dates" : "All Time"}</option>
             <option value="today">{i18n.language === "fr" ? "Aujourd'hui" : "Today"}</option>
             <option value="7d">{i18n.language === "fr" ? "7 derniers jours" : "Last 7 Days"}</option>
-            <option value="month">{i18n.language === "fr" ? "Ce mois" : "This Month"}</option>
+            <option value="month">{i18n.language === "fr" ? "Ce mois-ci" : "This Month"}</option>
+            <option value="last_month">{i18n.language === "fr" ? "Le mois dernier" : "Last Month"}</option>
           </select>
 
           <button
@@ -376,12 +401,15 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
           {/* Absolute Floating Tooltip Card (Rendered in-place snapping above the hovered point, displays Total Emails) */}
           {hoveredLatencyIndex !== null && (
             <div
-              className="absolute z-30 p-2.5 bg-white border border-border-subtle text-on-surface rounded-xl text-[11px] shadow-xl flex flex-col gap-1.5 w-40 font-sans select-none pointer-events-none animate-in fade-in duration-100 -translate-x-1/2"
+              className="absolute z-30 p-3 bg-white border border-border-subtle text-on-surface rounded-xl text-xs shadow-xl flex flex-col gap-1.5 w-48 font-sans select-none pointer-events-none animate-in fade-in duration-100 -translate-x-1/2"
               style={{
                 left: `${points[hoveredLatencyIndex].x / 10}%`,
-                top: `${points[hoveredLatencyIndex].y - 85}px`,
+                top: `${points[hoveredLatencyIndex].y - 95}px`,
               }}
             >
+              <div className="text-center font-extrabold border-b border-border-subtle/60 pb-1 text-primary text-[11px] uppercase tracking-wider mb-0.5">
+                {latencyData[hoveredLatencyIndex].label}
+              </div>
               <div className="flex justify-between text-on-surface-variant font-bold">
                 <span>Avg Latency:</span>
                 <span className="font-mono text-primary">{latencyData[hoveredLatencyIndex].latency} ms</span>
@@ -403,12 +431,17 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
         </div>
 
         {/* X-axis date labels */}
-        <div className="w-[96%] mx-auto flex justify-between mt-2 pt-2.5 border-t border-border-subtle/50 text-[10px] font-bold text-on-surface-variant font-sans px-1 select-none">
+        <div className="relative w-[96%] mx-auto h-6 mt-2 pt-2.5 border-t border-border-subtle/50 text-[10px] font-bold text-on-surface-variant font-sans select-none">
           {latencyData.map((d, idx) => {
             const shouldShowLabel = latencyData.length <= 7 || idx % 5 === 0 || idx === latencyData.length - 1;
+            if (!shouldShowLabel) return null;
             return (
-              <div key={idx} className="text-center w-16 uppercase tracking-wider font-extrabold">
-                {shouldShowLabel ? d.label : ""}
+              <div
+                key={idx}
+                className="absolute text-center uppercase tracking-wider font-extrabold -translate-x-1/2"
+                style={{ left: `${(idx / (latencyData.length - 1 || 1)) * 100}%` }}
+              >
+                {d.label}
               </div>
             );
           })}
@@ -476,11 +509,10 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-border-subtle bg-surface-low/40">
-                  <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[25%] min-w-[170px]">{t("threats.timestamp")}</th>
-                  <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[30%] min-w-[180px]">{t("threats.sender")}</th>
-                  <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[35%] min-w-[200px]">{t("threats.subject")}</th>
-                  <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[18%] min-w-[140px]">{t("threats.verdict")}</th>
-                  <th className="px-5 py-3 text-right text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-auto">{t("threats.actions")}</th>
+                  <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[22%] min-w-[170px]">{t("threats.timestamp")}</th>
+                  <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[28%] min-w-[180px]">{t("threats.sender")}</th>
+                  <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[35%] min-w-[220px]">{t("threats.subject")}</th>
+                  <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[15%] min-w-[140px]">{t("threats.verdict")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-subtle">
@@ -515,19 +547,6 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
                       </td>
                       <td className="px-5 py-3.5">
                         <VerdictBadge verdict={threat.verdict} confidence={threat.confidence} />
-                      </td>
-                      <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="inline-flex gap-2 justify-end w-full items-center">
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            onClick={() => setConfirmDeleteId(threat.id)}
-                            className="text-[11px] gap-1.5 h-8 font-bold"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                            Delete
-                          </Button>
-                        </div>
                       </td>
                     </tr>
                   </MotionDiv>
@@ -568,46 +587,6 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
           </div>
         )}
       </div>
-
-      {/* Center confirmation delete modal with background blur */}
-      {confirmDeleteId && (
-        <div className="fixed inset-0 z-50 bg-neutral-900/60 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white border border-border-subtle rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4 font-sans text-center select-none">
-            <div className="w-12 h-12 bg-error/10 text-error rounded-full flex items-center justify-center mx-auto">
-              <Trash2 className="w-6 h-6" />
-            </div>
-            <div className="space-y-2">
-              <h3 className="font-display font-bold text-lg text-on-surface">
-                {i18n.language === "fr" ? "Confirmer la suppression" : "Confirm Deletion"}
-              </h3>
-              <p className="text-sm text-on-surface-variant leading-relaxed font-medium">
-                {i18n.language === "fr"
-                  ? "Cette action est destructive. L'e-mail sera définitivement masqué de vos logs, mais restera stocké de manière sécurisée dans la base de données pour l'entraînement du modèle d'IA."
-                  : "This is a destructive action. The email will be removed from your active logs, but remains stored securely in the database for AI training model feedback."}
-              </p>
-            </div>
-            <div className="flex gap-3 justify-center pt-2">
-              <Button
-                variant="outline"
-                onClick={() => setConfirmDeleteId(null)}
-                className="px-4 py-2 font-bold text-sm h-10 cursor-pointer"
-              >
-                {i18n.language === "fr" ? "Annuler" : "Cancel"}
-              </Button>
-              <Button
-                variant="danger"
-                onClick={() => {
-                  handleUpdateStatus(confirmDeleteId, "trashed");
-                  setConfirmDeleteId(null);
-                }}
-                className="px-4 py-2 font-bold text-sm h-10 cursor-pointer"
-              >
-                {i18n.language === "fr" ? "Supprimer définitivement" : "Delete Record"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </MotionDiv>
   );
 }

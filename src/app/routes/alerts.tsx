@@ -278,7 +278,7 @@ export default function AlertsRoute() {
             {prefsError && <p className="text-xs text-error font-semibold">{prefsError}</p>}
 
             <div className="flex justify-end pt-2">
-              <Button type="submit" className="text-xs font-bold uppercase tracking-wider">
+              <Button type="submit" className="text-xs font-bold tracking-wide">
                 {t("alerts.save_preferences")}
               </Button>
             </div>

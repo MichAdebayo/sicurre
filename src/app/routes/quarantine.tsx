@@ -95,8 +95,8 @@ export default function QuarantineRoute() {
   const handleDelete = async (id: string) => {
     const confirmDelete = window.confirm(
       isFR
-        ? "Êtes-vous sûr de vouloir supprimer définitivement cet e-mail de la quarantaine ?"
-        : "Are you sure you want to permanently delete this email from quarantine?"
+        ? "Êtes-vous sûr de vouloir supprimer cet e-mail ?"
+        : "Are you sure you want to delete this email?"
     );
     if (!confirmDelete) return;
 
