@@ -82,7 +82,7 @@ export function Sidebar({
       )}
     >
       {/* Logo */}
-      <div className="px-5 py-5 border-b border-border-subtle">
+      <div className="px-5 py-5">
         <div className="flex items-center gap-3">
           <img src={sicurreLogo} alt="Sicurre" className="w-16 h-16" />
           <div className="flex flex-col">
@@ -117,7 +117,7 @@ export function Sidebar({
       </nav>
 
       {/* Bottom Section */}
-      <div className="px-3 pb-4 space-y-3 border-t border-border-subtle pt-3">
+      <div className="px-3 pb-4 space-y-3 pt-3">
         {/* Support Link */}
         {bottomNav.map((item) => {
           const Icon = item.icon;
