@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -43,6 +43,18 @@ export default function QuarantineRoute() {
   const [actionSuccess, setActionSuccess] = useState("");
   const [actionError, setActionError] = useState("");
 
+  useEffect(() => {
+    if (!actionSuccess) return;
+    const t = setTimeout(() => setActionSuccess(""), 4000);
+    return () => clearTimeout(t);
+  }, [actionSuccess]);
+
+  useEffect(() => {
+    if (!actionError) return;
+    const t = setTimeout(() => setActionError(""), 4000);
+    return () => clearTimeout(t);
+  }, [actionError]);
+
   const getRemainingTime = (expiresAtStr: string) => {
     if (!expiresAtStr) return "14 d";
     const expiry = new Date(expiresAtStr).getTime();
@@ -81,6 +93,13 @@ export default function QuarantineRoute() {
   };
 
   const handleDelete = async (id: string) => {
+    const confirmDelete = window.confirm(
+      isFR
+        ? "Êtes-vous sûr de vouloir supprimer définitivement cet e-mail de la quarantaine ?"
+        : "Are you sure you want to permanently delete this email from quarantine?"
+    );
+    if (!confirmDelete) return;
+
     setActionError("");
     setActionSuccess("");
     try {
@@ -302,32 +321,32 @@ export default function QuarantineRoute() {
 
                 <div className="space-y-4 pt-4 text-xs">
                   <div>
-                    <span className="app-label-tiny block text-on-surface-variant/60 uppercase tracking-wider">
+                    <span className="app-label-tiny block text-on-surface-variant/90 font-bold uppercase tracking-wider">
                       From
                     </span>
-                    <span className="text-[14px] font-semibold text-on-surface select-all block mt-1">
+                    <span className="text-[14px] font-medium text-on-surface select-all block mt-1">
                       {selectedItem.sender}
                     </span>
                   </div>
 
                   <div>
-                    <span className="app-label-tiny block text-on-surface-variant/60 uppercase tracking-wider">
+                    <span className="app-label-tiny block text-on-surface-variant/90 font-bold uppercase tracking-wider">
                       Subject
                     </span>
-                    <span className="text-[14px] font-semibold text-on-surface block mt-1">
+                    <span className="text-[14px] font-medium text-on-surface block mt-1">
                       {selectedItem.subject || t("threats.no_subject")}
                     </span>
                   </div>
 
                   <div>
-                    <span className="app-label-tiny block text-on-surface-variant/60 uppercase tracking-wider">
+                    <span className="app-label-tiny block text-on-surface-variant/90 font-bold uppercase tracking-wider">
                       Quarantined Risk Analysis
                     </span>
                     <div className="flex items-center gap-2 mt-1.5 select-none">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase bg-error/15 text-error">
                         {selectedItem.safety_verdict}
                       </span>
-                      <span className="text-[13px] font-mono text-on-surface-variant font-bold">
+                      <span className="text-[13px] font-mono text-on-surface-variant font-medium">
                         Score: {Math.round(selectedItem.composite_score * 100)}%
                       </span>
                     </div>
@@ -335,9 +354,6 @@ export default function QuarantineRoute() {
 
                   {/* Sandboxed Preview Frame */}
                   <div className="pt-2">
-                    <span className="app-label-tiny block text-on-surface-variant/60 uppercase tracking-wider mb-1.5 select-none">
-                      Sanitized Content Body
-                    </span>
                     <iframe
                       title="Quarantine Safe Preview Frame"
                       srcDoc={`<!DOCTYPE html><html><head><style>body { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #374151; font-size: 13.5px; line-height: 1.6; margin: 10px; word-break: break-word; } a { color: #2563eb; pointer-events: none !important; text-decoration: underline; } img { display: none !important; }</style></head><body>${renderSafeHtml(selectedItem.body_text)}</body></html>`}
@@ -357,7 +373,7 @@ export default function QuarantineRoute() {
                     onClick={() => handleRelease(selectedItem.id)}
                   >
                     <Mail className="w-4 h-4" />
-                    {i18n.language === "fr" ? "Libérer vers la boîte" : "Release to Inbox"}
+                    {t("quarantine.release")}
                   </Button>
 
                   <Button
@@ -366,7 +382,7 @@ export default function QuarantineRoute() {
                     onClick={() => handleWhitelist(selectedItem.id)}
                   >
                     <ShieldCheck className="w-4 h-4 text-safe" />
-                    {i18n.language === "fr" ? "Autoriser l'expéditeur" : "Whitelist Sender"}
+                    {t("quarantine.whitelist")}
                   </Button>
 
                   <Button
@@ -375,7 +391,7 @@ export default function QuarantineRoute() {
                     onClick={() => handleDelete(selectedItem.id)}
                   >
                     <Trash2 className="w-4 h-4" />
-                    {i18n.language === "fr" ? "Supprimer l'e-mail" : "Delete Email"}
+                    {t("quarantine.delete")}
                   </Button>
                 </div>
                 

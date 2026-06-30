@@ -53,7 +53,7 @@ export interface ThreatLog {
   subject: string;
   sender: string;
   body_preview: string;
-  verdict: "phishing" | "spam" | "legitimate";
+  verdict: "phishing" | "spam" | "legitimate" | "quarantine";
   confidence: number;
   status: "active" | "trashed" | "restored";
   received_at: string;

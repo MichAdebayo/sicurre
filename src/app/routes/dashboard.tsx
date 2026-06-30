@@ -129,7 +129,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
         });
 
         const safe = dailyThreats.filter((t) => t.verdict === "legitimate").length;
-        const phish = dailyThreats.filter((t) => t.verdict === "phishing" || t.verdict === "spam").length;
+        const phish = dailyThreats.filter((t) => t.verdict === "phishing" || t.verdict === "spam" || t.verdict === "quarantine").length;
 
         labels.push(d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { weekday: "short", day: "numeric" }));
         safeCounts.push(safe);
@@ -150,7 +150,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
         });
 
         const safe = dailyThreats.filter((t) => t.verdict === "legitimate").length;
-        const phish = dailyThreats.filter((t) => t.verdict === "phishing" || t.verdict === "spam").length;
+        const phish = dailyThreats.filter((t) => t.verdict === "phishing" || t.verdict === "spam" || t.verdict === "quarantine").length;
 
         labels.push(d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short" }));
         safeCounts.push(safe);
@@ -171,7 +171,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
         });
 
         const safe = monthlyThreats.filter((t) => t.verdict === "legitimate").length;
-        const phish = monthlyThreats.filter((t) => t.verdict === "phishing" || t.verdict === "spam").length;
+        const phish = monthlyThreats.filter((t) => t.verdict === "phishing" || t.verdict === "spam" || t.verdict === "quarantine").length;
 
         labels.push(d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "short", year: "2-digit" }));
         safeCounts.push(safe);

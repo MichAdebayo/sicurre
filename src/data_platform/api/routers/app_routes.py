@@ -153,8 +153,8 @@ async def get_kpis(
         for row in rows:
             verdict = row["safety_verdict"]
             count = row["cnt"]
-            if verdict == "phishing":
-                phishing_count = count
+            if verdict in ("phishing", "quarantine"):
+                phishing_count += count
             elif verdict == "spam":
                 spam_count = count
             elif verdict == "legitimate":
@@ -452,8 +452,8 @@ async def release_quarantine_item(id: str, current_user: AuthUser = Depends(get_
         (id,)
     )
     await async_query_auth_db(
-        "UPDATE app_inference_event SET safety_verdict = 'legitimate' WHERE workspace_id = ? AND sender = ? AND subject = ?",
-        (current_user.workspace_id, item["sender"], item["subject"])
+        "UPDATE app_inference_event SET safety_verdict = 'legitimate' WHERE id = ? AND workspace_id = ?",
+        (item["message_id"], current_user.workspace_id)
     )
     
     dest_rows = await async_query_auth_db(
@@ -503,8 +503,8 @@ async def release_and_whitelist_item(id: str, current_user: AuthUser = Depends(g
         (id,)
     )
     await async_query_auth_db(
-        "UPDATE app_inference_event SET safety_verdict = 'legitimate' WHERE workspace_id = ? AND sender = ? AND subject = ?",
-        (current_user.workspace_id, item["sender"], item["subject"])
+        "UPDATE app_inference_event SET safety_verdict = 'legitimate' WHERE id = ? AND workspace_id = ?",
+        (item["message_id"], current_user.workspace_id)
     )
     
     rule_id = str(uuid.uuid4())

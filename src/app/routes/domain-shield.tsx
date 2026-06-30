@@ -70,6 +70,9 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
   } = useDomainShieldStatus(selectedDomain, !!selectedDomain);
 
   const refreshShieldMutation = useRefreshDomainShieldStatus();
+
+  const isDmarcValid = !!(shieldStatus?.dmarc?.valid && (shieldStatus?.dmarc?.record || "").includes("dmarc@sicurre.com"));
+  const needsDnsSetup = !!(shieldStatus && (!shieldStatus.spf.valid || !shieldStatus.dkim.valid || !isDmarcValid));
   const isShieldLoading = shieldLoading || refreshShieldMutation.isPending;
 
   const handleManualRefresh = async () => {
@@ -215,6 +218,9 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
   const [cfToken, setCfToken] = useState("");
   const [autoFixProgress, setAutoFixProgress] = useState<"idle" | "verify" | "dns" | "routing" | "success" | "error">("idle");
   const [autoFixErrorMsg, setAutoFixErrorMsg] = useState("");
+  const [fixSpf, setFixSpf] = useState(true);
+  const [fixDkim, setFixDkim] = useState(true);
+  const [fixDmarc, setFixDmarc] = useState(true);
   const setupMutation = useSetupCloudflare();
 
   const handleRunAutoFix = async () => {
@@ -673,7 +679,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   </p>
                 </div>
 
-                {(shieldStatus.spf.valid && shieldStatus.dkim.valid && shieldStatus.dmarc.valid) && (
+                {!needsDnsSetup && (
                   <div className="p-3 bg-safe/[0.04] border border-safe/20 rounded-xl flex items-start gap-2.5">
                     <ShieldCheck className="w-4.5 h-4.5 text-safe shrink-0 mt-0.5" />
                     <div className="text-[11.5px] text-safe font-semibold leading-relaxed">
@@ -685,7 +691,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                 )}
 
                 {/* Target configuration breakdown list */}
-                {(!shieldStatus.spf.valid || !shieldStatus.dkim.valid || !shieldStatus.dmarc.valid) && (
+                {needsDnsSetup && (
                   <div className="bg-surface-low border border-border-subtle rounded-xl p-3.5 space-y-2.5 text-xs">
                     <div className="font-bold text-[10px] uppercase tracking-wider text-on-surface-variant mb-1 flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
@@ -725,11 +731,13 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                       )}
 
                       {/* DMARC Record */}
-                      {!shieldStatus.dmarc.valid && (
+                      {(!shieldStatus.dmarc.valid || !(shieldStatus.dmarc.record || "").includes("dmarc@sicurre.com")) && (
                         <div className="flex items-center justify-between font-semibold last:border-b-0">
                           <span className="text-on-surface">DMARC (TXT _dmarc)</span>
                           <span className="text-[#b45309] text-[11px] font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200/50">
-                            {isFR ? "Manquant / Incorrect" : "Missing / Incorrect"}
+                            {!shieldStatus.dmarc.valid 
+                              ? (isFR ? "Manquant / Incorrect" : "Missing / Incorrect")
+                              : (isFR ? "Configuration Partielle" : "Partial Configuration")}
                           </span>
                         </div>
                       )}
@@ -740,17 +748,61 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                 {showAutoFix && (
                   <div className="space-y-3 pt-2">
                     {autoFixProgress === "idle" ? (
-                      <div className="space-y-2.5">
-                        <label className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                          Cloudflare API Token
-                        </label>
-                        <Input
-                          type="password"
-                          placeholder="Zone.DNS Edit Scoped Token"
-                          value={cfToken}
-                          onChange={(e) => setCfToken(e.target.value)}
-                          className="bg-white border-border-subtle"
-                        />
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block">
+                            Cloudflare API Token
+                          </label>
+                          <Input
+                            type="password"
+                            placeholder="Zone.DNS Edit Scoped Token"
+                            value={cfToken}
+                            onChange={(e) => setCfToken(e.target.value)}
+                            className="bg-white border-border-subtle"
+                          />
+                        </div>
+
+                        {/* Selective checkboxes list */}
+                        <div className="space-y-2 pt-1 border-t border-border-subtle/50">
+                          <label className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block">
+                            {isFR ? "Enregistrements à configurer :" : "Records to configure:"}
+                          </label>
+                          <div className="grid grid-cols-1 gap-2 pt-0.5 select-none">
+                            {(!shieldStatus.spf.valid) && (
+                              <label className="flex items-center gap-2 text-xs font-semibold text-on-surface cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={fixSpf}
+                                  onChange={(e) => setFixSpf(e.target.checked)}
+                                  className="w-4 h-4 text-primary bg-white border-border-subtle rounded focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                                />
+                                <span>SPF (TXT @)</span>
+                              </label>
+                            )}
+                            {(!shieldStatus.dkim.valid) && (
+                              <label className="flex items-center gap-2 text-xs font-semibold text-on-surface cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={fixDkim}
+                                  onChange={(e) => setFixDkim(e.target.checked)}
+                                  className="w-4 h-4 text-primary bg-white border-border-subtle rounded focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                                />
+                                <span>DKIM (TXT cloudflare._domainkey)</span>
+                              </label>
+                            )}
+                            {(!shieldStatus.dmarc.valid || !(shieldStatus.dmarc.record || "").includes("dmarc@sicurre.com")) && (
+                              <label className="flex items-center gap-2 text-xs font-semibold text-on-surface cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={fixDmarc}
+                                  onChange={(e) => setFixDmarc(e.target.checked)}
+                                  className="w-4 h-4 text-primary bg-white border-border-subtle rounded focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                                />
+                                <span>DMARC (TXT _dmarc) - {isFR ? "Politique & rapports" : "Policy & reporting"}</span>
+                              </label>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     ) : (
                       <div className="p-4 bg-surface-low border border-border-subtle rounded-xl space-y-2 text-xs font-semibold">
@@ -758,13 +810,18 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                           <span className="flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5 animate-spin text-[#2e6bb5]" /> {isFR ? "Vérification du token Cloudflare..." : "Verifying Cloudflare token..."}</span>
                         )}
                         {autoFixProgress === "dns" && (
-                          <span className="flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5 animate-spin text-[#2e6bb5]" /> {isFR ? "Écriture des enregistrements DNS manquants..." : "Writing missing DNS records..."}</span>
+                          <span className="flex items-center gap-2">
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#2e6bb5]" /> 
+                            {isFR 
+                              ? `Écriture des enregistrements sélectionnés (${[fixSpf && "SPF", fixDkim && "DKIM", fixDmarc && "DMARC"].filter(Boolean).join(", ")})...` 
+                              : `Writing selected DNS records (${[fixSpf && "SPF", fixDkim && "DKIM", fixDmarc && "DMARC"].filter(Boolean).join(", ")})...`}
+                          </span>
                         )}
                         {autoFixProgress === "routing" && (
                           <span className="flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5 animate-spin text-[#2e6bb5]" /> {isFR ? "Synchronisation de la redirection d'email..." : "Syncing email routing..."}</span>
                         )}
                         {autoFixProgress === "success" && (
-                          <span className="flex items-center gap-2 text-safe"><CheckCircle2 className="w-4 h-4" /> {isFR ? "Enregistrements DNS configurés avec succès !" : "DNS records successfully provisioned!"}</span>
+                          <span className="flex items-center gap-2 text-safe"><CheckCircle2 className="w-4 h-4" /> {isFR ? "Configuration DNS appliquée avec succès !" : "Selected DNS records successfully provisioned!"}</span>
                         )}
                         {autoFixProgress === "error" && (
                           <span className="flex items-center gap-2 text-error"><ShieldAlert className="w-4 h-4" /> {autoFixErrorMsg}</span>
@@ -792,14 +849,14 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     <Button
                       size="sm"
                       onClick={handleRunAutoFix}
-                      disabled={autoFixProgress !== "idle" || !cfToken.trim()}
+                      disabled={autoFixProgress !== "idle" || !cfToken.trim() || (!fixSpf && !fixDkim && !fixDmarc)}
                       className="cursor-pointer font-bold text-xs bg-[#2e6bb5] hover:bg-[#23589b] text-white border-none rounded-lg"
                     >
                       {isFR ? "Valider et Corriger" : "Validate & Deploy"}
                     </Button>
                   </>
                 ) : (
-                  (!shieldStatus.spf.valid || !shieldStatus.dkim.valid || !shieldStatus.dmarc.valid) && (
+                  needsDnsSetup && (
                     <Button
                       size="sm"
                       onClick={() => setShowAutoFix(true)}

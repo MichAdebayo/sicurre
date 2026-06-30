@@ -34,7 +34,7 @@ export default function AlertsRoute() {
   const { data: preferences, isLoading: prefsLoading } = useAlertPreferences();
   const updatePrefsMutation = useUpdateAlertPreferences();
 
-  const { data: rules, isLoading: rulesLoading } = useSecurityRules();
+  const { data: rules, isLoading: rulesLoading, refetch: refetchRules } = useSecurityRules();
   const createRuleMutation = useCreateSecurityRule();
   const deleteRuleMutation = useDeleteSecurityRule();
 
@@ -115,8 +115,16 @@ export default function AlertsRoute() {
   };
 
   const handleDeleteRule = async (id: string) => {
+    const confirmDelete = window.confirm(
+      i18n.language === "fr"
+        ? "Êtes-vous sûr de vouloir supprimer cette règle de filtrage ?"
+        : "Are you sure you want to delete this filtering rule?"
+    );
+    if (!confirmDelete) return;
+
     try {
       await deleteRuleMutation.mutateAsync(id);
+      refetchRules();
     } catch (err) {
       console.error(err);
     }

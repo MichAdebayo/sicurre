@@ -29,7 +29,7 @@
     "nav_dashboard": "Tableau de bord",
     "nav_threats": "Flux de menaces",
     "nav_quarantine": "Quarantaine",
-    "nav_alerts": "Alertes & Règles",
+    "nav_alerts": "Alertes & règles",
     "nav_domain_shield": "Bouclier de domaine",
     "nav_settings": "Paramètres",
     "nav_support": "Support",
@@ -98,7 +98,7 @@
     "explain_legitimate": "Classé comme sûr et distribué dans la boîte de réception."
   },
   "quarantine": {
-    "title": "Zone de Quarantaine",
+    "title": "Zone de quarantaine",
     "subtitle": "Espace sécurisé pour les emails suspects. Purge automatique après 14 jours.",
     "sender": "Expéditeur",
     "subject": "Objet",
@@ -106,9 +106,9 @@
     "expires_in": "Expire dans",
     "actions": "Actions",
     "no_items": "Aucun email en quarantaine pour le moment.",
-    "release": "Délivrer dans la Boîte",
-    "delete": "Supprimer Définitivement",
-    "whitelist": "Autoriser & Délivrer",
+    "release": "Délivrer",
+    "delete": "Supprimer",
+    "whitelist": "Marquer comme sain",
     "days": "jours",
     "hours": "heures",
     "safe_preview": "Aperçu Sécurisé de l'Email",
@@ -120,7 +120,7 @@
     "quarantined_count": "Vous avez {{count}} emails en quarantaine."
   },
   "alerts": {
-    "title": "Alertes & Règles Personnalisées",
+    "title": "Alertes & règles",
     "subtitle": "Configurez vos alertes email, plages de silence et filtres d'expéditeurs personnalisés.",
     "section_preferences": "Préférences de Notification",
     "notify_phishing": "M'alerter immédiatement en cas de phishing détecté",
@@ -149,7 +149,7 @@
     "preferences_saved": "Préférences enregistrées avec succès."
   },
   "domain_shield": {
-    "title": "Bouclier de Domaine (Domain Shield)",
+    "title": "Bouclier de domaine",
     "subtitle": "Contrôlez vos protocoles de sécurité email et la réputation de vos domaines.",
     "domain_selector": "Sélectionner le domaine protégé",
     "reputation": "Réputation du Domaine",

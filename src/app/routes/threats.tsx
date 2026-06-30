@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import {
@@ -44,6 +44,18 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
 
   const [actionSuccess, setActionSuccess] = useState("");
   const [actionError, setActionError] = useState("");
+
+  useEffect(() => {
+    if (!actionSuccess) return;
+    const t = setTimeout(() => setActionSuccess(""), 4000);
+    return () => clearTimeout(t);
+  }, [actionSuccess]);
+
+  useEffect(() => {
+    if (!actionError) return;
+    const t = setTimeout(() => setActionError(""), 4000);
+    return () => clearTimeout(t);
+  }, [actionError]);
 
   const handleUpdateStatus = async (id: string, newStatus: "trashed" | "restored") => {
     setActionSuccess("");
@@ -91,7 +103,10 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
         const matchesSearch =
           threat.subject?.toLowerCase().includes(query) ||
           threat.sender?.toLowerCase().includes(query);
-        const matchesFilter = filterVerdict === "all" || threat.verdict === filterVerdict;
+        const matchesFilter =
+          filterVerdict === "all" ||
+          threat.verdict === filterVerdict ||
+          (filterVerdict === "phishing" && threat.verdict === "quarantine");
         const matchesDate = matchesDateFilter(threat.received_at);
         return matchesSearch && matchesFilter && matchesDate;
       })
@@ -168,23 +183,23 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
         days.push({ label, latency, diffPct, emails_count });
       }
     } else {
-      // 8 points for month/all (30 days total in blocks of 4 days)
-      for (let i = 28; i >= 0; i -= 4) {
+      // 30 daily points
+      for (let i = 29; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
         const label = d.toLocaleDateString(i18n.language === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric" });
         
-        const startOfPeriod = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 3, 0, 0, 0, 0);
-        const endOfPeriod = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+        const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+        const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
 
-        const periodThreats = threatsList.filter((t) => {
+        const dailyThreats = threatsList.filter((t) => {
           const rDate = new Date(t.received_at);
-          return rDate >= startOfPeriod && rDate <= endOfPeriod;
+          return rDate >= startOfDay && rDate <= endOfDay;
         });
 
-        const emails_count = periodThreats.length;
+        const emails_count = dailyThreats.length;
         const latency = emails_count > 0
-          ? Math.round(periodThreats.reduce((sum, t) => sum + (t.latency_ms || 0), 0) / emails_count)
+          ? Math.round(dailyThreats.reduce((sum, t) => sum + (t.latency_ms || 0), 0) / emails_count)
           : 0;
 
         const diffPct = latency > 0 ? Math.round(((latency - slaLimit) / slaLimit) * 100) : 0;
@@ -389,11 +404,14 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
 
         {/* X-axis date labels */}
         <div className="w-[96%] mx-auto flex justify-between mt-2 pt-2.5 border-t border-border-subtle/50 text-[10px] font-bold text-on-surface-variant font-sans px-1 select-none">
-          {latencyData.map((d, idx) => (
-            <div key={idx} className="text-center w-16 uppercase tracking-wider font-extrabold">
-              {d.label}
-            </div>
-          ))}
+          {latencyData.map((d, idx) => {
+            const shouldShowLabel = latencyData.length <= 7 || idx % 5 === 0 || idx === latencyData.length - 1;
+            return (
+              <div key={idx} className="text-center w-16 uppercase tracking-wider font-extrabold">
+                {shouldShowLabel ? d.label : ""}
+              </div>
+            );
+          })}
         </div>
       </div>
 

@@ -2,7 +2,7 @@ import { ShieldCheck, ShieldAlert, MailWarning } from "lucide-react";
 import { clsx } from "clsx";
 
 interface VerdictBadgeProps {
-  verdict: "phishing" | "spam" | "legitimate";
+  verdict: "phishing" | "spam" | "legitimate" | "quarantine";
   confidence: number;
 }
 
@@ -11,7 +11,7 @@ export function VerdictBadge({ verdict, confidence }: VerdictBadgeProps) {
   let Icon = ShieldCheck;
   let label = "Légitime";
 
-  if (verdict === "phishing") {
+  if (verdict === "phishing" || verdict === "quarantine") {
     badgeStyles = "bg-error/10 text-error border-error/20";
     Icon = ShieldAlert;
     label = "Phishing";

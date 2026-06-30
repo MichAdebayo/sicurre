@@ -70,6 +70,18 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
   const [integrationSuccess, setIntegrationSuccess] = useState("");
   const [integrationError, setIntegrationError] = useState("");
 
+  useEffect(() => {
+    if (!integrationSuccess) return;
+    const t = setTimeout(() => setIntegrationSuccess(""), 4000);
+    return () => clearTimeout(t);
+  }, [integrationSuccess]);
+
+  useEffect(() => {
+    if (!integrationError) return;
+    const t = setTimeout(() => setIntegrationError(""), 4000);
+    return () => clearTimeout(t);
+  }, [integrationError]);
+
   const updateProfileMutation = useUpdateProfile();
   const changePasswordMutation = useChangePassword();
   const authProvider = getStoredAuthProvider();
@@ -162,6 +174,13 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
   };
 
   const handleRemoveDomain = async (id: string) => {
+    const confirmTeardown = window.confirm(
+      lang === "fr"
+        ? "Êtes-vous sûr de vouloir dissocier et supprimer ce domaine ? Cette action arrêtera l'interception et la classification des emails."
+        : "Are you sure you want to disconnect and remove this domain? This will stop email interception and classification."
+    );
+    if (!confirmTeardown) return;
+
     setIntegrationError("");
     setIntegrationSuccess("");
     try {

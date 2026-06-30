@@ -272,6 +272,7 @@ async def scan_email(
 
     # ── Quarantine Handling ────────────────────────────────────────────────
     # If verdict is phishing, quarantine the email instead of bouncing
+    event_id = str(uuid4())
     if verdict_safety == "phishing":
         q_id = str(uuid4())
         expires_at = (datetime.now(timezone.utc) + timedelta(days=14)).isoformat() + "Z"
@@ -286,7 +287,7 @@ async def scan_email(
                 (
                     q_id,
                     workspace_id,
-                    str(uuid4()),
+                    event_id,
                     payload.sender,
                     payload.subject,
                     payload.text,
@@ -357,7 +358,7 @@ async def scan_email(
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
-                str(uuid4()),
+                event_id,
                 now,
                 integration["user_email"],
                 integration.get("workspace_id"),
