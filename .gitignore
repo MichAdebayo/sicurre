@@ -118,3 +118,6 @@ node_modules/
 assets/
 ui-ideas/
 src/app/assets/
+
+src/app/task.md
+src/app/walkthrough.md

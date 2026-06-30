@@ -25,6 +25,7 @@ const MotionDiv = motion.div as any;
 
 export default function QuarantineRoute() {
   const { t, i18n } = useTranslation();
+  const isFR = i18n.language === "fr";
 
   // Queries & Mutations
   const { data: items, isLoading, error, refetch } = useQuarantineItems();
@@ -284,10 +285,10 @@ export default function QuarantineRoute() {
               <div>
                 <div className="flex justify-between items-start border-b border-border-subtle pb-4 select-none">
                   <div>
-                    <h3 className="font-display font-bold text-lg text-on-surface">
+                    <h3 className="app-h2 text-on-surface">
                       {t("quarantine.safe_preview")}
                     </h3>
-                    <p className="text-[11px] text-on-surface-variant font-medium mt-0.5">
+                    <p className="app-body-sub mt-0.5">
                       {t("quarantine.preview_notice")}
                     </p>
                   </div>
@@ -299,34 +300,34 @@ export default function QuarantineRoute() {
                   </button>
                 </div>
 
-                <div className="space-y-3.5 pt-4 text-xs">
+                <div className="space-y-4 pt-4 text-xs">
                   <div>
-                    <span className="font-bold text-on-surface-variant/70 block uppercase tracking-wider text-[10px]">
+                    <span className="app-label-tiny block text-on-surface-variant/60 uppercase tracking-wider">
                       From
                     </span>
-                    <span className="text-on-surface font-semibold select-all block mt-0.5">
+                    <span className="text-[14px] font-semibold text-on-surface select-all block mt-1">
                       {selectedItem.sender}
                     </span>
                   </div>
 
                   <div>
-                    <span className="font-bold text-on-surface-variant/70 block uppercase tracking-wider text-[10px]">
+                    <span className="app-label-tiny block text-on-surface-variant/60 uppercase tracking-wider">
                       Subject
                     </span>
-                    <span className="text-on-surface font-semibold block mt-0.5">
+                    <span className="text-[14px] font-semibold text-on-surface block mt-1">
                       {selectedItem.subject || t("threats.no_subject")}
                     </span>
                   </div>
 
                   <div>
-                    <span className="font-bold text-on-surface-variant/70 block uppercase tracking-wider text-[10px]">
+                    <span className="app-label-tiny block text-on-surface-variant/60 uppercase tracking-wider">
                       Quarantined Risk Analysis
                     </span>
-                    <div className="flex items-center gap-2 mt-1 select-none">
+                    <div className="flex items-center gap-2 mt-1.5 select-none">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase bg-error/15 text-error">
                         {selectedItem.safety_verdict}
                       </span>
-                      <span className="font-mono text-on-surface-variant font-bold">
+                      <span className="text-[13px] font-mono text-on-surface-variant font-bold">
                         Score: {Math.round(selectedItem.composite_score * 100)}%
                       </span>
                     </div>
@@ -334,12 +335,12 @@ export default function QuarantineRoute() {
 
                   {/* Sandboxed Preview Frame */}
                   <div className="pt-2">
-                    <span className="font-bold text-on-surface-variant/70 block uppercase tracking-wider text-[10px] mb-1.5 select-none">
+                    <span className="app-label-tiny block text-on-surface-variant/60 uppercase tracking-wider mb-1.5 select-none">
                       Sanitized Content Body
                     </span>
                     <iframe
                       title="Quarantine Safe Preview Frame"
-                      srcDoc={`<!DOCTYPE html><html><head><style>body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #374151; font-size: 12px; line-height: 1.6; margin: 10px; word-break: break-word; } a { color: #2563eb; pointer-events: none !important; text-decoration: underline; } img { display: none !important; }</style></head><body>${renderSafeHtml(selectedItem.body_text)}</body></html>`}
+                      srcDoc={`<!DOCTYPE html><html><head><style>body { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #374151; font-size: 13.5px; line-height: 1.6; margin: 10px; word-break: break-word; } a { color: #2563eb; pointer-events: none !important; text-decoration: underline; } img { display: none !important; }</style></head><body>${renderSafeHtml(selectedItem.body_text)}</body></html>`}
                       sandbox=""
                       className="w-full h-[240px] bg-surface-low border border-border-subtle rounded-xl select-text"
                     />
@@ -348,33 +349,41 @@ export default function QuarantineRoute() {
               </div>
 
               {/* Action task buttons in the footer modal */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-5 border-t border-border-subtle mt-5 select-none">
-                <Button
-                  variant="primary"
-                  className="w-full gap-2 text-xs py-2.5 uppercase font-bold tracking-wider"
-                  onClick={() => handleRelease(selectedItem.id)}
-                >
-                  <Mail className="w-4 h-4" />
-                  {i18n.language === "fr" ? "Libérer" : "Release"}
-                </Button>
+              <div className="pt-5 border-t border-border-subtle mt-5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 select-none">
+                  <Button
+                    variant="primary"
+                    className="w-full gap-2 text-xs py-2.5 uppercase font-bold tracking-wider"
+                    onClick={() => handleRelease(selectedItem.id)}
+                  >
+                    <Mail className="w-4 h-4" />
+                    {i18n.language === "fr" ? "Libérer vers la boîte" : "Release to Inbox"}
+                  </Button>
 
-                <Button
-                  variant="outline"
-                  className="w-full gap-2 text-xs py-2.5 border-safe/30 text-safe hover:bg-safe/5 font-bold uppercase tracking-wider"
-                  onClick={() => handleWhitelist(selectedItem.id)}
-                >
-                  <ShieldCheck className="w-4 h-4 text-safe" />
-                  {i18n.language === "fr" ? "Sain & Liste Blanche" : "Mark as Safe"}
-                </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2 text-xs py-2.5 border-safe/30 text-safe hover:bg-safe/5 font-bold uppercase tracking-wider"
+                    onClick={() => handleWhitelist(selectedItem.id)}
+                  >
+                    <ShieldCheck className="w-4 h-4 text-safe" />
+                    {i18n.language === "fr" ? "Autoriser l'expéditeur" : "Whitelist Sender"}
+                  </Button>
 
-                <Button
-                  variant="danger"
-                  className="w-full gap-2 text-xs py-2.5 uppercase font-bold tracking-wider"
-                  onClick={() => handleDelete(selectedItem.id)}
-                >
-                  <Trash2 className="w-4 h-4" />
-                  {i18n.language === "fr" ? "Supprimer" : "Delete"}
-                </Button>
+                  <Button
+                    variant="danger"
+                    className="w-full gap-2 text-xs py-2.5 uppercase font-bold tracking-wider"
+                    onClick={() => handleDelete(selectedItem.id)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    {i18n.language === "fr" ? "Supprimer l'e-mail" : "Delete Email"}
+                  </Button>
+                </div>
+                
+                <p className="text-[11px] text-on-surface-variant/70 mt-3.5 leading-normal italic text-center select-none">
+                  {isFR
+                    ? "Note : Libérer transfère l'e-mail dans votre boîte. Autoriser l'expéditeur l'ajoute à votre liste blanche pour contourner les prochains scans."
+                    : "Note: Release forwards the email to your inbox. Whitelist adds the sender to your allowlist to bypass future scans."}
+                </p>
               </div>
             </MotionDiv>
           </div>

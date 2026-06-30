@@ -399,7 +399,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
             {/* Security Grade Hero (Reduced circle, overflow-visible for z-index tooltip popup) */}
             <div className="md:col-span-4 bg-white rounded-xl border border-border-subtle p-6 flex flex-col items-center justify-center text-center shadow-sm relative overflow-visible">
-              <div className="absolute top-0 left-0 w-full h-1 bg-primary rounded-t-xl" />
+              <div className="absolute top-0 left-6 right-6 h-[3px] bg-primary rounded-b-md" />
               <div className="text-[12px] font-extrabold uppercase tracking-wider text-on-surface-variant mb-5 flex items-center justify-center gap-1.5 w-full">
                 <Award className="w-4 h-4 text-primary" />
                 <span>{t("dashboard.security_score")}</span>
