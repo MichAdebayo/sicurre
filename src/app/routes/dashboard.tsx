@@ -320,28 +320,28 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left">
+              <table className="w-full border-collapse text-left font-sans">
                 <thead>
-                  <tr className="border-b border-border-subtle text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant/70">
+                  <tr className="border-b border-border-subtle text-xs font-bold text-on-surface-variant/90 tracking-wide">
                     <th className="pb-3 pl-2">Version Tag</th>
                     <th className="pb-3">Nombre d'Éléments</th>
                     <th className="pb-3">Statut</th>
                     <th className="pb-3 pr-2 text-right">Date de Publication</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border-subtle/50 text-sm">
+                <tbody className="divide-y divide-border-subtle/50 text-xs">
                   {datasetsQuery.data.map((ds) => (
                     <tr key={ds.id} className="hover:bg-surface-low/30 transition-colors">
-                      <td className="py-3.5 pl-2 font-mono text-[13px] font-semibold text-on-surface">{ds.version_tag}</td>
-                      <td className="py-3.5 font-semibold text-on-surface">{ds.item_count.toLocaleString("fr-FR")}</td>
+                      <td className="py-3.5 pl-2 font-semibold text-on-surface text-xs">{ds.version_tag}</td>
+                      <td className="py-3.5 text-xs font-semibold text-on-surface">{ds.item_count.toLocaleString("fr-FR")}</td>
                       <td className="py-3.5">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
                           ds.status === "frozen" ? "bg-safe/10 text-safe" : "bg-warning/10 text-warning"
                         }`}>
                           {ds.status}
                         </span>
                       </td>
-                      <td className="py-3.5 pr-2 text-right text-on-surface-variant/80 font-semibold">
+                      <td className="py-3.5 pr-2 text-right text-xs text-on-surface-variant/80 font-semibold">
                         {ds.published_at ? new Date(ds.published_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }) : "—"}
                       </td>
                     </tr>

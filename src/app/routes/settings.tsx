@@ -87,6 +87,15 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
   const [workspaceTokenVisible, setWorkspaceTokenVisible] = useState(false);
   const [integrationsError, setIntegrationsError] = useState("");
   const [integrationsSuccess, setIntegrationsSuccess] = useState("");
+  const [deleteTokenConfirmVisible, setDeleteTokenConfirmVisible] = useState(false);
+  const [removeDomainConfirmId, setRemoveDomainConfirmId] = useState<string | null>(null);
+  const [selectedIntegrationDomainId, setSelectedIntegrationDomainId] = useState<string>("");
+
+  useEffect(() => {
+    if (domains && domains.length > 0 && !selectedIntegrationDomainId) {
+      setSelectedIntegrationDomainId(domains[0].id || "");
+    }
+  }, [domains, selectedIntegrationDomainId]);
 
   useEffect(() => {
     if (!integrationSuccess) return;
@@ -204,13 +213,11 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
   };
 
   const handleRemoveDomain = async (id: string) => {
-    const confirmTeardown = window.confirm(
-      lang === "fr"
-        ? "Êtes-vous sûr de vouloir dissocier et supprimer ce domaine ? Cette action arrêtera l'interception et la classification des emails."
-        : "Are you sure you want to disconnect and remove this domain? This will stop email interception and classification."
-    );
-    if (!confirmTeardown) return;
+    setRemoveDomainConfirmId(id);
+  };
 
+  const executeRemoveDomain = async (id: string) => {
+    setRemoveDomainConfirmId(null);
     setIntegrationError("");
     setIntegrationSuccess("");
     try {
@@ -242,13 +249,11 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
   };
 
   const handleDeleteToken = async () => {
-    const confirmDelete = window.confirm(
-      lang === "fr"
-        ? "Veuillez confirmer la suppression de votre jeton API Cloudflare globale de votre espace de travail. Cette suppression désactivera également la configuration automatique."
-        : "Confirm removing your global Cloudflare API token. This will disable auto-configuration capabilities."
-    );
-    if (!confirmDelete) return;
+    setDeleteTokenConfirmVisible(true);
+  };
 
+  const executeDeleteToken = async () => {
+    setDeleteTokenConfirmVisible(false);
     setIntegrationsError("");
     setIntegrationsSuccess("");
     try {
@@ -362,7 +367,7 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
                 {saveError && <p className="text-xs text-error font-semibold">{saveError}</p>}
 
                 <div className="flex justify-end pt-2">
-                  <Button type="submit" className="gap-2 uppercase tracking-wider text-[11px] font-bold cursor-pointer">
+                  <Button type="submit" className="gap-2 text-xs font-bold cursor-pointer">
                     <Save className="w-4 h-4" />
                     {t("common.save")}
                   </Button>
@@ -427,7 +432,7 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
                     </div>
                   )}
                   <div className="flex justify-end pt-2">
-                    <Button type="submit" className="uppercase tracking-wider text-[11px] font-bold cursor-pointer" disabled={changePasswordMutation.isPending}>
+                    <Button type="submit" className="text-xs font-bold cursor-pointer" disabled={changePasswordMutation.isPending}>
                       {lang === "fr" ? "Mettre à jour" : "Update Password"}
                     </Button>
                   </div>
@@ -574,7 +579,7 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
                         {/* Standardized table columns typography layout to match standard sans fonts */}
                         <table className="w-full text-left border-collapse text-xs font-sans">
                           <thead>
-                            <tr className="border-b border-border-subtle bg-surface-low/30 text-on-surface-variant uppercase font-bold">
+                            <tr className="border-b border-border-subtle bg-surface-low/30 text-on-surface-variant font-bold text-xs tracking-wide">
                               <th className="px-4 py-3">{t("settings.domain_name")}</th>
                               <th className="px-4 py-3">{t("settings.domain_status")}</th>
                               <th className="px-4 py-3">{t("settings.domain_recipient")}</th>
@@ -626,18 +631,40 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
             <div className="space-y-6 animate-in fade-in duration-200">
               {/* Global Integrations Card */}
               <div className="bg-surface-lowest rounded-xl border border-border-subtle p-6 shadow-sm space-y-6">
-                <div className="flex items-center gap-3 border-b border-border-subtle pb-4">
-                  <Puzzle className="w-5 h-5 text-primary" />
-                  <div>
-                    <h3 className="font-display font-semibold text-[17px] text-on-surface">
-                      {lang === "fr" ? "Gestion des Intégrations" : "Integrations Management"}
-                    </h3>
-                    <p className="text-sm font-semibold text-on-surface-variant">
-                      {lang === "fr" 
-                        ? "Configurez vos clés API tierces pour piloter la protection automatique." 
-                        : "Configure third-party API tokens to power automatic domain security."}
-                    </p>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border-subtle pb-4">
+                  <div className="flex items-center gap-3">
+                    <Puzzle className="w-5 h-5 text-primary shrink-0" />
+                    <div>
+                      <h3 className="font-display font-semibold text-[17px] text-on-surface">
+                        {lang === "fr" ? "Gestion des Intégrations" : "Integrations Management"}
+                      </h3>
+                      <p className="text-xs font-semibold text-on-surface-variant">
+                        {lang === "fr" 
+                          ? "Configurez vos clés API tierces pour piloter la protection automatique." 
+                          : "Configure third-party API tokens to power automatic domain security."}
+                      </p>
+                    </div>
                   </div>
+
+                  {/* Connected domains selector dropdown next to the title */}
+                  {!domainsLoading && domains && domains.length > 0 && (
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs font-semibold text-on-surface-variant">
+                        {lang === "fr" ? "Domaine :" : "Domain :"}
+                      </span>
+                      <select
+                        value={selectedIntegrationDomainId}
+                        onChange={(e) => setSelectedIntegrationDomainId(e.target.value)}
+                        className="bg-surface-low border border-border-subtle rounded-lg text-xs font-bold px-3 py-1.5 focus:outline-none focus:border-primary text-on-surface cursor-pointer"
+                      >
+                        {domains.map((dom) => (
+                          <option key={dom.id} value={dom.id}>
+                            {dom.zone_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 {/* Notifications Area */}
@@ -757,7 +784,7 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
                             setCfTokenInput(wsTokenData.api_token || "");
                             setIsEditingToken(true);
                           }}
-                          className="font-bold text-xs h-9"
+                          className="font-bold text-xs h-9 text-primary border-primary/20 bg-primary/[0.04] hover:bg-primary/10 hover:border-primary/30 transition-all"
                         >
                           {lang === "fr" ? "Modifier le jeton" : "Edit Token"}
                         </Button>
@@ -765,41 +792,11 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
                           variant="outline"
                           size="sm"
                           onClick={handleDeleteToken}
-                          className="font-bold text-xs h-9 text-error hover:text-error hover:bg-error/5 border-error/20 hover:border-error/30"
+                          className="font-bold text-xs h-9 text-error border-error/20 bg-error/[0.04] hover:bg-error/10 hover:border-error/30 transition-all"
                         >
                           {lang === "fr" ? "Révoquer l'accès" : "Revoke Credentials"}
                         </Button>
                       </div>
-                    </div>
-
-                    {/* Bottom Row: Connected Domains inside the Card */}
-                    <div className="p-5 bg-surface-lowest/40 space-y-3.5">
-                      <div className="border-b border-border-subtle pb-2">
-                        <h4 className="font-display font-semibold text-xs text-on-surface uppercase tracking-wider">
-                          {lang === "fr" ? "Domaines rattachés à cette intégration" : "Domains attached to this integration"}
-                        </h4>
-                      </div>
-                      {domainsLoading ? (
-                        <div className="h-10 bg-surface-low rounded-lg animate-pulse" />
-                      ) : !domains || domains.length === 0 ? (
-                        <p className="text-xs text-on-surface-variant/60 italic font-semibold">
-                          {lang === "fr" ? "Aucun domaine n'est encore configuré." : "No domains configured yet."}
-                        </p>
-                      ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {domains.map((dom) => (
-                            <div key={dom.id} className="p-3 border border-border-subtle/40 bg-surface-lowest rounded-lg flex items-center justify-between text-xs hover:border-border-subtle transition-all">
-                              <span className="font-bold text-on-surface">{dom.zone_name}</span>
-                              <div className="flex items-center gap-2.5">
-                                <span className="font-semibold text-on-surface-variant/75 text-[11px]">{dom.destination_email}</span>
-                                <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${dom.status === "active" ? "bg-safe/10 text-safe border border-safe/20" : "bg-warning/10 text-warning border border-warning/20"}`}>
-                                  {dom.status}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   </div>
                 )}
@@ -935,6 +932,84 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
           )}
         </div>
       </div>
+
+      {/* UI Confirmation Modal for Token Deletion */}
+      {deleteTokenConfirmVisible && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm select-none animate-in fade-in duration-200">
+          <div className="bg-white border border-border-subtle rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-error/10 text-error rounded-xl">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <h4 className="font-display font-bold text-base text-on-surface">
+                {lang === "fr" ? "Révoquer l'accès API" : "Revoke API Credentials"}
+              </h4>
+            </div>
+            <p className="text-xs font-semibold text-on-surface-variant leading-relaxed">
+              {lang === "fr"
+                ? "Veuillez confirmer la suppression de votre jeton API Cloudflare global. Cette suppression désactivera également la configuration automatique de vos domaines."
+                : "Confirm removing your global Cloudflare API token. This will disable auto-configuration capabilities."}
+            </p>
+            <div className="flex justify-end gap-2.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDeleteTokenConfirmVisible(false)}
+                className="font-bold text-xs"
+              >
+                {lang === "fr" ? "Annuler" : "Cancel"}
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={executeDeleteToken}
+                className="font-bold text-xs"
+              >
+                {lang === "fr" ? "Révoquer" : "Revoke"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* UI Confirmation Modal for Domain Deletion */}
+      {removeDomainConfirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm select-none animate-in fade-in duration-200">
+          <div className="bg-white border border-border-subtle rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-error/10 text-error rounded-xl">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <h4 className="font-display font-bold text-base text-on-surface">
+                {lang === "fr" ? "Dissocier le domaine" : "Disconnect Domain"}
+              </h4>
+            </div>
+            <p className="text-xs font-semibold text-on-surface-variant leading-relaxed">
+              {lang === "fr"
+                ? "Êtes-vous sûr de vouloir dissocier et supprimer ce domaine ? Cette action arrêtera l'interception et la classification des emails."
+                : "Are you sure you want to disconnect and remove this domain? This will stop email interception and classification."}
+            </p>
+            <div className="flex justify-end gap-2.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setRemoveDomainConfirmId(null)}
+                className="font-bold text-xs"
+              >
+                {lang === "fr" ? "Annuler" : "Cancel"}
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => executeRemoveDomain(removeDomainConfirmId)}
+                className="font-bold text-xs"
+              >
+                {lang === "fr" ? "Supprimer" : "Remove"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </MotionDiv>
   );
 }

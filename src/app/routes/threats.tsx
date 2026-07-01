@@ -506,13 +506,13 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse font-sans">
               <thead>
                 <tr className="border-b border-border-subtle bg-surface-low/40">
-                  <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[22%] min-w-[170px]">{t("threats.timestamp")}</th>
-                  <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[28%] min-w-[180px]">{t("threats.sender")}</th>
-                  <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[35%] min-w-[220px]">{t("threats.subject")}</th>
-                  <th className="px-5 py-3 text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.12em] w-[15%] min-w-[140px]">{t("threats.verdict")}</th>
+                  <th className="px-5 py-3 text-xs font-bold text-on-surface-variant tracking-wide w-[22%] min-w-[170px]">{t("threats.timestamp")}</th>
+                  <th className="px-5 py-3 text-xs font-bold text-on-surface-variant tracking-wide w-[28%] min-w-[180px]">{t("threats.sender")}</th>
+                  <th className="px-5 py-3 text-xs font-bold text-on-surface-variant tracking-wide w-[35%] min-w-[220px]">{t("threats.subject")}</th>
+                  <th className="px-5 py-3 text-xs font-bold text-on-surface-variant tracking-wide w-[15%] min-w-[140px]">{t("threats.verdict")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-subtle">
@@ -524,9 +524,9 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
                     transition={{ duration: 0.25, delay: idx * 0.02 }}
                     className="contents"
                   >
-                    <tr className="hover:bg-surface-low/20 transition-all text-sm">
+                    <tr className="hover:bg-surface-low/20 transition-all text-xs">
                       <td className="px-5 py-3.5">
-                        <span className="font-mono text-[12px] text-on-surface-variant font-bold">
+                        <span className="text-xs text-on-surface-variant font-medium">
                           {new Date(threat.received_at).toLocaleString(i18n.language === "fr" ? "fr-FR" : "en-US", {
                             day: "numeric",
                             month: "short",

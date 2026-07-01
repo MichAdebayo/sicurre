@@ -35,6 +35,7 @@ export default function QuarantineRoute() {
 
   // Selected item for the Zoom Modal
   const [selectedItem, setSelectedItem] = useState<QuarantineItem | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   
   // Page pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -93,23 +94,7 @@ export default function QuarantineRoute() {
   };
 
   const handleDelete = async (id: string) => {
-    const confirmDelete = window.confirm(
-      isFR
-        ? "Êtes-vous sûr de vouloir supprimer cet e-mail ?"
-        : "Are you sure you want to delete this email?"
-    );
-    if (!confirmDelete) return;
-
-    setActionError("");
-    setActionSuccess("");
-    try {
-      await deleteMutation.mutateAsync(id);
-      setActionSuccess(t("quarantine.delete_success"));
-      setSelectedItem(null);
-      refetch();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to delete item.");
-    }
+    setConfirmDeleteId(id);
   };
 
   const handleWhitelist = async (id: string) => {
@@ -369,7 +354,7 @@ export default function QuarantineRoute() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 select-none">
                   <Button
                     variant="primary"
-                    className="w-full gap-2 text-xs py-2.5 uppercase font-bold tracking-wider"
+                    className="w-full gap-2 text-xs py-2.5 font-bold"
                     onClick={() => handleRelease(selectedItem.id)}
                   >
                     <Mail className="w-4 h-4" />
@@ -378,7 +363,7 @@ export default function QuarantineRoute() {
 
                   <Button
                     variant="outline"
-                    className="w-full gap-2 text-xs py-2.5 border-safe/30 text-safe hover:bg-safe/5 font-bold uppercase tracking-wider"
+                    className="w-full gap-2 text-xs py-2.5 border-safe/30 text-safe hover:bg-safe/5 font-bold"
                     onClick={() => handleWhitelist(selectedItem.id)}
                   >
                     <ShieldCheck className="w-4 h-4 text-safe" />
@@ -387,7 +372,7 @@ export default function QuarantineRoute() {
 
                   <Button
                     variant="danger"
-                    className="w-full gap-2 text-xs py-2.5 uppercase font-bold tracking-wider"
+                    className="w-full gap-2 text-xs py-2.5 font-bold"
                     onClick={() => handleDelete(selectedItem.id)}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -405,6 +390,58 @@ export default function QuarantineRoute() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Confirmation Modal */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm select-none">
+          <div className="bg-white border border-border-subtle rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-error/10 text-error rounded-xl">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <h4 className="font-display font-bold text-base text-on-surface">
+                {isFR ? "Confirmer la suppression" : "Confirm Deletion"}
+              </h4>
+            </div>
+            <p className="text-xs font-semibold text-on-surface-variant leading-relaxed">
+              {isFR
+                ? "Cette action est irréversible. L'e-mail en quarantaine sera définitivement effacé."
+                : "This action is irreversible. The quarantined email will be permanently deleted."}
+            </p>
+            <div className="flex justify-end gap-2.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setConfirmDeleteId(null)}
+                className="font-bold text-xs"
+              >
+                {isFR ? "Annuler" : "Cancel"}
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={async () => {
+                  const id = confirmDeleteId;
+                  setConfirmDeleteId(null);
+                  setActionError("");
+                  setActionSuccess("");
+                  try {
+                    await deleteMutation.mutateAsync(id);
+                    setActionSuccess(t("quarantine.delete_success"));
+                    setSelectedItem(null);
+                    refetch();
+                  } catch (err) {
+                    setActionError(err instanceof Error ? err.message : "Failed to delete item.");
+                  }
+                }}
+                className="font-bold text-xs"
+              >
+                {isFR ? "Supprimer" : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* footer text note */}
       <div className="pt-8 border-t border-border-subtle select-none">
