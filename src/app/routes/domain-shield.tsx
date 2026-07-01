@@ -734,86 +734,64 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     </div>
                     <div className="space-y-2.5 pt-0.5">
                       {/* SPF Record */}
-                      <div className="flex items-center justify-between font-semibold border-b border-border-subtle/50 pb-2 last:border-b-0">
-                        <div className="flex items-center gap-2">
-                          {!shieldStatus.spf.valid ? (
+                      {!shieldStatus.spf.valid && (
+                        <div className="flex items-center justify-between font-semibold border-b border-border-subtle/50 pb-2 last:border-b-0">
+                          <div className="flex items-center gap-2">
                             <input
                               type="checkbox"
                               checked={fixSpf}
                               onChange={(e) => setFixSpf(e.target.checked)}
                               className="w-4 h-4 text-primary bg-white border-border-subtle rounded cursor-pointer focus:ring-0"
                             />
-                          ) : (
-                            <Check className="w-4 h-4 text-safe shrink-0 stroke-[2.5]" />
-                          )}
-                          <span className="text-on-surface">SPF (TXT @)</span>
-                        </div>
-                        {shieldStatus.spf.valid ? (
-                          <span className="text-[#047857] text-[11px] font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/50">
-                            {isFR ? "Configuré" : "Configured"}
-                          </span>
-                        ) : (
+                            <span className="text-on-surface">SPF (TXT @)</span>
+                          </div>
                           <span className="text-error text-[11px] font-bold bg-error/[0.04] px-2 py-0.5 rounded border border-error/20">
                             {isFR ? "Manquant / Incorrect" : "Missing / Incorrect"}
                           </span>
-                        )}
-                      </div>
+                        </div>
+                      )}
 
                       {/* DKIM Record */}
-                      <div className="flex items-center justify-between font-semibold border-b border-border-subtle/50 pb-2 last:border-b-0">
-                        <div className="flex items-center gap-2">
-                          {!shieldStatus.dkim.valid ? (
+                      {!shieldStatus.dkim.valid && (
+                        <div className="flex items-center justify-between font-semibold border-b border-border-subtle/50 pb-2 last:border-b-0">
+                          <div className="flex items-center gap-2">
                             <input
                               type="checkbox"
                               checked={fixDkim}
                               onChange={(e) => setFixDkim(e.target.checked)}
                               className="w-4 h-4 text-primary bg-white border-border-subtle rounded cursor-pointer focus:ring-0"
                             />
-                          ) : (
-                            <Check className="w-4 h-4 text-safe shrink-0 stroke-[2.5]" />
-                          )}
-                          <span className="text-on-surface">DKIM (TXT cloudflare._domainkey)</span>
-                        </div>
-                        {shieldStatus.dkim.valid ? (
-                          <span className="text-[#047857] text-[11px] font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/50">
-                            {isFR ? "Configuré" : "Configured"}
-                          </span>
-                        ) : (
+                            <span className="text-on-surface">DKIM (TXT cloudflare._domainkey)</span>
+                          </div>
                           <span className="text-error text-[11px] font-bold bg-error/[0.04] px-2 py-0.5 rounded border border-error/20">
                             {isFR ? "Manquant / Incorrect" : "Missing / Incorrect"}
                           </span>
-                        )}
-                      </div>
+                        </div>
+                      )}
 
                       {/* DMARC Record */}
-                      <div className="flex items-center justify-between font-semibold last:border-b-0">
-                        <div className="flex items-center gap-2">
-                          {!isDmarcValid ? (
+                      {!isDmarcValid && (
+                        <div className="flex items-center justify-between font-semibold last:border-b-0">
+                          <div className="flex items-center gap-2">
                             <input
                               type="checkbox"
                               checked={fixDmarc}
                               onChange={(e) => setFixDmarc(e.target.checked)}
                               className="w-4 h-4 text-primary bg-white border-border-subtle rounded cursor-pointer focus:ring-0"
                             />
+                            <span className="text-on-surface">DMARC (TXT _dmarc)</span>
+                          </div>
+                          {!shieldStatus.dmarc.valid ? (
+                            <span className="text-error text-[11px] font-bold bg-error/[0.04] px-2 py-0.5 rounded border border-error/20">
+                              {isFR ? "Manquant / Incorrect" : "Missing / Incorrect"}
+                            </span>
                           ) : (
-                            <Check className="w-4 h-4 text-safe shrink-0 stroke-[2.5]" />
+                            <span className="text-[#b45309] text-[11px] font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200/50">
+                              {isFR ? "Configuration Partielle" : "Partial Configuration"}
+                            </span>
                           )}
-                          <span className="text-on-surface">DMARC (TXT _dmarc)</span>
                         </div>
-                        {isDmarcValid ? (
-                          <span className="text-[#047857] text-[11px] font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/50">
-                            {isFR ? "Configuré" : "Configured"}
-                          </span>
-                        ) : !shieldStatus.dmarc.valid ? (
-                          <span className="text-error text-[11px] font-bold bg-error/[0.04] px-2 py-0.5 rounded border border-error/20">
-                            {isFR ? "Manquant / Incorrect" : "Missing / Incorrect"}
-                          </span>
-                        ) : (
-                          <span className="text-[#b45309] text-[11px] font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200/50">
-                            {isFR ? "Configuration Partielle" : "Partial Configuration"}
-                          </span>
-                        )}
-                      </div>
+                      )}
                     </div>
                   </div>
                 )}
