@@ -236,7 +236,10 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
       const payload = {
         cf_api_token: cfToken,
         zone_name: selectedDomain,
-        destination_email: session?.email || "owner@sicurre.com"
+        destination_email: session?.email || "owner@sicurre.com",
+        fix_spf: fixSpf,
+        fix_dkim: fixDkim,
+        fix_dmarc: fixDmarc
       };
 
       setTimeout(async () => {

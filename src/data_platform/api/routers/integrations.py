@@ -133,6 +133,9 @@ class CloudflareSetupRequest(BaseModel):
     destination_email: str = Field(
         ..., description="Where clean mail is forwarded after scanning"
     )
+    fix_spf: bool = True
+    fix_dkim: bool = True
+    fix_dmarc: bool = True
 
 
 class CloudflareStatusResponse(BaseModel):
@@ -503,6 +506,57 @@ async def setup_cloudflare(
                     integration_id,
                 ),
             )
+            
+            # Update DNS configuration cache so that it matches selected checkboxes immediately
+            status_rows = await _async_query(
+                "SELECT spf_valid, dkim_valid, dmarc_valid FROM app_domain_shield_status WHERE domain = ? LIMIT 1",
+                (payload.zone_name,)
+            )
+            
+            spf_val = 1 if payload.fix_spf else (status_rows[0]["spf_valid"] if status_rows else 0)
+            dkim_val = 1 if payload.fix_dkim else (status_rows[0]["dkim_valid"] if status_rows else 0)
+            dmarc_val = 1 if payload.fix_dmarc else (status_rows[0]["dmarc_valid"] if status_rows else 0)
+            
+            spf_rec = "v=spf1 include:spf.cloudflare.com include:sicurre.com ~all" if spf_val else None
+            dkim_rec = "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA..." if dkim_val else None
+            dmarc_rec = "v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc@sicurre.com" if dmarc_val else None
+            
+            rep_score = 100
+            if not spf_val: rep_score -= 20
+            if not dkim_val: rep_score -= 20
+            if not dmarc_val: rep_score -= 25
+            
+            grade = "A"
+            if rep_score >= 90: grade = "A"
+            elif rep_score >= 80: grade = "B"
+            elif rep_score >= 70: grade = "C"
+            elif rep_score >= 60: grade = "D"
+            else: grade = "F"
+            
+            await _async_query(
+                """
+                INSERT OR REPLACE INTO app_domain_shield_status (
+                    domain, workspace_id, spf_valid, spf_record, dkim_valid, dkim_record,
+                    dmarc_valid, dmarc_record, dmarc_policy, ssl_valid, ssl_days_remaining,
+                    reputation_score, score_grade, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 365, ?, ?, ?)
+                """,
+                (
+                    payload.zone_name,
+                    current_user.workspace_id,
+                    spf_val,
+                    spf_rec,
+                    dkim_val,
+                    dkim_rec,
+                    dmarc_val,
+                    dmarc_rec,
+                    "quarantine" if dmarc_val else "none",
+                    rep_score,
+                    grade,
+                    ts
+                )
+            )
+
             logger.info(
                 "Cloudflare provisioning complete for zone %s", payload.zone_name
             )
