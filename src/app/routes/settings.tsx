@@ -778,21 +778,21 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
 
                       <div className="flex items-center gap-2 sm:self-center shrink-0">
                         <Button
-                          variant="outline"
+                          variant="primary"
                           size="sm"
                           onClick={() => {
                             setCfTokenInput(wsTokenData.api_token || "");
                             setIsEditingToken(true);
                           }}
-                          className="font-bold text-xs h-9 text-primary border-primary/20 bg-primary/[0.04] hover:bg-primary/10 hover:border-primary/30 transition-all"
+                          className="font-bold text-xs h-9 cursor-pointer"
                         >
                           {lang === "fr" ? "Modifier le jeton" : "Edit Token"}
                         </Button>
                         <Button
-                          variant="outline"
+                          variant="danger"
                           size="sm"
                           onClick={handleDeleteToken}
-                          className="font-bold text-xs h-9 text-error border-error/20 bg-error/[0.04] hover:bg-error/10 hover:border-error/30 transition-all"
+                          className="font-bold text-xs h-9 cursor-pointer"
                         >
                           {lang === "fr" ? "Révoquer l'accès" : "Revoke Credentials"}
                         </Button>

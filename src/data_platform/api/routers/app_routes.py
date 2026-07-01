@@ -794,7 +794,36 @@ async def check_domain_shield_status(
         status["reputation_score"] -= 20
         
     # 2. Query DKIM
-    dkim_selectors = ["cloudflare", "default", "google"]
+    discovered_selectors = []
+    try:
+        token_rows = await async_query_auth_db(
+            "SELECT api_token FROM app_cloudflare_config WHERE workspace_id = ? LIMIT 1",
+            (current_user.workspace_id,)
+        )
+        if token_rows and token_rows[0]["api_token"]:
+            from data_platform.services.cloudflare_provisioner import CloudflareProvisioner
+            provisioner = CloudflareProvisioner(api_token=token_rows[0]["api_token"])
+            try:
+                zone_id, _ = await provisioner.get_zone(domain)
+                records = await provisioner.get_dns_records(zone_id)
+                for rec in records:
+                    name = str(rec.get("name", ""))
+                    if "_domainkey" in name and rec.get("type") == "TXT":
+                        parts = name.split("._domainkey")
+                        if len(parts) > 0 and parts[0]:
+                            selector = parts[0].strip()
+                            if selector and selector not in discovered_selectors:
+                                discovered_selectors.append(selector)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    dkim_selectors = ["cloudflare", "default", "google", "cf2024-1", "smtp", "mail", "k1", "mandrill", "s1", "s2"]
+    for sel in discovered_selectors:
+        if sel not in dkim_selectors:
+            dkim_selectors.append(sel)
+
     for selector in dkim_selectors:
         try:
             dkim_domain = f"{selector}._domainkey.{domain}"
@@ -812,7 +841,7 @@ async def check_domain_shield_status(
             pass
             
     if not status["dkim"]["valid"]:
-        status["dkim"]["error"] = "DKIM record not found for cloudflare/default selectors"
+        status["dkim"]["error"] = f"DKIM record not found for selectors: {', '.join(dkim_selectors)}"
         status["reputation_score"] -= 20
         
     # 3. Query DMARC

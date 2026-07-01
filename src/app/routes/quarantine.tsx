@@ -201,10 +201,10 @@ export default function QuarantineRoute() {
               >
                 <div>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-bold text-on-surface-variant text-[11px] uppercase tracking-wider block truncate max-w-[70%] select-none" title={item.sender}>
+                    <span className="font-bold text-on-surface-variant/80 text-xs block truncate max-w-[70%] select-none" title={item.sender}>
                       {item.sender}
                     </span>
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold font-mono text-error uppercase bg-error/10 px-2 py-0.5 rounded-full select-none shrink-0">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold font-sans text-error bg-error/10 px-2 py-0.5 rounded-full select-none shrink-0">
                       Phishing
                     </span>
                   </div>
@@ -306,7 +306,7 @@ export default function QuarantineRoute() {
 
                 <div className="space-y-4 pt-4 text-xs">
                   <div>
-                    <span className="app-label-tiny block text-on-surface-variant/90 font-bold uppercase tracking-wider">
+                    <span className="app-label-tiny block text-on-surface-variant/80 font-bold text-xs">
                       From
                     </span>
                     <span className="text-[14px] font-medium text-on-surface select-all block mt-1">
@@ -315,7 +315,7 @@ export default function QuarantineRoute() {
                   </div>
 
                   <div>
-                    <span className="app-label-tiny block text-on-surface-variant/90 font-bold uppercase tracking-wider">
+                    <span className="app-label-tiny block text-on-surface-variant/80 font-bold text-xs">
                       Subject
                     </span>
                     <span className="text-[14px] font-medium text-on-surface block mt-1">
@@ -324,14 +324,14 @@ export default function QuarantineRoute() {
                   </div>
 
                   <div>
-                    <span className="app-label-tiny block text-on-surface-variant/90 font-bold uppercase tracking-wider">
+                    <span className="app-label-tiny block text-on-surface-variant/80 font-bold text-xs">
                       Quarantined Risk Analysis
                     </span>
                     <div className="flex items-center gap-2 mt-1.5 select-none">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase bg-error/15 text-error">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-error/15 text-error">
                         {selectedItem.safety_verdict}
                       </span>
-                      <span className="text-[13px] font-mono text-on-surface-variant font-medium">
+                      <span className="text-xs font-sans text-on-surface-variant font-medium">
                         Score: {Math.round(selectedItem.composite_score * 100)}%
                       </span>
                     </div>

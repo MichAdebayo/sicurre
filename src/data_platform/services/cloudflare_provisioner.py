@@ -386,6 +386,17 @@ class CloudflareProvisioner:
         data = await self._get(f"/zones/{zone_id}/email/routing")
         return data.get("result", {})
 
+    async def get_dns_records(self, zone_id: str) -> list[dict[str, Any]]:
+        """Fetch all DNS records for a given zone."""
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            r = await client.get(
+                f"{CF_BASE}/zones/{zone_id}/dns_records",
+                headers=self._headers,
+                params={"per_page": 100},
+            )
+        data = self._unwrap(r)
+        return data.get("result", [])
+
     # ── full provisioning flow ──────────────────────────────────────────────
 
     async def provision(
