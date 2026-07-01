@@ -348,6 +348,17 @@ async def scan_email(
 
     # ── Persist to audit log ────────────────────────────────────────────────
     now = datetime.now(timezone.utc).isoformat()
+    
+    db_subject = payload.subject[:240]
+    db_sender = payload.sender[:200]
+    db_snippet = payload.text[:240]
+
+    # Anonymize legitimate and spam email contents to ensure user privacy compliance (GDPR)
+    if verdict_safety not in ("phishing", "quarantine"):
+        db_subject = "[Masqué par Sicurre]"
+        db_sender = "[Masqué par Sicurre]"
+        db_snippet = "[Masqué par Sicurre]"
+
     try:
         await _async_query(
             """
@@ -367,9 +378,9 @@ async def scan_email(
                 integration.get("workspace_id"),
                 integration.get("workspace_member_user_id"),
                 "cloudflare_intercept",
-                payload.subject[:240],
-                payload.sender[:200],
-                payload.text[:240],
+                db_subject,
+                db_sender,
+                db_snippet,
                 verdict_safety,
                 verdict_label,
                 score,
