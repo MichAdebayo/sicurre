@@ -854,6 +854,11 @@ async def check_domain_shield_status(
                 status["dmarc"]["valid"] = True
                 status["dmarc"]["record"] = txt
                 status["dmarc"]["error"] = None
+                
+                # Check for partial setup (missing report feeding address)
+                if "dmarc@sicurre.com" not in txt:
+                    status["reputation_score"] -= 10
+                
                 if "p=reject" in txt:
                     status["dmarc"]["policy"] = "reject"
                 elif "p=quarantine" in txt:

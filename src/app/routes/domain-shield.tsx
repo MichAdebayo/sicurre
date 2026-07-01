@@ -1168,13 +1168,17 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   <span className={`text-[9px] font-extrabold font-mono px-2 py-0.5 rounded border uppercase select-none ${getDmarcPolicyClass(shieldStatus.dmarc.policy)}`}>
                     Policy: {shieldStatus.dmarc.policy}
                   </span>
-                  {shieldStatus.dmarc.valid ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-safe uppercase bg-safe/10 px-2.5 py-0.5 rounded-full">
+                  {isDmarcValid ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-safe bg-safe/10 px-2.5 py-0.5 rounded-full">
                       <ShieldCheck className="w-3.5 h-3.5" /> Valid
                     </span>
+                  ) : shieldStatus.dmarc.valid ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-warning bg-warning/10 px-2.5 py-0.5 rounded-full">
+                      <AlertTriangle className="w-3.5 h-3.5" /> {isFR ? "Configuration Partielle" : "Partial Configuration"}
+                    </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-warning uppercase bg-warning/10 px-2.5 py-0.5 rounded-full">
-                      <AlertTriangle className="w-3.5 h-3.5" /> Missing / Invalid
+                    <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-error bg-error/10 px-2.5 py-0.5 rounded-full">
+                      <AlertTriangle className="w-3.5 h-3.5" /> {isFR ? "Manquant / Incorrect" : "Missing / Invalid"}
                     </span>
                   )}
                 </div>
