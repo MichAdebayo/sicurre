@@ -658,6 +658,7 @@ async def list_cloudflare_integrations(current_user: AuthUser = Depends(get_curr
                 "destination_email": r["destination_email"],
                 "worker_name": r["worker_name"],
                 "status": r["status"],
+                "api_token": r.get("api_token"),
                 "error_message": r.get("error_message"),
                 "created_at": r["created_at"],
                 "updated_at": r["updated_at"],

@@ -12,10 +12,14 @@ import {
   Plus,
   CreditCard,
   Settings,
+  Eye,
+  EyeOff,
+  Puzzle,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { CloudflareIntegrator } from "../components/common/cloudflare-integrator";
+import cloudflareLogo from "../assets/cloudflare-svgrepo-com.svg";
 import {
   AuthSession,
   getStoredAuthProvider,
@@ -23,6 +27,9 @@ import {
   useUpdateProfile,
   useCloudflareList,
   useTeardownCloudflare,
+  useWorkspaceCloudflareToken,
+  useSaveWorkspaceCloudflareToken,
+  useDeleteWorkspaceCloudflareToken,
 } from "../lib/api";
 
 const MotionDiv = motion.div as any;
@@ -33,7 +40,7 @@ interface SettingsRouteProps {
 
 export default function SettingsRoute({ session }: SettingsRouteProps) {
   const { t, i18n } = useTranslation();
-  const [activeTab, setActiveTab] = useState<"profile" | "security" | "preferences" | "domains" | "billing">(
+  const [activeTab, setActiveTab] = useState<"profile" | "security" | "preferences" | "domains" | "integrations" | "billing">(
     session.onboarding_required ? "domains" : "profile"
   );
 
@@ -69,6 +76,17 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
   const [showIntegrator, setShowIntegrator] = useState(false);
   const [integrationSuccess, setIntegrationSuccess] = useState("");
   const [integrationError, setIntegrationError] = useState("");
+  const [visibleTokens, setVisibleTokens] = useState<Record<string, boolean>>({});
+
+  // Workspace-level global Cloudflare Token management
+  const { data: wsTokenData, refetch: refetchWsToken } = useWorkspaceCloudflareToken();
+  const saveWsTokenMutation = useSaveWorkspaceCloudflareToken();
+  const deleteWsTokenMutation = useDeleteWorkspaceCloudflareToken();
+  const [cfTokenInput, setCfTokenInput] = useState("");
+  const [isEditingToken, setIsEditingToken] = useState(false);
+  const [workspaceTokenVisible, setWorkspaceTokenVisible] = useState(false);
+  const [integrationsError, setIntegrationsError] = useState("");
+  const [integrationsSuccess, setIntegrationsSuccess] = useState("");
 
   useEffect(() => {
     if (!integrationSuccess) return;
@@ -81,6 +99,18 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
     const t = setTimeout(() => setIntegrationError(""), 4000);
     return () => clearTimeout(t);
   }, [integrationError]);
+
+  useEffect(() => {
+    if (!integrationsSuccess) return;
+    const t = setTimeout(() => setIntegrationsSuccess(""), 4000);
+    return () => clearTimeout(t);
+  }, [integrationsSuccess]);
+
+  useEffect(() => {
+    if (!integrationsError) return;
+    const t = setTimeout(() => setIntegrationsError(""), 4000);
+    return () => clearTimeout(t);
+  }, [integrationsError]);
 
   const updateProfileMutation = useUpdateProfile();
   const changePasswordMutation = useChangePassword();
@@ -192,11 +222,50 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
     }
   };
 
+  const handleSaveToken = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIntegrationsError("");
+    setIntegrationsSuccess("");
+    if (!cfTokenInput.trim()) {
+      setIntegrationsError(lang === "fr" ? "Veuillez entrer un jeton API." : "Please enter an API token.");
+      return;
+    }
+    try {
+      await saveWsTokenMutation.mutateAsync(cfTokenInput.trim());
+      setIntegrationsSuccess(lang === "fr" ? "Jeton API enregistré avec succès." : "API token saved successfully.");
+      setIsEditingToken(false);
+      setCfTokenInput("");
+      refetchWsToken();
+    } catch (err: any) {
+      setIntegrationsError(err?.message || "Failed to verify or save Cloudflare API token.");
+    }
+  };
+
+  const handleDeleteToken = async () => {
+    const confirmDelete = window.confirm(
+      lang === "fr"
+        ? "Veuillez confirmer la suppression de votre jeton API Cloudflare globale de votre espace de travail. Cette suppression désactivera également la configuration automatique."
+        : "Confirm removing your global Cloudflare API token. This will disable auto-configuration capabilities."
+    );
+    if (!confirmDelete) return;
+
+    setIntegrationsError("");
+    setIntegrationsSuccess("");
+    try {
+      await deleteWsTokenMutation.mutateAsync();
+      setIntegrationsSuccess(lang === "fr" ? "Jeton API supprimé avec succès." : "API token deleted successfully.");
+      refetchWsToken();
+    } catch (err: any) {
+      setIntegrationsError(err?.message || "Failed to delete API token.");
+    }
+  };
+
   const tabs = [
     { id: "profile", label: t("settings.tab_profile"), icon: User },
     { id: "security", label: t("settings.tab_security"), icon: ShieldCheck },
     { id: "preferences", label: t("settings.tab_preferences"), icon: Settings },
     { id: "domains", label: t("settings.tab_domains"), icon: Globe },
+    { id: "integrations", label: lang === "fr" ? "Intégrations" : "Integrations", icon: Puzzle },
     { id: "billing", label: t("settings.tab_billing"), icon: CreditCard },
   ] as const;
 
@@ -546,6 +615,192 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
                         </table>
                       </div>
                     )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Integrations Tab */}
+          {activeTab === "integrations" && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              {/* Global Integrations Card */}
+              <div className="bg-surface-lowest rounded-xl border border-border-subtle p-6 shadow-sm space-y-6">
+                <div className="flex items-center gap-3 border-b border-border-subtle pb-4">
+                  <Puzzle className="w-5 h-5 text-primary" />
+                  <div>
+                    <h3 className="font-display font-semibold text-[17px] text-on-surface">
+                      {lang === "fr" ? "Gestion des Intégrations" : "Integrations Management"}
+                    </h3>
+                    <p className="text-sm font-semibold text-on-surface-variant">
+                      {lang === "fr" 
+                        ? "Configurez vos clés API tierces pour piloter la protection automatique." 
+                        : "Configure third-party API tokens to power automatic domain security."}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Notifications Area */}
+                {integrationsError && (
+                  <div className="p-3.5 bg-error/10 border border-error/20 text-error rounded-lg text-xs font-semibold">
+                    {integrationsError}
+                  </div>
+                )}
+                {integrationsSuccess && (
+                  <div className="p-3.5 bg-safe/10 border border-safe/20 text-safe rounded-lg text-xs font-semibold">
+                    {integrationsSuccess}
+                  </div>
+                )}
+
+                {/* Setup or Token Details */}
+                {!wsTokenData?.api_token || isEditingToken ? (
+                  <form onSubmit={handleSaveToken} className="space-y-4 max-w-xl">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase text-on-surface-variant tracking-wider">
+                        {lang === "fr" ? "Jeton API Cloudflare" : "Cloudflare API Token"}
+                      </label>
+                      <div className="relative">
+                        <Input
+                          type={workspaceTokenVisible ? "text" : "password"}
+                          placeholder="e.g. 8x_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                          value={cfTokenInput}
+                          onChange={(e) => setCfTokenInput(e.target.value)}
+                          className="pr-10 font-mono text-xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setWorkspaceTokenVisible(!workspaceTokenVisible)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+                        >
+                          {workspaceTokenVisible ? (
+                            <EyeOff className="w-4 h-4" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-on-surface-variant font-semibold leading-normal">
+                        {lang === "fr"
+                          ? "Requis pour modifier automatiquement les configurations DNS manquantes et configurer les routeurs d'e-mails."
+                          : "Required to edit missing DNS configurations automatically and configure email worker routes."}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3 pt-2">
+                      <Button
+                        type="submit"
+                        disabled={saveWsTokenMutation.isPending}
+                        className="bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold px-4 py-2 rounded-lg cursor-pointer h-9 transition-all"
+                      >
+                        {saveWsTokenMutation.isPending
+                          ? (lang === "fr" ? "Vérification..." : "Verifying...")
+                          : (lang === "fr" ? "Enregistrer l'intégration" : "Save Integration")}
+                      </Button>
+
+                      {isEditingToken && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsEditingToken(false);
+                            setCfTokenInput("");
+                          }}
+                          className="bg-surface-low border border-border-subtle text-on-surface hover:bg-surface-low/80 text-xs font-bold px-4 py-2 rounded-lg cursor-pointer h-9 transition-all"
+                        >
+                          {lang === "fr" ? "Annuler" : "Cancel"}
+                        </button>
+                      )}
+                    </div>
+                  </form>
+                ) : (
+                  <div className="border border-border-subtle rounded-xl bg-surface-low/10 divide-y divide-border-subtle/50 hover:shadow-sm transition-all overflow-hidden">
+                    {/* Top Row: Integration Status & Token Info + Actions */}
+                    <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                      <div className="flex items-start gap-4 grow">
+                        <div className="p-2.5 bg-primary/[0.04] border border-primary/10 rounded-xl shrink-0">
+                          <img src={cloudflareLogo} alt="Cloudflare" className="w-8 h-8" />
+                        </div>
+                        <div className="space-y-1 grow">
+                          <h4 className="font-bold text-sm text-on-surface flex items-center gap-2">
+                            <span>Cloudflare Integration</span>
+                            <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-emerald-50 text-[#047857] border border-emerald-200">
+                              {lang === "fr" ? "Connecté" : "Connected"}
+                            </span>
+                          </h4>
+                          
+                          {/* Eyeballed Token Display */}
+                          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border-subtle/50 text-xs w-full">
+                            <span className="font-bold text-on-surface-variant shrink-0">Token :</span>
+                            <span className="font-mono bg-surface-low px-3 py-1 rounded text-[10px] select-all font-semibold grow max-w-xs md:max-w-md tracking-wider block overflow-hidden text-ellipsis whitespace-nowrap">
+                              {workspaceTokenVisible ? wsTokenData.api_token : "••••••••••••••••••••••••••••••••••••••••••••••••"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setWorkspaceTokenVisible(!workspaceTokenVisible)}
+                              className="p-1 text-on-surface-variant/70 hover:text-primary transition-colors cursor-pointer shrink-0"
+                              title={lang === "fr" ? "Afficher/Masquer" : "Toggle Visibility"}
+                            >
+                              {workspaceTokenVisible ? (
+                                <EyeOff className="w-3.5 h-3.5" />
+                              ) : (
+                                <Eye className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 sm:self-center shrink-0">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setCfTokenInput(wsTokenData.api_token || "");
+                            setIsEditingToken(true);
+                          }}
+                          className="font-bold text-xs h-9"
+                        >
+                          {lang === "fr" ? "Modifier le jeton" : "Edit Token"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleDeleteToken}
+                          className="font-bold text-xs h-9 text-error hover:text-error hover:bg-error/5 border-error/20 hover:border-error/30"
+                        >
+                          {lang === "fr" ? "Révoquer l'accès" : "Revoke Credentials"}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Bottom Row: Connected Domains inside the Card */}
+                    <div className="p-5 bg-surface-lowest/40 space-y-3.5">
+                      <div className="border-b border-border-subtle pb-2">
+                        <h4 className="font-display font-semibold text-xs text-on-surface uppercase tracking-wider">
+                          {lang === "fr" ? "Domaines rattachés à cette intégration" : "Domains attached to this integration"}
+                        </h4>
+                      </div>
+                      {domainsLoading ? (
+                        <div className="h-10 bg-surface-low rounded-lg animate-pulse" />
+                      ) : !domains || domains.length === 0 ? (
+                        <p className="text-xs text-on-surface-variant/60 italic font-semibold">
+                          {lang === "fr" ? "Aucun domaine n'est encore configuré." : "No domains configured yet."}
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {domains.map((dom) => (
+                            <div key={dom.id} className="p-3 border border-border-subtle/40 bg-surface-lowest rounded-lg flex items-center justify-between text-xs hover:border-border-subtle transition-all">
+                              <span className="font-bold text-on-surface">{dom.zone_name}</span>
+                              <div className="flex items-center gap-2.5">
+                                <span className="font-semibold text-on-surface-variant/75 text-[11px]">{dom.destination_email}</span>
+                                <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${dom.status === "active" ? "bg-safe/10 text-safe border border-safe/20" : "bg-warning/10 text-warning border border-warning/20"}`}>
+                                  {dom.status}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

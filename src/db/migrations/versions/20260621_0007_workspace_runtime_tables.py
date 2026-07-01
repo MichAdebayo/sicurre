@@ -122,6 +122,7 @@ def upgrade() -> None:
                 worker_name TEXT NOT NULL,
                 rule_id TEXT NOT NULL DEFAULT 'unknown',
                 destination_email TEXT NOT NULL,
+                api_token TEXT NULL,
                 shared_secret_hash TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'pending_verification',
                 error_message TEXT,

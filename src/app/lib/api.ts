@@ -68,6 +68,7 @@ export interface CloudflareStatus {
   zone_name?: string;
   destination_email?: string;
   worker_name?: string;
+  api_token?: string | null;
   error_message?: string | null;
   created_at?: string;
   updated_at?: string;
@@ -77,6 +78,9 @@ export interface CloudflareSetupPayload {
   cf_api_token: string;
   zone_name: string;
   destination_email: string;
+  fix_spf?: boolean;
+  fix_dkim?: boolean;
+  fix_dmarc?: boolean;
 }
 
 export interface CfTokenVerifyPayload {
@@ -318,6 +322,39 @@ export function useTeardownCloudflare() {
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cf-integration"] });
+      queryClient.invalidateQueries({ queryKey: ["cloudflare-list"] });
+    },
+  });
+}
+
+export function useWorkspaceCloudflareToken() {
+  return useQuery<{ api_token: string | null }>({
+    queryKey: ["cf-workspace-token"],
+    queryFn: () => fetchJson<{ api_token: string | null }>(`${CF_BASE}/token`),
+  });
+}
+
+export function useSaveWorkspaceCloudflareToken() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (cf_api_token: string) =>
+      fetchJson<{ status: string }>(`${CF_BASE}/token`, {
+        method: "POST",
+        body: JSON.stringify({ cf_api_token }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cf-workspace-token"] });
+    },
+  });
+}
+
+export function useDeleteWorkspaceCloudflareToken() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      fetchJson<{ status: string }>(`${CF_BASE}/token`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cf-workspace-token"] });
     },
   });
 }

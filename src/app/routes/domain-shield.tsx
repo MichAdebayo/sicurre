@@ -34,6 +34,7 @@ import {
   useDomainShieldStatus,
   useSetupCloudflare,
   useRefreshDomainShieldStatus,
+  useWorkspaceCloudflareToken,
   AuthSession,
 } from "../lib/api";
 
@@ -213,10 +214,29 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
     }, 1200);
   };
 
+  // Workspace Cloudflare API token query
+  const { data: wsTokenData } = useWorkspaceCloudflareToken();
+
   // State for Cloudflare Auto-Fix Wizard
   const [showAutoFix, setShowAutoFix] = useState(false);
   const [cfToken, setCfToken] = useState("");
   const [autoFixProgress, setAutoFixProgress] = useState<"idle" | "verify" | "dns" | "routing" | "success" | "error">("idle");
+
+  // Pre-fill Cloudflare API token from workspace-level saved token
+  useEffect(() => {
+    if (wsTokenData?.api_token) {
+      setCfToken(wsTokenData.api_token);
+    } else if (selectedDomain && domainsList) {
+      const integration = domainsList.find((d) => d.zone_name === selectedDomain);
+      if (integration?.api_token) {
+        setCfToken(integration.api_token);
+      } else {
+        setCfToken("");
+      }
+    } else {
+      setCfToken("");
+    }
+  }, [wsTokenData, selectedDomain, domainsList]);
   const [autoFixErrorMsg, setAutoFixErrorMsg] = useState("");
   const [fixSpf, setFixSpf] = useState(true);
   const [fixDkim, setFixDkim] = useState(true);
@@ -802,34 +822,44 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   <div className="space-y-3 pt-2">
                     {autoFixProgress === "idle" ? (
                       <div className="space-y-3">
-                        <div className="space-y-1.5">
-                          <label className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block">
-                            Cloudflare API Token
-                          </label>
-                          <Input
-                            type="password"
-                            placeholder="Zone.DNS Edit Scoped Token"
-                            value={cfToken}
-                            onChange={(e) => setCfToken(e.target.value)}
-                            className="bg-white border-border-subtle"
-                          />
-                        </div>
+                        {!wsTokenData?.api_token ? (
+                          <div className="p-4 bg-error/5 border border-error/20 rounded-xl space-y-2 text-xs text-error">
+                            <p className="font-bold flex items-center gap-1.5">
+                              <AlertTriangle className="w-4 h-4 shrink-0" />
+                              {isFR ? "Configuration Cloudflare requise" : "Cloudflare Integration Required"}
+                            </p>
+                            <p className="font-semibold text-on-surface-variant leading-normal">
+                              {isFR 
+                                ? "Veuillez d'abord configurer votre jeton API Cloudflare dans les Paramètres > onglet Intégrations avant de lancer l'auto-configuration." 
+                                : "Please configure your Cloudflare API token in Settings > Integrations first before launching auto-configuration."}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-safe/5 border border-safe/10 rounded-xl text-xs text-safe font-semibold flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 shrink-0 text-safe" />
+                            <span>
+                              {isFR 
+                                ? "Jeton API Cloudflare actif détecté dans votre espace de travail." 
+                                : "Active Cloudflare API token detected in your workspace."}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="p-4 bg-surface-low border border-border-subtle rounded-xl space-y-2 text-xs font-semibold">
                         {autoFixProgress === "verify" && (
-                          <span className="flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5 animate-spin text-[#2e6bb5]" /> {isFR ? "Vérification du token Cloudflare..." : "Verifying Cloudflare token..."}</span>
+                          <span className="flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5 animate-spin text-primary" /> {isFR ? "Vérification du token Cloudflare..." : "Verifying Cloudflare token..."}</span>
                         )}
                         {autoFixProgress === "dns" && (
                           <span className="flex items-center gap-2">
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#2e6bb5]" /> 
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin text-primary" /> 
                             {isFR 
                               ? `Écriture des enregistrements sélectionnés (${[fixSpf && "SPF", fixDkim && "DKIM", fixDmarc && "DMARC"].filter(Boolean).join(", ")})...` 
                               : `Writing selected DNS records (${[fixSpf && "SPF", fixDkim && "DKIM", fixDmarc && "DMARC"].filter(Boolean).join(", ")})...`}
                           </span>
                         )}
                         {autoFixProgress === "routing" && (
-                          <span className="flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5 animate-spin text-[#2e6bb5]" /> {isFR ? "Synchronisation de la redirection d'email..." : "Syncing email routing..."}</span>
+                          <span className="flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5 animate-spin text-primary" /> {isFR ? "Synchronisation de la redirection d'email..." : "Syncing email routing..."}</span>
                         )}
                         {autoFixProgress === "success" && (
                           <span className="flex items-center gap-2 text-safe"><CheckCircle2 className="w-4 h-4" /> {isFR ? "Configuration DNS appliquée avec succès !" : "Selected DNS records successfully provisioned!"}</span>
@@ -853,15 +883,15 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                         setShowAutoFix(false);
                         setAutoFixProgress("idle");
                       }}
-                      className="cursor-pointer font-semibold text-xs"
+                      className="cursor-pointer font-semibold text-xs border border-border-subtle hover:bg-surface-low/80 rounded-lg"
                     >
                       {isFR ? "Annuler" : "Cancel"}
                     </Button>
                     <Button
                       size="sm"
                       onClick={handleRunAutoFix}
-                      disabled={autoFixProgress !== "idle" || !cfToken.trim() || (!fixSpf && !fixDkim && !fixDmarc)}
-                      className="cursor-pointer font-bold text-xs bg-[#2e6bb5] hover:bg-[#23589b] text-white border-none rounded-lg"
+                      disabled={autoFixProgress !== "idle" || !cfToken.trim() || (!fixSpf && !fixDkim && !fixDmarc) || !wsTokenData?.api_token}
+                      className="cursor-pointer font-bold text-xs bg-primary hover:bg-primary/90 text-on-primary border-none rounded-lg"
                     >
                       {isFR ? "Valider et Corriger" : "Validate & Deploy"}
                     </Button>

@@ -455,8 +455,8 @@ async def setup_cloudflare(
         """
         INSERT INTO cloudflare_integration
             (id, user_email, workspace_id, workspace_member_user_id, zone_id, zone_name, account_id, worker_name, rule_id,
-             destination_email, shared_secret_hash, status, created_at, updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             destination_email, api_token, shared_secret_hash, status, created_at, updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """,
         (
             integration_id,
@@ -469,6 +469,7 @@ async def setup_cloudflare(
             "",
             "unknown",
             str(payload.destination_email),
+            payload.cf_api_token,
             "",
             "provisioning",
             now,
@@ -604,6 +605,7 @@ async def cloudflare_status(
         "destination_email": row["destination_email"],
         "worker_name": row["worker_name"],
         "status": row["status"],
+        "api_token": row.get("api_token"),
         "error_message": row.get("error_message"),
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
@@ -684,3 +686,67 @@ async def verify_cloudflare_token(
         return {"valid": True, "zone_id": zone_id}
     except CloudflareAPIError as exc:
         return {"valid": False, "error": str(exc)}
+
+
+# ---------------------------------------------------------------------------
+# ── 6. Global Workspace Token Management ──────────────────────────────────
+# ---------------------------------------------------------------------------
+
+class CloudflareTokenSaveRequest(BaseModel):
+    cf_api_token: str = Field(..., description="Cloudflare API token to store")
+
+@router.get("/v1/integrations/cloudflare/token")
+async def get_workspace_cloudflare_token(
+    current_user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Retrieve the stored Cloudflare API token for the current workspace."""
+    rows = await _async_query(
+        "SELECT api_token FROM app_cloudflare_config WHERE workspace_id = ? LIMIT 1",
+        (current_user.workspace_id,),
+    )
+    if not rows:
+        return {"api_token": None}
+    return {"api_token": rows[0]["api_token"]}
+
+@router.post("/v1/integrations/cloudflare/token")
+async def save_workspace_cloudflare_token(
+    payload: CloudflareTokenSaveRequest,
+    current_user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Save or overwrite the stored Cloudflare API token for the current workspace."""
+    # Lightweight check: verify token works
+    try:
+        provisioner = CloudflareProvisioner(api_token=payload.cf_api_token)
+        token_ok = await provisioner.verify_token()
+        if not token_ok:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Token verification failed on Cloudflare API",
+            )
+    except CloudflareAPIError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Token verification failed: {str(exc)}",
+        )
+
+    ts = datetime.now(timezone.utc).isoformat()
+    await _async_query(
+        """
+        INSERT OR REPLACE INTO app_cloudflare_config (workspace_id, api_token, created_at, updated_at)
+        VALUES (?, ?, ?, ?)
+        """,
+        (current_user.workspace_id, payload.cf_api_token, ts, ts),
+    )
+    return {"status": "saved"}
+
+@router.delete("/v1/integrations/cloudflare/token")
+async def delete_workspace_cloudflare_token(
+    current_user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Delete the stored Cloudflare API token for the current workspace."""
+    await _async_query(
+        "DELETE FROM app_cloudflare_config WHERE workspace_id = ?",
+        (current_user.workspace_id,),
+    )
+    return {"status": "deleted"}
+

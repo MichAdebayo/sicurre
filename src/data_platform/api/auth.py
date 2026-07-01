@@ -116,8 +116,22 @@ def ensure_runtime_tables() -> None:
                 conn.execute(
                     "ALTER TABLE cloudflare_integration ADD COLUMN workspace_member_user_id TEXT NULL"
                 )
+            if "api_token" not in cf_columns:
+                conn.execute(
+                    "ALTER TABLE cloudflare_integration ADD COLUMN api_token TEXT NULL"
+                )
 
         # ── 1. Security Rules ────────────────────────────────────────────────
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS app_cloudflare_config (
+                workspace_id TEXT PRIMARY KEY,
+                api_token TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS ix_app_cloudflare_config_workspace_id ON app_cloudflare_config(workspace_id)")
+
         conn.execute("""
             CREATE TABLE IF NOT EXISTS app_security_rule (
                 id TEXT PRIMARY KEY,
