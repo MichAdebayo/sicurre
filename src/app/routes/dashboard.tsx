@@ -10,6 +10,7 @@ import {
   TrendingUp,
   Cpu,
   Info,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { VerdictBadge } from "../components/threats/verdict-badge";
@@ -27,7 +28,7 @@ const MotionDiv = motion.div as any;
 
 interface DashboardRouteProps {
   session: AuthSession;
-  onGoToSettings: () => void;
+  onGoToSettings: (tab?: string) => void;
 }
 
 function KPIBlock({
@@ -81,7 +82,10 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
 
   // Domains & Shield status check for security score
   const { data: domainsList } = useCloudflareList();
-  const activeDomain = domainsList && domainsList.length > 0
+  const hasActiveDomain = !!domainsList && domainsList.length > 0;
+  const showOnboarding = session.onboarding_required || !hasActiveDomain;
+
+  const activeDomain = hasActiveDomain
     ? (domainsList.find((d) => d.status === "active")?.zone_name || domainsList[0].zone_name)
     : "";
 
@@ -373,29 +377,62 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
         </div>
       </div>
 
-      {session.onboarding_required ? (
-        <div className="bg-white rounded-xl border border-border-subtle p-8 space-y-4 shadow-sm">
-          <div className="flex items-start gap-3">
-            <ShieldCheck className="w-6 h-6 text-primary shrink-0 mt-0.5" />
+      {/* Domain Status Alert Banner for Disconnected or New Workspaces */}
+      {!hasActiveDomain && totalScans > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-start gap-3.5">
+            <div className="p-2 bg-amber-500/15 rounded-lg shrink-0 mt-0.5">
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
+            </div>
             <div>
-              <h2 className="font-display font-semibold text-xl text-on-surface">
-                {i18n.language === "fr" ? "Connectez d'abord votre domaine" : "Connect your domain first"}
-              </h2>
-              <p className="text-sm text-on-surface-variant mt-1 max-w-2xl font-medium">
+              <h3 className="font-bold text-sm text-on-surface">
+                {i18n.language === "fr" ? "Surveillance en temps réel suspendue" : "Real-time monitoring suspended"}
+              </h3>
+              <p className="text-xs text-on-surface-variant mt-0.5 font-medium leading-relaxed">
                 {i18n.language === "fr"
-                  ? "Votre compte existe, mais aucun domaine n'est encore protégé. Commencez par configurer Cloudflare dans les paramètres pour activer l'interception et les premiers scans."
-                  : "Your account is active, but no domains are protected. Start by setting up Cloudflare integration in settings to secure your email gateway."}
+                  ? "Votre domaine a été déconnecté. Vos données historiques sont conservées ci-dessous, mais aucun nouvel email n'est actuellement intercepté."
+                  : "Your domain is disconnected. Your historical scan logs are preserved below, but no incoming emails are currently intercepted."}
               </p>
             </div>
           </div>
-          <Button onClick={onGoToSettings} className="gap-2">
-            <Settings className="w-4 h-4" />
-            {i18n.language === "fr" ? "Ouvrir l'intégration Cloudflare" : "Open Cloudflare Integration"}
+          <Button
+            onClick={() => onGoToSettings("domains")}
+            size="sm"
+            className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shrink-0 cursor-pointer h-9 px-4 rounded-lg shadow-sm"
+          >
+            {i18n.language === "fr" ? "Reconnecter mon domaine" : "Reconnect Domain"}
           </Button>
         </div>
-      ) : (
-        <>
-          {/* Hero Row: KPI blocks + Security Score Grade */}
+      )}
+
+      {!hasActiveDomain && totalScans === 0 && (
+        <div className="bg-primary/[0.04] border border-primary/15 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-start gap-3.5">
+            <div className="p-2 bg-primary/10 rounded-lg shrink-0 mt-0.5">
+              <ShieldCheck className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-bold text-sm text-on-surface">
+                {i18n.language === "fr" ? "Bienvenue sur Sicurre ! Protégez votre domaine" : "Welcome to Sicurre! Protect your domain"}
+              </h3>
+              <p className="text-xs text-on-surface-variant mt-0.5 font-medium leading-relaxed">
+                {i18n.language === "fr"
+                  ? "Connectez votre domaine via Cloudflare pour activer l'interception automatique et sécuriser vos e-mails."
+                  : "Connect your domain via Cloudflare to enable automatic interception and secure your email gateway."}
+              </p>
+            </div>
+          </div>
+          <Button
+            onClick={() => onGoToSettings("domains")}
+            size="sm"
+            className="bg-primary hover:bg-primary/90 text-on-primary font-bold text-xs shrink-0 cursor-pointer h-9 px-4 rounded-lg shadow-sm"
+          >
+            {i18n.language === "fr" ? "Connecter mon domaine" : "Connect Domain"}
+          </Button>
+        </div>
+      )}
+
+      {/* Hero Row: KPI blocks + Security Score Grade */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
             {/* Security Grade Hero (Reduced circle, overflow-visible for z-index tooltip popup) */}
             <div className="md:col-span-4 bg-white rounded-xl border border-border-subtle p-6 flex flex-col items-center justify-center text-center shadow-sm relative overflow-visible">
@@ -583,19 +620,29 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
             <div className="bg-white rounded-xl border border-border-subtle p-6 shadow-sm">
               <div className="flex items-center justify-between mb-5 pb-4 border-b border-border-subtle">
                 <div className="flex items-center gap-2.5">
-                  {/* Live pulsing green node blinker */}
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-safe" />
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-safe" />
-                  </span>
+                  {/* Live pulsing green node blinker when active, static amber when suspended */}
+                  {hasActiveDomain ? (
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-safe" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-safe" />
+                    </span>
+                  ) : (
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
+                    </span>
+                  )}
                   {/* Text size increased to match Live Feed titles */}
                   <h3 className="font-display font-bold text-[19px] text-on-surface">
                     {i18n.language === "fr" ? "Emails Récemment Scannés" : "Recent Emails Scanned"}
                   </h3>
                 </div>
-                <div className="inline-flex items-center gap-2 text-[12px] font-bold text-primary">
+                <div className={`inline-flex items-center gap-2 text-[12px] font-bold ${hasActiveDomain ? "text-primary" : "text-amber-600"}`}>
                   <Mail className="w-4 h-4" />
-                  <span>{i18n.language === "fr" ? "Flux Live" : "Recent Scans"}</span>
+                  <span>
+                    {hasActiveDomain
+                      ? (i18n.language === "fr" ? "Flux Live" : "Recent Scans")
+                      : (i18n.language === "fr" ? "Interception Suspendue" : "Interception Suspended")}
+                  </span>
                 </div>
               </div>
               {threatsLoading ? (
@@ -641,8 +688,6 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
               )}
             </div>
           </div>
-        </>
-      )}
     </MotionDiv>
   );
 }

@@ -4,9 +4,9 @@ import { motion } from "framer-motion";
 import {
   Send,
   CheckCircle2,
-  Cpu,
   Mail,
   MessageSquare,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -140,27 +140,30 @@ export default function SupportRoute({ session }: SupportRouteProps) {
                 <label className="app-label-tiny">
                   {isFR ? "Motif de la demande" : "Request Category"}
                 </label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-border-subtle rounded-lg text-xs font-semibold text-on-surface focus:outline-none focus:border-primary cursor-pointer shadow-sm h-10"
-                >
-                  <option value="incident">
-                    {isFR ? "Incident de sécurité / Phishing suspect" : "Security Incident / Phishing Suspicion"}
-                  </option>
-                  <option value="dns">
-                    {isFR ? "Configuration DNS & Cloudflare" : "DNS & Cloudflare Setup"}
-                  </option>
-                  <option value="billing">
-                    {isFR ? "Facturation et abonnements" : "Billing & Subscription"}
-                  </option>
-                  <option value="feedback">
-                    {isFR ? "Suggestions / Retour d'expérience" : "Feedback & Suggestions"}
-                  </option>
-                  <option value="other">
-                    {isFR ? "Autre demande d'assistance" : "Other Support Inquiry"}
-                  </option>
-                </select>
+                <div className="relative">
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full pl-3.5 pr-10 py-2 bg-white border border-border-subtle rounded-lg text-xs font-semibold text-on-surface focus:outline-none focus:border-primary cursor-pointer shadow-sm h-10 appearance-none"
+                  >
+                    <option value="incident">
+                      {isFR ? "Incident de sécurité / Phishing suspect" : "Security Incident / Phishing Suspicion"}
+                    </option>
+                    <option value="dns">
+                      {isFR ? "Configuration DNS & Cloudflare" : "DNS & Cloudflare Setup"}
+                    </option>
+                    <option value="billing">
+                      {isFR ? "Facturation et abonnements" : "Billing & Subscription"}
+                    </option>
+                    <option value="feedback">
+                      {isFR ? "Suggestions / Retour d'expérience" : "Feedback & Suggestions"}
+                    </option>
+                    <option value="other">
+                      {isFR ? "Autre demande d'assistance" : "Other Support Inquiry"}
+                    </option>
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-on-surface-variant pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2" />
+                </div>
               </div>
 
               {/* Message Content */}
@@ -210,28 +213,6 @@ export default function SupportRoute({ session }: SupportRouteProps) {
                 ? "Vous pouvez également envoyer un email directement à support@sicurre.com à tout moment."
                 : "You can also reach us directly via email at support@sicurre.com."}
             </p>
-          </div>
-
-          {/* System Status Nodes */}
-          <div className="bg-surface-lowest border border-border-subtle rounded-2xl p-5 shadow-sm">
-            <div className="flex items-center gap-2 pb-3 border-b border-border-subtle/50 mb-4">
-              <Cpu className="w-4 h-4 text-primary" />
-              <h3 className="app-h3">{isFR ? "Statuts du Système" : "System Status Nodes"}</h3>
-            </div>
-            <div className="space-y-3">
-              {systemNodes.map((node, idx) => (
-                <div key={idx} className="p-3 bg-surface-low border border-border-subtle/60 rounded-xl space-y-2 select-none">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs text-on-surface">{node.name}</span>
-                    <span className="text-[10px] text-safe font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">{node.status}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-[10px] text-on-surface-variant font-bold">
-                    <span>{node.metric}</span>
-                    <span className="font-mono text-primary">{node.value}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </div>

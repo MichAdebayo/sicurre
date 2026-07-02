@@ -41,6 +41,7 @@ export default function App() {
   const [hasStoredSession, setHasStoredSession] = useState(getInitialLoginState);
   const [viewState, setViewState] = useState<"landing" | "login" | "signup" | "mentions-legales" | "confidentialite" | "contact">("landing");
   const [activePage, setActivePage] = useState<SidebarPage>("dashboard");
+  const [settingsTab, setSettingsTab] = useState<string | undefined>();
   const sessionQuery = useCurrentSession(true);
   const logoutMutation = useLogout();
   const session = sessionQuery.data;
@@ -131,23 +132,33 @@ export default function App() {
     );
   }
 
+  const handleGoToSettings = (tab?: string) => {
+    if (tab) {
+      setSettingsTab(tab);
+    }
+    setActivePage("settings");
+  };
+
   return (
     <AppShell
       currentPage={activePage}
-      onPageChange={setActivePage}
+      onPageChange={(page) => {
+        if (page !== "settings") setSettingsTab(undefined);
+        setActivePage(page);
+      }}
       onLogout={handleLogout}
       userName={session.display_name}
       userEmail={session.email}
       userRole={session.is_platform_admin ? "admin" : session.role}
     >
       <AnimatePresence mode="wait">
-        {activePage === "dashboard" && <DashboardRoute key="dashboard" session={session} onGoToSettings={() => setActivePage("settings")} />}
+        {activePage === "dashboard" && <DashboardRoute key="dashboard" session={session} onGoToSettings={handleGoToSettings} />}
         {activePage === "threats" && <ThreatsRoute key="threats" session={session} />}
         {activePage === "quarantine" && <QuarantineRoute key="quarantine" />}
         {activePage === "alerts" && <AlertsRoute key="alerts" />}
         {activePage === "domain-shield" && <DomainShieldRoute key="domain-shield" session={session} />}
         {activePage === "logs" && session.is_platform_admin && <LogsRoute key="logs" />}
-        {activePage === "settings" && <SettingsRoute key="settings" session={session} />}
+        {activePage === "settings" && <SettingsRoute key="settings" session={session} initialTab={settingsTab} />}
         {activePage === "support" && <SupportRoute key="support" session={session} />}
       </AnimatePresence>
     </AppShell>

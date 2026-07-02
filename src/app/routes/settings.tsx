@@ -37,12 +37,13 @@ const MotionDiv = motion.div as any;
 
 interface SettingsRouteProps {
   session: AuthSession;
+  initialTab?: string;
 }
 
-export default function SettingsRoute({ session }: SettingsRouteProps) {
+export default function SettingsRoute({ session, initialTab }: SettingsRouteProps) {
   const { t, i18n } = useTranslation();
   const [activeTab, setActiveTab] = useState<"profile" | "security" | "preferences" | "domains" | "integrations" | "billing">(
-    session.onboarding_required ? "domains" : "profile"
+    (initialTab as any) || (session.onboarding_required ? "domains" : "profile")
   );
 
   // Split Display Name into First Name & Last Name
@@ -802,23 +803,10 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
                     </div>
                   </div>
                 ) : (
-                  <div className="p-4 border border-border-subtle rounded-xl bg-surface-low/30 text-xs font-semibold flex items-center justify-between gap-3 max-w-xl">
-                    <div className="flex items-center gap-2.5">
-                      <AlertTriangle className="w-4 h-4 text-warning shrink-0" />
-                      <span className="text-on-surface">
-                        {lang === "fr"
-                          ? "Aucune intégration active. Veuillez d'abord connecter un domaine dans l'onglet Domaines Connectés."
-                          : "No active integration. Please connect a domain under Connected Domains."}
-                      </span>
-                    </div>
-                    <div className="relative group shrink-0">
-                      <Info className="w-4 h-4 text-primary cursor-help" />
-                      <div className="absolute bottom-full right-0 mb-2 w-64 p-2.5 bg-surface-lowest border border-border-subtle text-[11px] text-on-surface-variant font-medium rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 leading-normal font-sans">
-                        {lang === "fr"
-                          ? "Le jeton API Cloudflare est automatiquement configuré et lié lors de la connexion de votre premier domaine dans l'onglet Domaines Connectés."
-                          : "The Cloudflare API token is automatically configured and attached when adding your domain under the Connected Domains tab."}
-                      </div>
-                    </div>
+                  <div className="py-6 text-center text-xs font-semibold text-on-surface-variant w-full">
+                    {lang === "fr"
+                      ? "Aucune intégration active. Veuillez d'abord connecter un domaine dans l'onglet Domaines Connectés."
+                      : "No active integration. Please connect a domain under Connected Domains."}
                   </div>
                 )}
               </div>
