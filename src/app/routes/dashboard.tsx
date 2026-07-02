@@ -667,14 +667,14 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-[11px] text-on-surface-variant font-medium">{alert.time}</span>
                           <span className="text-xs font-bold text-on-surface truncate max-w-[200px]" title={alert.sender}>
-                            {alert.sender}
+                            {alert.verdict !== "phishing" && alert.verdict !== "quarantine" ? "[Masqué par Sicurre]" : alert.sender}
                           </span>
                         </div>
                         <h4 className="font-bold text-sm text-on-surface truncate">
-                          {alert.subject}
+                          {alert.verdict !== "phishing" && alert.verdict !== "quarantine" ? "[Masqué par Sicurre]" : alert.subject}
                         </h4>
                         <p className="text-[12px] text-on-surface-variant font-medium truncate max-w-3xl">
-                          {alert.content}
+                          {alert.verdict !== "phishing" && alert.verdict !== "quarantine" ? "[Masqué par Sicurre]" : alert.content}
                         </p>
                       </div>
 

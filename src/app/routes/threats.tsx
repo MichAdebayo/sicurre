@@ -537,12 +537,16 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
                       </td>
                       <td className="px-5 py-3.5">
                         <span className="font-bold text-on-surface truncate max-w-[180px] block select-all">
-                          {threat.sender || t("threats.unknown_sender")}
+                          {threat.verdict !== "phishing" && threat.verdict !== "quarantine"
+                            ? "[Masqué par Sicurre]"
+                            : (threat.sender || t("threats.unknown_sender"))}
                         </span>
                       </td>
                       <td className="px-5 py-3.5">
                         <span className="text-on-surface truncate block max-w-[220px] select-all font-semibold" title={threat.subject}>
-                          {threat.subject || t("threats.no_subject")}
+                          {threat.verdict !== "phishing" && threat.verdict !== "quarantine"
+                            ? "[Masqué par Sicurre]"
+                            : (threat.subject || t("threats.no_subject"))}
                         </span>
                       </td>
                       <td className="px-5 py-3.5">

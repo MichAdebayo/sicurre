@@ -200,14 +200,16 @@ async def get_threats(current_user: AuthUser = Depends(get_current_user)):
             status = row["status"]
             if status not in ("active", "trashed", "restored"):
                 status = "active"
+            verdict = row["verdict"]
+            is_anonymized = verdict not in ("phishing", "quarantine")
             threats.append(
                 {
                     "id": row["id"],
                     "message_id": row["message_id"],
-                    "subject": row["subject"],
-                    "sender": row["sender"],
-                    "body_preview": row["body_preview"],
-                    "verdict": row["verdict"],
+                    "subject": "[Masqué par Sicurre]" if is_anonymized else row["subject"],
+                    "sender": "[Masqué par Sicurre]" if is_anonymized else row["sender"],
+                    "body_preview": "[Masqué par Sicurre]" if is_anonymized else row["body_preview"],
+                    "verdict": verdict,
                     "confidence": row["confidence"],
                     "received_at": row["received_at"],
                     "status": status,
@@ -247,13 +249,15 @@ async def update_threat_status(
         if not rows:
             raise HTTPException(status_code=404, detail="Threat not found")
         row = rows[0]
+        verdict = row["verdict"]
+        is_anonymized = verdict not in ("phishing", "quarantine")
         return {
             "id": row["id"],
             "message_id": row["message_id"],
-            "subject": row["subject"],
-            "sender": row["sender"],
-            "body_preview": row["body_preview"],
-            "verdict": row["verdict"],
+            "subject": "[Masqué par Sicurre]" if is_anonymized else row["subject"],
+            "sender": "[Masqué par Sicurre]" if is_anonymized else row["sender"],
+            "body_preview": "[Masqué par Sicurre]" if is_anonymized else row["body_preview"],
+            "verdict": verdict,
             "confidence": row["confidence"],
             "received_at": row["received_at"],
             "status": (
