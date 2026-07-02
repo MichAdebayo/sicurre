@@ -15,6 +15,7 @@ import {
   Eye,
   EyeOff,
   Puzzle,
+  Info,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -224,6 +225,7 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
       await teardownMutation.mutateAsync({ cf_api_token: "MOCK_TEARDOWN_TOKEN" });
       setIntegrationSuccess(lang === "fr" ? "Domaine dissocié avec succès." : "Domain disconnected successfully.");
       refetchDomains();
+      refetchWsToken();
     } catch (error) {
       setIntegrationError(error instanceof Error ? error.message : "Failed to remove domain.");
     }
@@ -243,6 +245,7 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
       setIsEditingToken(false);
       setCfTokenInput("");
       refetchWsToken();
+      refetchDomains();
     } catch (err: any) {
       setIntegrationsError(err?.message || "Failed to verify or save Cloudflare API token.");
     }
@@ -260,6 +263,7 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
       await deleteWsTokenMutation.mutateAsync();
       setIntegrationsSuccess(lang === "fr" ? "Jeton API supprimé avec succès." : "API token deleted successfully.");
       refetchWsToken();
+      refetchDomains();
     } catch (err: any) {
       setIntegrationsError(err?.message || "Failed to delete API token.");
     }
@@ -680,7 +684,7 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
                 )}
 
                 {/* Setup or Token Details */}
-                {!wsTokenData?.api_token || isEditingToken ? (
+                {isEditingToken ? (
                   <form onSubmit={handleSaveToken} className="space-y-4 max-w-xl">
                     <div className="space-y-2">
                       <label className="text-xs font-bold uppercase text-on-surface-variant tracking-wider">
@@ -724,21 +728,19 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
                           : (lang === "fr" ? "Enregistrer l'intégration" : "Save Integration")}
                       </Button>
 
-                      {isEditingToken && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsEditingToken(false);
-                            setCfTokenInput("");
-                          }}
-                          className="bg-surface-low border border-border-subtle text-on-surface hover:bg-surface-low/80 text-xs font-bold px-4 py-2 rounded-lg cursor-pointer h-9 transition-all"
-                        >
-                          {lang === "fr" ? "Annuler" : "Cancel"}
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsEditingToken(false);
+                          setCfTokenInput("");
+                        }}
+                        className="bg-surface-low border border-border-subtle text-on-surface hover:bg-surface-low/80 text-xs font-bold px-4 py-2 rounded-lg cursor-pointer h-9 transition-all"
+                      >
+                        {lang === "fr" ? "Annuler" : "Cancel"}
+                      </button>
                     </div>
                   </form>
-                ) : (
+                ) : wsTokenData?.api_token ? (
                   <div className="border border-border-subtle rounded-xl bg-surface-low/10 divide-y divide-border-subtle/50 hover:shadow-sm transition-all overflow-hidden">
                     {/* Top Row: Integration Status & Token Info + Actions */}
                     <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
@@ -796,6 +798,25 @@ export default function SettingsRoute({ session }: SettingsRouteProps) {
                         >
                           {lang === "fr" ? "Révoquer l'accès" : "Revoke Credentials"}
                         </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 border border-border-subtle rounded-xl bg-surface-low/30 text-xs font-semibold flex items-center justify-between gap-3 max-w-xl">
+                    <div className="flex items-center gap-2.5">
+                      <AlertTriangle className="w-4 h-4 text-warning shrink-0" />
+                      <span className="text-on-surface">
+                        {lang === "fr"
+                          ? "Aucune intégration active. Veuillez d'abord connecter un domaine dans l'onglet Domaines Connectés."
+                          : "No active integration. Please connect a domain under Connected Domains."}
+                      </span>
+                    </div>
+                    <div className="relative group shrink-0">
+                      <Info className="w-4 h-4 text-primary cursor-help" />
+                      <div className="absolute bottom-full right-0 mb-2 w-64 p-2.5 bg-surface-lowest border border-border-subtle text-[11px] text-on-surface-variant font-medium rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 leading-normal font-sans">
+                        {lang === "fr"
+                          ? "Le jeton API Cloudflare est automatiquement configuré et lié lors de la connexion de votre premier domaine dans l'onglet Domaines Connectés."
+                          : "The Cloudflare API token is automatically configured and attached when adding your domain under the Connected Domains tab."}
                       </div>
                     </div>
                   </div>

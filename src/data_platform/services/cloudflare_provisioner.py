@@ -516,6 +516,58 @@ class CloudflareProvisioner:
             destination_verified=destination_verified,
         )
 
+    async def deploy_dns_record(
+        self,
+        zone_id: str,
+        rec_type: str,
+        name: str,
+        content: str,
+    ) -> None:
+        """Create or update a DNS record for the zone."""
+        # Clean record value: remove any raw python byte literal indicators (e.g. b'...')
+        content_clean = content
+        if content_clean.startswith("b'") or content_clean.startswith('b"'):
+            content_clean = content_clean[2:-1]
+
+        # 1. Fetch existing records to check for duplicates
+        records = await self.get_dns_records(zone_id)
+        existing_id = None
+        
+        # Cloudflare zone names are fully qualified in responses. Normalize both side-by-side comparison
+        target_name_normalized = name.lower().rstrip(".")
+        for rec in records:
+            if rec.get("type") == rec_type:
+                rec_name_normalized = str(rec.get("name", "")).lower().rstrip(".")
+                if rec_name_normalized == target_name_normalized:
+                    existing_id = rec["id"]
+                    break
+
+        body = {
+            "type": rec_type,
+            "name": name,
+            "content": content_clean,
+            "ttl": 3600
+        }
+
+        if existing_id:
+            logger.info("Updating existing DNS record %s (%s) with content: %s", existing_id, name, content_clean)
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                r = await client.put(
+                    f"{CF_BASE}/zones/{zone_id}/dns_records/{existing_id}",
+                    headers=self._headers,
+                    json=body,
+                )
+            self._unwrap(r)
+        else:
+            logger.info("Creating new DNS record (%s) with content: %s", name, content_clean)
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                r = await client.post(
+                    f"{CF_BASE}/zones/{zone_id}/dns_records",
+                    headers=self._headers,
+                    json=body,
+                )
+            self._unwrap(r)
+
     async def teardown(
         self,
         zone_id: str,

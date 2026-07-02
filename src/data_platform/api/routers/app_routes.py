@@ -783,7 +783,7 @@ async def check_domain_shield_status(
     try:
         answers = await asyncio.to_thread(dns.resolver.resolve, domain, "TXT")
         for rdata in answers:
-            txt = "".join(str(s) for s in rdata.strings)
+            txt = "".join(s.decode("utf-8", errors="ignore") if isinstance(s, bytes) else str(s) for s in rdata.strings)
             if "v=spf1" in txt:
                 status["spf"]["valid"] = True
                 status["spf"]["record"] = txt
@@ -829,7 +829,7 @@ async def check_domain_shield_status(
             dkim_domain = f"{selector}._domainkey.{domain}"
             answers = await asyncio.to_thread(dns.resolver.resolve, dkim_domain, "TXT")
             for rdata in answers:
-                txt = "".join(str(s) for s in rdata.strings)
+                txt = "".join(s.decode("utf-8", errors="ignore") if isinstance(s, bytes) else str(s) for s in rdata.strings)
                 if "v=DKIM1" in txt or "k=rsa" in txt:
                     status["dkim"]["valid"] = True
                     status["dkim"]["record"] = txt
@@ -849,7 +849,7 @@ async def check_domain_shield_status(
         dmarc_domain = f"_dmarc.{domain}"
         answers = await asyncio.to_thread(dns.resolver.resolve, dmarc_domain, "TXT")
         for rdata in answers:
-            txt = "".join(str(s) for s in rdata.strings)
+            txt = "".join(s.decode("utf-8", errors="ignore") if isinstance(s, bytes) else str(s) for s in rdata.strings)
             if "v=DMARC1" in txt:
                 status["dmarc"]["valid"] = True
                 status["dmarc"]["record"] = txt

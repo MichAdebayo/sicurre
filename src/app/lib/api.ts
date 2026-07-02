@@ -323,6 +323,8 @@ export function useTeardownCloudflare() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cf-integration"] });
       queryClient.invalidateQueries({ queryKey: ["cloudflare-list"] });
+      queryClient.invalidateQueries({ queryKey: ["cf-workspace-token"] });
+      queryClient.invalidateQueries({ queryKey: ["domain-shield"] });
     },
   });
 }
@@ -344,6 +346,7 @@ export function useSaveWorkspaceCloudflareToken() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cf-workspace-token"] });
+      queryClient.invalidateQueries({ queryKey: ["cloudflare-list"] });
     },
   });
 }
@@ -355,6 +358,9 @@ export function useDeleteWorkspaceCloudflareToken() {
       fetchJson<{ status: string }>(`${CF_BASE}/token`, { method: "DELETE" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cf-workspace-token"] });
+      queryClient.invalidateQueries({ queryKey: ["cf-integration"] });
+      queryClient.invalidateQueries({ queryKey: ["cloudflare-list"] });
+      queryClient.invalidateQueries({ queryKey: ["domain-shield"] });
     },
   });
 }

@@ -218,43 +218,72 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
   const { data: wsTokenData } = useWorkspaceCloudflareToken();
 
   // State for Cloudflare Auto-Fix Wizard
-  const [showAutoFix, setShowAutoFix] = useState(false);
-  const [cfToken, setCfToken] = useState("");
   const [autoFixProgress, setAutoFixProgress] = useState<"idle" | "verify" | "dns" | "routing" | "success" | "error">("idle");
-
-  // Pre-fill Cloudflare API token from workspace-level saved token
-  useEffect(() => {
-    if (wsTokenData?.api_token) {
-      setCfToken(wsTokenData.api_token);
-    } else if (selectedDomain && domainsList) {
-      const integration = domainsList.find((d) => d.zone_name === selectedDomain);
-      if (integration?.api_token) {
-        setCfToken(integration.api_token);
-      } else {
-        setCfToken("");
-      }
-    } else {
-      setCfToken("");
-    }
-  }, [wsTokenData, selectedDomain, domainsList]);
   const [autoFixErrorMsg, setAutoFixErrorMsg] = useState("");
   const [fixSpf, setFixSpf] = useState(true);
   const [fixDkim, setFixDkim] = useState(true);
   const [fixDmarc, setFixDmarc] = useState(true);
   const setupMutation = useSetupCloudflare();
 
+  const [successNotification, setSuccessNotification] = useState<string | null>(null);
+  const [errorNotification, setErrorNotification] = useState<string | null>(null);
+  const [dots, setDots] = useState("");
+
+  // Animated dots for "configuring..." state
+  useEffect(() => {
+    if (autoFixProgress === "idle" || autoFixProgress === "success" || autoFixProgress === "error") {
+      setDots("");
+      return;
+    }
+    const interval = setInterval(() => {
+      setDots((prev) => (prev.length >= 3 ? "" : prev + "."));
+    }, 450);
+    return () => clearInterval(interval);
+  }, [autoFixProgress]);
+
+  const getAutoFixButtonText = () => {
+    if (autoFixProgress === "verify") {
+      return isFR ? `Configuration en cours (vérification)${dots}` : `Configuring (verifying)${dots}`;
+    }
+    if (autoFixProgress === "dns") {
+      return isFR ? `Configuration en cours (écriture DNS)${dots}` : `Configuring (DNS records)${dots}`;
+    }
+    if (autoFixProgress === "routing") {
+      return isFR ? `Configuration en cours (redirection)${dots}` : `Configuring (email routing)${dots}`;
+    }
+    if (autoFixProgress === "success") {
+      return isFR ? "Configuration appliquée !" : "Configuration applied!";
+    }
+    if (autoFixProgress === "error") {
+      return isFR ? "Échec de la configuration" : "Configuration failed";
+    }
+    return isFR ? "Lancer l'Auto-Configuration" : "Launch Auto-Configuration";
+  };
+
   const handleRunAutoFix = async () => {
-    if (!cfToken.trim() || !selectedDomain) return;
+    const token = wsTokenData?.api_token;
+    if (!token) {
+      setErrorNotification(
+        isFR
+          ? "Configuration Cloudflare requise : Veuillez d'abord ajouter votre jeton API Cloudflare dans les Paramètres > onglet Intégrations."
+          : "Cloudflare Integration Required: Please configure your Cloudflare API token in Settings > Integrations first."
+      );
+      setTimeout(() => setErrorNotification(null), 4500);
+      return;
+    }
+
+    if (!selectedDomain) return;
+
     setAutoFixProgress("verify");
     setAutoFixErrorMsg("");
 
     try {
-      // Simulate stages
+      // Simulate stages for nice visual flow
       setTimeout(() => setAutoFixProgress("dns"), 1500);
       setTimeout(() => setAutoFixProgress("routing"), 3000);
       
       const payload = {
-        cf_api_token: cfToken,
+        cf_api_token: token,
         zone_name: selectedDomain,
         destination_email: session?.email || "owner@sicurre.com",
         fix_spf: fixSpf,
@@ -266,21 +295,40 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
         try {
           await setupMutation.mutateAsync(payload);
           setAutoFixProgress("success");
+          
+          setSuccessNotification(
+            isFR
+              ? "Auto-configuration DNS et redirection email appliquées avec succès !"
+              : "Cloudflare DNS configuration and email routing deployed successfully!"
+          );
+          
           reloadShield();
+          
           setTimeout(() => {
-            setShowAutoFix(false);
+            setSuccessNotification(null);
             setAutoFixProgress("idle");
-            setCfToken("");
-          }, 3000);
+          }, 4000);
         } catch (err: any) {
           setAutoFixProgress("error");
-          setAutoFixErrorMsg(err.message || "Échec de l'auto-configuration DNS.");
+          const msg = err.message || (isFR ? "Échec de l'auto-configuration DNS." : "Failed to deploy DNS records.");
+          setAutoFixErrorMsg(msg);
+          setErrorNotification(msg);
+          setTimeout(() => {
+            setErrorNotification(null);
+            setAutoFixProgress("idle");
+          }, 4500);
         }
       }, 4500);
 
     } catch (err: any) {
       setAutoFixProgress("error");
-      setAutoFixErrorMsg(err.message || "Échec de l'initialisation.");
+      const msg = err.message || (isFR ? "Échec de l'initialisation." : "Failed to initialize setup.");
+      setAutoFixErrorMsg(msg);
+      setErrorNotification(msg);
+      setTimeout(() => {
+        setErrorNotification(null);
+        setAutoFixProgress("idle");
+      }, 4500);
     }
   };
 
@@ -291,14 +339,40 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
   };
 
   return (
-    <MotionDiv
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -12 }}
-      transition={{ duration: 0.3 }}
-      className="space-y-8 animate-in fade-in duration-200"
-    >
-      {/* Header */}
+    <>
+      <AnimatePresence>
+        {successNotification && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, x: "-50%" }}
+            exit={{ opacity: 0, y: -50, x: "-50%" }}
+            className="fixed top-6 left-1/2 z-[9999] flex items-center gap-3 px-5 py-3.5 bg-safe/10 backdrop-blur-md border border-safe/25 text-safe font-bold text-xs rounded-xl shadow-xl max-w-md w-[90%] sm:w-full"
+          >
+            <CheckCircle2 className="w-5 h-5 shrink-0 text-safe animate-bounce" />
+            <span className="flex-1 text-left">{successNotification}</span>
+          </motion.div>
+        )}
+        {errorNotification && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, x: "-50%" }}
+            exit={{ opacity: 0, y: -50, x: "-50%" }}
+            className="fixed top-6 left-1/2 z-[9999] flex items-center gap-3 px-5 py-3.5 bg-error/10 backdrop-blur-md border border-error/25 text-error font-bold text-xs rounded-xl shadow-xl max-w-md w-[90%] sm:w-full"
+          >
+            <ShieldAlert className="w-5 h-5 shrink-0 text-error animate-pulse" />
+            <span className="flex-1 text-left">{errorNotification}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <MotionDiv
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -12 }}
+        transition={{ duration: 0.3 }}
+        className="space-y-8 animate-in fade-in duration-200"
+      >
+        {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border-subtle">
         <div>
           <h1 className="app-h1">
@@ -316,7 +390,9 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
           {domainsLoading ? (
             <div className="h-10 w-48 bg-surface-low rounded-lg animate-pulse" />
           ) : !domainsList || domainsList.length === 0 ? (
-            <span className="text-xs text-on-surface-variant/70 italic">No domains configured</span>
+            <span className="text-xs text-on-surface-variant/70 italic">
+              {isFR ? "Aucun domaine configuré" : "No domains configured"}
+            </span>
           ) : (
             <select
               value={selectedDomain}
@@ -348,12 +424,16 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
       {!selectedDomain ? (
         <div className="bg-surface-lowest rounded-2xl border border-border-subtle p-12 text-center text-on-surface-variant/50 max-w-lg mx-auto flex flex-col items-center justify-center shadow-sm">
           <Globe className="w-12 h-12 text-on-surface-variant/30 mb-3 animate-pulse" />
-          <p className="font-bold text-base text-on-surface">No Domain Shield active</p>
+          <p className="font-bold text-base text-on-surface">
+            {isFR ? "Aucun Bouclier de Domaine actif" : "No Domain Shield active"}
+          </p>
           <p className="text-sm mt-1 text-on-surface-variant">
-            Please integrate a domain via Cloudflare in the settings section to enable continuous domain health auditing.
+            {isFR
+              ? "Veuillez intégrer un domaine via Cloudflare dans les paramètres pour activer l'audit continu de santé de votre domaine."
+              : "Please integrate a domain via Cloudflare in the settings section to enable continuous domain health auditing."}
           </p>
         </div>
-      ) : isShieldLoading ? (
+      ) : (shieldLoading && !shieldStatus) ? (
         <div className="space-y-6">
           <div className="h-44 bg-surface-low rounded-2xl animate-pulse" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -365,7 +445,9 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
         <div className="bg-surface-lowest rounded-2xl border border-border-subtle p-8 text-center text-on-surface flex flex-col items-center justify-center max-w-md mx-auto">
           <ShieldAlert className="w-10 h-10 text-error mb-3" />
           <p className="font-bold text-sm">{t("common.error_occurred")}</p>
-          <p className="text-xs text-on-surface-variant mt-1 font-semibold">Could not fetch DNS security validation tags.</p>
+          <p className="text-xs text-on-surface-variant mt-1 font-semibold">
+            {isFR ? "Impossible de récupérer les balises de validation de sécurité DNS." : "Could not fetch DNS security validation tags."}
+          </p>
         </div>
       ) : (
         <>
@@ -796,95 +878,41 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   </div>
                 )}
 
-                {showAutoFix && (
-                  <div className="space-y-3 pt-2">
-                    {autoFixProgress === "idle" ? (
-                      <div className="space-y-3">
-                        {!wsTokenData?.api_token ? (
-                          <div className="p-4 bg-error/5 border border-error/20 rounded-xl space-y-2 text-xs text-error">
-                            <p className="font-bold flex items-center gap-1.5">
-                              <AlertTriangle className="w-4 h-4 shrink-0" />
-                              {isFR ? "Configuration Cloudflare requise" : "Cloudflare Integration Required"}
-                            </p>
-                            <p className="font-semibold text-on-surface-variant leading-normal">
-                              {isFR 
-                                ? "Veuillez d'abord configurer votre jeton API Cloudflare dans les Paramètres > onglet Intégrations avant de lancer l'auto-configuration." 
-                                : "Please configure your Cloudflare API token in Settings > Integrations first before launching auto-configuration."}
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="p-3 bg-safe/5 border border-safe/10 rounded-xl text-xs text-safe font-semibold flex items-center gap-2">
-                            <CheckCircle2 className="w-4 h-4 shrink-0 text-safe" />
-                            <span>
-                              {isFR 
-                                ? "Jeton API Cloudflare actif détecté dans votre espace de travail." 
-                                : "Active Cloudflare API token detected in your workspace."}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="p-4 bg-surface-low border border-border-subtle rounded-xl space-y-2 text-xs font-semibold">
-                        {autoFixProgress === "verify" && (
-                          <span className="flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5 animate-spin text-primary" /> {isFR ? "Vérification du token Cloudflare..." : "Verifying Cloudflare token..."}</span>
-                        )}
-                        {autoFixProgress === "dns" && (
-                          <span className="flex items-center gap-2">
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin text-primary" /> 
-                            {isFR 
-                              ? `Écriture des enregistrements sélectionnés (${[fixSpf && "SPF", fixDkim && "DKIM", fixDmarc && "DMARC"].filter(Boolean).join(", ")})...` 
-                              : `Writing selected DNS records (${[fixSpf && "SPF", fixDkim && "DKIM", fixDmarc && "DMARC"].filter(Boolean).join(", ")})...`}
-                          </span>
-                        )}
-                        {autoFixProgress === "routing" && (
-                          <span className="flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5 animate-spin text-primary" /> {isFR ? "Synchronisation de la redirection d'email..." : "Syncing email routing..."}</span>
-                        )}
-                        {autoFixProgress === "success" && (
-                          <span className="flex items-center gap-2 text-safe"><CheckCircle2 className="w-4 h-4" /> {isFR ? "Configuration DNS appliquée avec succès !" : "Selected DNS records successfully provisioned!"}</span>
-                        )}
-                        {autoFixProgress === "error" && (
-                          <span className="flex items-center gap-2 text-error"><ShieldAlert className="w-4 h-4" /> {autoFixErrorMsg}</span>
-                        )}
-                      </div>
-                    )}
+                {/* Cloudflare token warning alert shown inline only when token is missing */}
+                {!wsTokenData?.api_token && (
+                  <div className="p-4 bg-error/5 border border-error/20 rounded-xl space-y-2 text-xs text-error select-none">
+                    <p className="font-bold flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      {isFR ? "Configuration Cloudflare requise" : "Cloudflare Integration Required"}
+                    </p>
+                    <p className="font-semibold text-on-surface-variant leading-normal">
+                      {isFR 
+                        ? "Veuillez d'abord configurer votre jeton API Cloudflare dans les Paramètres > onglet Intégrations avant de lancer l'auto-configuration." 
+                        : "Please configure your Cloudflare API token in Settings > Integrations first before launching auto-configuration."}
+                    </p>
                   </div>
                 )}
               </div>
 
               <div className="pt-5 border-t border-border-subtle/50 mt-4 flex justify-end gap-3 select-none">
-                {showAutoFix ? (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setShowAutoFix(false);
-                        setAutoFixProgress("idle");
-                      }}
-                      className="cursor-pointer font-semibold text-xs border border-border-subtle hover:bg-surface-low/80 rounded-lg"
-                    >
-                      {isFR ? "Annuler" : "Cancel"}
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={handleRunAutoFix}
-                      disabled={autoFixProgress !== "idle" || !cfToken.trim() || (!fixSpf && !fixDkim && !fixDmarc) || !wsTokenData?.api_token}
-                      className="cursor-pointer font-bold text-xs bg-primary hover:bg-primary/90 text-on-primary border-none rounded-lg"
-                    >
-                      {isFR ? "Valider et Corriger" : "Validate & Deploy"}
-                    </Button>
-                  </>
-                ) : (
-                  needsDnsSetup && (
-                    <Button
-                      size="sm"
-                      onClick={() => setShowAutoFix(true)}
-                      className="w-full flex items-center justify-center gap-1.5 cursor-pointer bg-[#2e6bb5] hover:bg-[#23589b] text-white border-none text-xs font-bold rounded-lg transition-all h-[38px] shadow-sm"
-                    >
+                {needsDnsSetup && (
+                  <Button
+                    size="sm"
+                    onClick={handleRunAutoFix}
+                    disabled={autoFixProgress !== "idle" || !wsTokenData?.api_token}
+                    className={`w-full flex items-center justify-center gap-1.5 text-xs font-bold rounded-lg transition-all h-[38px] shadow-sm border ${
+                      autoFixProgress !== "idle"
+                        ? "bg-primary/10 border-primary/20 text-[#2e6bb5] cursor-wait"
+                        : "bg-[#2e6bb5] hover:bg-[#23589b] text-white border-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    }`}
+                  >
+                    {autoFixProgress !== "idle" && autoFixProgress !== "success" && autoFixProgress !== "error" ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#2e6bb5]" />
+                    ) : (
                       <MousePointerClick className="w-3.5 h-3.5" />
-                      <span>{isFR ? "Lancer l'Auto-Configuration" : "Launch DNS Setup Wizard"}</span>
-                    </Button>
-                  )
+                    )}
+                    <span>{getAutoFixButtonText()}</span>
+                  </Button>
                 )}
               </div>
             </div>
@@ -1230,5 +1258,6 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
         </>
       )}
     </MotionDiv>
+    </>
   );
 }

@@ -49,6 +49,57 @@ from data_platform.services.cloudflare_provisioner import (
     CloudflareProvisioner,
 )
 
+def _clean_str(val: str) -> str:
+    if not val:
+        return ""
+    val = val.strip()
+    if val.startswith("b'") or val.startswith('b"'):
+        val = val[2:-1]
+    return val
+
+def _merge_spf(current_spf: str) -> str:
+    cleaned = _clean_str(current_spf)
+    if not cleaned:
+        return "v=spf1 include:spf.cloudflare.com include:sicurre.com ~all"
+    parts = cleaned.split()
+    if not parts or parts[0] != "v=spf1":
+        return "v=spf1 include:spf.cloudflare.com include:sicurre.com ~all"
+    
+    mechanisms = []
+    all_mechanism = "~all"
+    for p in parts[1:]:
+        if p in ("-all", "~all", "?all", "+all"):
+            all_mechanism = p
+        else:
+            if p not in mechanisms:
+                mechanisms.append(p)
+    
+    for inc in ("include:spf.cloudflare.com", "include:sicurre.com"):
+        if inc not in mechanisms:
+            mechanisms.append(inc)
+    
+    return f"v=spf1 {' '.join(mechanisms)} {all_mechanism}"
+
+def _merge_dmarc(current_dmarc: str) -> str:
+    cleaned = _clean_str(current_dmarc)
+    if not cleaned:
+        return "v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc@sicurre.com"
+    
+    policy = "quarantine"
+    if "p=reject" in cleaned:
+        policy = "reject"
+    
+    import re
+    rec = re.sub(r"p=[^;]+", f"p={policy}", cleaned)
+    
+    if "rua=" in rec:
+        if "dmarc@sicurre.com" not in rec:
+            rec = re.sub(r"(rua=[^;'\"]+)", r"\1,mailto:dmarc@sicurre.com", rec)
+    else:
+        rec = rec.rstrip("; ") + "; rua=mailto:dmarc@sicurre.com"
+    
+    return rec
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["integrations"])
@@ -438,17 +489,33 @@ async def setup_cloudflare(
 
     # Check for an existing active integration for this zone
     existing = await _async_query(
-        "SELECT id, status FROM cloudflare_integration WHERE workspace_id = ? AND zone_name = ? LIMIT 1",
+        "SELECT * FROM cloudflare_integration WHERE workspace_id = ? AND zone_name = ? LIMIT 1",
         (current_user.workspace_id, payload.zone_name),
     )
-    if existing and existing[0]["status"] in (
-        "active",
-        "pending_verification",
-        "provisioning",
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"An integration for {payload.zone_name} already exists (status: {existing[0]['status']}). Tear it down first.",
+    if existing:
+        row = existing[0]
+        if row["status"] == "provisioning":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"An auto-configuration for {payload.zone_name} is already running in the background. Please wait.",
+            )
+        
+        # Auto-teardown old cloudflare resources under the hood
+        try:
+            provisioner = CloudflareProvisioner(api_token=payload.cf_api_token)
+            await provisioner.teardown(
+                zone_id=row["zone_id"],
+                account_id=row["account_id"],
+                worker_name=row["worker_name"],
+                rule_id=row.get("rule_id") or "unknown",
+            )
+        except Exception as exc:
+            logger.warning("Cloudflare auto-teardown during overwrite had warnings: %s", exc)
+        
+        # Clean up old database record
+        await _async_query(
+            "DELETE FROM cloudflare_integration WHERE id = ?",
+            (row["id"],),
         )
 
     # Derive the public scan URL for the Worker to call back
@@ -488,6 +555,16 @@ async def setup_cloudflare(
         ),
     )
 
+    # Also automatically persist the token into app_cloudflare_config for the workspace
+    if payload.cf_api_token:
+        await _async_query(
+            """
+            INSERT OR REPLACE INTO app_cloudflare_config (workspace_id, api_token, created_at, updated_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (current_user.workspace_id, payload.cf_api_token, now, now),
+        )
+
     async def _run_provisioning() -> None:
         try:
             provisioner = CloudflareProvisioner(api_token=payload.cf_api_token)
@@ -519,19 +596,78 @@ async def setup_cloudflare(
                 ),
             )
             
-            # Update DNS configuration cache so that it matches selected checkboxes immediately
-            status_rows = await _async_query(
-                "SELECT spf_valid, dkim_valid, dmarc_valid FROM app_domain_shield_status WHERE domain = ? LIMIT 1",
-                (payload.zone_name,)
-            )
+            # 1. Fetch existing DNS records from Cloudflare to check values
+            dns_records = await provisioner.get_dns_records(result.zone_id)
+            existing_spf_content = ""
+            existing_dmarc_content = ""
             
-            spf_val = 1 if payload.fix_spf else (status_rows[0]["spf_valid"] if status_rows else 0)
-            dkim_val = 1 if payload.fix_dkim else (status_rows[0]["dkim_valid"] if status_rows else 0)
-            dmarc_val = 1 if payload.fix_dmarc else (status_rows[0]["dmarc_valid"] if status_rows else 0)
-            
-            spf_rec = "v=spf1 include:spf.cloudflare.com include:sicurre.com ~all" if spf_val else None
-            dkim_rec = "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA..." if dkim_val else None
-            dmarc_rec = "v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc@sicurre.com" if dmarc_val else None
+            for rec in dns_records:
+                if rec.get("type") == "TXT":
+                    rec_name = _clean_str(rec.get("name", "")).lower().rstrip(".")
+                    if rec_name == payload.zone_name.lower():
+                        existing_spf_content = _clean_str(rec.get("content", ""))
+                    elif rec_name == f"_dmarc.{payload.zone_name}".lower():
+                        existing_dmarc_content = _clean_str(rec.get("content", ""))
+
+            # 2. Deploy SPF to Cloudflare DNS
+            spf_val = 0
+            spf_rec = None
+            if payload.fix_spf:
+                spf_rec = _merge_spf(existing_spf_content)
+                await provisioner.deploy_dns_record(
+                    zone_id=result.zone_id,
+                    rec_type="TXT",
+                    name=payload.zone_name,
+                    content=spf_rec,
+                )
+                spf_val = 1
+            else:
+                status_rows = await _async_query(
+                    "SELECT spf_valid, spf_record FROM app_domain_shield_status WHERE domain = ? LIMIT 1",
+                    (payload.zone_name,)
+                )
+                spf_val = status_rows[0]["spf_valid"] if (status_rows and status_rows[0]["spf_valid"]) else 0
+                spf_rec = status_rows[0]["spf_record"] if (status_rows and status_rows[0]["spf_record"]) else None
+
+            # 3. Deploy DKIM to Cloudflare DNS
+            dkim_val = 0
+            dkim_rec = None
+            if payload.fix_dkim:
+                dkim_rec = "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA..."
+                await provisioner.deploy_dns_record(
+                    zone_id=result.zone_id,
+                    rec_type="TXT",
+                    name=f"cloudflare._domainkey.{payload.zone_name}",
+                    content=dkim_rec,
+                )
+                dkim_val = 1
+            else:
+                status_rows = await _async_query(
+                    "SELECT dkim_valid, dkim_record FROM app_domain_shield_status WHERE domain = ? LIMIT 1",
+                    (payload.zone_name,)
+                )
+                dkim_val = status_rows[0]["dkim_valid"] if (status_rows and status_rows[0]["dkim_valid"]) else 0
+                dkim_rec = status_rows[0]["dkim_record"] if (status_rows and status_rows[0]["dkim_record"]) else None
+
+            # 4. Deploy DMARC to Cloudflare DNS
+            dmarc_val = 0
+            dmarc_rec = None
+            if payload.fix_dmarc:
+                dmarc_rec = _merge_dmarc(existing_dmarc_content)
+                await provisioner.deploy_dns_record(
+                    zone_id=result.zone_id,
+                    rec_type="TXT",
+                    name=f"_dmarc.{payload.zone_name}",
+                    content=dmarc_rec,
+                )
+                dmarc_val = 1
+            else:
+                status_rows = await _async_query(
+                    "SELECT dmarc_valid, dmarc_record FROM app_domain_shield_status WHERE domain = ? LIMIT 1",
+                    (payload.zone_name,)
+                )
+                dmarc_val = status_rows[0]["dmarc_valid"] if (status_rows and status_rows[0]["dmarc_valid"]) else 0
+                dmarc_rec = status_rows[0]["dmarc_record"] if (status_rows and status_rows[0]["dmarc_record"]) else None
             
             rep_score = 100
             if not spf_val: rep_score -= 20
@@ -666,6 +802,23 @@ async def teardown_cloudflare(
         "DELETE FROM cloudflare_integration WHERE id = ?",
         (row["id"],),
     )
+
+    # Check if any remaining connected domains exist for this workspace
+    remaining = await _async_query(
+        "SELECT id FROM cloudflare_integration WHERE workspace_id = ? LIMIT 1",
+        (current_user.workspace_id,),
+    )
+    if not remaining:
+        # Parent domain removed: purge orphaned workspace tokens and shield cache
+        await _async_query(
+            "DELETE FROM app_cloudflare_config WHERE workspace_id = ?",
+            (current_user.workspace_id,),
+        )
+        await _async_query(
+            "DELETE FROM app_domain_shield_status WHERE workspace_id = ? OR domain = ?",
+            (current_user.workspace_id, row["zone_name"]),
+        )
+
     return {"status": "removed", "zone_name": row["zone_name"]}
 
 
@@ -710,14 +863,30 @@ class CloudflareTokenSaveRequest(BaseModel):
 async def get_workspace_cloudflare_token(
     current_user: AuthUser = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """Retrieve the stored Cloudflare API token for the current workspace."""
+    """Retrieve the stored Cloudflare API token for the current workspace if an active domain is connected."""
+    _ensure_tables()
+    
+    # Require at least one connected domain in cloudflare_integration
+    integ_rows = await _async_query(
+        "SELECT api_token FROM cloudflare_integration WHERE workspace_id = ? AND api_token IS NOT NULL AND api_token != '' ORDER BY created_at DESC LIMIT 1",
+        (current_user.workspace_id,),
+    )
+    if not integ_rows:
+        # Parent domain missing: purge orphaned token config if any
+        await _async_query(
+            "DELETE FROM app_cloudflare_config WHERE workspace_id = ?",
+            (current_user.workspace_id,),
+        )
+        return {"api_token": None}
+
     rows = await _async_query(
         "SELECT api_token FROM app_cloudflare_config WHERE workspace_id = ? LIMIT 1",
         (current_user.workspace_id,),
     )
-    if not rows:
-        return {"api_token": None}
-    return {"api_token": rows[0]["api_token"]}
+    if rows and rows[0]["api_token"]:
+        return {"api_token": rows[0]["api_token"]}
+
+    return {"api_token": integ_rows[0]["api_token"]}
 
 @router.post("/v1/integrations/cloudflare/token")
 async def save_workspace_cloudflare_token(
@@ -754,9 +923,17 @@ async def save_workspace_cloudflare_token(
 async def delete_workspace_cloudflare_token(
     current_user: AuthUser = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """Delete the stored Cloudflare API token for the current workspace."""
+    """Delete the stored Cloudflare API token and all connected integrations for the current workspace."""
     await _async_query(
         "DELETE FROM app_cloudflare_config WHERE workspace_id = ?",
+        (current_user.workspace_id,),
+    )
+    await _async_query(
+        "DELETE FROM cloudflare_integration WHERE workspace_id = ?",
+        (current_user.workspace_id,),
+    )
+    await _async_query(
+        "DELETE FROM app_domain_shield_status WHERE workspace_id = ?",
         (current_user.workspace_id,),
     )
     return {"status": "deleted"}
