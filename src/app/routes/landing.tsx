@@ -286,18 +286,18 @@ export default function LandingRoute({
     <div className="min-h-screen font-sans select-none relative overflow-x-hidden bg-black text-white">
       
       {/* ═══════════════════════════════════════════════════════════════════════
-          HEADER — Sticky glassmorphism nav (Resend-style)
+          HEADER — Sticky glassmorphism nav (No height jump on scroll)
           ═══════════════════════════════════════════════════════════════════════ */}
       <header
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        className={`fixed top-0 left-0 right-0 z-50 py-3.5 transition-all duration-300 ${
           scrolled
-            ? "bg-black/70 backdrop-blur-xl border-b border-white/5 py-3"
-            : "bg-transparent py-5"
+            ? "bg-black/80 backdrop-blur-xl border-b border-white/10 shadow-lg shadow-black/40"
+            : "bg-transparent border-b border-transparent"
         }`}
       >
         <div className="max-w-7xl mx-auto px-6 lg:px-8 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src={sicurreLogo} alt="Sicurre Logo" className="w-10 h-10" />
+            <img src={sicurreLogo} alt="Sicurre Logo" className="w-9 h-9" />
             <span className="font-display font-bold text-xl tracking-tight text-white">
               Sicurre
             </span>
@@ -309,7 +309,7 @@ export default function LandingRoute({
           </nav>
 
           <div className="flex items-center gap-4">
-            <LanguageSwitcher scrolled={false} />
+            <LanguageSwitcher scrolled={scrolled} />
             <button
               onClick={onNavigateToLogin}
               className="text-[13px] font-medium text-white/50 hover:text-white transition-colors cursor-pointer hidden sm:block"
@@ -327,10 +327,10 @@ export default function LandingRoute({
       </header>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          HERO — Resend-style large serif heading + animation
+          HERO — Sleek heading, trust badges & marquee banner
           ═══════════════════════════════════════════════════════════════════════ */}
-      <section className="relative w-full min-h-screen flex flex-col justify-between overflow-hidden">
-        {/* ── Layer 1: Floor surface with subtle reflections (Resend bg-hero-1 equivalent) ── */}
+      <section className="relative w-full overflow-hidden pt-28 pb-12 lg:pt-36 lg:pb-16">
+        {/* ── Layer 1: Floor surface with subtle reflections ── */}
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
@@ -346,7 +346,7 @@ export default function LandingRoute({
           }}
         />
         
-        {/* ── Layer 2: Light ray cone from top center (Resend bg-light equivalent) ── */}
+        {/* ── Layer 2: Light ray cone from top center ── */}
         <div
           className="absolute pointer-events-none"
           style={{
@@ -372,7 +372,7 @@ export default function LandingRoute({
           }}
         />
 
-        {/* ── Layer 3: Radial spotlight glow (soft center wash) ── */}
+        {/* ── Layer 3: Radial spotlight glow ── */}
         <div
           className="absolute pointer-events-none"
           style={{
@@ -397,7 +397,7 @@ export default function LandingRoute({
           }}
         />
 
-        {/* ── Layer 5: Side vignette (dark blue tint at edges like Resend) ── */}
+        {/* ── Layer 5: Side vignette ── */}
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
@@ -407,21 +407,22 @@ export default function LandingRoute({
           }}
         />
 
-        {/* ── Layer 6: Very subtle grid texture ── */}
+        {/* ── Layer 6: Grid texture ── */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.008)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.008)_1px,transparent_1px)] bg-[size:5rem_5rem] pointer-events-none" />
 
         {/* Hero content */}
-        <div className="flex-1 w-full max-w-7xl mx-auto px-6 lg:px-12 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-center relative z-10 pt-32 pb-8">
+        <div className="w-full max-w-7xl mx-auto px-6 lg:px-12 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-center relative z-10">
           <div className="lg:col-span-6 space-y-6 flex flex-col justify-center">
             <MotionDiv
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.1 }}
             >
-              <h1 className="font-display font-extrabold text-[clamp(2.5rem,5.5vw,4.5rem)] leading-[1.05] tracking-[-0.02em] text-white">
+              <h1 className="font-display font-extrabold text-[clamp(2.25rem,4.5vw,3.75rem)] leading-[1.12] tracking-[-0.025em] text-white">
                 {t("landing.hero_title_line1")}
-                <br />
-                <span className="text-white/40">{t("landing.hero_title_line2")}</span>
+                <span className="block text-white/50 font-semibold mt-1">
+                  {t("landing.hero_title_line2")}
+                </span>
               </h1>
             </MotionDiv>
 
@@ -429,7 +430,7 @@ export default function LandingRoute({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="text-[16px] sm:text-[18px] text-white/50 leading-[1.6] max-w-[30rem] font-normal"
+              className="text-[15px] sm:text-[17px] text-white/50 leading-[1.6] max-w-[32rem] font-normal"
             >
               {t("landing.hero_desc")}
             </MotionDiv>
@@ -442,14 +443,14 @@ export default function LandingRoute({
             >
               <button
                 onClick={onNavigateToSignUp}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl text-[15px] font-semibold transition-all active:scale-[0.97] cursor-pointer text-white border border-white/10 bg-white/[0.06] hover:bg-white/90 hover:text-black hover:shadow-[0_0_20px_rgba(255,255,255,0.15)] duration-200"
+                className="flex items-center gap-2 px-6 py-3.5 rounded-xl text-[15px] font-semibold transition-all active:scale-[0.97] cursor-pointer text-white border border-white/10 bg-white/[0.08] hover:bg-white/90 hover:text-black hover:shadow-[0_0_20px_rgba(255,255,255,0.15)] duration-200"
               >
                 <span>{t("landing.hero_cta_primary")}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
               <a
                 href="#features"
-                className="flex items-center gap-2 px-6 py-3 text-[15px] font-medium text-white/50 hover:text-white transition-colors cursor-pointer"
+                className="flex items-center gap-2 px-6 py-3.5 text-[15px] font-medium text-white/50 hover:text-white transition-colors cursor-pointer"
               >
                 {t("landing.hero_cta_secondary")}
               </a>
@@ -459,9 +460,10 @@ export default function LandingRoute({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.6, delay: 0.45 }}
-              className="text-[13px] text-white/35 font-medium pt-2 max-w-md"
+              className="flex items-center gap-2 text-[13px] text-white/40 font-medium pt-1"
             >
-              {t("landing.hero_note")}
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{t("landing.hero_note")}</span>
             </MotionDiv>
           </div>
 
@@ -477,13 +479,13 @@ export default function LandingRoute({
           </div>
         </div>
 
-        {/* Marquee loop at bottom of hero — highly visible with primary tinted background */}
+        {/* Marquee loop integrated at base of hero */}
         <div 
-          className="w-full py-5 relative z-20"
+          className="w-full mt-12 lg:mt-16 py-4 relative z-20"
           style={{
-            background: "linear-gradient(135deg, rgba(46,107,181,0.25) 0%, rgba(74,144,217,0.15) 50%, rgba(46,107,181,0.25) 100%)",
-            borderTop: "1px solid rgba(74,144,217,0.3)",
-            borderBottom: "1px solid rgba(74,144,217,0.2)",
+            background: "linear-gradient(135deg, rgba(46,107,181,0.2) 0%, rgba(74,144,217,0.1) 50%, rgba(46,107,181,0.2) 100%)",
+            borderTop: "1px solid rgba(74,144,217,0.25)",
+            borderBottom: "1px solid rgba(74,144,217,0.15)",
             backdropFilter: "blur(12px)",
             WebkitBackdropFilter: "blur(12px)",
           }}
@@ -493,8 +495,8 @@ export default function LandingRoute({
               {[...marqueeItems, ...marqueeItems].map((item, idx) => {
                 const Icon = item.icon;
                 return (
-                  <span key={idx} className="flex items-center gap-3 text-[13px] font-bold tracking-[0.15em] uppercase text-white/80">
-                    <Icon className="w-4.5 h-4.5 text-white/50" />
+                  <span key={idx} className="flex items-center gap-3 text-[12px] font-bold tracking-[0.15em] uppercase text-white/70">
+                    <Icon className="w-4 h-4 text-white/40" />
                     {item.label}
                   </span>
                 );
@@ -505,19 +507,19 @@ export default function LandingRoute({
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          FEATURES — 3-column glassmorphism grid with gradient accents
+          FEATURES — 3-column glassmorphism grid
           ═══════════════════════════════════════════════════════════════════════ */}
-      <section id="features" className="py-28 lg:py-36 relative">
+      <section id="features" className="py-16 lg:py-24 relative">
         {/* Background glow */}
         <div className="absolute inset-0 pointer-events-none" style={{
           background: "radial-gradient(ellipse 80% 50% at 50% 20%, rgba(74,144,217,0.06) 0%, transparent 60%)",
         }} />
 
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 space-y-20 relative z-10">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 space-y-14 relative z-10">
           
-          <FadeInSection className="text-center max-w-3xl mx-auto space-y-5">
+          <FadeInSection className="text-center max-w-3xl mx-auto space-y-4">
             <span
-              className="px-4 py-2 rounded-full w-fit inline-block text-[12px] font-bold tracking-widest uppercase"
+              className="px-4 py-1.5 rounded-full w-fit inline-block text-[12px] font-bold tracking-widest uppercase"
               style={{ 
                 color: "#4a90d9", 
                 backgroundColor: "rgba(74, 144, 217, 0.1)",
@@ -526,15 +528,15 @@ export default function LandingRoute({
             >
               {t("landing.features_label")}
             </span>
-            <h2 className="font-display font-extrabold text-[clamp(2rem,4.5vw,3.25rem)] leading-[1.08] tracking-[-0.025em] text-white mt-4">
+            <h2 className="font-display font-extrabold text-[clamp(1.85rem,3.8vw,2.75rem)] leading-[1.1] tracking-[-0.02em] text-white mt-3">
               {t("landing.features_title")}
             </h2>
-            <p className="text-[17px] leading-[1.7] max-w-2xl mx-auto font-normal text-white/45">
+            <p className="text-[16px] leading-[1.65] max-w-2xl mx-auto font-normal text-white/45">
               {t("landing.features_desc")}
             </p>
           </FadeInSection>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-7">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {featuresConfig.map((feat, idx) => {
               const IconComponent = feat.icon;
               return (
@@ -560,15 +562,15 @@ export default function LandingRoute({
                       background: `radial-gradient(circle at 0% 0%, ${feat.lineColor}12, transparent 70%)`,
                     }} />
 
-                    <div className="p-9 space-y-6 flex-1 flex flex-col justify-between relative z-10">
-                      <div className="space-y-5">
+                    <div className="p-7 space-y-5 flex-1 flex flex-col justify-between relative z-10">
+                      <div className="space-y-4">
                         <div 
                           className="group-hover:scale-110 group-hover:-translate-y-1 transition-all duration-300"
                           style={{
-                            width: "48px",
-                            height: "48px",
-                            borderRadius: "14px",
-                            padding: "10px",
+                            width: "44px",
+                            height: "44px",
+                            borderRadius: "12px",
+                            padding: "9px",
                             backgroundColor: feat.iconBg,
                             border: `1px solid ${feat.iconColor}25`,
                             display: "flex",
@@ -576,25 +578,25 @@ export default function LandingRoute({
                             justifyContent: "center",
                           }}
                         >
-                          <IconComponent style={{ width: "26px", height: "26px", color: feat.iconColor }} strokeWidth={1.5} />
+                          <IconComponent style={{ width: "24px", height: "24px", color: feat.iconColor }} strokeWidth={1.5} />
                         </div>
 
-                        <div className="font-display font-bold text-[28px] text-white tracking-[-0.02em] leading-tight">
+                        <div className="font-display font-bold text-[26px] text-white tracking-[-0.02em] leading-tight">
                           {feat.stat}
                         </div>
 
                         <div 
-                          className="text-[12px] uppercase tracking-[0.12em] font-bold"
+                          className="text-[11px] uppercase tracking-[0.12em] font-bold"
                           style={{ color: feat.labelColor }}
                         >
                           {feat.label}
                         </div>
 
-                        <h3 className="font-display font-bold text-[18px] text-white/85 tracking-tight leading-snug">
+                        <h3 className="font-display font-bold text-[17px] text-white/90 tracking-tight leading-snug">
                           {feat.title}
                         </h3>
 
-                        <p className="text-[15px] leading-[1.7] text-white/40">
+                        <p className="text-[14px] leading-[1.65] text-white/45">
                           {feat.desc}
                         </p>
                       </div>
@@ -608,21 +610,21 @@ export default function LandingRoute({
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          INTEGRATION — 1-Click DNS auto-config showcase (glassmorphism)
+          INTEGRATION — 1-Click DNS auto-config showcase
           ═══════════════════════════════════════════════════════════════════════ */}
-      <section id="integration" className="py-28 lg:py-36 relative">
+      <section id="integration" className="py-16 lg:py-24 relative">
         {/* Background glow */}
         <div className="absolute inset-0 pointer-events-none" style={{
           background: "radial-gradient(ellipse 60% 40% at 30% 50%, rgba(16,185,129,0.05) 0%, transparent 60%)",
         }} />
         
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-14 lg:gap-20 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             
             {/* Left: Copy */}
-            <FadeInSection className="space-y-7">
+            <FadeInSection className="space-y-6">
               <span
-                className="px-4 py-2 rounded-full w-fit inline-block text-[12px] font-bold tracking-widest uppercase"
+                className="px-4 py-1.5 rounded-full w-fit inline-block text-[12px] font-bold tracking-widest uppercase"
                 style={{ 
                   color: "#10b981", 
                   backgroundColor: "rgba(16, 185, 129, 0.1)",
@@ -632,30 +634,30 @@ export default function LandingRoute({
                 {t("landing.integration_label")}
               </span>
               
-              <h2 className="font-display font-extrabold text-[clamp(2rem,4.5vw,3.25rem)] leading-[1.08] tracking-[-0.025em] text-white">
+              <h2 className="font-display font-extrabold text-[clamp(1.85rem,3.8vw,2.75rem)] leading-[1.1] tracking-[-0.02em] text-white">
                 {t("landing.integration_title")}
               </h2>
               
-              <p className="text-[17px] leading-[1.7] text-white/45 font-normal max-w-lg">
+              <p className="text-[16px] leading-[1.65] text-white/45 font-normal max-w-lg">
                 {t("landing.integration_desc")}
               </p>
 
-              <div className="flex flex-col sm:flex-row items-start gap-4 pt-3">
+              <div className="flex flex-col sm:flex-row items-start gap-4 pt-2">
                 <button
                   onClick={onNavigateToSignUp}
-                  className="flex items-center gap-2.5 px-7 py-3.5 rounded-xl text-[15px] font-semibold transition-all active:scale-[0.97] cursor-pointer duration-200"
+                  className="flex items-center gap-2.5 px-6 py-3 rounded-xl text-[14px] font-semibold transition-all active:scale-[0.97] cursor-pointer duration-200"
                   style={{
                     background: "linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(16,185,129,0.08) 100%)",
                     border: "1px solid rgba(16,185,129,0.25)",
                     color: "#10b981",
                   }}
                 >
-                  <Terminal className="w-4.5 h-4.5" />
+                  <Terminal className="w-4 h-4" />
                   <span>{t("landing.integration_cta")}</span>
                 </button>
               </div>
 
-              <p className="text-[14px] text-white/25 font-medium pt-1">
+              <p className="text-[13px] text-white/30 font-medium pt-1">
                 {t("landing.integration_note")}
               </p>
             </FadeInSection>
@@ -669,29 +671,29 @@ export default function LandingRoute({
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          CTA — Honest early-stage conversion section
+          CTA — Early-stage conversion section
           ═══════════════════════════════════════════════════════════════════════ */}
-      <section className="py-28 lg:py-36 relative">
+      <section className="py-16 lg:py-24 relative">
         {/* Background glow */}
         <div className="absolute inset-0 pointer-events-none" style={{
           background: "radial-gradient(ellipse 70% 50% at 50% 30%, rgba(74,144,217,0.06) 0%, transparent 60%)",
         }} />
 
-        <div className="max-w-4xl mx-auto px-6 lg:px-8 text-center space-y-12 relative z-10">
-          <FadeInSection className="space-y-5">
-            <h2 className="font-display font-extrabold text-[clamp(1.75rem,4.5vw,3rem)] leading-[1.08] tracking-[-0.025em] text-white mt-4">
+        <div className="max-w-4xl mx-auto px-6 lg:px-8 text-center space-y-10 relative z-10">
+          <FadeInSection className="space-y-4">
+            <h2 className="font-display font-extrabold text-[clamp(1.75rem,3.8vw,2.5rem)] leading-[1.1] tracking-[-0.02em] text-white mt-2">
               {t("landing.cta_section_title")}
             </h2>
-            <p className="text-[17px] leading-[1.7] max-w-xl mx-auto font-normal text-white/45">
+            <p className="text-[16px] leading-[1.65] max-w-xl mx-auto font-normal text-white/45">
               {t("landing.cta_section_desc")}
             </p>
           </FadeInSection>
 
           <FadeInSection delay={0.14}>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-1">
               <button
                 onClick={onNavigateToSignUp}
-                className="flex items-center gap-2.5 px-8 py-4 rounded-xl text-[16px] font-semibold transition-all active:scale-[0.97] cursor-pointer duration-200"
+                className="flex items-center gap-2.5 px-7 py-3.5 rounded-xl text-[15px] font-semibold transition-all active:scale-[0.97] cursor-pointer duration-200"
                 style={{
                   background: "linear-gradient(135deg, rgba(74,144,217,0.2) 0%, rgba(74,144,217,0.1) 100%)",
                   border: "1px solid rgba(74,144,217,0.3)",
@@ -700,25 +702,25 @@ export default function LandingRoute({
                 }}
               >
                 <span>{t("landing.cta_section_trial")}</span>
-                <ArrowRight className="w-4.5 h-4.5" />
+                <ArrowRight className="w-4 h-4" />
               </button>
             </div>
-            <div className="text-[14px] text-white/25 mt-4 font-medium">
+            <div className="text-[13px] text-white/30 mt-3 font-medium">
               {t("landing.cta_no_card")}
             </div>
           </FadeInSection>
 
-          <FadeInSection delay={0.18} className="pt-6 flex flex-wrap justify-center gap-x-10 gap-y-3 text-[14px] font-medium">
-            <div className="flex items-center gap-2.5 text-white/35">
-              <ShieldCheck className="w-4.5 h-4.5 text-emerald-500/70" />
+          <FadeInSection delay={0.18} className="pt-4 flex flex-wrap justify-center gap-x-8 gap-y-3 text-[13px] font-medium">
+            <div className="flex items-center gap-2 text-white/40">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
               <span>{t("landing.cta_badge_rgpd")}</span>
             </div>
-            <div className="flex items-center gap-2.5 text-white/35">
-              <ShieldCheck className="w-4.5 h-4.5 text-emerald-500/70" />
+            <div className="flex items-center gap-2 text-white/40">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
               <span>{t("landing.cta_badge_sovereign")}</span>
             </div>
-            <div className="flex items-center gap-2.5 text-white/35">
-              <ShieldCheck className="w-4.5 h-4.5 text-emerald-500/70" />
+            <div className="flex items-center gap-2 text-white/40">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
               <span>{t("landing.cta_badge_instant")}</span>
             </div>
           </FadeInSection>
