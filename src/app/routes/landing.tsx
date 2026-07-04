@@ -142,27 +142,28 @@ function IntegrationTerminal() {
   return (
     <div
       style={{
-        background: "linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.005) 100%)",
-        border: "1px solid rgba(255,255,255,0.08)",
-        borderRadius: "16px",
-        overflow: "hidden",
+        background: "rgba(16, 20, 32, 0.75)",
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
+        border: "1px solid rgba(255, 255, 255, 0.09)",
+        boxShadow: "0 20px 50px rgba(0, 0, 0, 0.5)",
       }}
-      className="w-full max-w-[520px]"
+      className="w-full max-w-[500px] rounded-2xl overflow-hidden"
     >
       {/* Terminal Header */}
-      <div className="flex items-center gap-2 px-5 py-3.5 border-b border-white/5">
+      <div className="flex items-center gap-2 px-5 py-3 border-b border-white/5 bg-white/[0.02]">
         <div className="flex gap-1.5">
-          <div className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]" />
-          <div className="w-2.5 h-2.5 rounded-full bg-[#febc2e]" />
-          <div className="w-2.5 h-2.5 rounded-full bg-[#28c840]" />
+          <div className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]/80" />
+          <div className="w-2.5 h-2.5 rounded-full bg-[#febc2e]/80" />
+          <div className="w-2.5 h-2.5 rounded-full bg-[#28c840]/80" />
         </div>
-        <div className="flex-1 text-center">
-          <span className="text-[11px] text-white/30 font-mono">sicurre — integration</span>
+        <div className="flex-1 text-center pr-8">
+          <span className="text-[11px] text-white/40 font-mono tracking-wide">sicurre — cloudflare email routing</span>
         </div>
       </div>
 
       {/* Terminal Body */}
-      <div className="p-5 space-y-3 font-mono text-[13px]">
+      <div className="p-5 space-y-2.5 text-[13px]">
         {steps.map((step, idx) => {
           const Icon = step.icon;
           const isActive = idx <= activeStep;
@@ -173,27 +174,29 @@ function IntegrationTerminal() {
               initial={{ opacity: 0.3 }}
               animate={{ opacity: isActive ? 1 : 0.3 }}
               transition={{ duration: 0.4 }}
-              className={`flex items-start gap-3 py-2.5 px-3 rounded-lg transition-all duration-300 ${
-                isCurrent ? "bg-white/[0.04]" : ""
+              className={`flex items-start gap-3.5 py-3 px-3.5 rounded-xl transition-all duration-300 border ${
+                isCurrent
+                  ? "bg-white/[0.04] border-white/10 shadow-sm"
+                  : "border-transparent"
               }`}
             >
               <div
-                className="mt-0.5 flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center transition-all duration-300"
+                className="mt-0.5 flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-300"
                 style={{
-                  backgroundColor: isActive ? `${step.color}15` : "rgba(255,255,255,0.03)",
-                  border: `1px solid ${isActive ? `${step.color}30` : "rgba(255,255,255,0.05)"}`,
+                  backgroundColor: isActive ? `${step.color}18` : "rgba(255,255,255,0.03)",
+                  border: `1px solid ${isActive ? `${step.color}35` : "rgba(255,255,255,0.05)"}`,
                 }}
               >
                 {isActive && idx < activeStep ? (
-                  <CheckCircle2 className="w-3.5 h-3.5" style={{ color: step.color }} />
+                  <CheckCircle2 className="w-4 h-4" style={{ color: step.color }} />
                 ) : (
-                  <Icon className="w-3.5 h-3.5" style={{ color: isActive ? step.color : "#555" }} />
+                  <Icon className="w-4 h-4" style={{ color: isActive ? step.color : "#666" }} />
                 )}
               </div>
               <div className="flex-1 min-w-0">
                 <div
-                  className="text-[12px] font-semibold leading-tight transition-colors"
-                  style={{ color: isActive ? "#e2e8f0" : "#555", fontFamily: "Inter, system-ui, sans-serif" }}
+                  className="text-[13px] font-semibold leading-snug transition-colors"
+                  style={{ color: isActive ? "#f1f5f9" : "#666" }}
                 >
                   {step.title}
                 </div>
@@ -203,14 +206,14 @@ function IntegrationTerminal() {
                     animate={{ opacity: 1, height: "auto" }}
                     transition={{ duration: 0.3 }}
                   >
-                    <p className="text-[11px] text-white/40 mt-1 leading-relaxed" style={{ fontFamily: "Inter, system-ui, sans-serif" }}>
+                    <p className="text-[12px] text-white/50 mt-1 leading-relaxed">
                       {step.desc}
                     </p>
                   </MotionDiv>
                 )}
               </div>
               {isCurrent && (
-                <div className="mt-1 w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: step.color }} />
+                <div className="mt-1.5 w-2 h-2 rounded-full animate-pulse shrink-0" style={{ backgroundColor: step.color }} />
               )}
             </MotionDiv>
           );
@@ -479,24 +482,17 @@ export default function LandingRoute({
           </div>
         </div>
 
-        {/* Marquee loop integrated at base of hero */}
+        {/* Marquee loop integrated flush at base of hero */}
         <div 
-          className="w-full mt-12 lg:mt-16 py-4 relative z-20"
-          style={{
-            background: "linear-gradient(135deg, rgba(46,107,181,0.2) 0%, rgba(74,144,217,0.1) 50%, rgba(46,107,181,0.2) 100%)",
-            borderTop: "1px solid rgba(74,144,217,0.25)",
-            borderBottom: "1px solid rgba(74,144,217,0.15)",
-            backdropFilter: "blur(12px)",
-            WebkitBackdropFilter: "blur(12px)",
-          }}
+          className="w-full mt-14 lg:mt-20 py-4 relative z-20 border-t border-b border-white/10 bg-black/40 backdrop-blur-md"
         >
           <div className="relative flex max-w-full overflow-hidden">
             <div className="animate-marquee flex gap-14 whitespace-nowrap shrink-0">
               {[...marqueeItems, ...marqueeItems].map((item, idx) => {
                 const Icon = item.icon;
                 return (
-                  <span key={idx} className="flex items-center gap-3 text-[12px] font-bold tracking-[0.15em] uppercase text-white/70">
-                    <Icon className="w-4 h-4 text-white/40" />
+                  <span key={idx} className="flex items-center gap-3 text-[13px] font-medium text-white/80">
+                    <Icon className="w-4 h-4 text-primary/70 shrink-0" />
                     {item.label}
                   </span>
                 );
@@ -515,20 +511,10 @@ export default function LandingRoute({
           background: "radial-gradient(ellipse 80% 50% at 50% 20%, rgba(74,144,217,0.06) 0%, transparent 60%)",
         }} />
 
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 space-y-14 relative z-10">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 space-y-12 relative z-10">
           
-          <FadeInSection className="text-center max-w-3xl mx-auto space-y-4">
-            <span
-              className="px-4 py-1.5 rounded-full w-fit inline-block text-[12px] font-bold tracking-widest uppercase"
-              style={{ 
-                color: "#4a90d9", 
-                backgroundColor: "rgba(74, 144, 217, 0.1)",
-                border: "1px solid rgba(74, 144, 217, 0.15)",
-              }}
-            >
-              {t("landing.features_label")}
-            </span>
-            <h2 className="font-display font-extrabold text-[clamp(1.85rem,3.8vw,2.75rem)] leading-[1.1] tracking-[-0.02em] text-white mt-3">
+          <FadeInSection className="text-center max-w-3xl mx-auto space-y-3">
+            <h2 className="font-display font-extrabold text-[clamp(1.85rem,3.8vw,2.75rem)] leading-[1.1] tracking-[-0.02em] text-white">
               {t("landing.features_title")}
             </h2>
             <p className="text-[16px] leading-[1.65] max-w-2xl mx-auto font-normal text-white/45">
@@ -610,12 +596,12 @@ export default function LandingRoute({
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          INTEGRATION — 1-Click DNS auto-config showcase
+          INTEGRATION — Clean DNS auto-config showcase
           ═══════════════════════════════════════════════════════════════════════ */}
       <section id="integration" className="py-16 lg:py-24 relative">
         {/* Background glow */}
         <div className="absolute inset-0 pointer-events-none" style={{
-          background: "radial-gradient(ellipse 60% 40% at 30% 50%, rgba(16,185,129,0.05) 0%, transparent 60%)",
+          background: "radial-gradient(ellipse 60% 40% at 30% 50%, rgba(74,144,217,0.06) 0%, transparent 60%)",
         }} />
         
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
@@ -623,17 +609,6 @@ export default function LandingRoute({
             
             {/* Left: Copy */}
             <FadeInSection className="space-y-6">
-              <span
-                className="px-4 py-1.5 rounded-full w-fit inline-block text-[12px] font-bold tracking-widest uppercase"
-                style={{ 
-                  color: "#10b981", 
-                  backgroundColor: "rgba(16, 185, 129, 0.1)",
-                  border: "1px solid rgba(16, 185, 129, 0.15)",
-                }}
-              >
-                {t("landing.integration_label")}
-              </span>
-              
               <h2 className="font-display font-extrabold text-[clamp(1.85rem,3.8vw,2.75rem)] leading-[1.1] tracking-[-0.02em] text-white">
                 {t("landing.integration_title")}
               </h2>
@@ -645,15 +620,10 @@ export default function LandingRoute({
               <div className="flex flex-col sm:flex-row items-start gap-4 pt-2">
                 <button
                   onClick={onNavigateToSignUp}
-                  className="flex items-center gap-2.5 px-6 py-3 rounded-xl text-[14px] font-semibold transition-all active:scale-[0.97] cursor-pointer duration-200"
-                  style={{
-                    background: "linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(16,185,129,0.08) 100%)",
-                    border: "1px solid rgba(16,185,129,0.25)",
-                    color: "#10b981",
-                  }}
+                  className="flex items-center gap-2 px-6 py-3.5 rounded-xl text-[14px] font-semibold text-white bg-primary hover:bg-navy-dark transition-all shadow-md shadow-primary/20 active:scale-[0.98] cursor-pointer"
                 >
-                  <Terminal className="w-4 h-4" />
                   <span>{t("landing.integration_cta")}</span>
+                  <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
 
