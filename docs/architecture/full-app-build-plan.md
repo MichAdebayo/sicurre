@@ -2,25 +2,26 @@
 
 ## Purpose
 
-This document defines the build plan for the **future full application branch**.
+This document records the build plan and current gap map for the production application in `src/app`.
 
-It is intentionally separate from the current POC branch. The Streamlit POC proves the jury demo flow locally. The full application will replace that temporary surface with a production-ready product frontend and app runtime.
+The Streamlit POC remains useful for Simplon/demo evidence, but the React application is now the implemented product surface and should be treated as current runtime work, not a future branch.
 
 ## Branch boundary
 
-- **Current POC branch**
+- **POC surface (`src/poc`)**
   - Streamlit UI
   - local auth DB for demo users
   - local data-platform DB for demo ingestion
   - local inference service for the jury narrative
-- **Future full app branch**
+- **Production app surface (`src/app`)**
   - React 19 + TypeScript frontend
   - Better Auth integration
+  - Cloudflare Email Routing integration
   - production app API wiring
   - production inference API wiring
   - deployment-grade UI, monitoring, and release setup
 
-Do not build the full frontend in the POC branch. Use this document as the handoff blueprint when the dedicated branch is created.
+Do not port POC UI patterns directly into the production app. Use the POC for evidence and demos; use `src/app` for product UX.
 
 ## Non-negotiable references
 
@@ -47,7 +48,7 @@ Core product surfaces:
    - verdict details
    - remediation and restore actions
 3. **Settings and integrations**
-   - Gmail / Microsoft 365 connection state
+   - Cloudflare Email Routing connection state
    - protection preferences
    - notification settings
 4. **Operations and evidence**
@@ -130,7 +131,7 @@ Exit criteria:
 
 ## Phase 2 — Authentication and user context
 
-- integrate Better Auth with the app shell
+- integrate Better Auth sidecar with the app shell
 - implement session-aware navigation
 - define admin vs end-user views
 - add a local dev auth harness if needed for feature development
@@ -145,7 +146,7 @@ Exit criteria:
 
 - build the dashboard overview page
 - build the threat journal with filters and detail panel
-- expose remediation actions in the UI
+- expose status actions and false-negative/false-positive feedback in the UI
 - display confidence and evidence in a calm, explainable way
 
 Exit criteria:
@@ -155,7 +156,7 @@ Exit criteria:
 
 ## Phase 4 — Settings and integrations
 
-- Gmail connection flow
+- Cloudflare Email Routing connection flow
 - account preferences
 - notification preferences
 - protection and remediation defaults
@@ -191,14 +192,15 @@ Exit criteria:
 
 - the frontend calls APIs only
 - no direct database access from the frontend
-- no Gmail API calls directly from the frontend
+- no Cloudflare or classifier calls directly from the frontend
+- all Cloudflare operations go through the app API
 - all contracts must follow [docs/api/openapi.yaml](docs/api/openapi.yaml)
 
 ## UX rules for the full app
 
 - French-first copy
 - whitespace over density
-- card-first information hierarchy before dense tables
+- restrained information hierarchy; use cards only for repeated items, framed tools, and dialogs
 - confidence shown in clear language, not ML jargon
 - explain actions taken in plain French
 - favor calm, legible states over cleverness

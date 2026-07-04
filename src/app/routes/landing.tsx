@@ -220,17 +220,6 @@ function IntegrationTerminal() {
   );
 }
 
-/* ── Trust Logo Placeholders ───────────────────────────────────────────────── */
-function TrustLogo({ name }: { name: string }) {
-  return (
-    <div className="flex h-12 items-center justify-center opacity-30 hover:opacity-50 transition-opacity duration-300">
-      <div className="text-[14px] font-bold tracking-[0.15em] uppercase text-white/60 select-none">
-        {name}
-      </div>
-    </div>
-  );
-}
-
 /* ── Main Landing Component ────────────────────────────────────────────────── */
 export default function LandingRoute({
   onNavigateToLogin,
@@ -470,9 +459,9 @@ export default function LandingRoute({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.6, delay: 0.45 }}
-              className="text-[13px] text-white/25 font-medium pt-2"
+              className="text-[13px] text-white/35 font-medium pt-2 max-w-md"
             >
-              {t("landing.hero_social_proof")}
+              {t("landing.hero_note")}
             </MotionDiv>
           </div>
 
@@ -511,25 +500,6 @@ export default function LandingRoute({
                 );
               })}
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════════════════════════════════
-          TRUST BAR — Company logos (glassmorphism strip)
-          ═══════════════════════════════════════════════════════════════════════ */}
-      <section className="py-20 relative">
-        <div className="max-w-5xl mx-auto px-6 lg:px-8 flex flex-col items-center">
-          <p className="text-[17px] text-white/35 font-medium mb-12 text-center tracking-tight">
-            {t("landing.trust_subtitle")}
-          </p>
-          <div className="w-full grid grid-cols-3 sm:grid-cols-6 gap-6 items-center">
-            <TrustLogo name="Mediaflow" />
-            <TrustLogo name="Nextera" />
-            <TrustLogo name="LogiPro" />
-            <TrustLogo name="Axantis" />
-            <TrustLogo name="Primelis" />
-            <TrustLogo name="Vecteur" />
           </div>
         </div>
       </section>
@@ -699,7 +669,7 @@ export default function LandingRoute({
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          STATS + TESTIMONIAL + CTA — Premium glassmorphism section
+          CTA — Honest early-stage conversion section
           ═══════════════════════════════════════════════════════════════════════ */}
       <section className="py-28 lg:py-36 relative">
         {/* Background glow */}
@@ -707,82 +677,8 @@ export default function LandingRoute({
           background: "radial-gradient(ellipse 70% 50% at 50% 30%, rgba(74,144,217,0.06) 0%, transparent 60%)",
         }} />
 
-        <div className="max-w-4xl mx-auto px-6 lg:px-8 text-center space-y-16 relative z-10">
-          
-          {/* Stats Row — Glassmorphism strip */}
-          <FadeInSection>
-            <div 
-              className="flex flex-row items-center justify-center gap-14 sm:gap-20 py-8 px-6 rounded-2xl mx-auto max-w-2xl"
-              style={{
-                background: "rgba(255, 255, 255, 0.025)",
-                backdropFilter: "blur(16px)",
-                WebkitBackdropFilter: "blur(16px)",
-                border: "1px solid rgba(255, 255, 255, 0.07)",
-              }}
-            >
-              <div className="text-center">
-                <div className="font-display font-extrabold text-[36px] text-white tracking-tight">{t("landing.stats_smes")}</div>
-                <div className="text-[14px] text-white/35 mt-1.5 font-medium">{t("landing.stats_smes_label")}</div>
-              </div>
-              <div className="text-center">
-                <div className="font-display font-extrabold text-[36px] text-white tracking-tight">{t("landing.stats_emails")}</div>
-                <div className="text-[14px] text-white/35 mt-1.5 font-medium">{t("landing.stats_emails_label")}</div>
-              </div>
-              <div className="text-center">
-                <div className="font-display font-extrabold text-[36px] text-white tracking-tight">{t("landing.stats_breaches")}</div>
-                <div className="text-[14px] text-white/35 mt-1.5 font-medium">{t("landing.stats_breaches_label")}</div>
-              </div>
-            </div>
-          </FadeInSection>
-
-          {/* Testimonial — Glassmorphism card */}
-          <FadeInSection delay={0.06}>
-            <div 
-              className="max-w-[560px] mx-auto text-left rounded-2xl hover:scale-[1.01] transition-all duration-300"
-              style={{
-                background: "rgba(255, 255, 255, 0.03)",
-                backdropFilter: "blur(20px)",
-                WebkitBackdropFilter: "blur(20px)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                padding: "28px 32px",
-              }}
-            >
-              <p className="text-[16px] text-white/60 leading-[1.75] mb-5 italic">
-                "{t("landing.testimonial_text")}"
-              </p>
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div 
-                    style={{
-                      width: "36px",
-                      height: "36px",
-                      borderRadius: "50%",
-                      background: "linear-gradient(135deg, rgba(74,144,217,0.2), rgba(74,144,217,0.1))",
-                      border: "1px solid rgba(74,144,217,0.2)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#4a90d9",
-                      fontSize: "12px",
-                      fontWeight: "bold",
-                    }}
-                  >
-                    TM
-                  </div>
-                  <div>
-                    <div className="text-[15px] font-semibold text-white/80">{t("landing.testimonial_author")}</div>
-                    <div className="text-[13px] text-white/35">{t("landing.testimonial_role")}</div>
-                  </div>
-                </div>
-                <div className="text-[15px] text-amber-400 tracking-wider">
-                  ★★★★★
-                </div>
-              </div>
-            </div>
-          </FadeInSection>
-
-          {/* CTA */}
-          <FadeInSection className="space-y-5" delay={0.1}>
+        <div className="max-w-4xl mx-auto px-6 lg:px-8 text-center space-y-12 relative z-10">
+          <FadeInSection className="space-y-5">
             <h2 className="font-display font-extrabold text-[clamp(1.75rem,4.5vw,3rem)] leading-[1.08] tracking-[-0.025em] text-white mt-4">
               {t("landing.cta_section_title")}
             </h2>
@@ -866,4 +762,3 @@ export default function LandingRoute({
     </div>
   );
 }
-

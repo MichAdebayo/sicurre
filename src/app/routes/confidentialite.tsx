@@ -51,22 +51,21 @@ export default function ConfidentialiteRoute({ onBack }: ConfidentialiteProps) {
           </section>
 
           <section className="space-y-3">
-            <h2 className="font-display font-bold text-lg text-slate-900">2. API Google Workspace & Autorisations OAuth</h2>
+            <h2 className="font-display font-bold text-lg text-slate-900">2. Cloudflare Email Routing & autorisations</h2>
             <p className="text-sm text-slate-600 leading-relaxed">
-              Pour assurer la détection et la remédiation en temps réel de votre boîte de messagerie, Sicurre se connecte 
-              à votre espace Google Workspace via une autorisation sécurisée OAuth 2.0. Nous demandons uniquement les scopes suivants :
+              Pour protéger un domaine, Sicurre configure Cloudflare Email Routing et un Email Worker qui transmet les e-mails entrants
+              à notre API de scan avant livraison. L'application utilise un jeton Cloudflare restreint au domaine choisi et aux permissions
+              nécessaires pour gérer le routage, les enregistrements DNS liés à l'e-mail et le Worker.
             </p>
             <ul className="list-disc pl-5 text-sm text-slate-600 space-y-2">
               <li>
-                <strong>gmail.modify</strong> : Utilisé exclusivement pour déplacer les e-mails classés comme phishing 
-                directement et automatiquement vers votre corbeille Gmail dans un délai de 2 secondes.
+                <strong>DNS zone read/edit</strong> : utilisé pour vérifier et créer les enregistrements MX/TXT nécessaires au routage.
               </li>
               <li>
-                <strong>gmail.settings.basic</strong> : Utilisé pour auditer les paramètres de base indispensables à la protection.
+                <strong>Email Routing read/edit</strong> : utilisé pour activer les destinations et règles de protection du domaine.
               </li>
               <li>
-                <strong>pubsub.subscribe</strong> : Utilisé pour recevoir des notifications push instantanées dès qu'un nouvel e-mail 
-                arrive, éliminant tout besoin de requêtes régulières (crawling).
+                <strong>Workers read/edit</strong> : utilisé pour déployer le Worker qui appelle Sicurre avec un secret partagé.
               </li>
             </ul>
           </section>
@@ -98,9 +97,8 @@ export default function ConfidentialiteRoute({ onBack }: ConfidentialiteProps) {
           <section className="space-y-3">
             <h2 className="font-display font-bold text-lg text-slate-900">5. Révocation de vos autorisations</h2>
             <p className="text-sm text-slate-600 leading-relaxed">
-              Vous pouvez à tout moment couper la synchronisation de Sicurre avec votre boîte de messagerie en vous rendant 
-              dans les paramètres de sécurité de votre compte Google, ou directement en cliquant sur le bouton de suppression 
-              de clé API dans votre console Sicurre.
+              Vous pouvez à tout moment couper la protection Sicurre depuis Domain Shield en supprimant l'intégration Cloudflare,
+              ou depuis Cloudflare en révoquant le jeton API et en désactivant le routage/Worker associé au domaine.
             </p>
           </section>
         </MotionDiv>

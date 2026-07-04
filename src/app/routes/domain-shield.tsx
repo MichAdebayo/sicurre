@@ -278,10 +278,6 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
     setAutoFixErrorMsg("");
 
     try {
-      // Simulate stages for nice visual flow
-      setTimeout(() => setAutoFixProgress("dns"), 1500);
-      setTimeout(() => setAutoFixProgress("routing"), 3000);
-      
       const payload = {
         cf_api_token: token,
         zone_name: selectedDomain,
@@ -291,34 +287,26 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
         fix_dmarc: fixDmarc
       };
 
-      setTimeout(async () => {
-        try {
-          await setupMutation.mutateAsync(payload);
-          setAutoFixProgress("success");
-          
-          setSuccessNotification(
-            isFR
-              ? "Auto-configuration DNS et redirection email appliquées avec succès !"
-              : "Cloudflare DNS configuration and email routing deployed successfully!"
-          );
-          
-          reloadShield();
-          
-          setTimeout(() => {
-            setSuccessNotification(null);
-            setAutoFixProgress("idle");
-          }, 4000);
-        } catch (err: any) {
-          setAutoFixProgress("error");
-          const msg = err.message || (isFR ? "Échec de l'auto-configuration DNS." : "Failed to deploy DNS records.");
-          setAutoFixErrorMsg(msg);
-          setErrorNotification(msg);
-          setTimeout(() => {
-            setErrorNotification(null);
-            setAutoFixProgress("idle");
-          }, 4500);
-        }
-      }, 4500);
+      setAutoFixProgress("dns");
+      const result = await setupMutation.mutateAsync(payload);
+      setAutoFixProgress(result.status === "provisioning" ? "routing" : "success");
+
+      setSuccessNotification(
+        result.status === "provisioning"
+          ? (isFR
+              ? "Provisionnement Cloudflare lancé. La vérification et la propagation DNS peuvent prendre quelques minutes."
+              : "Cloudflare provisioning started. Verification and DNS propagation can take a few minutes.")
+          : (isFR
+              ? "Configuration Cloudflare enregistrée."
+              : "Cloudflare configuration saved.")
+      );
+
+      reloadShield();
+
+      setTimeout(() => {
+        setSuccessNotification(null);
+        setAutoFixProgress("idle");
+      }, 5500);
 
     } catch (err: any) {
       setAutoFixProgress("error");

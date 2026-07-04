@@ -2,7 +2,7 @@
 
 /* ─── Sicurre Design System ─────────────────────────────────────────────────
    Source of truth: docs/brand/brand-identity.md + ui-ideas DESIGN.md
-   Colors: Material-3 inspired tonal system
+   Colors: logo-aligned Sicurre tokens with semantic verdict colors
    Fonts: Hanken Grotesk (display) · Inter (body) · JetBrains Mono (data)
    ────────────────────────────────────────────────────────────────────────── */
 
@@ -13,12 +13,12 @@
   --font-mono: "JetBrains Mono", monospace;
 
   /* ── Core Palette ── */
-  --color-primary: #4a90d9;
+  --color-primary: #1b4fcc;
   --color-on-primary: #ffffff;
-  --color-primary-container: #2e6bb5;
-  --color-on-primary-container: #d0e4ff;
-  --color-inverse-primary: #a3c9f0;
-  --color-navy-dark: #1a4f8a;
+  --color-primary-container: #eef3ff;
+  --color-on-primary-container: #1239a6;
+  --color-inverse-primary: #93b4ff;
+  --color-navy-dark: #1239a6;
 
   /* ── Secondary (Amber — Attention Required) ── */
   --color-secondary: #855300;
@@ -40,36 +40,36 @@
   --color-on-error-container: #93000a;
 
   /* ── Surfaces ── */
-  --color-background: #faf8ff;
-  --color-on-background: #131b2e;
-  --color-surface: #faf8ff;
-  --color-surface-dim: #d2d9f4;
-  --color-surface-bright: #faf8ff;
+  --color-background: #f8fafc;
+  --color-on-background: #0f172a;
+  --color-surface: #f8fafc;
+  --color-surface-dim: #d7deea;
+  --color-surface-bright: #ffffff;
   --color-surface-lowest: #ffffff;
-  --color-surface-low: #f2f3ff;
-  --color-surface-container: #eaedff;
-  --color-surface-high: #e2e7ff;
-  --color-surface-highest: #dae2fd;
-  --color-on-surface: #131b2e;
-  --color-on-surface-variant: #434654;
-  --color-surface-variant: #dae2fd;
-  --color-surface-tint: #4a90d9;
-  --color-inverse-surface: #283044;
-  --color-inverse-on-surface: #eef0ff;
+  --color-surface-low: #f1f5f9;
+  --color-surface-container: #e8eef7;
+  --color-surface-high: #dbe4f0;
+  --color-surface-highest: #cbd5e1;
+  --color-on-surface: #0f172a;
+  --color-on-surface-variant: #475569;
+  --color-surface-variant: #e2e8f0;
+  --color-surface-tint: #1b4fcc;
+  --color-inverse-surface: #172033;
+  --color-inverse-on-surface: #f8fafc;
 
   /* ── Semantic Surfaces ── */
   --color-surface-safe: #f0f4ff;
   --color-surface-alert: #fff7ed;
 
   /* ── Outlines & Borders ── */
-  --color-outline: #747685;
+  --color-outline: #64748b;
   --color-outline-variant: #c4c5d6;
   --color-border-subtle: #e2e8f0;
 
   /* ── Fixed Colors (for elevation-independent tinting) ── */
-  --color-primary-fixed: #e0efff;
-  --color-primary-fixed-dim: #a3c9f0;
-  --color-on-primary-fixed: #0c2d4d;
+  --color-primary-fixed: #eef3ff;
+  --color-primary-fixed-dim: #c7d7ff;
+  --color-on-primary-fixed: #1239a6;
   --color-secondary-fixed: #ffddb8;
   --color-secondary-fixed-dim: #ffb95f;
   --color-on-secondary-fixed: #2a1700;
@@ -77,10 +77,10 @@
   --color-tertiary-fixed-dim: #ffb59a;
 
   /* ── Semantic Verdict Colors (from brand-identity.md) ── */
-  --color-safe: #15803d;
-  --color-safe-bg: #f0fdf4;
-  --color-danger: #d97706;
-  --color-danger-bg: #fffbeb;
+  --color-safe: #10b981;
+  --color-safe-bg: #ecfdf5;
+  --color-danger: #ef4444;
+  --color-danger-bg: #fef2f2;
   --color-warning: #f59e0b;
   --color-warning-bg: #fffbeb;
 
@@ -116,6 +116,7 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    color-scheme: light;
   }
 
   ::selection {
@@ -370,17 +371,54 @@
 }
 
 html.dark {
-  --color-background: #0f172a;
+  color-scheme: dark;
+  --color-background: #07111f;
   --color-on-background: #f8fafc;
-  --color-surface: #1e293b;
-  --color-surface-lowest: #0f172a;
-  --color-surface-low: #1e293b;
-  --color-surface-container: #334155;
-  --color-surface-high: #475569;
-  --color-surface-highest: #64748b;
+  --color-surface: #07111f;
+  --color-surface-lowest: #0b1626;
+  --color-surface-low: #111c2d;
+  --color-surface-container: #17253a;
+  --color-surface-high: #20314a;
+  --color-surface-highest: #2b3d59;
   --color-on-surface: #f8fafc;
-  --color-on-surface-variant: #94a3b8;
-  --color-surface-variant: #334155;
-  --color-border-subtle: #334155;
+  --color-on-surface-variant: #b7c4d7;
+  --color-surface-variant: #22324a;
+  --color-border-subtle: #26364f;
+  --color-outline: #8090a6;
+  --color-outline-variant: #33445f;
+  --color-primary: #7fa4ff;
+  --color-on-primary: #07111f;
+  --color-primary-container: #1239a6;
+  --color-on-primary-container: #eef3ff;
+  --color-navy-dark: #9ab8ff;
+  --color-secondary-container: #4a3005;
+  --color-on-secondary-container: #ffe7bd;
+  --color-error-container: #4a1414;
+  --color-on-error-container: #ffe1e1;
+  --color-safe-bg: #0d2c24;
+  --color-danger-bg: #3a1215;
+  --color-warning-bg: #332508;
 }
 
+html.dark .bg-white {
+  background-color: var(--color-surface-lowest) !important;
+}
+
+html.dark .shadow-sm,
+html.dark .shadow-md,
+html.dark .shadow-lg,
+html.dark .shadow-xl {
+  box-shadow: none !important;
+}
+
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: var(--color-surface-lowest);
+  color: var(--color-on-surface);
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: color-mix(in srgb, var(--color-on-surface-variant) 72%, transparent);
+}

@@ -20,8 +20,8 @@ This repository uses a split documentation model:
 - `docs/ops/`
 - `docs/architecture/threat-model.md`
 - `docs/architecture/privacy-rgpd.md`
-- `docs/adr/0001-post-delivery-gmail.md`
-- `docs/adr/0006-scope-selection-gmail.md`
-- `docs/adr/0007-idempotency-pubsub-history.md`
+- `docs/adr/0001-post-delivery-gmail_superseded.md`
+- `docs/adr/0006-scope-selection-gmail_superseded.md`
+- `docs/adr/0007-idempotency-pubsub-history_superseded.md`
 
 If a private document needs to be published later, remove its ignore rule first and review for sensitive content before committing.

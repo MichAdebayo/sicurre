@@ -8,8 +8,8 @@ The API surfaces remain organized by runtime responsibility, while planning and 
 
 The source of truth is [openapi.yaml](openapi.yaml).
 
-Documentation comes before implementation.
-If the architecture changes, update the OpenAPI contract first and only then implement the backend.
+The contract should track the implemented runtime. If the architecture changes, update
+the OpenAPI contract and the runtime docs in the same change.
 
 ## API surfaces
 
@@ -74,28 +74,36 @@ Primary resources:
 ### Application API
 
 Purpose:
-Expose the Bloc 3 runtime product operations for authenticated users.
+Expose the runtime product operations for authenticated users and the Cloudflare Email
+Worker.
 
 Current endpoints:
 
-- `POST /v1/app/remediate/gmail/trash`
-- `GET /v1/app/threat-log`
-- `POST /v1/app/threat-log/{id}/restore`
-- `POST /v1/app/feedback`
-- `GET /v1/app/users/me`
-- `GET /v1/app/stats`
-- `GET /auth/login/google`
-- `GET /auth/callback/google`
-- `POST /auth/logout`
+- `POST /v1/email/scan`
+- `GET /v1/auth/session`
+- `PATCH /v1/auth/profile`
+- `GET /v1/threats`
+- `POST /v1/threats/{id}/status`
+- `POST /v1/feedback`
+- `GET /v1/quarantine`
+- `POST /v1/quarantine/{id}/release`
+- `POST /v1/quarantine/{id}/whitelist`
+- `DELETE /v1/quarantine/{id}`
+- `POST /v1/integrations/cloudflare/setup`
+- `GET /v1/integrations/cloudflare/status`
+- `POST /v1/integrations/cloudflare/verify-token`
+- `GET /v1/integrations/cloudflare/list`
+- `/api/auth/*` Better Auth sidecar routes
 
 Primary resources:
 
-- `app_user`
-- `app_oauth_token`
-- `app_watch_state`
-- `app_threat_log`
+- Better Auth `user`, `session`, `account`, and `verification`
+- `app_workspace`
+- `workspace_member`
+- `cloudflare_integration`
+- `app_inference_event`
+- `app_quarantine_item`
 - `app_feedback`
-- `app_session`
 
 ## Naming convention
 

@@ -73,7 +73,8 @@ flowchart LR
 				APPAPI[Sicurre API - App domain\nFastAPI REST]
 				STREAMLIT[POC Dashboard]
 				REACT[Production dashboard]
-				LISTENER[Gmail listener]
+				AUTH[Better Auth sidecar\nNode.js]
+				CF[Cloudflare Email Routing\n+ Email Worker]
 		end
 
 		subgraph Monitoring[Delivery Bloc 5 - Monitoring]
@@ -98,14 +99,15 @@ flowchart LR
 		TRAIN --> MODELAPI
 		MODELAPI --> APPAPI
 		DB --> APPAPI
+		APPAPI --> AUTH
 		STREAMLIT --> APPAPI
 		REACT --> APPAPI
-		LISTENER --> MODELAPI
-		LISTENER --> APPAPI
+		CF --> APPAPI
+		APPAPI --> MODELAPI
 		DATAAPI --> OBS
 		MODELAPI --> OBS
 		APPAPI --> OBS
-		LISTENER --> OBS
+		CF --> OBS
 		OBS --> INC
 ```
 
@@ -280,18 +282,20 @@ The related issue note for the Bloc 1 source perimeter is documented in [issue-a
 
 - Role: expose user-facing product functionality
 - Responsibility:
-	- auth integration
+	- Better Auth session integration
 	- user settings
 	- threat log
 	- feedback
-	- restore and remediation endpoints
+	- quarantine and remediation endpoints
+	- Cloudflare integration endpoints
 
-### 12. Gmail listener
+### 12. Cloudflare Email Routing runtime
 
-- Role: receive push notifications, fetch message changes, call the classifier, then call the app domain to persist audit results
+- Role: receive inbound domain email through Cloudflare Email Routing, execute the Cloudflare Email Worker, and call Sicurre API `POST /v1/email/scan`
 - Constraint:
-	- idempotent processing is mandatory
-	- no direct database access
+	- Worker uses a shared secret and has no database credentials
+	- Sicurre API owns persistence, quarantine, and feedback records
+	- mailbox destination verification and DNS propagation remain explicit setup states
 
 ### 13. POC dashboard
 
@@ -436,5 +440,5 @@ This contract is aligned with the Bloc 1 schema defined in `docs/architecture/da
 ### Production constraint preserved
 
 - In deployed runtime architecture, only the Sicurre API owns the database connection
-- Gmail listener and classifier remain separate compute services and communicate over HTTP
-
+- Cloudflare Worker and classifier remain separate compute services and communicate over HTTP
+- Better Auth sidecar owns auth/session tables through its library-managed schema

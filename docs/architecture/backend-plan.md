@@ -151,9 +151,10 @@ This domain reads curated datasets from the data platform but does not own their
 Owns:
 
 - user-facing product concerns
-- auth integration
+- Better Auth session integration
 - threat log
-- remediation actions
+- Cloudflare Email Routing integration
+- quarantine and remediation actions
 - feedback for deployed product usage
 - dashboard-facing endpoints
 
@@ -192,12 +193,19 @@ This capability spans all domains and is the technical backbone of the monitorin
 
 ### Application tables
 
-- `app_user`
-- `app_oauth_token`
-- `app_watch_state`
-- `app_threat_log`
+- Better Auth library tables: `user`, `session`, `account`, `verification`
+- `app_workspace`
+- `app_workspace_membership`
+- `cloudflare_integration`
+- `app_cloudflare_config`
+- `app_inference_event`
+- `app_quarantine_item`
+- `app_alert_preference`
+- `app_alert_history`
+- `app_security_rule`
+- `app_domain_shield_status`
+- `app_domain_shield_history`
 - `app_feedback`
-- `app_session`
 
 ## Recommended implementation order
 
@@ -241,7 +249,8 @@ The backend should expose three API surfaces under one codebase:
 
 - `/v1/data/...` for Bloc 1
 - `/v1/model/...` for Bloc 2
-- `/v1/app/...` and `/auth/...` for Bloc 3 and runtime product flows
+- `/v1/threats`, `/v1/quarantine`, `/v1/feedback`, `/v1/alerts/...`, `/v1/domain-shield/...`, and `/v1/integrations/cloudflare/...` for Bloc 3 runtime product flows
+- `/api/auth/...` for Better Auth sidecar routes exposed through the frontend/API proxy
 
 This keeps the certification narrative explicit and avoids mixing data CRUD with end-user SaaS behavior.
 

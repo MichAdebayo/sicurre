@@ -1,25 +1,26 @@
 # Product goals, scope, and success metrics
 
 ## Product goals
-- Reduce phishing victimization for French SMBs via automatic remediation
+- Reduce phishing victimization for French SMBs through pre-delivery domain email scanning and controlled quarantine
 - Build trust through explainability (“why flagged”) + undo capability
 - Maintain low operational cost (bootstrappable)
 
 ## In-scope (MVP)
-- Gmail integration (OAuth + watch)
+- Cloudflare Email Routing integration for customer-owned domains
+- Cloudflare Email Worker calling Sicurre API `POST /v1/email/scan`
 - Phishing classification API (French-first)
-- Automatic remediation: move phishing emails to Trash
+- Quarantine workflow: hold, deliver, delete, and allow-list sender
 - Audit log + dashboard
-- Feedback loop: “correct/incorrect” user labels for retraining
+- Feedback loop: false positive / false negative reports stored in `app_feedback`
 
 ## Out-of-scope (MVP)
-- True pre-delivery interception via MX/SMTP relay
+- Gmail watch / Pub/Sub runtime ingestion
 - Enterprise SOC/MDR functionality
 - Large-scale DLP / compliance archiving
 - Attachment sandbox detonation (possible later)
 
 ## Success metrics (MVP)
-- Time-to-remediate (TTR): p95 < 5 seconds from delivery to Trash
+- Time-to-classify: p95 within configured SLA from Worker callback to verdict
 - Model performance: F1 ≥ 0.95 on French phishing evaluation set (internal)
 - False positives: ≤ 0.5% on validated “legit” emails
 - Availability: 99.5% monthly for API + ingestion

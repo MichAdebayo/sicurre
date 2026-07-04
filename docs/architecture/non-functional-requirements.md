@@ -2,16 +2,16 @@
 
 ## Performance
 - p95 classify latency < 200ms (model endpoint)
-- p95 end-to-end remediation < 5s (delivery → Trash)
+- p95 end-to-end classification/quarantine < 5s (Cloudflare Email Worker delivery → Sicurre verdict)
 - DMARC/SPF DNS results cached 30 min (in-process `TTLCache`)
-- Gmail access tokens cached 55 min per user (below Google's 60 min expiry)
+- Cloudflare integration status cached briefly for UI reads only
 - Classifier results cached 6 hours by content hash (deduplicates phishing campaigns)
 - Session validation cached 5 min in-process
 - See ADR-0009 for full caching strategy and Redis upgrade triggers
 
 ## Reliability
-- At-least-once Pub/Sub delivery → idempotent processing required
-- Retry with exponential backoff on Gmail API transient failures
+- Cloudflare Worker/API retry semantics require idempotent processing
+- Retry with exponential backoff on Cloudflare API transient failures
 - Dead-letter queue for repeated failures (later)
 
 ## Security
@@ -28,5 +28,5 @@
 
 ## Operability
 - Structured logs (JSON)
-- Metrics: request count, latency, verdict counts, remediation counts
-- Alerts: listener failures, watch expiry, error rate spikes
+- Metrics: request count, latency, verdict counts, quarantine counts, feedback counts
+- Alerts: Worker/API failures, inactive domains, error rate spikes

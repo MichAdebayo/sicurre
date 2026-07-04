@@ -74,8 +74,8 @@ The DeBERTaV3 RTD objective trains on every token position (not just the 40% tha
 | **3-class (phishing, spam, legitimate)** | Distinct remediation actions per class; higher precision on true phishing; better user trust | Slightly more training data needed per class |
 
 Remediation differs by class:
-- **Phishing → Trash** (automatic, high confidence)
-- **Spam → Label/archive** (softer action, user-configurable)
+- **Phishing → Quarantine** (automatic, high confidence)
+- **Spam → Deliver or mark according to policy** (softer action, user-configurable)
 - **Legitimate → No action**
 
 ## Consequences

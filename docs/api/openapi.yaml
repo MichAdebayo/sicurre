@@ -424,72 +424,88 @@ paths:
                   total:
                     type: integer
 
-  /v1/app/remediate/gmail/trash:
+  /v1/email/scan:
     post:
       tags: [app]
-      summary: Move a Gmail message to Trash
+      summary: Scan an inbound email from the Cloudflare Email Worker
       security:
-        - ApiKeyAuth: []
+        - WorkerSecretAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/TrashRequest"
+              $ref: "#/components/schemas/EmailScanRequest"
       responses:
         "200":
-          description: Trash action completed
+          description: Classification verdict for the Worker
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TrashResponse"
-        "400":
-          description: Bad request
+                $ref: "#/components/schemas/EmailScanResponse"
         "401":
-          description: Unauthorized
+          description: Missing or invalid Worker secret
 
-  /v1/app/threat-log:
+  /v1/auth/session:
     get:
       tags: [app]
-      summary: List threat log entries for the authenticated user
+      summary: Get the current Better Auth-backed Sicurre session
       security:
         - BearerAuth: []
-      parameters:
-        - in: query
-          name: limit
-          schema:
-            type: integer
-            default: 50
-            maximum: 200
-        - in: query
-          name: offset
-          schema:
-            type: integer
-            default: 0
-        - in: query
-          name: verdict
-          schema:
-            type: string
-            enum: [phishing, spam, legitimate]
       responses:
         "200":
-          description: Threat log entries
+          description: Current session
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  items:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/ThreatLogEntry"
-                  total:
-                    type: integer
+                $ref: "#/components/schemas/AuthSession"
 
-  /v1/app/threat-log/{id}/restore:
+  /v1/auth/profile:
+    patch:
+      tags: [app]
+      summary: Update the current user's display name
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [display_name]
+              properties:
+                display_name:
+                  type: string
+                  minLength: 2
+                  maxLength: 120
+      responses:
+        "200":
+          description: Updated session payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+
+  /v1/threats:
+    get:
+      tags: [app]
+      summary: List workspace-scoped scan events for the threat log
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Threat log rows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ThreatLogEntry"
+
+  /v1/threats/{id}/status:
     post:
       tags: [app]
-      summary: Restore a previously trashed Gmail message
+      summary: Update a threat log row status
       security:
         - BearerAuth: []
       parameters:
@@ -498,28 +514,24 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ThreatStatusUpdate"
       responses:
         "200":
-          description: Message restored
+          description: Updated threat log row
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: restored
-                  message_id:
-                    type: string
-        "404":
-          description: Threat log entry not found
-        "409":
-          description: Message already restored or not trashed
+                $ref: "#/components/schemas/ThreatLogEntry"
 
-  /v1/app/feedback:
+  /v1/feedback:
     post:
       tags: [app]
-      summary: Submit feedback on a deployed classification verdict
+      summary: Submit production feedback for false positives or false negatives
       security:
         - BearerAuth: []
       requestBody:
@@ -535,88 +547,200 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/FeedbackResponse"
-        "400":
-          description: Bad request
         "409":
-          description: Feedback already submitted
+          description: Feedback already submitted for the same event/type
 
-  /v1/app/users/me:
+  /v1/quarantine:
     get:
       tags: [app]
-      summary: Get current user profile
+      summary: List currently held quarantine items
       security:
         - BearerAuth: []
       responses:
         "200":
-          description: User profile
+          description: Quarantine items
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UserProfile"
-        "401":
-          description: Unauthorized
+                type: array
+                items:
+                  $ref: "#/components/schemas/QuarantineItem"
 
-  /v1/app/stats:
-    get:
+  /v1/quarantine/{id}/release:
+    post:
       tags: [app]
-      summary: Get summary statistics for the authenticated user
+      summary: Release a quarantined item to the configured destination inbox
       security:
         - BearerAuth: []
       parameters:
-        - in: query
-          name: days
-          schema:
-            type: integer
-            default: 30
-            minimum: 1
-            maximum: 365
-      responses:
-        "200":
-          description: User stats
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UserStats"
-
-  /auth/login/google:
-    get:
-      tags: [auth]
-      summary: Initiate Google OAuth login
-      responses:
-        "302":
-          description: Redirect to Google OAuth consent
-
-  /auth/callback/google:
-    get:
-      tags: [auth]
-      summary: Google OAuth callback
-      parameters:
-        - in: query
-          name: code
+        - in: path
+          name: id
           required: true
           schema:
             type: string
-        - in: query
-          name: state
+      responses:
+        "200":
+          description: Release accepted
+        "404":
+          description: Quarantine item not found
+
+  /v1/quarantine/{id}/whitelist:
+    post:
+      tags: [app]
+      summary: Release a quarantined item and create an allow-list rule
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
           schema:
             type: string
       responses:
-        "302":
-          description: Redirect to dashboard after successful login
-        "400":
-          description: Invalid OAuth callback
+        "200":
+          description: Release and allow-list accepted
+        "404":
+          description: Quarantine item not found
 
-  /auth/logout:
+  /v1/quarantine/{id}:
+    delete:
+      tags: [app]
+      summary: Delete a quarantined item
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Quarantine item deleted
+        "404":
+          description: Quarantine item not found
+
+  /v1/integrations/cloudflare/setup:
     post:
-      tags: [auth]
-      summary: End the current session
+      tags: [app]
+      summary: Start Cloudflare Email Routing provisioning for a domain
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CloudflareSetupRequest"
+      responses:
+        "201":
+          description: Provisioning started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CloudflareSetupResponse"
+
+  /v1/integrations/cloudflare/status:
+    get:
+      tags: [app]
+      summary: Get the latest Cloudflare integration status for the workspace
       security:
         - BearerAuth: []
       responses:
         "200":
-          description: Session ended
-        "401":
-          description: Not authenticated
+          description: Cloudflare integration status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CloudflareStatus"
+
+  /v1/integrations/cloudflare/verify-token:
+    post:
+      tags: [app]
+      summary: Verify that a Cloudflare token can access a zone
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CloudflareTokenVerifyRequest"
+      responses:
+        "200":
+          description: Token verification result
+
+  /v1/integrations/cloudflare/list:
+    get:
+      tags: [auth]
+      summary: List Cloudflare integrations connected to the workspace
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Integration list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CloudflareStatus"
+
+  /v1/integrations/cloudflare:
+    delete:
+      tags: [app]
+      summary: Remove the current Cloudflare Email Routing integration
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CloudflareTeardownRequest"
+      responses:
+        "200":
+          description: Integration removed
+        "404":
+          description: Integration not found
+        "409":
+          description: Provisioning is still in progress
+
+  /v1/integrations/cloudflare/token:
+    get:
+      tags: [app]
+      summary: Get the workspace Cloudflare token status
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Token lookup result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CloudflareTokenStatus"
+    post:
+      tags: [app]
+      summary: Save or replace the workspace Cloudflare API token
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CloudflareTokenSaveRequest"
+      responses:
+        "200":
+          description: Token saved
+    delete:
+      tags: [app]
+      summary: Delete the workspace Cloudflare token and connected integrations
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Token and integrations deleted
 
   /internal/phishtank/snapshot:
     get:
@@ -652,23 +776,6 @@ paths:
         "503":
           description: Internal API not configured (INTERNAL_API_KEY not set)
 
-  /internal/renew-watches:
-    post:
-      tags: [internal]
-      summary: Renew Gmail watch subscriptions for all active users
-      security:
-        - InternalServiceAuth: []
-      responses:
-        "200":
-          description: Renewal completed
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/RenewWatchesResponse"
-        "401":
-          description: Missing or invalid IAM credentials
-        "429":
-          description: Rate limit exceeded
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -679,10 +786,14 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+    WorkerSecretAuth:
+      type: apiKey
+      in: header
+      name: X-Sicurre-Secret
     InternalServiceAuth:
       type: http
       scheme: bearer
-      description: GCP IAM identity token for internal scheduled calls.
+      description: Static service bearer token for internal platform calls.
   schemas:
     PhishtankSnapshotResponse:
       type: object
@@ -1008,25 +1119,77 @@ components:
           type: string
           format: date-time
 
-    TrashRequest:
+    EmailScanRequest:
       type: object
-      required: [user_id, message_id]
+      required: [subject, sender, text]
       properties:
-        user_id:
+        subject:
           type: string
-        message_id:
+          example: "Facture impayee - action requise"
+        sender:
           type: string
-        reason:
+          example: "billing@example.test"
+        text:
+          type: string
+          description: Plain-text email content extracted by the Cloudflare Email Worker.
+        use_llm:
+          type: boolean
+          default: false
+        use_virustotal:
+          type: boolean
+          default: false
+
+    EmailScanResponse:
+      type: object
+      required: [verdict, label, score]
+      properties:
+        verdict:
+          type: string
+          enum: [safe, spam, phishing, quarantine]
+        label:
+          type: string
+          enum: [phishing, spam, legitimate]
+        score:
+          type: number
+          minimum: 0
+          maximum: 1
+        explanation:
           type: string
 
-    TrashResponse:
+    AuthSession:
       type: object
       properties:
-        status:
-          type: string
-          example: trashed
-        message_id:
-          type: string
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+            email:
+              type: string
+              format: email
+            name:
+              type: string
+        workspace:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+        member:
+          type: object
+          properties:
+            role:
+              type: string
+              enum: [owner, admin, analyst, viewer]
+        session:
+          type: object
+          properties:
+            id:
+              type: string
+            expires_at:
+              type: string
+              format: date-time
 
     ThreatLogEntry:
       type: object
@@ -1035,36 +1198,55 @@ components:
           type: string
         message_id:
           type: string
+        subject:
+          type: string
+        sender:
+          type: string
+        body_preview:
+          type: string
         received_at:
           type: string
           format: date-time
         verdict:
           type: string
-          enum: [phishing, spam, legitimate]
+          enum: [phishing, spam, legitimate, quarantine]
         confidence:
           type: number
-        signals:
-          type: array
-          items:
-            type: string
+        status:
+          type: string
+          enum: [active, trashed, restored]
         model_version:
           type: string
-        action_taken:
+        latency_ms:
+          type: number
+        explanation:
           type: string
         action_at:
           type: string
           format: date-time
 
+    ThreatStatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [active, trashed, restored]
+
     FeedbackRequest:
       type: object
-      required: [threat_log_id, feedback_label]
+      required: [feedback_type, corrected_verdict]
       properties:
-        threat_log_id:
+        event_id:
           type: string
-        feedback_label:
+          description: Optional app_inference_event id when feedback is tied to a known scan.
+        feedback_type:
           type: string
           enum: [true_positive, false_positive, false_negative, true_negative]
-        comment:
+        corrected_verdict:
+          type: string
+          enum: [phishing, spam, legitimate]
+        reporter_note:
           type: string
 
     FeedbackResponse:
@@ -1072,58 +1254,130 @@ components:
       properties:
         id:
           type: string
-        threat_log_id:
+        event_id:
           type: string
-        feedback_label:
+        feedback_type:
           type: string
         created_at:
           type: string
           format: date-time
 
-    UserProfile:
+    QuarantineItem:
       type: object
       properties:
         id:
           type: string
-        email:
+        event_id:
           type: string
-        display_name:
+        subject:
           type: string
-        plan:
+        sender:
           type: string
-          enum: [free, pro, business]
-        watch_active:
-          type: boolean
+        recipient:
+          type: string
+        verdict:
+          type: string
+          enum: [phishing, spam, quarantine]
+        confidence:
+          type: number
+        status:
+          type: string
+          enum: [held, released, deleted, whitelisted]
+        released_at:
+          type: string
+          format: date-time
         created_at:
           type: string
           format: date-time
 
-    UserStats:
+    CloudflareSetupRequest:
       type: object
+      required: [cf_api_token, zone_name, destination_email]
       properties:
-        total_scanned:
-          type: integer
-        total_phishing:
-          type: integer
-        total_spam:
-          type: integer
-        total_legitimate:
-          type: integer
-        total_trashed:
-          type: integer
-        total_restored:
-          type: integer
-        false_positive_rate:
-          type: number
-        period_days:
-          type: integer
+        cf_api_token:
+          type: string
+          writeOnly: true
+        zone_name:
+          type: string
+          example: example.fr
+        destination_email:
+          type: string
+          format: email
+        fix_spf:
+          type: boolean
+          default: true
+        fix_dkim:
+          type: boolean
+          default: true
+        fix_dmarc:
+          type: boolean
+          default: true
 
-    RenewWatchesResponse:
+    CloudflareSetupResponse:
       type: object
       properties:
-        renewed:
-          type: integer
-        failed:
-          type: integer
-        skipped:
-          type: integer
+        integration_id:
+          type: string
+        status:
+          type: string
+          enum: [provisioning, active, degraded, disconnected]
+        message:
+          type: string
+
+    CloudflareStatus:
+      type: object
+      properties:
+        id:
+          type: string
+        domain:
+          type: string
+        zone_name:
+          type: string
+        zone_id:
+          type: string
+        status:
+          type: string
+          enum: [not_configured, provisioning, active, degraded, disconnected]
+        routing_enabled:
+          type: boolean
+        worker_deployed:
+          type: boolean
+        mx_configured:
+          type: boolean
+        last_checked_at:
+          type: string
+          format: date-time
+
+    CloudflareTokenVerifyRequest:
+      type: object
+      required: [cf_api_token, zone_name]
+      properties:
+        cf_api_token:
+          type: string
+          writeOnly: true
+        zone_name:
+          type: string
+
+    CloudflareTeardownRequest:
+      type: object
+      required: [cf_api_token]
+      properties:
+        cf_api_token:
+          type: string
+          writeOnly: true
+
+    CloudflareTokenSaveRequest:
+      type: object
+      required: [cf_api_token]
+      properties:
+        cf_api_token:
+          type: string
+          writeOnly: true
+
+    CloudflareTokenStatus:
+      type: object
+      properties:
+        api_token:
+          type: string
+          nullable: true
+          description: Current implementation returns the stored token; production should replace this with presence metadata only.

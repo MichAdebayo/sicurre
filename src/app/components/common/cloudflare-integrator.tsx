@@ -158,8 +158,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
         s.id === "dns" ? { ...s, status: "loading" } : s
       ));
 
-      // Step 2: DNS MX Configuration simulation (DNS check happens backend)
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // The backend performs DNS and routing provisioning in the setup call.
       setStages(prev => prev.map(s =>
         s.id === "dns" ? { ...s, status: "success" } :
         s.id === "worker" ? { ...s, status: "loading" } : s
@@ -444,9 +443,6 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
           variant="outline"
           size="sm"
           onClick={async () => {
-            if (cfToken) {
-              await teardownMutation.mutateAsync({ cf_api_token: cfToken || "dummy" }).catch(() => {});
-            }
             refetch();
           }}
           className="gap-1.5 text-[11px]"

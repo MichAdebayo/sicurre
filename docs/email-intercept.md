@@ -7,8 +7,8 @@ This guide shows how to intercept incoming email for a customer domain (example:
 Incoming email
 -> Cloudflare MX receives mail for `vinse.app`
 -> Cloudflare Email Worker calls Sicurre API (Hetzner)
--> Sicurre returns verdict (`clean`, `spam`, `phishing`)
--> Worker forwards clean (or clean+spam) mail, rejects/drops phishing
+-> Sicurre returns verdict (`safe`, `spam`, `phishing`, or `quarantine`)
+-> Worker forwards safe mail and applies the configured spam/phishing quarantine policy
 
 ## 2. Decision: Manual Setup vs Integrator
 
@@ -80,16 +80,16 @@ Where:
 What to do:
 1. Create Worker `sicurre-email-gateway`.
 2. Add secret variables:
-   - `SICURRE_SCAN_URL` (example: `https://api.sicurre.com/v1/email/intercept`)
+   - `SICURRE_SCAN_URL` (example: `https://api.sicurre.com/v1/email/scan`)
    - `SICURRE_SHARED_SECRET` (strong random value)
    - `FORWARD_TO` (verified destination mailbox)
 3. Configure worker as email handler for the domain.
 4. Worker logic:
    - Parse inbound email metadata/body.
    - POST to Sicurre scan endpoint.
-   - If `phishing`: reject or quarantine.
+   - If `phishing`: quarantine or reject according to policy.
    - If `spam`: forward to spam destination (optional policy).
-   - If `clean`: forward to normal destination.
+   - If `safe`: forward to normal destination.
 
 Watch for:
 - Ensure worker handles timeouts; if Sicurre is unavailable, choose fail-open or fail-closed policy.
@@ -121,20 +121,20 @@ Watch for:
 ### Step 5.1 - Create scan endpoint
 
 Create endpoint in Sicurre API, example:
-- `POST /v1/email/intercept`
+- `POST /v1/email/scan`
 
 Input should include:
-- Envelope sender / recipient
-- Headers
+- Sender
 - Subject
-- Plain body / HTML body
+- Plain body text extracted by the Worker
 - Optional attachments metadata
-- Request signature or shared secret
+- `X-Sicurre-Secret` shared secret
 
 Output contract:
-- `{"verdict":"clean"}`
+- `{"verdict":"safe"}`
 - `{"verdict":"spam"}`
 - `{"verdict":"phishing"}`
+- `{"verdict":"quarantine"}`
 - Optional fields: `score`, `reason`, `action`
 
 ### Step 5.2 - Protect endpoint

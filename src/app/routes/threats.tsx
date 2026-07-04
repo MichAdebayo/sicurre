@@ -5,11 +5,14 @@ import {
   Search,
   Download,
   Trash2,
+  RotateCcw,
+  Flag,
   AlertTriangle,
 } from "lucide-react";
 import {
   useThreatLogs,
   useUpdateThreatStatus,
+  useCreateFeedback,
   AuthSession,
 } from "../lib/api";
 import { VerdictBadge } from "../components/threats/verdict-badge";
@@ -25,6 +28,7 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
   const { t, i18n } = useTranslation();
   const { data: threats, isLoading, error, refetch } = useThreatLogs();
   const updateStatusMutation = useUpdateThreatStatus();
+  const feedbackMutation = useCreateFeedback();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterVerdict, setFilterVerdict] = useState<string>("all");
@@ -61,12 +65,36 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
       await updateStatusMutation.mutateAsync({ id, status: newStatus });
       setActionSuccess(
         newStatus === "trashed"
-          ? (i18n.language === "fr" ? "Menace mise à la corbeille." : "Threat moved to trash.")
+          ? (i18n.language === "fr" ? "Menace mise en quarantaine." : "Threat quarantined.")
           : (i18n.language === "fr" ? "Menace restaurée." : "Threat restored.")
       );
       refetch();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Failed to update status.");
+    }
+  };
+
+  const handleReportFalseNegative = async (id: string) => {
+    setActionSuccess("");
+    setActionError("");
+    try {
+      await feedbackMutation.mutateAsync({
+        event_id: id,
+        feedback_type: "false_negative",
+        corrected_verdict: "phishing",
+        reporter_note:
+          i18n.language === "fr"
+            ? "Signalé depuis le journal des menaces comme phishing non intercepté."
+            : "Reported from threat log as missed phishing.",
+      });
+      setActionSuccess(
+        i18n.language === "fr"
+          ? "Signalement reçu. Nous l'utiliserons pour améliorer la détection."
+          : "Report received. We will use it to improve detection."
+      );
+      refetch();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to submit feedback.");
     }
   };
 
@@ -513,6 +541,7 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
                   <th className="px-5 py-3 text-xs font-bold text-on-surface-variant tracking-wide w-[28%] min-w-[180px]">{t("threats.sender")}</th>
                   <th className="px-5 py-3 text-xs font-bold text-on-surface-variant tracking-wide w-[35%] min-w-[220px]">{t("threats.subject")}</th>
                   <th className="px-5 py-3 text-xs font-bold text-on-surface-variant tracking-wide w-[15%] min-w-[140px]">{t("threats.verdict")}</th>
+                  <th className="px-5 py-3 text-xs font-bold text-on-surface-variant tracking-wide min-w-[180px]">{t("threats.actions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-subtle">
@@ -551,6 +580,44 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
                       </td>
                       <td className="px-5 py-3.5">
                         <VerdictBadge verdict={threat.verdict} confidence={threat.confidence} />
+                      </td>
+                      <td className="px-5 py-3.5">
+                        {threat.verdict === "phishing" || threat.verdict === "quarantine" ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={updateStatusMutation.isPending}
+                            onClick={() =>
+                              handleUpdateStatus(
+                                threat.id,
+                                threat.status === "trashed" ? "restored" : "trashed",
+                              )
+                            }
+                            className="h-8 text-[11px]"
+                          >
+                            {threat.status === "trashed" ? (
+                              <RotateCcw className="w-3.5 h-3.5" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5" />
+                            )}
+                            <span>
+                              {threat.status === "trashed"
+                                ? t("threats.action_restore")
+                                : t("threats.action_trash")}
+                            </span>
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={feedbackMutation.isPending}
+                            onClick={() => handleReportFalseNegative(threat.id)}
+                            className="h-8 text-[11px]"
+                          >
+                            <Flag className="w-3.5 h-3.5" />
+                            <span>{i18n.language === "fr" ? "Signaler phishing" : "Report phishing"}</span>
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   </MotionDiv>

@@ -81,7 +81,7 @@ export function ThreatRow({ threat, onUpdateStatus }: ThreatRowProps) {
               }}
             >
               <Trash2 className="w-3.5 h-3.5 mr-1" />
-              <span>Supprimer</span>
+              <span>Mettre en quarantaine</span>
             </Button>
           )}
         </div>

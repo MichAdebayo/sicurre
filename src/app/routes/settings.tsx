@@ -56,15 +56,19 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
   const [email, setEmail] = useState(session.email);
 
   // New Profile fields
-  const [title, setTitle] = useState(localStorage.getItem("sicurre_profile_title") || "Founder & CEO");
-  const [company, setCompany] = useState(localStorage.getItem("sicurre_profile_company") || "Vinse");
+  const [title, setTitle] = useState(localStorage.getItem("sicurre_profile_title") || "");
+  const [company, setCompany] = useState(localStorage.getItem("sicurre_profile_company") || "");
   const [role, setRole] = useState(localStorage.getItem("sicurre_profile_role") || "owner");
 
   const [saveStatus, setSaveStatus] = useState(false);
   const [saveError, setSaveError] = useState("");
 
   const [lang, setLang] = useState(localStorage.getItem("sicurre_lang") || "fr");
-  const [theme, setTheme] = useState(localStorage.getItem("sicurre_theme") || "light");
+  const [theme, setTheme] = useState(() => {
+    const savedTheme = localStorage.getItem("sicurre_theme");
+    if (savedTheme) return savedTheme;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  });
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -129,7 +133,9 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
 
   // Apply theme class on mount to ensure light/dark variables resolve
   useEffect(() => {
-    const savedTheme = localStorage.getItem("sicurre_theme") || "light";
+    const savedTheme =
+      localStorage.getItem("sicurre_theme") ||
+      (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
     if (savedTheme === "dark") {
       document.documentElement.classList.add("dark");
     } else {
@@ -222,14 +228,11 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
     setRemoveDomainConfirmId(null);
     setIntegrationError("");
     setIntegrationSuccess("");
-    try {
-      await teardownMutation.mutateAsync({ cf_api_token: "MOCK_TEARDOWN_TOKEN" });
-      setIntegrationSuccess(lang === "fr" ? "Domaine dissocié avec succès." : "Domain disconnected successfully.");
-      refetchDomains();
-      refetchWsToken();
-    } catch (error) {
-      setIntegrationError(error instanceof Error ? error.message : "Failed to remove domain.");
-    }
+    setIntegrationError(
+      lang === "fr"
+        ? "La désactivation nécessite un jeton Cloudflare. Ouvrez Domain Shield pour supprimer le Worker et la règle de routage."
+        : "Disconnecting requires a Cloudflare token. Open Domain Shield to remove the Worker and routing rule."
+    );
   };
 
   const handleSaveToken = async (e: React.FormEvent) => {
@@ -876,7 +879,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                       <ul className="text-xs space-y-2 text-on-surface pt-3 border-t border-border-subtle/50 font-semibold">
                         <li>• 1 Protected Domain</li>
                         <li>• 250 analyzed emails/mo</li>
-                        <li>• Phishing email auto-trash</li>
+                        <li>• Phishing email quarantine</li>
                       </ul>
                     </div>
                     <Button variant="outline" disabled className="w-full text-xs mt-6 font-bold">

@@ -1,7 +1,7 @@
 # ADR-0003: FastAPI + Cloud Run for serving
 
 **Date:** 2026-02-28  
-**Status:** Accepted  
+**Status:** Superseded by [ADR-0003: FastAPI on Hetzner with Better Auth sidecar](0003-fastapi-hetzner-sidecar-runtime.md)  
 
 ## Context
 Bootstrapped build: minimize ops overhead, support autoscaling, keep costs low. The API layer must serve ML inference (CamemBERTav2), handle Gmail Pub/Sub webhooks, and proxy auth flows — all with high concurrency and low latency on Cloud Run's container-based serverless platform.

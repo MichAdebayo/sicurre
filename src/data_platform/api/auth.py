@@ -220,6 +220,23 @@ def ensure_runtime_tables() -> None:
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS ix_app_domain_shield_history_domain ON app_domain_shield_history(domain)")
 
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS app_feedback (
+                id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                workspace_member_user_id TEXT NOT NULL,
+                event_id TEXT,
+                feedback_type TEXT NOT NULL,
+                original_verdict TEXT,
+                corrected_verdict TEXT NOT NULL,
+                reporter_note TEXT,
+                created_at TEXT NOT NULL,
+                UNIQUE(workspace_id, event_id, feedback_type)
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS ix_app_feedback_workspace_id ON app_feedback(workspace_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS ix_app_feedback_event_id ON app_feedback(event_id)")
+
         conn.commit()
     finally:
         conn.close()

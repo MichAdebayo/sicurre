@@ -61,6 +61,13 @@ export interface ThreatLog {
   explanation?: string;
 }
 
+export interface FeedbackPayload {
+  event_id?: string;
+  feedback_type: "false_negative" | "false_positive" | "true_positive" | "true_negative";
+  corrected_verdict: "phishing" | "spam" | "legitimate" | "quarantine";
+  reporter_note?: string;
+}
+
 export interface CloudflareStatus {
   status: "not_configured" | "provisioning" | "pending_verification" | "active" | "error";
   id?: string;
@@ -271,6 +278,21 @@ export function useUpdateThreatStatus() {
       fetchJson<ThreatLog>(`/threats/${id}/status`, {
         method: "POST",
         body: JSON.stringify({ status }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["threats"] });
+      queryClient.invalidateQueries({ queryKey: ["kpis"] });
+    },
+  });
+}
+
+export function useCreateFeedback() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: FeedbackPayload) =>
+      fetchJson<{ id: string; event_id?: string; feedback_type: string; created_at: string }>("/feedback", {
+        method: "POST",
+        body: JSON.stringify(payload),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["threats"] });

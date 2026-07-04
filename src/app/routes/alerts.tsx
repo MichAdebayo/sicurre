@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import {
@@ -56,7 +56,7 @@ export default function AlertsRoute() {
   const [ruleError, setRuleError] = useState("");
 
   // Sync component state when preferences query finishes loading
-  useState(() => {
+  useEffect(() => {
     if (preferences) {
       setNotifyPhishing(preferences.notify_phishing);
       setNotifySpam(preferences.notify_spam);
@@ -64,7 +64,7 @@ export default function AlertsRoute() {
       setQuietStart(preferences.quiet_hours_start);
       setQuietEnd(preferences.quiet_hours_end);
     }
-  });
+  }, [preferences]);
 
   // Sync state explicitly if query updates
   const handlePrefsSync = () => {

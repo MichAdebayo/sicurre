@@ -47,6 +47,12 @@ export default function App() {
   const session = sessionQuery.data;
 
   useEffect(() => {
+    const savedTheme = localStorage.getItem("sicurre_theme");
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.classList.toggle("dark", savedTheme === "dark" || (!savedTheme && prefersDark));
+  }, []);
+
+  useEffect(() => {
     if (sessionQuery.isError) {
       clearStoredSession();
       setHasStoredSession(false);

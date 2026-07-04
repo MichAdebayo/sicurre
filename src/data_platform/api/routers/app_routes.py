@@ -27,6 +27,19 @@ class UpdateProfileRequest(BaseModel):
     display_name: str = Field(min_length=2, max_length=120)
 
 
+class FeedbackCreate(BaseModel):
+    event_id: str | None = Field(default=None, max_length=120)
+    feedback_type: str = Field(
+        ...,
+        pattern="^(false_negative|false_positive|true_positive|true_negative)$",
+    )
+    corrected_verdict: str = Field(
+        ...,
+        pattern="^(phishing|spam|legitimate|quarantine)$",
+    )
+    reporter_note: str | None = Field(default=None, max_length=500)
+
+
 async def _workspace_threat_count(workspace_id: str) -> int:
     try:
         rows = await auth_query(
@@ -270,6 +283,87 @@ async def update_threat_status(
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Database error: {exc}") from exc
+
+
+@router.post("/v1/feedback", status_code=201)
+async def create_feedback(
+    payload: FeedbackCreate,
+    current_user: AuthUser = Depends(get_current_user),
+):
+    event_row = None
+    if payload.event_id:
+        rows = await async_query_auth_db(
+            """
+            SELECT id, safety_verdict
+            FROM app_inference_event
+            WHERE id = ? AND workspace_id = ?
+            LIMIT 1
+            """,
+            (payload.event_id, current_user.workspace_id),
+        )
+        if not rows:
+            raise HTTPException(status_code=404, detail="Linked event not found")
+        event_row = rows[0]
+
+    feedback_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat() + "Z"
+    original_verdict = event_row["safety_verdict"] if event_row else None
+
+    try:
+        await async_query_auth_db(
+            """
+            INSERT INTO app_feedback (
+                id, workspace_id, workspace_member_user_id, event_id,
+                feedback_type, original_verdict, corrected_verdict,
+                reporter_note, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                feedback_id,
+                current_user.workspace_id,
+                current_user.id,
+                payload.event_id,
+                payload.feedback_type,
+                original_verdict,
+                payload.corrected_verdict,
+                (payload.reporter_note or "").strip() or None,
+                now,
+            ),
+        )
+    except Exception as exc:
+        message = str(exc).lower()
+        if "unique" in message:
+            raise HTTPException(status_code=409, detail="Feedback already submitted") from exc
+        raise HTTPException(status_code=500, detail="Could not record feedback") from exc
+
+    if payload.event_id:
+        override_status = (
+            "reported_false_negative"
+            if payload.feedback_type == "false_negative"
+            else "reported_false_positive"
+        )
+        await async_query_auth_db(
+            """
+            UPDATE app_inference_event
+            SET override_verdict = ?, overridden_at = ?
+            WHERE id = ? AND workspace_id = ?
+            """,
+            (
+                override_status,
+                now,
+                payload.event_id,
+                current_user.workspace_id,
+            ),
+        )
+
+    return {
+        "id": feedback_id,
+        "event_id": payload.event_id,
+        "feedback_type": payload.feedback_type,
+        "original_verdict": original_verdict,
+        "corrected_verdict": payload.corrected_verdict,
+        "created_at": now,
+    }
 
 
 @router.get("/v1/datasets")
