@@ -37,9 +37,22 @@ const getInitialLoginState = () => {
   return false;
 };
 
+const getInitialViewState = (): "landing" | "login" | "signup" | "mentions-legales" | "confidentialite" | "contact" => {
+  const saved = sessionStorage.getItem("sicurre_view_state");
+  if (saved && ["landing", "login", "signup", "mentions-legales", "confidentialite", "contact"].includes(saved)) {
+    return saved as any;
+  }
+  return "landing";
+};
+
 export default function App() {
   const [hasStoredSession, setHasStoredSession] = useState(getInitialLoginState);
-  const [viewState, setViewState] = useState<"landing" | "login" | "signup" | "mentions-legales" | "confidentialite" | "contact">("landing");
+  const [viewState, setViewStateState] = useState<"landing" | "login" | "signup" | "mentions-legales" | "confidentialite" | "contact">(getInitialViewState);
+
+  const setViewState = (view: "landing" | "login" | "signup" | "mentions-legales" | "confidentialite" | "contact") => {
+    sessionStorage.setItem("sicurre_view_state", view);
+    setViewStateState(view);
+  };
   const [activePage, setActivePage] = useState<SidebarPage>("dashboard");
   const [settingsTab, setSettingsTab] = useState<string | undefined>();
   const sessionQuery = useCurrentSession(true);

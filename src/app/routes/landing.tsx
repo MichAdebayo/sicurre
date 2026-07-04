@@ -306,11 +306,6 @@ export default function LandingRoute({
             </span>
           </div>
 
-          <nav className="hidden md:flex items-center gap-8 text-[13px] font-medium text-white/50">
-            <a href="#features" className="hover:text-white transition-colors duration-200">{t("landing.nav_features")}</a>
-            <a href="#integration" className="hover:text-white transition-colors duration-200">Integration</a>
-          </nav>
-
           <div className="flex items-center gap-4">
             <LanguageSwitcher scrolled={scrolled} />
             <button
@@ -422,9 +417,9 @@ export default function LandingRoute({
               transition={{ duration: 0.6, delay: 0.1 }}
             >
               <h1 className="font-display font-extrabold text-[clamp(2.5rem,5.2vw,4.25rem)] leading-[1.08] tracking-[-0.03em] text-white">
-                {t("landing.hero_title_line1")}
+                <span className="block whitespace-nowrap">{t("landing.hero_title_line1")}</span>
                 {t("landing.hero_title_line2") && (
-                  <span className="block text-white/50 font-semibold mt-2">
+                  <span className="block text-white/50 font-semibold mt-1">
                     {t("landing.hero_title_line2")}
                   </span>
                 )}
@@ -444,34 +439,16 @@ export default function LandingRoute({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.3 }}
-              className="flex flex-col sm:flex-row items-start gap-4 pt-2"
+              className="flex items-center gap-4 pt-2"
             >
               <button
                 onClick={onNavigateToSignUp}
-                className="flex items-center gap-2.5 px-7 py-4 rounded-xl text-[16px] font-semibold transition-all active:scale-[0.97] cursor-pointer text-white border border-white/10 bg-white/[0.08] hover:bg-white/90 hover:text-black hover:shadow-[0_0_25px_rgba(255,255,255,0.2)] duration-200"
+                className="flex items-center gap-2.5 px-7 py-4 rounded-xl text-[16px] font-semibold transition-all active:scale-[0.97] cursor-pointer text-white border border-white/15 bg-white/[0.08] hover:bg-primary hover:text-white hover:border-primary hover:shadow-[0_0_25px_rgba(74,144,217,0.4)] duration-200"
               >
                 <span>{t("landing.hero_cta_primary")}</span>
                 <ArrowRight className="w-4.5 h-4.5" />
               </button>
-              <a
-                href="#features"
-                className="flex items-center gap-2 px-6 py-4 text-[15px] font-medium text-white/50 hover:text-white transition-colors cursor-pointer"
-              >
-                {t("landing.hero_cta_secondary")}
-              </a>
             </MotionDiv>
-
-            {t("landing.hero_social_proof") && (
-              <MotionDiv
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.6, delay: 0.45 }}
-                className="flex items-center gap-2.5 text-[14px] text-white/50 font-medium pt-1"
-              >
-                <CheckCircle2 className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
-                <span>{t("landing.hero_social_proof")}</span>
-              </MotionDiv>
-            )}
           </div>
 
           <div className="lg:col-span-6 flex justify-center lg:justify-end h-full max-h-[460px]">
@@ -488,7 +465,7 @@ export default function LandingRoute({
 
         {/* Marquee loop pinned flush at the bottom of hero screen */}
         <div 
-          className="w-full py-5 relative z-20 border-t border-b border-white/10 bg-black/60 backdrop-blur-xl shrink-0"
+          className="w-full py-3.5 relative z-20 border-t border-b border-white/10 bg-black/60 backdrop-blur-xl shrink-0"
         >
           <div className="relative flex max-w-full overflow-hidden">
             <div className="animate-marquee flex gap-16 whitespace-nowrap shrink-0">
