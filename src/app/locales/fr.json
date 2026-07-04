@@ -217,15 +217,12 @@
     "no_domains": "Aucun domaine connecté. Configurez Cloudflare pour protéger votre premier domaine."
   },
   "landing": {
-    "nav_features": "Fonctionnalités",
     "nav_login": "Connexion",
     "nav_cta": "Commencer gratuitement",
     "hero_title_line1": "Stoppez le phishing",
     "hero_title_line2": "avant qu'il arrive.",
     "hero_desc": "Protection e-mail en temps réel pour votre domaine. Natif Cloudflare, conforme RGPD, actif en 2 minutes.",
     "hero_cta_primary": "Protéger mon domaine",
-    "hero_cta_secondary": "Voir comment ça marche",
-    "hero_social_proof": "Fait confiance par 200+ entreprises en France",
     "marquee_zero_trust": "Architecture Zero-Trust",
     "marquee_ai": "Détection IA",
     "marquee_gmail": "Natif Cloudflare",

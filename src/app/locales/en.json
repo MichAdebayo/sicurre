@@ -217,15 +217,12 @@
     "no_domains": "No domains configured. Setup Cloudflare to secure your first domain."
   },
   "landing": {
-    "nav_features": "Features",
     "nav_login": "Sign in",
     "nav_cta": "Start free",
-    "hero_title_line1": "Stop phishing before it lands.",
-    "hero_title_line2": "",
+    "hero_title_line1": "Stop phishing",
+    "hero_title_line2": "before it lands.",
     "hero_desc": "Real-time email protection for your domain. Cloudflare-native, GDPR-compliant, live in 2 minutes.",
     "hero_cta_primary": "Protect my domain",
-    "hero_cta_secondary": "See how it works",
-    "hero_social_proof": "Trusted by 200+ businesses across France",
     "marquee_zero_trust": "Zero-trust architecture",
     "marquee_ai": "AI threat detection",
     "marquee_gmail": "Cloudflare-native",
