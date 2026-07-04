@@ -56,9 +56,9 @@ export function TopBar({
     
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return i18n.language === "fr" ? "à l'instant" : "just now";
-    if (mins < 60) return `${mins}m ago`;
+    if (mins < 60) return i18n.language === "fr" ? `il y a ${mins} min` : `${mins}m ago`;
     const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
+    if (hours < 24) return i18n.language === "fr" ? `il y a ${hours} h` : `${hours}h ago`;
     return new Date(dateStr).toLocaleDateString(i18n.language === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short" });
   };
 
@@ -114,8 +114,10 @@ export function TopBar({
     notificationsList.push({
       id: "ssl_expiring",
       title: i18n.language === "fr" ? "Certificat SSL expirant bientôt" : "SSL certificate expiring soon",
-      desc: `${activeDomain} certificate expires in ${shieldStatus.ssl.days_remaining} days`,
-      time: "13h ago",
+      desc: i18n.language === "fr"
+        ? `${activeDomain} expire dans ${shieldStatus.ssl.days_remaining} jours`
+        : `${activeDomain} certificate expires in ${shieldStatus.ssl.days_remaining} days`,
+      time: i18n.language === "fr" ? "il y a 13 h" : "13h ago",
       badge: "Domain shield",
       category: "Domain" as const,
       page: "domain-shield" as const,
@@ -128,8 +130,10 @@ export function TopBar({
     notificationsList.push({
       id: "dmarc_none",
       title: i18n.language === "fr" ? 'Politique DMARC définie sur "none"' : 'DMARC policy is set to "none"',
-      desc: `Anyone can spoof @${activeDomain} — change policy`,
-      time: "Yesterday",
+      desc: i18n.language === "fr"
+        ? `@${activeDomain} peut être usurpé. Modifiez la politique.`
+        : `@${activeDomain} can be spoofed. Change the policy.`,
+      time: i18n.language === "fr" ? "hier" : "yesterday",
       badge: "Domain shield",
       category: "Domain" as const,
       page: "domain-shield" as const,
@@ -142,8 +146,10 @@ export function TopBar({
     notificationsList.push({
       id: "quarantine_held",
       title: i18n.language === "fr" ? `${quarantineItems.length} emails en quarantaine` : `${quarantineItems.length} emails waiting in quarantine`,
-      desc: `Held from: ${quarantineItems.map(i => i.sender.split("@")[0]).slice(0, 2).join(", ")}...`,
-      time: quarantineItems && quarantineItems.length > 0 ? timeSince(quarantineItems[0].created_at) : "14h ago",
+      desc: i18n.language === "fr"
+        ? `Expéditeurs: ${quarantineItems.map(i => i.sender.split("@")[0]).slice(0, 2).join(", ")}`
+        : `Held from: ${quarantineItems.map(i => i.sender.split("@")[0]).slice(0, 2).join(", ")}`,
+      time: quarantineItems && quarantineItems.length > 0 ? timeSince(quarantineItems[0].created_at) : i18n.language === "fr" ? "il y a 14 h" : "14h ago",
       badge: "Quarantine",
       category: "System" as const,
       page: "quarantine" as const,
@@ -155,9 +161,11 @@ export function TopBar({
   if (notificationsList.length === 0) {
     notificationsList.push({
       id: "system_ok",
-      title: "All perimeters protected",
-      desc: "No active threats, SSL and domain settings optimal.",
-      time: "just now",
+      title: i18n.language === "fr" ? "Périmètre protégé" : "All perimeters protected",
+      desc: i18n.language === "fr"
+        ? "Aucune menace active et configuration domaine stable."
+        : "No active threats, SSL and domain settings are stable.",
+      time: i18n.language === "fr" ? "à l'instant" : "just now",
       badge: "System",
       category: "System" as const,
       page: "dashboard" as const,
@@ -195,7 +203,7 @@ export function TopBar({
       icon = <Cpu className="w-4 h-4 text-on-surface-variant" />;
     }
     return (
-      <div className={`p-2 rounded-xl shrink-0 ${bg}`}>
+      <div className={`p-2 rounded-lg shrink-0 ${bg}`}>
         {icon}
       </div>
     );
@@ -223,7 +231,7 @@ export function TopBar({
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-safe" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-safe" />
             </span>
-            <span className="text-[9px] font-bold text-on-surface-variant/80 tracking-[0.12em] uppercase flex items-center gap-1">
+            <span className="text-[9px] font-bold text-on-surface-variant/80 uppercase flex items-center gap-1">
               <Cpu className="w-3 h-3 text-primary" />
               {i18n.language === "fr" ? "Système Actif" : "System Operational"}
             </span>
@@ -236,11 +244,12 @@ export function TopBar({
             e.stopPropagation();
             setIsOpen(!isOpen);
           }}
-          className="relative p-2 rounded-lg text-on-surface-variant/80 hover:bg-white hover:text-on-surface hover:shadow-sm border border-transparent hover:border-border-subtle transition-all cursor-pointer bg-white/50 backdrop-blur-sm"
+          className="relative rounded-lg border border-border-subtle bg-surface-lowest/80 p-2 text-on-surface-variant transition-[background-color,border-color,transform] duration-200 hover:border-primary/35 hover:bg-primary-fixed hover:text-on-surface active:scale-[0.98] dark:bg-surface-low"
+          aria-label={i18n.language === "fr" ? "Ouvrir les notifications" : "Open notifications"}
         >
           <Bell className="w-[22px] h-[22px] stroke-[1.5]" />
           {unreadCount > 0 && (
-            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-error rounded-full ring-2 ring-white" />
+            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-error rounded-full ring-2 ring-surface-lowest dark:ring-surface-low" />
           )}
         </button>
 
@@ -248,7 +257,7 @@ export function TopBar({
         {isOpen && (
           <div
             onClick={(e) => e.stopPropagation()}
-            className="absolute right-0 top-11 w-96 bg-white border border-border-subtle rounded-2xl shadow-xl p-4 text-on-surface z-50 animate-in fade-in slide-in-from-top-1 duration-150 font-sans"
+            className="absolute right-0 top-11 z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg border border-border-subtle bg-surface-lowest p-4 text-on-surface shadow-xl shadow-primary/10 animate-in fade-in slide-in-from-top-1 duration-150 font-sans dark:bg-surface-low"
           >
             {/* Popover Header */}
             <div className="flex items-center justify-between pb-3.5 border-b border-border-subtle">
@@ -256,15 +265,15 @@ export function TopBar({
                 <span className="font-bold text-sm text-on-surface">Notifications</span>
                 {unreadCount > 0 && (
                   <span className="text-[10px] font-bold bg-error/10 text-error px-2 py-0.5 rounded-full">
-                    {unreadCount} unread
+                    {unreadCount} {i18n.language === "fr" ? "non lues" : "unread"}
                   </span>
                 )}
               </div>
               <button
                 onClick={markAllRead}
-                className="text-[11px] font-bold text-primary hover:text-primary-hover transition-colors cursor-pointer"
+                className="text-[11px] font-bold text-primary hover:text-navy-dark transition-colors cursor-pointer"
               >
-                Mark all read
+                {i18n.language === "fr" ? "Tout marquer lu" : "Mark all read"}
               </button>
             </div>
 
@@ -272,6 +281,9 @@ export function TopBar({
             <div className="flex gap-1.5 py-3">
               {(["All", "Critical", "Domain", "System"] as const).map((filter) => {
                 const isActive = activeFilter === filter;
+                const label = i18n.language === "fr"
+                  ? ({ All: "Tout", Critical: "Critique", Domain: "Domaine", System: "Système" } as const)[filter]
+                  : filter;
                 return (
                   <button
                     key={filter}
@@ -282,7 +294,7 @@ export function TopBar({
                         : "bg-transparent text-on-surface-variant hover:text-on-surface border-transparent"
                     }`}
                   >
-                    {filter}
+                    {label}
                   </button>
                 );
               })}
@@ -292,7 +304,7 @@ export function TopBar({
             <div className="space-y-1.5 max-h-[340px] overflow-y-auto pt-1 select-none pr-1">
               {filteredNotifs.length === 0 ? (
                 <div className="text-center py-8 text-xs text-on-surface-variant">
-                  No notifications matching filter
+                  {i18n.language === "fr" ? "Aucune notification pour ce filtre" : "No notifications matching this filter"}
                 </div>
               ) : (
                 filteredNotifs.map((notif) => {
@@ -307,7 +319,7 @@ export function TopBar({
                         }
                         setIsOpen(false);
                       }}
-                      className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-surface-low transition-colors cursor-pointer border border-transparent hover:border-border-subtle"
+                      className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-surface-low transition-colors cursor-pointer border border-transparent hover:border-border-subtle"
                     >
                       {/* Icon */}
                       {getCategoryIconContainer(notif.badge)}
@@ -330,7 +342,7 @@ export function TopBar({
                             {notif.badge}
                           </span>
                           {isUnread && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
                           )}
                         </div>
                       </div>

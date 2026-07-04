@@ -77,7 +77,7 @@ export function Sidebar({
   return (
     <aside
       className={clsx(
-        "w-[240px] h-screen border-r border-border-subtle bg-white flex flex-col shrink-0",
+        "w-[240px] h-screen border-r border-border-subtle bg-surface-lowest flex flex-col shrink-0 dark:bg-surface-low",
         className,
       )}
     >
@@ -86,7 +86,7 @@ export function Sidebar({
         <div className="flex items-center gap-3">
           <img src={sicurreLogo} alt="Sicurre" className="w-16 h-16" />
           <div className="flex flex-col">
-            <span className="font-display font-bold text-3xl text-on-surface leading-tight tracking-tight">
+            <span className="font-display font-bold text-3xl text-on-surface leading-tight">
               Sicurre
             </span>
           </div>
@@ -151,7 +151,7 @@ export function Sidebar({
         )}
 
         {/* User Profile */}
-        <div className="flex items-center justify-between p-2.5 rounded-xl bg-surface-low/50 border border-border-subtle/50">
+        <div className="flex items-center justify-between p-2.5 rounded-lg bg-surface-low/70 border border-border-subtle/50 dark:bg-surface">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-full bg-primary/[0.08] text-primary flex items-center justify-center font-display font-bold text-[12px] shrink-0">
               {userName.substring(0, 2).toUpperCase()}

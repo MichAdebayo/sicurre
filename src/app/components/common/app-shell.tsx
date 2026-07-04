@@ -29,7 +29,7 @@ export function AppShell({
   userRole,
 }: AppShellProps) {
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#f6f7f9]">
+    <div className="flex h-screen w-screen overflow-hidden bg-background text-on-surface">
       {/* Sidebar */}
       <Sidebar
         currentPage={currentPage}

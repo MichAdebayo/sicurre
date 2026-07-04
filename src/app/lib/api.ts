@@ -68,6 +68,45 @@ export interface FeedbackPayload {
   reporter_note?: string;
 }
 
+export interface AdminOverview {
+  summary: {
+    workspaces_count: number;
+    members_count: number;
+    threat_events_count: number;
+    feedback_count: number;
+    false_negative_count: number;
+    quarantine_held_count: number;
+    cloudflare_integrations_count: number;
+    cloudflare_active_count: number;
+  };
+  verdicts: { verdict: string; count: number }[];
+  feedback_by_type: { feedback_type: string; count: number }[];
+  cloudflare_domains: {
+    zone_name: string | null;
+    status: string | null;
+    user_email: string | null;
+    updated_at: string | null;
+  }[];
+  recent_feedback: {
+    id: string;
+    workspace_id: string;
+    feedback_type: string;
+    original_verdict: string | null;
+    corrected_verdict: string;
+    created_at: string;
+    reporter_email: string | null;
+  }[];
+  recent_quarantine: {
+    id: string;
+    workspace_id: string;
+    safety_verdict: string;
+    composite_score: number;
+    status: string;
+    created_at: string;
+    expires_at: string;
+  }[];
+}
+
 export interface CloudflareStatus {
   status: "not_configured" | "provisioning" | "pending_verification" | "active" | "error";
   id?: string;
@@ -261,6 +300,14 @@ export function useKPIStats() {
     queryKey: ["kpis"],
     queryFn: () => fetchJson<KPIStats>("/stats/kpi"),
     refetchInterval: 10000,
+  });
+}
+
+export function useAdminOverview() {
+  return useQuery<AdminOverview>({
+    queryKey: ["admin-overview"],
+    queryFn: () => fetchJson<AdminOverview>("/admin/overview"),
+    refetchInterval: 15000,
   });
 }
 

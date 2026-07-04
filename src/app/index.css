@@ -1,24 +1,24 @@
 @import "tailwindcss";
 
 /* ─── Sicurre Design System ─────────────────────────────────────────────────
-   Source of truth: docs/brand/brand-identity.md + ui-ideas DESIGN.md
+   Source of truth: docs/brand/brand-identity.md + docs/brand/DESIGN.md
    Colors: logo-aligned Sicurre tokens with semantic verdict colors
-   Fonts: Hanken Grotesk (display) · Inter (body) · JetBrains Mono (data)
+   Fonts: Sora (display) · Inter (body) · JetBrains Mono (data)
    ────────────────────────────────────────────────────────────────────────── */
 
 @theme {
   /* ── Font Families ── */
   --font-sans: "Inter", system-ui, sans-serif;
-  --font-display: "Hanken Grotesk", "Inter", sans-serif;
+  --font-display: "Sora", "Inter", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 
   /* ── Core Palette ── */
-  --color-primary: #1b4fcc;
+  --color-primary: #4a90d9;
   --color-on-primary: #ffffff;
-  --color-primary-container: #eef3ff;
-  --color-on-primary-container: #1239a6;
-  --color-inverse-primary: #93b4ff;
-  --color-navy-dark: #1239a6;
+  --color-primary-container: #eaf4ff;
+  --color-on-primary-container: #173f75;
+  --color-inverse-primary: #9dd0ff;
+  --color-navy-dark: #2e6bb5;
 
   /* ── Secondary (Amber — Attention Required) ── */
   --color-secondary: #855300;
@@ -53,7 +53,7 @@
   --color-on-surface: #0f172a;
   --color-on-surface-variant: #475569;
   --color-surface-variant: #e2e8f0;
-  --color-surface-tint: #1b4fcc;
+  --color-surface-tint: #4a90d9;
   --color-inverse-surface: #172033;
   --color-inverse-on-surface: #f8fafc;
 
@@ -67,9 +67,9 @@
   --color-border-subtle: #e2e8f0;
 
   /* ── Fixed Colors (for elevation-independent tinting) ── */
-  --color-primary-fixed: #eef3ff;
-  --color-primary-fixed-dim: #c7d7ff;
-  --color-on-primary-fixed: #1239a6;
+  --color-primary-fixed: #eaf4ff;
+  --color-primary-fixed-dim: #c7e2ff;
+  --color-on-primary-fixed: #173f75;
   --color-secondary-fixed: #ffddb8;
   --color-secondary-fixed-dim: #ffb95f;
   --color-on-secondary-fixed: #2a1700;
@@ -149,7 +149,7 @@
     font-family: var(--font-display);
     font-size: 48px;
     line-height: 56px;
-    letter-spacing: -0.02em;
+    letter-spacing: 0;
     font-weight: 700;
   }
 
@@ -157,7 +157,7 @@
     font-family: var(--font-display);
     font-size: 32px;
     line-height: 40px;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
     font-weight: 600;
   }
 
@@ -218,7 +218,7 @@
     font-size: 28px;
     line-height: 36px;
     font-weight: 800;
-    letter-spacing: -0.02em;
+    letter-spacing: 0;
     color: var(--color-on-surface);
   }
 
@@ -227,7 +227,7 @@
     font-size: 18px;
     line-height: 26px;
     font-weight: 700;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
     color: var(--color-on-surface);
   }
 
@@ -386,11 +386,11 @@ html.dark {
   --color-border-subtle: #26364f;
   --color-outline: #8090a6;
   --color-outline-variant: #33445f;
-  --color-primary: #7fa4ff;
-  --color-on-primary: #07111f;
-  --color-primary-container: #1239a6;
-  --color-on-primary-container: #eef3ff;
-  --color-navy-dark: #9ab8ff;
+  --color-primary: #4a90d9;
+  --color-on-primary: #06111f;
+  --color-primary-container: #153f73;
+  --color-on-primary-container: #eaf4ff;
+  --color-navy-dark: #86c3f3;
   --color-secondary-container: #4a3005;
   --color-on-secondary-container: #ffe7bd;
   --color-error-container: #4a1414;
@@ -402,6 +402,49 @@ html.dark {
 
 html.dark .bg-white {
   background-color: var(--color-surface-lowest) !important;
+}
+
+html.dark .bg-slate-50,
+html.dark .bg-\[\#f6f7f9\] {
+  background-color: var(--color-background) !important;
+}
+
+html.dark .bg-slate-100 {
+  background-color: var(--color-surface-low) !important;
+}
+
+html.dark .bg-slate-200 {
+  background-color: var(--color-surface-container) !important;
+}
+
+html.dark .border-slate-100,
+html.dark .border-slate-200,
+html.dark .border-white\/5,
+html.dark .border-white\/10 {
+  border-color: var(--color-border-subtle) !important;
+}
+
+html.dark .text-slate-950,
+html.dark .text-slate-900,
+html.dark .text-black {
+  color: var(--color-on-surface) !important;
+}
+
+html.dark .text-slate-800,
+html.dark .text-slate-700,
+html.dark .text-slate-600,
+html.dark .text-slate-500,
+html.dark .text-slate-400,
+html.dark .text-slate-300 {
+  color: var(--color-on-surface-variant) !important;
+}
+
+html.dark .text-white {
+  color: var(--color-on-surface) !important;
+}
+
+html.dark .bg-black\/60 {
+  background-color: rgb(2 8 23 / 0.72) !important;
 }
 
 html.dark .shadow-sm,

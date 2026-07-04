@@ -366,6 +366,114 @@ async def create_feedback(
     }
 
 
+async def _admin_count(sql: str, params: tuple = ()) -> int:
+    try:
+        rows = await async_query_auth_db(sql, params)
+        return int(rows[0]["count"]) if rows else 0
+    except Exception:
+        return 0
+
+
+async def _admin_rows(sql: str, params: tuple = ()) -> list[dict]:
+    try:
+        return await async_query_auth_db(sql, params)
+    except Exception:
+        return []
+
+
+@router.get("/v1/admin/overview")
+async def get_admin_overview(current_user: AuthUser = Depends(get_current_user)):
+    if not current_user.is_platform_admin:
+        raise HTTPException(status_code=403, detail="Platform admin access required")
+
+    overview = {
+        "workspaces_count": await _admin_count(
+            "SELECT COUNT(*) AS count FROM app_workspace"
+        ),
+        "members_count": await _admin_count(
+            "SELECT COUNT(*) AS count FROM app_workspace_membership"
+        ),
+        "threat_events_count": await _admin_count(
+            "SELECT COUNT(*) AS count FROM app_inference_event WHERE (is_deleted IS NULL OR is_deleted = 0)"
+        ),
+        "feedback_count": await _admin_count(
+            "SELECT COUNT(*) AS count FROM app_feedback"
+        ),
+        "false_negative_count": await _admin_count(
+            "SELECT COUNT(*) AS count FROM app_feedback WHERE feedback_type = 'false_negative'"
+        ),
+        "quarantine_held_count": await _admin_count(
+            "SELECT COUNT(*) AS count FROM app_quarantine_item WHERE status = 'held'"
+        ),
+        "cloudflare_integrations_count": await _admin_count(
+            "SELECT COUNT(*) AS count FROM cloudflare_integration"
+        ),
+        "cloudflare_active_count": await _admin_count(
+            "SELECT COUNT(*) AS count FROM cloudflare_integration WHERE status = 'active'"
+        ),
+    }
+
+    verdict_rows = await _admin_rows(
+        """
+        SELECT
+            CASE WHEN safety_verdict = 'safe' THEN 'legitimate' ELSE safety_verdict END AS verdict,
+            COUNT(*) AS count
+        FROM app_inference_event
+        WHERE (is_deleted IS NULL OR is_deleted = 0)
+        GROUP BY safety_verdict
+        """
+    )
+    feedback_rows = await _admin_rows(
+        """
+        SELECT feedback_type, COUNT(*) AS count
+        FROM app_feedback
+        GROUP BY feedback_type
+        """
+    )
+    domain_rows = await _admin_rows(
+        """
+        SELECT zone_name, status, user_email, updated_at
+        FROM cloudflare_integration
+        ORDER BY updated_at DESC
+        LIMIT 8
+        """
+    )
+
+    recent_feedback = await _admin_rows(
+        """
+        SELECT
+            f.id,
+            f.workspace_id,
+            f.feedback_type,
+            f.original_verdict,
+            f.corrected_verdict,
+            f.created_at,
+            m.email AS reporter_email
+        FROM app_feedback f
+        LEFT JOIN app_workspace_membership m ON m.auth_user_id = f.workspace_member_user_id
+        ORDER BY f.created_at DESC
+        LIMIT 8
+        """
+    )
+    recent_quarantine = await _admin_rows(
+        """
+        SELECT id, workspace_id, safety_verdict, composite_score, status, created_at, expires_at
+        FROM app_quarantine_item
+        ORDER BY created_at DESC
+        LIMIT 8
+        """
+    )
+
+    return {
+        "summary": overview,
+        "verdicts": verdict_rows,
+        "feedback_by_type": feedback_rows,
+        "cloudflare_domains": domain_rows,
+        "recent_feedback": recent_feedback,
+        "recent_quarantine": recent_quarantine,
+    }
+
+
 @router.get("/v1/datasets")
 async def list_datasets_alias(session: AsyncSession = Depends(get_async_session)):
     try:
