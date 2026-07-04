@@ -218,7 +218,7 @@
   },
   "landing": {
     "nav_login": "Connexion",
-    "nav_cta": "Commencer gratuitement",
+    "nav_cta": "S'inscrire",
     "hero_title_line1": "Stoppez le phishing",
     "hero_title_line2": "avant qu'il arrive.",
     "hero_desc": "Protection e-mail en temps réel pour votre domaine. Natif Cloudflare, conforme RGPD, actif en 2 minutes.",
@@ -256,7 +256,6 @@
     "integration_step_4_title": "Protection active",
     "integration_step_4_desc": "Chaque e-mail analysé instantanément. Les menaces n'atteignent jamais votre boîte.",
     "integration_cta": "Protéger mon domaine",
-    "integration_note": "Cloudflare Email Routing. Zéro migration.",
     "stats_smes": "200+",
     "stats_smes_label": "Entreprises protégées",
     "stats_emails": "1,2 M+",

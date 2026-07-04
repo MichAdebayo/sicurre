@@ -218,7 +218,7 @@
   },
   "landing": {
     "nav_login": "Sign in",
-    "nav_cta": "Start free",
+    "nav_cta": "Sign up",
     "hero_title_line1": "Stop phishing",
     "hero_title_line2": "before it lands.",
     "hero_desc": "Real-time email protection for your domain. Cloudflare-native, GDPR-compliant, live in 2 minutes.",
@@ -234,7 +234,7 @@
     "features_desc": "Filter threats, quarantine suspicious emails, and monitor DNS health — automatically.",
     "feat_ai_stat": "3 verdicts",
     "feat_ai_label": "Phishing · Spam · Legitimate",
-    "feat_ai_title": "AI email classification",
+    "feat_ai_title": "Sovereign AI classification",
     "feat_ai_desc": "Every incoming email classified instantly. Verdicts you can review and override in one click.",
     "feat_remediation_stat": "14 days",
     "feat_remediation_label": "Controlled quarantine",
