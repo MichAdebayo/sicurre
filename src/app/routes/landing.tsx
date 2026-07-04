@@ -330,9 +330,9 @@ export default function LandingRoute({
       </header>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          HERO — Sleek heading, trust badges & marquee banner
+          HERO — Full viewport heading, trust badges & bottom marquee banner
           ═══════════════════════════════════════════════════════════════════════ */}
-      <section className="relative w-full overflow-hidden pt-28 pb-12 lg:pt-36 lg:pb-16">
+      <section className="relative w-full min-h-screen flex flex-col justify-between overflow-hidden pt-24 pb-0">
         {/* ── Layer 1: Floor surface with subtle reflections ── */}
         <div
           className="absolute inset-0 pointer-events-none"
@@ -413,19 +413,21 @@ export default function LandingRoute({
         {/* ── Layer 6: Grid texture ── */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.008)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.008)_1px,transparent_1px)] bg-[size:5rem_5rem] pointer-events-none" />
 
-        {/* Hero content */}
-        <div className="w-full max-w-7xl mx-auto px-6 lg:px-12 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-center relative z-10">
-          <div className="lg:col-span-6 space-y-6 flex flex-col justify-center">
+        {/* Hero content — dynamically centered across full viewport */}
+        <div className="flex-1 w-full max-w-7xl mx-auto px-6 lg:px-12 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-center relative z-10 py-12">
+          <div className="lg:col-span-6 space-y-7 flex flex-col justify-center">
             <MotionDiv
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.1 }}
             >
-              <h1 className="font-display font-extrabold text-[clamp(2.25rem,4.5vw,3.75rem)] leading-[1.12] tracking-[-0.025em] text-white">
+              <h1 className="font-display font-extrabold text-[clamp(2.5rem,5.2vw,4.25rem)] leading-[1.08] tracking-[-0.03em] text-white">
                 {t("landing.hero_title_line1")}
-                <span className="block text-white/50 font-semibold mt-1">
-                  {t("landing.hero_title_line2")}
-                </span>
+                {t("landing.hero_title_line2") && (
+                  <span className="block text-white/50 font-semibold mt-2">
+                    {t("landing.hero_title_line2")}
+                  </span>
+                )}
               </h1>
             </MotionDiv>
 
@@ -433,7 +435,7 @@ export default function LandingRoute({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="text-[15px] sm:text-[17px] text-white/50 leading-[1.6] max-w-[32rem] font-normal"
+              className="text-[17px] sm:text-[19px] text-white/60 leading-[1.65] max-w-[34rem] font-normal"
             >
               {t("landing.hero_desc")}
             </MotionDiv>
@@ -442,35 +444,37 @@ export default function LandingRoute({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.3 }}
-              className="flex flex-col sm:flex-row items-start gap-4 pt-1"
+              className="flex flex-col sm:flex-row items-start gap-4 pt-2"
             >
               <button
                 onClick={onNavigateToSignUp}
-                className="flex items-center gap-2 px-6 py-3.5 rounded-xl text-[15px] font-semibold transition-all active:scale-[0.97] cursor-pointer text-white border border-white/10 bg-white/[0.08] hover:bg-white/90 hover:text-black hover:shadow-[0_0_20px_rgba(255,255,255,0.15)] duration-200"
+                className="flex items-center gap-2.5 px-7 py-4 rounded-xl text-[16px] font-semibold transition-all active:scale-[0.97] cursor-pointer text-white border border-white/10 bg-white/[0.08] hover:bg-white/90 hover:text-black hover:shadow-[0_0_25px_rgba(255,255,255,0.2)] duration-200"
               >
                 <span>{t("landing.hero_cta_primary")}</span>
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-4.5 h-4.5" />
               </button>
               <a
                 href="#features"
-                className="flex items-center gap-2 px-6 py-3.5 text-[15px] font-medium text-white/50 hover:text-white transition-colors cursor-pointer"
+                className="flex items-center gap-2 px-6 py-4 text-[15px] font-medium text-white/50 hover:text-white transition-colors cursor-pointer"
               >
                 {t("landing.hero_cta_secondary")}
               </a>
             </MotionDiv>
 
-            <MotionDiv
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.6, delay: 0.45 }}
-              className="flex items-center gap-2 text-[13px] text-white/40 font-medium pt-1"
-            >
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>{t("landing.hero_note")}</span>
-            </MotionDiv>
+            {t("landing.hero_social_proof") && (
+              <MotionDiv
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.6, delay: 0.45 }}
+                className="flex items-center gap-2.5 text-[14px] text-white/50 font-medium pt-1"
+              >
+                <CheckCircle2 className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
+                <span>{t("landing.hero_social_proof")}</span>
+              </MotionDiv>
+            )}
           </div>
 
-          <div className="lg:col-span-6 flex justify-center lg:justify-end h-full max-h-[420px]">
+          <div className="lg:col-span-6 flex justify-center lg:justify-end h-full max-h-[460px]">
             <MotionDiv
               initial={{ opacity: 0, filter: "blur(10px)" }}
               animate={{ opacity: 1, filter: "blur(0px)" }}
@@ -482,17 +486,17 @@ export default function LandingRoute({
           </div>
         </div>
 
-        {/* Marquee loop integrated flush at base of hero */}
+        {/* Marquee loop pinned flush at the bottom of hero screen */}
         <div 
-          className="w-full mt-14 lg:mt-20 py-4 relative z-20 border-t border-b border-white/10 bg-black/40 backdrop-blur-md"
+          className="w-full py-5 relative z-20 border-t border-b border-white/10 bg-black/60 backdrop-blur-xl shrink-0"
         >
           <div className="relative flex max-w-full overflow-hidden">
-            <div className="animate-marquee flex gap-14 whitespace-nowrap shrink-0">
+            <div className="animate-marquee flex gap-16 whitespace-nowrap shrink-0">
               {[...marqueeItems, ...marqueeItems].map((item, idx) => {
                 const Icon = item.icon;
                 return (
-                  <span key={idx} className="flex items-center gap-3 text-[13px] font-medium text-white/80">
-                    <Icon className="w-4 h-4 text-primary/70 shrink-0" />
+                  <span key={idx} className="flex items-center gap-3.5 text-[16px] sm:text-[17px] font-semibold text-white/90">
+                    <Icon className="w-5 h-5 text-primary/80 shrink-0" />
                     {item.label}
                   </span>
                 );
