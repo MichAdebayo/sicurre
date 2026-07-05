@@ -136,7 +136,7 @@ function IntegrationTerminal() {
         border: "1px solid rgba(255, 255, 255, 0.1)",
         boxShadow: "0 25px 60px rgba(0, 0, 0, 0.65)",
       }}
-      className="w-full max-w-[560px] rounded-2xl p-6 lg:p-8 space-y-4"
+      className="w-full max-w-[560px] min-h-[440px] rounded-2xl p-6 lg:p-8 flex flex-col justify-center select-none"
     >
       <div className="space-y-3.5">
         {steps.map((step, idx) => {
@@ -147,7 +147,7 @@ function IntegrationTerminal() {
             <MotionDiv
               key={idx}
               initial={{ opacity: 0.3 }}
-              animate={{ opacity: isActive ? 1 : 0.3 }}
+              animate={{ opacity: isActive ? 1 : 0.35 }}
               transition={{ duration: 0.4 }}
               className={`flex items-start gap-4 py-3.5 px-4 rounded-xl transition-all duration-300 border ${
                 isCurrent
@@ -175,17 +175,13 @@ function IntegrationTerminal() {
                 >
                   {step.title}
                 </div>
-                {isCurrent && (
-                  <MotionDiv
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <p className="text-[13px] sm:text-[14px] text-slate-400 mt-1 leading-relaxed">
-                      {step.desc}
-                    </p>
-                  </MotionDiv>
-                )}
+                <p
+                  className={`text-[13px] sm:text-[14px] leading-relaxed transition-all duration-300 ${
+                    isCurrent ? "text-slate-400 mt-1 max-h-16 opacity-100" : "text-slate-500/40 mt-0.5 max-h-0 opacity-0 overflow-hidden"
+                  }`}
+                >
+                  {step.desc}
+                </p>
               </div>
               {isCurrent && (
                 <div className="mt-2 w-2.5 h-2.5 rounded-full animate-pulse shrink-0" style={{ backgroundColor: step.color }} />
@@ -438,7 +434,7 @@ export default function LandingRoute({
       {/* ═══════════════════════════════════════════════════════════════════════
           INTEGRATION — Clean DNS auto-config showcase
           ═══════════════════════════════════════════════════════════════════════ */}
-      <section id="integration" className="pt-16 pb-8 lg:pt-24 lg:pb-12 relative">
+      <section id="integration" className="py-20 lg:py-28 relative">
         <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 40% at 30% 50%, rgba(74,144,217,0.06) 0%, transparent 60%)" }} />
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
@@ -471,7 +467,7 @@ export default function LandingRoute({
       {/* ═══════════════════════════════════════════════════════════════════════
           CTA — Early-stage conversion section
           ═══════════════════════════════════════════════════════════════════════ */}
-      <section className="pt-8 pb-16 lg:pt-12 lg:pb-24 relative">
+      <section className="py-20 lg:py-28 relative">
         {/* Background glow */}
         <div className="absolute inset-0 pointer-events-none" style={{
           background: "radial-gradient(ellipse 70% 50% at 50% 30%, rgba(74,144,217,0.06) 0%, transparent 60%)",
