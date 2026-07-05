@@ -434,9 +434,9 @@ export default function LandingRoute({
       {/* ═══════════════════════════════════════════════════════════════════════
           INTEGRATION — Clean DNS auto-config showcase
           ═══════════════════════════════════════════════════════════════════════ */}
-      <section id="integration" className="py-20 lg:py-28 relative">
+      <section id="integration" className="py-20 lg:py-28 relative overflow-hidden">
         <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 40% at 30% 50%, rgba(74,144,217,0.06) 0%, transparent 60%)" }} />
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             <FadeInSection className="space-y-6">
               <h2 className="font-display font-medium text-[clamp(2.15rem,4.2vw,3.25rem)] leading-[1.12] tracking-[-0.02em] text-slate-100">
@@ -467,7 +467,7 @@ export default function LandingRoute({
       {/* ═══════════════════════════════════════════════════════════════════════
           CTA — Early-stage conversion section
           ═══════════════════════════════════════════════════════════════════════ */}
-      <section className="py-20 lg:py-28 relative">
+      <section className="pt-24 pb-32 lg:pt-32 lg:pb-40 relative overflow-hidden z-10">
         {/* Background glow */}
         <div className="absolute inset-0 pointer-events-none" style={{
           background: "radial-gradient(ellipse 70% 50% at 50% 30%, rgba(74,144,217,0.06) 0%, transparent 60%)",
