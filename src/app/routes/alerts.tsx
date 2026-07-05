@@ -114,20 +114,10 @@ export default function AlertsRoute() {
     }
   };
 
-  const handleDeleteRule = async (id: string) => {
-    const confirmDelete = window.confirm(
-      i18n.language === "fr"
-        ? "Êtes-vous sûr de vouloir supprimer cette règle de filtrage ?"
-        : "Are you sure you want to delete this filtering rule?"
-    );
-    if (!confirmDelete) return;
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-    try {
-      await deleteRuleMutation.mutateAsync(id);
-      refetchRules();
-    } catch (err) {
-      console.error(err);
-    }
+  const handleDeleteRule = (id: string) => {
+    setConfirmDeleteId(id);
   };
 
   const handleDismissAlert = async (id: string) => {
@@ -424,6 +414,60 @@ export default function AlertsRoute() {
           )}
         </div>
       </div>
+
+      {/* Theme-Aware Confirmation Modal Overlay for Rule Deletion */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm select-none p-4">
+          <MotionDiv
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="bg-surface-lowest border border-border-subtle rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4 text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-error/10 text-error rounded-xl">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <h4 className="font-display font-bold text-base text-on-surface">
+                {i18n.language === "fr" ? "Confirmer la suppression" : "Confirm Deletion"}
+              </h4>
+            </div>
+            <p className="text-xs font-semibold text-on-surface-variant leading-relaxed">
+              {i18n.language === "fr"
+                ? "Êtes-vous sûr de vouloir supprimer cette règle de filtrage (liste autorisée / liste noire) ? Cette action est immédiate."
+                : "Are you sure you want to delete this filtering rule? This action takes effect immediately."}
+            </p>
+            <div className="flex justify-end gap-2.5 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setConfirmDeleteId(null)}
+                className="font-bold text-xs"
+              >
+                {i18n.language === "fr" ? "Annuler" : "Cancel"}
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={async () => {
+                  const id = confirmDeleteId;
+                  setConfirmDeleteId(null);
+                  try {
+                    await deleteRuleMutation.mutateAsync(id);
+                    refetchRules();
+                  } catch (err) {
+                    console.error(err);
+                  }
+                }}
+                className="font-bold text-xs"
+              >
+                {i18n.language === "fr" ? "Supprimer" : "Delete"}
+              </Button>
+            </div>
+          </MotionDiv>
+        </div>
+      )}
     </MotionDiv>
   );
 }
