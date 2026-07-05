@@ -376,11 +376,11 @@ export default function LandingRoute({
       <section id="features" className="py-20 lg:py-28 relative">
         <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 80% 50% at 50% 20%, rgba(74,144,217,0.06) 0%, transparent 60%)" }} />
         <div className="max-w-7xl mx-auto px-6 lg:px-8 space-y-16 lg:space-y-20 relative z-10">
-          <FadeInSection className="text-center max-w-3xl mx-auto space-y-4">
+          <FadeInSection className="text-center max-w-4xl mx-auto space-y-4">
             <h2 className="font-display font-medium text-[clamp(2.15rem,4.2vw,3.25rem)] leading-[1.12] tracking-[-0.02em] text-slate-100">
               {t("landing.features_title")}
             </h2>
-            <p className="text-[17px] sm:text-[19px] leading-[1.65] max-w-2xl mx-auto font-normal text-slate-400">
+            <p className="text-[16px] sm:text-[18px] lg:text-[19px] leading-[1.65] max-w-4xl mx-auto font-normal text-slate-400 md:whitespace-nowrap">
               {t("landing.features_desc")}
             </p>
           </FadeInSection>
@@ -438,7 +438,7 @@ export default function LandingRoute({
       {/* ═══════════════════════════════════════════════════════════════════════
           INTEGRATION — Clean DNS auto-config showcase
           ═══════════════════════════════════════════════════════════════════════ */}
-      <section id="integration" className="py-20 lg:py-28 relative">
+      <section id="integration" className="pt-16 pb-8 lg:pt-24 lg:pb-12 relative">
         <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 40% at 30% 50%, rgba(74,144,217,0.06) 0%, transparent 60%)" }} />
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
@@ -471,7 +471,7 @@ export default function LandingRoute({
       {/* ═══════════════════════════════════════════════════════════════════════
           CTA — Early-stage conversion section
           ═══════════════════════════════════════════════════════════════════════ */}
-      <section className="py-20 lg:py-28 relative">
+      <section className="pt-8 pb-16 lg:pt-12 lg:pb-24 relative">
         {/* Background glow */}
         <div className="absolute inset-0 pointer-events-none" style={{
           background: "radial-gradient(ellipse 70% 50% at 50% 30%, rgba(74,144,217,0.06) 0%, transparent 60%)",
@@ -482,7 +482,7 @@ export default function LandingRoute({
             <h2 className="font-display font-medium text-[clamp(2rem,4vw,3rem)] leading-[1.12] tracking-[-0.02em] text-slate-100 mt-2">
               {t("landing.cta_section_title")}
             </h2>
-            <p className="text-[17px] sm:text-[19px] leading-[1.65] max-w-xl mx-auto font-normal text-slate-400">
+            <p className="text-[16px] sm:text-[18px] lg:text-[19px] leading-[1.65] max-w-3xl mx-auto font-normal text-slate-400 md:whitespace-nowrap">
               {t("landing.cta_section_desc")}
             </p>
           </FadeInSection>
