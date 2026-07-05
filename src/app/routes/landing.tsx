@@ -526,15 +526,15 @@ export default function LandingRoute({
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          FOOTER — Sleek glassmorphism footer with high contrast
+          FOOTER — Compact sleek dark glassmorphism footer
           ═══════════════════════════════════════════════════════════════════════ */}
-      <footer className="border-t border-white/10 py-12 relative z-10 bg-black/60 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-3">
-            <img src={sicurreLogo} alt="Sicurre Logo" className="w-8 h-8" />
-            <span className="font-display font-bold text-white text-[18px] tracking-tight">Sicurre</span>
+      <footer className="border-t border-white/10 py-5 relative z-10 bg-black/60 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <img src={sicurreLogo} alt="Sicurre Logo" className="w-6 h-6" />
+            <span className="font-display font-bold text-white text-[15px] tracking-tight">Sicurre</span>
           </div>
-          <div className="flex flex-wrap items-center gap-8 text-[14px] font-medium">
+          <div className="flex flex-wrap items-center gap-6 text-[13px] font-medium">
             <button
               onClick={onNavigateToMentionsLegales}
               className="text-slate-300 hover:text-white transition-colors cursor-pointer border-none bg-transparent p-0 font-medium outline-none"
@@ -554,7 +554,7 @@ export default function LandingRoute({
               {t("landing.footer_contact")}
             </button>
           </div>
-          <div className="text-[13px] text-slate-400 font-normal">
+          <div className="text-[12px] text-slate-400 font-normal">
             {t("landing.footer_copyright")}
           </div>
         </div>
