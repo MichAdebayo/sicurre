@@ -467,7 +467,7 @@ export default function LandingRoute({
       {/* ═══════════════════════════════════════════════════════════════════════
           CTA — Early-stage conversion section
           ═══════════════════════════════════════════════════════════════════════ */}
-      <section className="pt-24 pb-32 lg:pt-32 lg:pb-40 relative overflow-hidden z-10">
+      <section className="pt-12 pb-36 lg:pt-16 lg:pb-48 relative overflow-hidden z-10">
         {/* Background glow */}
         <div className="absolute inset-0 pointer-events-none" style={{
           background: "radial-gradient(ellipse 70% 50% at 50% 30%, rgba(74,144,217,0.06) 0%, transparent 60%)",
