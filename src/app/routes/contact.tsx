@@ -42,18 +42,23 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans py-16 px-6 lg:px-8 select-none">
-      <div className="max-w-4xl mx-auto space-y-8">
+    <div className="min-h-screen bg-black text-white font-sans py-16 px-6 lg:px-8 select-none relative overflow-x-hidden">
+      {/* Background glow */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-5xl h-96 pointer-events-none" style={{
+        background: "radial-gradient(ellipse 60% 50% at 50% 0%, rgba(74,144,217,0.08) 0%, transparent 70%)",
+      }} />
+
+      <div className="max-w-4xl mx-auto space-y-8 relative z-10">
         
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 pb-6">
+        <div className="flex items-center justify-between border-b border-white/10 pb-6">
           <div className="flex items-center gap-3">
-            <img src={sicurreLogo} alt="Sicurre Logo" className="w-10 h-10" />
-            <span className="font-display font-bold text-xl text-slate-950">Sicurre</span>
+            <img src={sicurreLogo} alt="Sicurre Logo" className="w-9 h-9" />
+            <span className="font-display font-bold text-xl text-white tracking-tight">Sicurre</span>
           </div>
           <button
             onClick={onBack}
-            className="px-4 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 shadow-sm cursor-pointer transition-all"
+            className="px-4.5 py-2 text-xs font-semibold text-white/90 bg-white/[0.06] hover:bg-primary hover:border-primary border border-white/15 rounded-xl cursor-pointer transition-all shadow-sm"
           >
             &larr; Retour à l'accueil
           </button>
@@ -62,20 +67,28 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
         {/* Contact Page Grid Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
-          {/* Left Column: Innovative Contact Info */}
+          {/* Left Column: Contact Info Glass Card */}
           <div className="lg:col-span-4 space-y-6">
-            <div className="bg-slate-900 text-white rounded-2xl p-6 relative overflow-hidden shadow-lg">
+            <div 
+              style={{
+                background: "rgba(255, 255, 255, 0.025)",
+                backdropFilter: "blur(24px)",
+                WebkitBackdropFilter: "blur(24px)",
+                border: "1px solid rgba(255, 255, 255, 0.09)",
+              }}
+              className="rounded-2xl p-6 relative overflow-hidden shadow-2xl space-y-6 text-left"
+            >
               {/* Decorative background glow */}
               <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary/20 blur-2xl rounded-full" />
               
-              <div className="relative z-10 space-y-6 text-left">
+              <div className="relative z-10 space-y-6">
                 <div>
                   <span className="text-[10px] font-extrabold tracking-widest text-[#F59E0B] uppercase">ASSISTANCE 24/7</span>
-                  <h2 className="font-display font-bold text-2xl text-white mt-1 leading-tight">
+                  <h2 className="font-display font-medium text-2xl text-slate-100 mt-1 leading-tight">
                     Discutons ensemble
                   </h2>
                 </div>
-                <p className="text-xs text-slate-300 leading-relaxed">
+                <p className="text-xs text-slate-400 leading-relaxed">
                   Notre équipe de support client et nos ingénieurs en cybersécurité vous répondent en moins de 15 minutes.
                 </p>
 
@@ -91,7 +104,7 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-white/10 rounded-lg text-primary-light">
+                    <div className="p-2 bg-white/10 rounded-lg text-primary">
                       <Mail className="w-4 h-4" />
                     </div>
                     <div>
@@ -113,21 +126,35 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
               </div>
             </div>
             
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 space-y-3 shadow-sm text-left">
-              <h3 className="font-display font-bold text-sm text-slate-900 flex items-center gap-2">
+            <div 
+              style={{
+                background: "rgba(255, 255, 255, 0.02)",
+                backdropFilter: "blur(20px)",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+              }}
+              className="rounded-2xl p-5 space-y-3 text-left"
+            >
+              <h3 className="font-display font-medium text-sm text-slate-200 flex items-center gap-2">
                 <MessageSquare className="w-4.5 h-4.5 text-primary" />
                 Sécurité & Chiffrement
               </h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
+              <p className="text-xs text-slate-400 leading-relaxed">
                 Toutes les informations soumises via ce formulaire sont chiffrées de bout en bout (AES-256) avant transmission.
               </p>
             </div>
           </div>
 
-          {/* Right Column: Interactive Contact Form */}
+          {/* Right Column: Interactive Contact Form Glass Card */}
           <div className="lg:col-span-8">
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-8 shadow-sm h-full min-h-[420px] flex flex-col justify-center relative overflow-hidden">
-              
+            <div 
+              style={{
+                background: "rgba(255, 255, 255, 0.02)",
+                backdropFilter: "blur(24px)",
+                WebkitBackdropFilter: "blur(24px)",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+              }}
+              className="rounded-2xl p-8 shadow-2xl h-full min-h-[420px] flex flex-col justify-center relative overflow-hidden"
+            >
               <AnimatePresence mode="wait">
                 {!isSuccess ? (
                   <MotionDiv
@@ -139,10 +166,10 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
                     className="space-y-6 text-left"
                   >
                     <div>
-                      <h3 className="font-display font-extrabold text-xl text-slate-900 tracking-tight">
+                      <h3 className="font-display font-medium text-xl text-slate-100 tracking-tight">
                         Envoyer un message
                       </h3>
-                      <p className="text-xs text-slate-500 mt-1">
+                      <p className="text-xs text-slate-400 mt-1">
                         Remplissez le formulaire ci-dessous pour joindre notre équipe.
                       </p>
                     </div>
@@ -150,35 +177,35 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
                     <form onSubmit={handleSubmit} className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
-                          <label className="text-xs font-semibold text-slate-700">Votre nom complet</label>
+                          <label className="text-xs font-medium text-slate-300">Votre nom complet</label>
                           <input
                             type="text"
                             required
                             value={formData.name}
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                             placeholder="Jean Dupont"
-                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/15 transition-all"
+                            className="w-full px-4 py-2.5 rounded-xl border border-white/10 bg-white/[0.04] text-white text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all placeholder:text-white/20"
                           />
                         </div>
                         <div className="space-y-1.5">
-                          <label className="text-xs font-semibold text-slate-700">Adresse e-mail professionnelle</label>
+                          <label className="text-xs font-medium text-slate-300">Adresse e-mail professionnelle</label>
                           <input
                             type="email"
                             required
                             value={formData.email}
                             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                             placeholder="jean@entreprise.fr"
-                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/15 transition-all"
+                            className="w-full px-4 py-2.5 rounded-xl border border-white/10 bg-white/[0.04] text-white text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all placeholder:text-white/20"
                           />
                         </div>
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-700">Sujet de votre demande</label>
+                        <label className="text-xs font-medium text-slate-300">Sujet de votre demande</label>
                         <select
                           value={formData.subject}
                           onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/15 transition-all bg-white"
+                          className="w-full px-4 py-2.5 rounded-xl border border-white/10 bg-[#121624] text-white text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
                         >
                           <option value="support">Support Technique / Fausse classification</option>
                           <option value="sales">Demande Commerciale / Tarifs</option>
@@ -188,21 +215,21 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-700">Votre message</label>
+                        <label className="text-xs font-medium text-slate-300">Votre message</label>
                         <textarea
                           required
                           rows={4}
                           value={formData.message}
                           onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                           placeholder="Décrivez votre demande en détail..."
-                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/15 transition-all resize-none"
+                          className="w-full px-4 py-2.5 rounded-xl border border-white/10 bg-white/[0.04] text-white text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all resize-none placeholder:text-white/20"
                         />
                       </div>
 
                       <button
                         type="submit"
                         disabled={isSubmitting}
-                        className={`w-full py-3 bg-primary text-white hover:bg-navy-dark font-bold rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-sm cursor-pointer active:scale-[0.98] ${
+                        className={`w-full py-3.5 bg-primary text-white hover:bg-navy-dark font-semibold rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-md shadow-primary/20 cursor-pointer active:scale-[0.98] ${
                           isSubmitting ? "opacity-75 cursor-not-allowed" : ""
                         }`}
                       >
@@ -243,25 +270,25 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
                         transition={{ delay: 0.8, duration: 0.3, type: "spring" }}
-                        className="text-emerald-500"
+                        className="text-emerald-400"
                       >
                         <CheckCircle2 className="w-16 h-16" />
                       </MotionDiv>
                     </div>
 
                     <div className="space-y-2 max-w-sm">
-                      <h4 className="font-display font-extrabold text-2xl text-slate-950 tracking-tight">
+                      <h4 className="font-display font-medium text-2xl text-slate-100 tracking-tight">
                         Message envoyé !
                       </h4>
-                      <p className="text-sm text-slate-600 leading-relaxed">
-                        Merci <strong>{formData.name}</strong>, votre message a bien été envoyé de manière sécurisée 
-                        à <strong>contact@sicurre.com</strong>. Nous vous recontactons d'ici quelques minutes.
+                      <p className="text-sm text-slate-400 leading-relaxed">
+                        Merci <strong className="text-white">{formData.name}</strong>, votre message a bien été envoyé de manière sécurisée 
+                        à <strong className="text-white">contact@sicurre.com</strong>. Nous vous recontactons d'ici quelques minutes.
                       </p>
                     </div>
 
                     <button
                       onClick={handleReset}
-                      className="px-6 py-2.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
+                      className="px-6 py-2.5 text-xs font-semibold text-white/90 bg-white/[0.06] hover:bg-white/[0.12] border border-white/15 rounded-xl transition-all cursor-pointer"
                     >
                       Envoyer un autre message
                     </button>
@@ -275,7 +302,7 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
         </div>
 
         {/* Footer */}
-        <div className="text-center text-xs text-slate-400">
+        <div className="text-center text-xs text-slate-500">
           © 2026 Sicurre SAS. Tous droits réservés.
         </div>
       </div>

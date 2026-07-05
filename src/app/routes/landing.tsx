@@ -130,15 +130,15 @@ function IntegrationTerminal() {
   return (
     <div
       style={{
-        background: "rgba(255, 255, 255, 0.02)",
+        background: "rgba(255, 255, 255, 0.025)",
         backdropFilter: "blur(24px)",
         WebkitBackdropFilter: "blur(24px)",
-        border: "1px solid rgba(255, 255, 255, 0.08)",
-        boxShadow: "0 25px 60px rgba(0, 0, 0, 0.6)",
+        border: "1px solid rgba(255, 255, 255, 0.1)",
+        boxShadow: "0 25px 60px rgba(0, 0, 0, 0.65)",
       }}
-      className="w-full max-w-[500px] rounded-2xl p-5 lg:p-6 space-y-3"
+      className="w-full max-w-[560px] rounded-2xl p-6 lg:p-8 space-y-4"
     >
-      <div className="space-y-3">
+      <div className="space-y-3.5">
         {steps.map((step, idx) => {
           const Icon = step.icon;
           const isActive = idx <= activeStep;
@@ -149,28 +149,28 @@ function IntegrationTerminal() {
               initial={{ opacity: 0.3 }}
               animate={{ opacity: isActive ? 1 : 0.3 }}
               transition={{ duration: 0.4 }}
-              className={`flex items-start gap-3.5 py-3 px-3.5 rounded-xl transition-all duration-300 border ${
+              className={`flex items-start gap-4 py-3.5 px-4 rounded-xl transition-all duration-300 border ${
                 isCurrent
-                  ? "bg-white/[0.04] border-white/12 shadow-md shadow-black/20"
+                  ? "bg-white/[0.04] border-white/15 shadow-md shadow-black/30"
                   : "border-transparent"
               }`}
             >
               <div
-                className="mt-0.5 flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-300"
+                className="mt-0.5 flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300"
                 style={{
                   backgroundColor: isActive ? `${step.color}18` : "rgba(255,255,255,0.03)",
                   border: `1px solid ${isActive ? `${step.color}35` : "rgba(255,255,255,0.05)"}`,
                 }}
               >
                 {isActive && idx < activeStep ? (
-                  <CheckCircle2 className="w-4 h-4" style={{ color: step.color }} />
+                  <CheckCircle2 className="w-4.5 h-4.5" style={{ color: step.color }} />
                 ) : (
-                  <Icon className="w-4 h-4" style={{ color: isActive ? step.color : "#666" }} />
+                  <Icon className="w-4.5 h-4.5" style={{ color: isActive ? step.color : "#666" }} />
                 )}
               </div>
               <div className="flex-1 min-w-0">
                 <div
-                  className="text-[13px] font-semibold leading-snug transition-colors"
+                  className="text-[15px] sm:text-[16px] font-semibold leading-snug transition-colors"
                   style={{ color: isActive ? "#f8fafc" : "#64748b" }}
                 >
                   {step.title}
@@ -181,14 +181,14 @@ function IntegrationTerminal() {
                     animate={{ opacity: 1, height: "auto" }}
                     transition={{ duration: 0.3 }}
                   >
-                    <p className="text-[12px] text-white/50 mt-1 leading-relaxed">
+                    <p className="text-[13px] sm:text-[14px] text-slate-400 mt-1 leading-relaxed">
                       {step.desc}
                     </p>
                   </MotionDiv>
                 )}
               </div>
               {isCurrent && (
-                <div className="mt-1.5 w-2 h-2 rounded-full animate-pulse shrink-0" style={{ backgroundColor: step.color }} />
+                <div className="mt-2 w-2.5 h-2.5 rounded-full animate-pulse shrink-0" style={{ backgroundColor: step.color }} />
               )}
             </MotionDiv>
           );
@@ -373,7 +373,7 @@ export default function LandingRoute({
       {/* ═══════════════════════════════════════════════════════════════════════
           FEATURES — Sleek Resend-style glassmorphism grid
           ═══════════════════════════════════════════════════════════════════════ */}
-      <section id="features" className="py-28 lg:py-40 relative">
+      <section id="features" className="py-20 lg:py-28 relative">
         <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 80% 50% at 50% 20%, rgba(74,144,217,0.06) 0%, transparent 60%)" }} />
         <div className="max-w-7xl mx-auto px-6 lg:px-8 space-y-16 lg:space-y-20 relative z-10">
           <FadeInSection className="text-center max-w-3xl mx-auto space-y-4">
@@ -438,7 +438,7 @@ export default function LandingRoute({
       {/* ═══════════════════════════════════════════════════════════════════════
           INTEGRATION — Clean DNS auto-config showcase
           ═══════════════════════════════════════════════════════════════════════ */}
-      <section id="integration" className="py-28 lg:py-40 relative">
+      <section id="integration" className="py-20 lg:py-28 relative">
         <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 40% at 30% 50%, rgba(74,144,217,0.06) 0%, transparent 60%)" }} />
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
@@ -471,7 +471,7 @@ export default function LandingRoute({
       {/* ═══════════════════════════════════════════════════════════════════════
           CTA — Early-stage conversion section
           ═══════════════════════════════════════════════════════════════════════ */}
-      <section className="py-16 lg:py-24 relative">
+      <section className="py-20 lg:py-28 relative">
         {/* Background glow */}
         <div className="absolute inset-0 pointer-events-none" style={{
           background: "radial-gradient(ellipse 70% 50% at 50% 30%, rgba(74,144,217,0.06) 0%, transparent 60%)",
@@ -479,10 +479,10 @@ export default function LandingRoute({
 
         <div className="max-w-4xl mx-auto px-6 lg:px-8 text-center space-y-10 relative z-10">
           <FadeInSection className="space-y-4">
-            <h2 className="font-display font-extrabold text-[clamp(1.75rem,3.8vw,2.5rem)] leading-[1.1] tracking-[-0.02em] text-white mt-2">
+            <h2 className="font-display font-medium text-[clamp(2rem,4vw,3rem)] leading-[1.12] tracking-[-0.02em] text-slate-100 mt-2">
               {t("landing.cta_section_title")}
             </h2>
-            <p className="text-[16px] leading-[1.65] max-w-xl mx-auto font-normal text-white/45">
+            <p className="text-[17px] sm:text-[19px] leading-[1.65] max-w-xl mx-auto font-normal text-slate-400">
               {t("landing.cta_section_desc")}
             </p>
           </FadeInSection>
@@ -503,22 +503,22 @@ export default function LandingRoute({
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
-            <div className="text-[13px] text-white/30 mt-3 font-medium">
+            <div className="text-[13px] text-slate-400 mt-3 font-medium">
               {t("landing.cta_no_card")}
             </div>
           </FadeInSection>
 
-          <FadeInSection delay={0.18} className="pt-4 flex flex-wrap justify-center gap-x-8 gap-y-3 text-[13px] font-medium">
-            <div className="flex items-center gap-2 text-white/40">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+          <FadeInSection delay={0.18} className="pt-4 flex flex-wrap justify-center gap-x-8 gap-y-3 text-[14px] font-medium">
+            <div className="flex items-center gap-2 text-slate-300">
+              <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
               <span>{t("landing.cta_badge_rgpd")}</span>
             </div>
-            <div className="flex items-center gap-2 text-white/40">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <div className="flex items-center gap-2 text-slate-300">
+              <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
               <span>{t("landing.cta_badge_sovereign")}</span>
             </div>
-            <div className="flex items-center gap-2 text-white/40">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <div className="flex items-center gap-2 text-slate-300">
+              <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
               <span>{t("landing.cta_badge_instant")}</span>
             </div>
           </FadeInSection>
@@ -526,35 +526,35 @@ export default function LandingRoute({
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          FOOTER — Minimal dark with glassmorphism border
+          FOOTER — Sleek glassmorphism footer with high contrast
           ═══════════════════════════════════════════════════════════════════════ */}
-      <footer className="border-t border-white/[0.06] py-10 relative z-10">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-5">
+      <footer className="border-t border-white/10 py-12 relative z-10 bg-black/60 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-3">
-            <img src={sicurreLogo} alt="Sicurre Logo" className="w-7 h-7" />
-            <span className="font-display font-bold text-white text-[16px]">Sicurre</span>
+            <img src={sicurreLogo} alt="Sicurre Logo" className="w-8 h-8" />
+            <span className="font-display font-bold text-white text-[18px] tracking-tight">Sicurre</span>
           </div>
-          <div className="flex flex-wrap items-center gap-7 text-[13px] font-medium text-white/30">
+          <div className="flex flex-wrap items-center gap-8 text-[14px] font-medium">
             <button
               onClick={onNavigateToMentionsLegales}
-              className="hover:text-white/60 transition-colors cursor-pointer border-none bg-transparent p-0 text-inherit font-medium outline-none text-[13px]"
+              className="text-slate-300 hover:text-white transition-colors cursor-pointer border-none bg-transparent p-0 font-medium outline-none"
             >
               {t("landing.footer_mentions")}
             </button>
             <button
               onClick={onNavigateToConfidentialite}
-              className="hover:text-white/60 transition-colors cursor-pointer border-none bg-transparent p-0 text-inherit font-medium outline-none text-[13px]"
+              className="text-slate-300 hover:text-white transition-colors cursor-pointer border-none bg-transparent p-0 font-medium outline-none"
             >
               {t("landing.footer_privacy")}
             </button>
             <button
               onClick={onNavigateToContact}
-              className="hover:text-white/60 transition-colors cursor-pointer border-none bg-transparent p-0 text-inherit font-medium outline-none text-[13px]"
+              className="text-slate-300 hover:text-white transition-colors cursor-pointer border-none bg-transparent p-0 font-medium outline-none"
             >
               {t("landing.footer_contact")}
             </button>
           </div>
-          <div className="text-[12px] text-white/20">
+          <div className="text-[13px] text-slate-400 font-normal">
             {t("landing.footer_copyright")}
           </div>
         </div>
