@@ -232,12 +232,17 @@ export default function LandingRoute({
       title: t("landing.feat_ai_title"),
       desc: t("landing.feat_ai_desc"),
       preview: (
-        <div className="mt-4 p-3 rounded-xl bg-black/40 border border-white/10 font-mono text-[11px] space-y-1 text-white/70">
-          <div className="flex items-center justify-between text-white/90 font-semibold">
-            <span>Verdict: PHISHING</span>
-            <span className="text-red-500 font-bold">Score 0.98</span>
+        <div className="mt-5 p-3.5 rounded-xl bg-white/[0.03] border border-white/10 text-[13px] space-y-2 text-white/80 font-sans">
+          <div className="flex items-center justify-between text-white font-medium">
+            <span className="flex items-center gap-1.5 text-white/90">
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+              Verdict: Phishing
+            </span>
+            <span className="px-2.5 py-0.5 rounded-md bg-rose-500/20 text-rose-300 font-semibold border border-rose-500/30 text-[12px]">
+              Score 0.98
+            </span>
           </div>
-          <div className="text-[10px] text-white/40 truncate">Action: Retenu en quarantaine</div>
+          <div className="text-[12px] text-slate-400">Action: Retenu en quarantaine</div>
         </div>
       ),
     },
@@ -248,9 +253,11 @@ export default function LandingRoute({
       title: t("landing.feat_remediation_title"),
       desc: t("landing.feat_remediation_desc"),
       preview: (
-        <div className="mt-4 p-3 rounded-xl bg-black/40 border border-white/10 font-mono text-[11px] flex items-center justify-between text-white/70">
-          <span>Rétention 14 jours</span>
-          <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">Actif</span>
+        <div className="mt-5 p-3.5 rounded-xl bg-white/[0.03] border border-white/10 text-[13px] flex items-center justify-between text-white/80 font-sans">
+          <span className="text-slate-300 font-normal">Rétention 14 jours</span>
+          <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30 text-[12px]">
+            Actif
+          </span>
         </div>
       ),
     },
@@ -261,10 +268,10 @@ export default function LandingRoute({
       title: t("landing.feat_dns_title"),
       desc: t("landing.feat_dns_desc"),
       preview: (
-        <div className="mt-4 p-3 rounded-xl bg-black/40 border border-white/10 font-mono text-[11px] flex items-center justify-between text-white/70">
-          <span className="text-emerald-400 font-bold">SPF ✓</span>
-          <span className="text-emerald-400 font-bold">DKIM ✓</span>
-          <span className="text-emerald-400 font-bold">DMARC ✓</span>
+        <div className="mt-5 p-3.5 rounded-xl bg-white/[0.03] border border-white/10 text-[13px] flex items-center justify-between text-white/80 font-sans">
+          <span className="text-emerald-400 font-semibold">SPF ✓</span>
+          <span className="text-emerald-400 font-semibold">DKIM ✓</span>
+          <span className="text-emerald-400 font-semibold">DMARC ✓</span>
         </div>
       ),
     },
@@ -328,7 +335,7 @@ export default function LandingRoute({
                 {t("landing.hero_title_line2") && <span className="block text-white/50 font-semibold mt-1">{t("landing.hero_title_line2")}</span>}
               </h1>
             </MotionDiv>
-            <MotionDiv initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }} className="text-[17px] sm:text-[19px] text-white/60 leading-[1.65] max-w-[34rem] font-normal">
+            <MotionDiv initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }} className="text-[17px] sm:text-[19px] text-slate-400 leading-[1.65] max-w-[34rem] font-normal">
               {t("landing.hero_desc")}
             </MotionDiv>
             <MotionDiv initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.3 }} className="flex items-center gap-4 pt-2">
@@ -338,6 +345,7 @@ export default function LandingRoute({
               </button>
             </MotionDiv>
           </div>
+
           <div className="lg:col-span-6 flex justify-center lg:justify-end h-full max-h-[460px]">
             <MotionDiv initial={{ opacity: 0, filter: "blur(10px)" }} animate={{ opacity: 1, filter: "blur(0px)" }} transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }} className="w-full h-full flex items-center">
               <EmailGatewayAnimation />
@@ -365,14 +373,14 @@ export default function LandingRoute({
       {/* ═══════════════════════════════════════════════════════════════════════
           FEATURES — Sleek Resend-style glassmorphism grid
           ═══════════════════════════════════════════════════════════════════════ */}
-      <section id="features" className="py-16 lg:py-24 relative">
+      <section id="features" className="py-28 lg:py-40 relative">
         <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 80% 50% at 50% 20%, rgba(74,144,217,0.06) 0%, transparent 60%)" }} />
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 space-y-12 relative z-10">
-          <FadeInSection className="text-center max-w-3xl mx-auto space-y-3">
-            <h2 className="font-display font-extrabold text-[clamp(1.85rem,3.8vw,2.75rem)] leading-[1.1] tracking-[-0.02em] text-white">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 space-y-16 lg:space-y-20 relative z-10">
+          <FadeInSection className="text-center max-w-3xl mx-auto space-y-4">
+            <h2 className="font-display font-medium text-[clamp(2.15rem,4.2vw,3.25rem)] leading-[1.12] tracking-[-0.02em] text-slate-100">
               {t("landing.features_title")}
             </h2>
-            <p className="text-[16px] leading-[1.65] max-w-2xl mx-auto font-normal text-white/45">
+            <p className="text-[17px] sm:text-[19px] leading-[1.65] max-w-2xl mx-auto font-normal text-slate-400">
               {t("landing.features_desc")}
             </p>
           </FadeInSection>
@@ -382,29 +390,38 @@ export default function LandingRoute({
               return (
                 <FadeInSection key={idx} delay={idx * 0.08}>
                   <div 
-                    className="relative overflow-hidden text-left flex flex-col justify-between h-full group rounded-2xl transition-all duration-400 hover:scale-[1.02] hover:shadow-[0_12px_45px_rgba(74,144,217,0.12)] p-7"
+                    className="relative overflow-hidden text-left flex flex-col justify-between h-full group rounded-2xl transition-all duration-400 hover:scale-[1.02] hover:shadow-[0_16px_50px_rgba(74,144,217,0.14)] p-7"
                     style={{
                       background: "rgba(255, 255, 255, 0.02)",
-                      backdropFilter: "blur(20px)",
-                      WebkitBackdropFilter: "blur(20px)",
+                      backdropFilter: "blur(24px)",
+                      WebkitBackdropFilter: "blur(24px)",
                       border: "1px solid rgba(255, 255, 255, 0.08)",
                     }}
                   >
+                    {/* Resend top-center glass sheen reflection */}
+                    <div
+                      className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-20 pointer-events-none rounded-t-2xl"
+                      style={{
+                        background: "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.02) 45%, transparent 75%)",
+                      }}
+                    />
+                    <div className="absolute top-0 left-6 right-6 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" />
+
                     <div className="space-y-4 flex-1 flex flex-col justify-between relative z-10">
                       <div className="space-y-4">
                         <div className="w-10 h-10 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-white group-hover:bg-primary/20 group-hover:border-primary/40 group-hover:text-primary transition-all duration-300">
                           <IconComponent className="w-5 h-5" strokeWidth={1.75} />
                         </div>
-                        <div className="font-display font-bold text-[24px] text-white tracking-[-0.02em] leading-tight">
+                        <div className="font-display font-semibold text-[24px] text-white tracking-[-0.02em] leading-tight">
                           {feat.stat}
                         </div>
                         <div className="text-[11px] uppercase tracking-[0.12em] font-bold text-primary">
                           {feat.label}
                         </div>
-                        <h3 className="font-display font-bold text-[17px] text-white/90 tracking-tight leading-snug">
+                        <h3 className="font-display font-medium text-[20px] text-slate-100 tracking-tight leading-snug">
                           {feat.title}
                         </h3>
-                        <p className="text-[14px] leading-[1.65] text-white/45">
+                        <p className="text-[15px] leading-[1.65] text-slate-400 font-normal">
                           {feat.desc}
                         </p>
                       </div>
@@ -421,15 +438,15 @@ export default function LandingRoute({
       {/* ═══════════════════════════════════════════════════════════════════════
           INTEGRATION — Clean DNS auto-config showcase
           ═══════════════════════════════════════════════════════════════════════ */}
-      <section id="integration" className="py-16 lg:py-24 relative">
+      <section id="integration" className="py-28 lg:py-40 relative">
         <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 40% at 30% 50%, rgba(74,144,217,0.06) 0%, transparent 60%)" }} />
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             <FadeInSection className="space-y-6">
-              <h2 className="font-display font-extrabold text-[clamp(1.85rem,3.8vw,2.75rem)] leading-[1.1] tracking-[-0.02em] text-white">
+              <h2 className="font-display font-medium text-[clamp(2.15rem,4.2vw,3.25rem)] leading-[1.12] tracking-[-0.02em] text-slate-100">
                 {t("landing.integration_title")}
               </h2>
-              <p className="text-[16px] leading-[1.65] text-white/45 font-normal max-w-lg">
+              <p className="text-[17px] sm:text-[19px] leading-[1.65] text-slate-400 font-normal max-w-lg">
                 {t("landing.integration_desc")}
               </p>
               <div className="flex flex-col sm:flex-row items-start gap-4 pt-2">
@@ -441,10 +458,6 @@ export default function LandingRoute({
                   <ArrowRight className="w-4.5 h-4.5" />
                 </button>
               </div>
-
-              <p className="text-[13px] text-white/30 font-medium pt-1">
-                {t("landing.integration_note")}
-              </p>
             </FadeInSection>
 
             {/* Right: Terminal Mock */}
