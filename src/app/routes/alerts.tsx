@@ -328,17 +328,15 @@ export default function AlertsRoute() {
                 rules.map((rule) => (
                   <div
                     key={rule.id}
-                    className={`flex items-center justify-between p-3.5 rounded-xl border ${
-                      rule.rule_type === "whitelist"
-                        ? "bg-safe/[0.02] border-safe/10"
-                        : "bg-error/[0.02] border-error/10"
-                    }`}
+                    className={`flex items-center justify-between p-3.5 rounded-xl border ${rule.rule_type === "whitelist"
+                      ? "bg-safe/[0.02] border-safe/10"
+                      : "bg-error/[0.02] border-error/10"
+                      }`}
                   >
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${
-                          rule.rule_type === "whitelist" ? "bg-safe/10 text-safe" : "bg-error/10 text-error"
-                        }`}>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${rule.rule_type === "whitelist" ? "bg-safe/10 text-safe" : "bg-error/10 text-error"
+                          }`}>
                           {rule.rule_type === "whitelist"
                             ? (i18n.language === "fr" ? "Autoriser" : "Allow")
                             : (i18n.language === "fr" ? "Bloquer" : "Block")}
@@ -435,8 +433,8 @@ export default function AlertsRoute() {
             </div>
             <p className="text-xs font-semibold text-on-surface-variant leading-relaxed">
               {i18n.language === "fr"
-                ? "Êtes-vous sûr de vouloir supprimer cette règle de filtrage (liste autorisée / liste noire) ? Cette action est immédiate."
-                : "Are you sure you want to delete this filtering rule? This action takes effect immediately."}
+                ? "Êtes-vous sûr de vouloir supprimer cette adresse mail/domaine?"
+                : "Are you sure you want to delete this email/domain?"}
             </p>
             <div className="flex justify-end gap-2.5 pt-2">
               <Button
