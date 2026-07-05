@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Home } from "lucide-react";
-import { motion } from "framer-motion";
+import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Home, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import sicurreLogo from "../assets/sicurre.svg";
 import { loginSchema, signUpSchema } from "../lib/schemas";
 import { Input } from "../components/ui/input";
@@ -14,16 +14,12 @@ interface LoginRouteProps {
   onLoginSuccess: () => void;
   initialMode?: "login" | "signup";
   onNavigateToLanding?: () => void;
-  onNavigateToCGU?: () => void;
-  onNavigateToConfidentialite?: () => void;
 }
 
 export default function LoginRoute({
   onLoginSuccess,
   initialMode = "login",
   onNavigateToLanding,
-  onNavigateToCGU,
-  onNavigateToConfidentialite,
 }: LoginRouteProps) {
   const { t } = useTranslation();
   const [isSignUp, setIsSignUp] = useState(initialMode === "signup");
@@ -32,6 +28,7 @@ export default function LoginRoute({
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [activeLegalModal, setActiveLegalModal] = useState<"cgu" | "privacy" | null>(null);
   const loginMutation = useLogin();
   const signupMutation = useSignup();
 
@@ -111,7 +108,7 @@ export default function LoginRoute({
       />
       <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.008)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.008)_1px,transparent_1px)] bg-[size:5rem_5rem] pointer-events-none" />
 
-      {/* ── Content Layout ── */}
+      {/* ── Main Form Layout ── */}
       <MotionDiv
         initial={{ opacity: 0, scale: 0.99, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -139,10 +136,10 @@ export default function LoginRoute({
 
         {/* Form Container */}
         <div className="w-full space-y-5">
-          {/* Google SSO Button with Primary Hover */}
+          {/* Google SSO Button */}
           <button
             onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center gap-2.5 py-2.5 bg-white/5 hover:bg-primary/20 hover:border-primary/50 hover:text-white border border-white/10 text-white rounded-lg text-sm font-semibold transition-all cursor-pointer shadow-sm hover:shadow-[0_0_20px_rgba(74,144,217,0.2)]"
+            className="w-full flex items-center justify-center gap-2.5 !py-3 bg-white/[0.08] text-white border border-white/15 hover:bg-primary hover:text-white hover:border-primary hover:shadow-[0_0_25px_rgba(74,144,217,0.4)] text-sm font-semibold rounded-xl transition-all duration-200 cursor-pointer active:scale-[0.98]"
           >
             <svg className="w-4 h-4 text-white" viewBox="0 0 24 24">
               <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.56c2.08-1.92 3.28-4.74 3.28-8.1z" />
@@ -233,7 +230,7 @@ export default function LoginRoute({
               type="submit"
               fullWidth
               disabled={isSubmitting}
-              className="mt-2 flex items-center justify-center gap-2 !py-2.5 bg-primary hover:bg-navy-dark text-white font-semibold rounded-lg transition-colors cursor-pointer shadow-md shadow-primary/20 hover:shadow-primary/40 disabled:opacity-70"
+              className="mt-2 flex items-center justify-center gap-2.5 !py-3 bg-white/[0.08] text-white border border-white/15 hover:bg-primary hover:text-white hover:border-primary hover:shadow-[0_0_25px_rgba(74,144,217,0.4)] text-sm font-semibold rounded-xl transition-all duration-200 cursor-pointer active:scale-[0.98] disabled:opacity-70"
             >
               <span>{isSubmitting ? "Connexion en cours…" : isSignUp ? "Créer mon compte" : "Se connecter"}</span>
               <ArrowRight className="w-4 h-4" />
@@ -245,20 +242,114 @@ export default function LoginRoute({
         <p className="text-center text-[11px] text-slate-500 mt-10 leading-relaxed">
           En vous connectant, vous acceptez nos{" "}
           <button
-            onClick={onNavigateToCGU}
+            onClick={() => setActiveLegalModal("cgu")}
             className="text-white hover:underline cursor-pointer border-none bg-transparent p-0 text-inherit font-inherit"
           >
             Conditions d'utilisation
           </button>{" "}
           et notre{" "}
           <button
-            onClick={onNavigateToConfidentialite}
+            onClick={() => setActiveLegalModal("privacy")}
             className="text-white hover:underline cursor-pointer border-none bg-transparent p-0 text-inherit font-inherit"
           >
             Politique de confidentialité
           </button>.
         </p>
       </MotionDiv>
+
+      {/* ── In-Place Legal Modal Overlay ── */}
+      <AnimatePresence>
+        {activeLegalModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-black/80 backdrop-blur-md overflow-y-auto">
+            <MotionDiv
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              className="relative w-full max-w-3xl max-h-[85vh] bg-[#0a0d18] border border-white/15 rounded-2xl p-6 sm:p-8 lg:p-10 overflow-y-auto shadow-2xl text-left font-sans text-white space-y-6"
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between border-b border-white/10 pb-4 sticky top-0 bg-[#0a0d18] z-20 pt-1">
+                <h2 className="font-display font-medium text-2xl text-slate-100 tracking-tight">
+                  {activeLegalModal === "cgu" ? "Conditions Générales d'Utilisation" : "Politique de Confidentialité"}
+                </h2>
+                <button
+                  onClick={() => setActiveLegalModal(null)}
+                  aria-label="Fermer"
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              {activeLegalModal === "cgu" ? (
+                <div className="space-y-6 text-slate-400 text-sm leading-relaxed">
+                  <section className="space-y-2">
+                    <h3 className="font-display font-medium text-base text-slate-200">1. Objet des CGU</h3>
+                    <p>
+                      Les présentes Conditions Générales d'Utilisation (CGU) encadrent l'accès et l'utilisation de la plateforme 
+                      <strong className="text-white"> Sicurre</strong>. La plateforme fournit un service automatisé 
+                      d'analyse et de remédiation en temps réel des menaces par e-mail (phishing, indésirables, ingénierie sociale).
+                    </p>
+                  </section>
+
+                  <section className="space-y-2">
+                    <h3 className="font-display font-medium text-base text-slate-200">2. Connexion & Intégration Cloudflare</h3>
+                    <p>
+                      L'activation de la protection Sicurre nécessite l'association d'un jeton d'accès Cloudflare restreint. 
+                      En configurant cette intégration, l'utilisateur autorise Sicurre à inspecter les métadonnées des e-mails entrants, 
+                      sécuriser les enregistrements DNS (SPF, DKIM, DMARC), et isoler temporairement les messages malveillants.
+                    </p>
+                  </section>
+
+                  <section className="space-y-2">
+                    <h3 className="font-display font-medium text-base text-slate-200">3. Engagements & Responsabilités</h3>
+                    <p>
+                      Sicurre s'engage à maintenir un niveau élevé de disponibilité (99.9% de SLA) et à appliquer les meilleures 
+                      règles de sécurité informatique souveraine. L'utilisateur demeure responsable de la confidentialité de ses identifiants.
+                    </p>
+                  </section>
+
+                  <section className="space-y-2">
+                    <h3 className="font-display font-medium text-base text-slate-200">4. Droit applicable</h3>
+                    <p>
+                      Les présentes CGU sont soumises au droit français. Tout litige relève des tribunaux compétents de Paris, France.
+                    </p>
+                  </section>
+                </div>
+              ) : (
+                <div className="space-y-6 text-slate-400 text-sm leading-relaxed">
+                  <section className="space-y-2">
+                    <h3 className="font-display font-medium text-base text-slate-200">1. Engagements RGPD et Souveraineté</h3>
+                    <p>
+                      Chez Sicurre, nous traitons la sécurité et la confidentialité de vos e-mails avec la plus grande rigueur. 
+                      En conformité totale avec le RGPD, toutes les analyses d'inférence de phishing sont exécutées sur des 
+                      infrastructures souveraines situées en France. <strong className="text-white">Aucun e-mail n'est partagé avec des tiers ou utilisé pour entraîner des modèles publics.</strong>
+                    </p>
+                  </section>
+
+                  <section className="space-y-2">
+                    <h3 className="font-display font-medium text-base text-slate-200">2. Politique de Non-Stockage des E-mails</h3>
+                    <p>
+                      Par défaut, <strong className="text-white">Sicurre ne stocke jamais le corps ou le contenu de vos e-mails</strong> dans ses bases de données. 
+                      Seules les métadonnées techniques indispensables à votre journal de sécurité sont enregistrées (expéditeur, destinataire, sujet, verdict score).
+                    </p>
+                  </section>
+
+                  <section className="space-y-2">
+                    <h3 className="font-display font-medium text-base text-slate-200">3. Masquage PII Automatique</h3>
+                    <p>
+                      Toutes les données à caractère personnel (e-mails secondaires, numéros de téléphone, IBAN) transitant par le système 
+                      sont automatiquement transformées en balises anonymisées (<code className="text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">[EMAIL]</code>, <code className="text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">[IBAN]</code>) avant tout archivage.
+                    </p>
+                  </section>
+                </div>
+              )}
+            </MotionDiv>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

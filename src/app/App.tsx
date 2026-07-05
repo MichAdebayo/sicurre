@@ -150,8 +150,6 @@ export default function App() {
         onLoginSuccess={handleLoginSuccess}
         initialMode={viewState === "signup" ? "signup" : "login"}
         onNavigateToLanding={() => setViewState("landing")}
-        onNavigateToCGU={() => setViewState("cgu")}
-        onNavigateToConfidentialite={() => setViewState("confidentialite")}
       />
     );
   }
