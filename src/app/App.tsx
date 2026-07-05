@@ -13,6 +13,7 @@ import DomainShieldRoute from "./routes/domain-shield";
 import MentionsLegalesRoute from "./routes/mentions-legales";
 import ConfidentialiteRoute from "./routes/confidentialite";
 import ContactRoute from "./routes/contact";
+import CGURoute from "./routes/cgu";
 import { AppShell } from "./components/common/app-shell";
 import { SidebarPage } from "./components/common/sidebar";
 import {
@@ -21,6 +22,8 @@ import {
   useCurrentSession,
   useLogout,
 } from "./lib/api";
+
+type ViewState = "landing" | "login" | "signup" | "cgu" | "mentions-legales" | "confidentialite" | "contact";
 
 const getInitialLoginState = () => {
   const params = new URLSearchParams(window.location.search);
@@ -37,19 +40,19 @@ const getInitialLoginState = () => {
   return false;
 };
 
-const getInitialViewState = (): "landing" | "login" | "signup" | "mentions-legales" | "confidentialite" | "contact" => {
+const getInitialViewState = (): ViewState => {
   const saved = sessionStorage.getItem("sicurre_view_state");
-  if (saved && ["landing", "login", "signup", "mentions-legales", "confidentialite", "contact"].includes(saved)) {
-    return saved as any;
+  if (saved && ["landing", "login", "signup", "cgu", "mentions-legales", "confidentialite", "contact"].includes(saved)) {
+    return saved as ViewState;
   }
   return "landing";
 };
 
 export default function App() {
   const [hasStoredSession, setHasStoredSession] = useState(getInitialLoginState);
-  const [viewState, setViewStateState] = useState<"landing" | "login" | "signup" | "mentions-legales" | "confidentialite" | "contact">(getInitialViewState);
+  const [viewState, setViewStateState] = useState<ViewState>(getInitialViewState);
 
-  const setViewState = (view: "landing" | "login" | "signup" | "mentions-legales" | "confidentialite" | "contact") => {
+  const setViewState = (view: ViewState) => {
     sessionStorage.setItem("sicurre_view_state", view);
     setViewStateState(view);
   };
@@ -68,8 +71,10 @@ export default function App() {
   useEffect(() => {
     if (sessionQuery.isError) {
       clearStoredSession();
-      setHasStoredSession(false);
-      setViewState("login");
+      if (hasStoredSession) {
+        setHasStoredSession(false);
+        setViewState("login");
+      }
       setActivePage("dashboard");
     }
   }, [sessionQuery.isError]);
@@ -128,6 +133,9 @@ export default function App() {
         />
       );
     }
+    if (viewState === "cgu") {
+      return <CGURoute onBack={() => setViewState("landing")} />;
+    }
     if (viewState === "mentions-legales") {
       return <MentionsLegalesRoute onBack={() => setViewState("landing")} />;
     }
@@ -138,16 +146,13 @@ export default function App() {
       return <ContactRoute onBack={() => setViewState("landing")} />;
     }
     return (
-      <div className="relative bg-surface-low">
-        {/* Back to landing link on login screen */}
-        <button
-          onClick={() => setViewState("landing")}
-          className="absolute top-6 left-6 text-xs text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer z-20 font-semibold bg-surface-lowest hover:bg-surface-low px-4 py-2 rounded-lg border border-border-subtle shadow-sm"
-        >
-          &larr; Retour à l'accueil
-        </button>
-        <LoginRoute onLoginSuccess={handleLoginSuccess} initialMode={viewState === "signup" ? "signup" : "login"} />
-      </div>
+      <LoginRoute
+        onLoginSuccess={handleLoginSuccess}
+        initialMode={viewState === "signup" ? "signup" : "login"}
+        onNavigateToLanding={() => setViewState("landing")}
+        onNavigateToCGU={() => setViewState("cgu")}
+        onNavigateToConfidentialite={() => setViewState("confidentialite")}
+      />
     );
   }
 

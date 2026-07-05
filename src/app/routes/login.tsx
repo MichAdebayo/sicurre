@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Eye, EyeOff, Mail, Lock, User, ArrowRight } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Home } from "lucide-react";
 import { motion } from "framer-motion";
 import sicurreLogo from "../assets/sicurre.svg";
 import { loginSchema, signUpSchema } from "../lib/schemas";
@@ -13,9 +13,18 @@ const MotionDiv = motion.div as any;
 interface LoginRouteProps {
   onLoginSuccess: () => void;
   initialMode?: "login" | "signup";
+  onNavigateToLanding?: () => void;
+  onNavigateToCGU?: () => void;
+  onNavigateToConfidentialite?: () => void;
 }
 
-export default function LoginRoute({ onLoginSuccess, initialMode = "login" }: LoginRouteProps) {
+export default function LoginRoute({
+  onLoginSuccess,
+  initialMode = "login",
+  onNavigateToLanding,
+  onNavigateToCGU,
+  onNavigateToConfidentialite,
+}: LoginRouteProps) {
   const { t } = useTranslation();
   const [isSignUp, setIsSignUp] = useState(initialMode === "signup");
   const [name, setName] = useState("");
@@ -82,39 +91,25 @@ export default function LoginRoute({ onLoginSuccess, initialMode = "login" }: Lo
         }
       `}</style>
 
-      {/* ── Background Premium Metallic Waves (Resend Aesthetic) ── */}
-      {/* Top Right Wave */}
-      <div className="absolute top-0 right-0 w-[55%] h-[65%] select-none pointer-events-none opacity-40 z-0">
-        <svg className="w-full h-full" viewBox="0 0 600 600" fill="none" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="silk-grad-1" x1="100%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.12" />
-              <stop offset="40%" stopColor="#475569" stopOpacity="0.04" />
-              <stop offset="100%" stopColor="#000000" stopOpacity="0.9" />
-            </linearGradient>
-            <linearGradient id="silk-grad-2" x1="100%" y1="0%" x2="30%" y2="80%">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.08" />
-              <stop offset="100%" stopColor="#000000" stopOpacity="0.95" />
-            </linearGradient>
-          </defs>
-          <path d="M250 0 C380 180, 200 380, 600 480 L600 0 Z" fill="url(#silk-grad-1)" />
-          <path d="M380 0 C450 140, 320 280, 600 380 L600 0 Z" fill="url(#silk-grad-2)" opacity="0.6" />
-        </svg>
-      </div>
+      {/* ── Home Back Button (Top Left) ── */}
+      {onNavigateToLanding && (
+        <button
+          onClick={onNavigateToLanding}
+          aria-label="Retour à l'accueil"
+          className="absolute top-6 left-6 p-2.5 text-white/90 bg-white/[0.06] hover:bg-primary hover:border-primary border border-white/15 rounded-xl cursor-pointer transition-all shadow-sm z-20 flex items-center justify-center"
+        >
+          <Home className="w-4.5 h-4.5" />
+        </button>
+      )}
 
-      {/* Bottom Left Wave */}
-      <div className="absolute bottom-0 left-0 w-[50%] h-[60%] select-none pointer-events-none opacity-35 z-0">
-        <svg className="w-full h-full" viewBox="0 0 600 600" fill="none" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="silk-grad-3" x1="0%" y1="100%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.1" />
-              <stop offset="50%" stopColor="#475569" stopOpacity="0.03" />
-              <stop offset="100%" stopColor="#000000" stopOpacity="0.9" />
-            </linearGradient>
-          </defs>
-          <path d="M0 200 C180 320, 250 480, 350 600 L0 600 Z" fill="url(#silk-grad-3)" />
-        </svg>
-      </div>
+      {/* ── Unified Brand Background Spotlight & Space Grid ── */}
+      <div
+        className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-5xl h-96 pointer-events-none"
+        style={{
+          background: "radial-gradient(ellipse 60% 50% at 50% 0%, rgba(74,144,217,0.08) 0%, transparent 70%)",
+        }}
+      />
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.008)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.008)_1px,transparent_1px)] bg-[size:5rem_5rem] pointer-events-none" />
 
       {/* ── Content Layout ── */}
       <MotionDiv
@@ -142,12 +137,12 @@ export default function LoginRoute({ onLoginSuccess, initialMode = "login" }: Lo
           </p>
         </div>
 
-        {/* Form Container (No card border/wrapper, sitting directly on background) */}
+        {/* Form Container */}
         <div className="w-full space-y-5">
-          {/* Google SSO Dark Button */}
+          {/* Google SSO Button with Primary Hover */}
           <button
             onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center gap-2.5 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg text-sm font-semibold transition-all cursor-pointer shadow-sm"
+            className="w-full flex items-center justify-center gap-2.5 py-2.5 bg-white/5 hover:bg-primary/20 hover:border-primary/50 hover:text-white border border-white/10 text-white rounded-lg text-sm font-semibold transition-all cursor-pointer shadow-sm hover:shadow-[0_0_20px_rgba(74,144,217,0.2)]"
           >
             <svg className="w-4 h-4 text-white" viewBox="0 0 24 24">
               <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.56c2.08-1.92 3.28-4.74 3.28-8.1z" />
@@ -234,7 +229,12 @@ export default function LoginRoute({ onLoginSuccess, initialMode = "login" }: Lo
               </div>
             )}
 
-            <Button type="submit" fullWidth disabled={isSubmitting} className="mt-2 flex items-center justify-center gap-2 !py-2.5 bg-white hover:bg-slate-100 text-black font-semibold rounded-lg transition-colors cursor-pointer shadow-md disabled:opacity-70">
+            <Button
+              type="submit"
+              fullWidth
+              disabled={isSubmitting}
+              className="mt-2 flex items-center justify-center gap-2 !py-2.5 bg-primary hover:bg-navy-dark text-white font-semibold rounded-lg transition-colors cursor-pointer shadow-md shadow-primary/20 hover:shadow-primary/40 disabled:opacity-70"
+            >
               <span>{isSubmitting ? "Connexion en cours…" : isSignUp ? "Créer mon compte" : "Se connecter"}</span>
               <ArrowRight className="w-4 h-4" />
             </Button>
@@ -244,9 +244,19 @@ export default function LoginRoute({ onLoginSuccess, initialMode = "login" }: Lo
         {/* Footer */}
         <p className="text-center text-[11px] text-slate-500 mt-10 leading-relaxed">
           En vous connectant, vous acceptez nos{" "}
-          <a href="#" className="text-white hover:underline">Conditions d'utilisation</a>{" "}
+          <button
+            onClick={onNavigateToCGU}
+            className="text-white hover:underline cursor-pointer border-none bg-transparent p-0 text-inherit font-inherit"
+          >
+            Conditions d'utilisation
+          </button>{" "}
           et notre{" "}
-          <a href="#" className="text-white hover:underline">Politique de confidentialité</a>.
+          <button
+            onClick={onNavigateToConfidentialite}
+            className="text-white hover:underline cursor-pointer border-none bg-transparent p-0 text-inherit font-inherit"
+          >
+            Politique de confidentialité
+          </button>.
         </p>
       </MotionDiv>
     </div>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, MapPin, Send, CheckCircle2, MessageSquare, Clock } from "lucide-react";
+import { Mail, MapPin, Send, CheckCircle2, MessageSquare, Clock, Home } from "lucide-react";
 import sicurreLogo from "../assets/sicurre.svg";
 
 const MotionDiv = motion.div as any;
@@ -58,9 +58,10 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
           </div>
           <button
             onClick={onBack}
-            className="px-4.5 py-2 text-xs font-semibold text-white/90 bg-white/[0.06] hover:bg-primary hover:border-primary border border-white/15 rounded-xl cursor-pointer transition-all shadow-sm"
+            aria-label="Retour à l'accueil"
+            className="p-2.5 text-white/90 bg-white/[0.06] hover:bg-primary hover:border-primary border border-white/15 rounded-xl cursor-pointer transition-all shadow-sm flex items-center justify-center"
           >
-            &larr; Retour à l'accueil
+            <Home className="w-4.5 h-4.5" />
           </button>
         </div>
 
