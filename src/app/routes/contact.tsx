@@ -49,7 +49,7 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
       }} />
 
       <div className="max-w-4xl mx-auto space-y-8 relative z-10">
-        
+
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 pb-6">
           <div className="flex items-center gap-3">
@@ -66,10 +66,10 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
 
         {/* Contact Page Grid Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          
+
           {/* Left Column: Contact Info Glass Card */}
           <div className="lg:col-span-4 space-y-6">
-            <div 
+            <div
               style={{
                 background: "rgba(255, 255, 255, 0.025)",
                 backdropFilter: "blur(24px)",
@@ -80,7 +80,7 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
             >
               {/* Decorative background glow */}
               <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary/20 blur-2xl rounded-full" />
-              
+
               <div className="relative z-10 space-y-6">
                 <div>
                   <span className="text-[10px] font-extrabold tracking-widest text-[#F59E0B] uppercase">ASSISTANCE 24/7</span>
@@ -125,8 +125,8 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
                 </div>
               </div>
             </div>
-            
-            <div 
+
+            <div
               style={{
                 background: "rgba(255, 255, 255, 0.02)",
                 backdropFilter: "blur(20px)",
@@ -146,7 +146,7 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
 
           {/* Right Column: Interactive Contact Form Glass Card */}
           <div className="lg:col-span-8">
-            <div 
+            <div
               style={{
                 background: "rgba(255, 255, 255, 0.02)",
                 backdropFilter: "blur(24px)",
@@ -229,9 +229,8 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
                       <button
                         type="submit"
                         disabled={isSubmitting}
-                        className={`w-full py-3.5 bg-primary text-white hover:bg-navy-dark font-semibold rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-md shadow-primary/20 cursor-pointer active:scale-[0.98] ${
-                          isSubmitting ? "opacity-75 cursor-not-allowed" : ""
-                        }`}
+                        className={`w-full py-3.5 bg-primary text-white hover:bg-navy-dark font-semibold rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-md shadow-primary/20 cursor-pointer active:scale-[0.98] ${isSubmitting ? "opacity-75 cursor-not-allowed" : ""
+                          }`}
                       >
                         {isSubmitting ? (
                           <>
@@ -265,7 +264,7 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
                       >
                         <Mail className="w-5 h-5" />
                       </MotionDiv>
-                      
+
                       <MotionDiv
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
@@ -281,7 +280,7 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
                         Message envoyé !
                       </h4>
                       <p className="text-sm text-slate-400 leading-relaxed">
-                        Merci <strong className="text-white">{formData.name}</strong>, votre message a bien été envoyé de manière sécurisée 
+                        Merci <strong className="text-white">{formData.name}</strong>, votre message a bien été envoyé de manière sécurisée
                         à <strong className="text-white">contact@sicurre.com</strong>. Nous vous recontactons d'ici quelques minutes.
                       </p>
                     </div>
@@ -303,7 +302,7 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
 
         {/* Footer */}
         <div className="text-center text-xs text-slate-500">
-          © 2026 Sicurre SAS. Tous droits réservés.
+          © 2026 Sicurre. Tous droits réservés.
         </div>
       </div>
     </div>

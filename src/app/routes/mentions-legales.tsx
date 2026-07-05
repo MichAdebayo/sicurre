@@ -16,7 +16,7 @@ export default function MentionsLegalesRoute({ onBack }: MentionsLegalesProps) {
       }} />
 
       <div className="max-w-3xl mx-auto space-y-8 relative z-10">
-        
+
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 pb-6">
           <div className="flex items-center gap-3">
@@ -56,13 +56,13 @@ export default function MentionsLegalesRoute({ onBack }: MentionsLegalesProps) {
           <section className="space-y-3">
             <h2 className="font-display font-medium text-lg text-slate-200">1. Éditeur du site</h2>
             <p className="text-sm text-slate-400 leading-relaxed">
-              Le site <strong className="text-white">sicurre.io</strong> est édité par la société <strong className="text-white">Sicurre SAS</strong>, 
-              société par actions simplifiée au capital de 15 000 euros, immatriculée au Registre du Commerce 
-              et des Sociétés de Paris sous le numéro 987 654 321, dont le siège social est situé à 
+              Le site <strong className="text-white">sicurre.io</strong> est édité par la société <strong className="text-white">Sicurre</strong>,
+              société par actions simplifiée au capital de 15 000 euros, immatriculée au Registre du Commerce
+              et des Sociétés de Paris sous le numéro 987 654 321, dont le siège social est situé à
               Roubaix, France.
             </p>
             <p className="text-sm text-slate-400">
-              <strong className="text-white">Directeur de la publication :</strong> Michael Adebayo, en sa qualité de Président de Sicurre SAS.
+              <strong className="text-white">Directeur de la publication :</strong> Michael Adebayo, en sa qualité de Président de Sicurre.
             </p>
           </section>
 
@@ -76,7 +76,7 @@ export default function MentionsLegalesRoute({ onBack }: MentionsLegalesProps) {
                 <strong className="text-white">Neon Inc.</strong> (Base de données) : 2443 Fillmore St, San Francisco, CA 94115, États-Unis.
               </li>
               <li>
-                <strong className="text-white">Google Cloud Platform</strong> (Infrastructures de calcul et stockage) : Google Ireland Limited, 
+                <strong className="text-white">Google Cloud Platform</strong> (Infrastructures de calcul et stockage) : Google Ireland Limited,
                 Gordon House, Barrow Street, Dublin 4, Irlande. (Serveurs situés en Europe, région de Paris).
               </li>
             </ul>
@@ -95,8 +95,8 @@ export default function MentionsLegalesRoute({ onBack }: MentionsLegalesProps) {
           <section className="space-y-3">
             <h2 className="font-display font-medium text-lg text-slate-200">4. Propriété intellectuelle</h2>
             <p className="text-sm text-slate-400 leading-relaxed">
-              L'ensemble du contenu présent sur le site (textes, logos, animations 3D, chartes graphiques) 
-              est la propriété exclusive de Sicurre SAS. Toute reproduction, modification ou distribution 
+              L'ensemble du contenu présent sur le site (textes, logos, animations 3D, chartes graphiques)
+              est la propriété exclusive de Sicurre. Toute reproduction, modification ou distribution
               sans accord écrit préalable est strictly interdite.
             </p>
           </section>
@@ -104,7 +104,7 @@ export default function MentionsLegalesRoute({ onBack }: MentionsLegalesProps) {
 
         {/* Footer */}
         <div className="text-center text-xs text-slate-500">
-          © 2026 Sicurre SAS. Tous droits réservés.
+          © 2026 Sicurre. Tous droits réservés.
         </div>
       </div>
     </div>

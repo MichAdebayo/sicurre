@@ -16,7 +16,7 @@ export default function ConfidentialiteRoute({ onBack }: ConfidentialiteProps) {
       }} />
 
       <div className="max-w-3xl mx-auto space-y-8 relative z-10">
-        
+
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 pb-6">
           <div className="flex items-center gap-3">
@@ -56,9 +56,9 @@ export default function ConfidentialiteRoute({ onBack }: ConfidentialiteProps) {
           <section className="space-y-3">
             <h2 className="font-display font-medium text-lg text-slate-200">1. Engagements RGPD et Souveraineté</h2>
             <p className="text-sm text-slate-400 leading-relaxed">
-              Chez Sicurre, nous traitons la sécurité et la confidentialité de vos e-mails avec la plus grande rigueur. 
-              En conformité totale avec le Règlement Général sur la Protection des Données (RGPD), toutes les analyses 
-              d'inférence de phishing sont exécutées sur des infrastructures souveraines situées en France. 
+              Chez Sicurre, nous traitons la sécurité et la confidentialité de vos e-mails avec la plus grande rigueur.
+              En conformité totale avec le Règlement Général sur la Protection des Données (RGPD), toutes les analyses
+              d'inférence de phishing sont exécutées sur des infrastructures souveraines situées en France.
               <strong className="text-white"> Aucun e-mail n'est partagé avec des tiers ou utilisé pour entraîner des modèles publics.</strong>
             </p>
           </section>
@@ -86,7 +86,7 @@ export default function ConfidentialiteRoute({ onBack }: ConfidentialiteProps) {
           <section className="space-y-3">
             <h2 className="font-display font-medium text-lg text-slate-200">3. Politique stricte de Non-Stockage des E-mails</h2>
             <p className="text-sm text-slate-400 leading-relaxed">
-              Par défaut, <strong className="text-white">Sicurre ne stocke jamais le corps ou le contenu de vos e-mails</strong> dans ses bases de données. 
+              Par défaut, <strong className="text-white">Sicurre ne stocke jamais le corps ou le contenu de vos e-mails</strong> dans ses bases de données.
               Seules les métadonnées techniques indispensables à votre journal de sécurité sont enregistrées :
             </p>
             <ul className="list-disc pl-5 text-sm text-slate-400 space-y-1.5">
@@ -100,9 +100,9 @@ export default function ConfidentialiteRoute({ onBack }: ConfidentialiteProps) {
           <section className="space-y-3">
             <h2 className="font-display font-medium text-lg text-slate-200">4. Masquage automatique des Données Personnelles (PII)</h2>
             <p className="text-sm text-slate-400 leading-relaxed">
-              Toutes les données à caractère personnel qui transitent ou sont inspectées par le démon de détection sont 
-              systématiquement anonymisées. Les adresses e-mails secondaires, numéros de téléphone, numéros de sécurité 
-              sociale, SIRET ou IBAN sont immédiatement transformés en balises de métadonnées génériques 
+              Toutes les données à caractère personnel qui transitent ou sont inspectées par le démon de détection sont
+              systématiquement anonymisées. Les adresses e-mails secondaires, numéros de téléphone, numéros de sécurité
+              sociale, SIRET ou IBAN sont immédiatement transformés en balises de métadonnées génériques
               (ex: <code className="text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">[EMAIL]</code>, <code className="text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">[PHONE]</code>, <code className="text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">[IBAN]</code>) avant tout archivage dans votre tableau de bord.
             </p>
           </section>
@@ -118,7 +118,7 @@ export default function ConfidentialiteRoute({ onBack }: ConfidentialiteProps) {
 
         {/* Footer */}
         <div className="text-center text-xs text-slate-500">
-          © 2026 Sicurre SAS. Tous droits réservés.
+          © 2026 Sicurre. Tous droits réservés.
         </div>
       </div>
     </div>
