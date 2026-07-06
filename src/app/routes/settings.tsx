@@ -31,6 +31,7 @@ import {
   useWorkspaceCloudflareToken,
   useSaveWorkspaceCloudflareToken,
   useDeleteWorkspaceCloudflareToken,
+  useKPIStats,
 } from "../lib/api";
 
 const MotionDiv = motion.div as any;
@@ -42,6 +43,9 @@ interface SettingsRouteProps {
 
 export default function SettingsRoute({ session, initialTab }: SettingsRouteProps) {
   const { t, i18n } = useTranslation();
+  const { data: kpis } = useKPIStats();
+  const totalScans = kpis?.raw_records_count ?? 0;
+
   const [activeTab, setActiveTab] = useState<"profile" | "security" | "preferences" | "domains" | "integrations" | "billing">(
     (initialTab as any) || (session.onboarding_required ? "domains" : "profile")
   );
@@ -832,11 +836,11 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                   <div className="flex justify-between text-sm">
                     <span className="font-bold text-on-surface">{t("settings.usage_emails")}</span>
                     <span className="font-bold text-on-surface-variant">
-                      86 / 250 {lang === "fr" ? "emails scannés" : "emails analyzed"}
+                      {totalScans} / 250 {lang === "fr" ? "emails scannés" : "emails analyzed"}
                     </span>
                   </div>
                   <div className="w-full h-2 bg-surface-container rounded-full overflow-hidden">
-                    <div className="h-full bg-primary rounded-full" style={{ width: "34.4%" }} />
+                    <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${Math.min((totalScans / 250) * 100, 100)}%` }} />
                   </div>
                   <p className="text-sm font-semibold text-on-surface-variant leading-normal">
                     {lang === "fr"
