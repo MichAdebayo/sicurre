@@ -6,6 +6,7 @@ import {
   ShieldAlert,
   Globe,
   Inbox,
+  ArrowRight,
 } from "lucide-react";
 import { SidebarPage } from "./sidebar";
 import {
@@ -28,7 +29,6 @@ export function TopBar({
 }: TopBarProps) {
   const { t, i18n } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<"All" | "Critical" | "Domain" | "System">("All");
 
   // Persistent notification read IDs using localStorage
   const [readIds, setReadIds] = useState<string[]>(() => {
@@ -173,11 +173,8 @@ export function TopBar({
     });
   }
 
-  // Filter list
-  const filteredNotifs = notificationsList.filter((n) => {
-    if (activeFilter === "All") return true;
-    return n.category === activeFilter;
-  });
+  // Capped list of notifications (display most recent 4)
+  const cappedNotifs = notificationsList.slice(0, 4);
 
   const unreadCount = notificationsList.filter(n => n.unread && !readIds.includes(n.id)).length;
 
@@ -277,37 +274,14 @@ export function TopBar({
               </button>
             </div>
 
-            {/* Filter Buttons */}
-            <div className="flex gap-1.5 py-3">
-              {(["All", "Critical", "Domain", "System"] as const).map((filter) => {
-                const isActive = activeFilter === filter;
-                const label = i18n.language === "fr"
-                  ? ({ All: "Tout", Critical: "Critique", Domain: "Domaine", System: "Système" } as const)[filter]
-                  : filter;
-                return (
-                  <button
-                    key={filter}
-                    onClick={() => setActiveFilter(filter)}
-                    className={`px-3 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
-                      isActive
-                        ? "bg-surface-low text-primary border-primary/20 shadow-sm"
-                        : "bg-transparent text-on-surface-variant hover:text-on-surface border-transparent"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-
             {/* Notification items list */}
-            <div className="space-y-1.5 max-h-[340px] overflow-y-auto pt-1 select-none pr-1">
-              {filteredNotifs.length === 0 ? (
+            <div className="space-y-1.5 max-h-[340px] overflow-y-auto pt-3 select-none pr-1">
+              {cappedNotifs.length === 0 ? (
                 <div className="text-center py-8 text-xs text-on-surface-variant">
-                  {i18n.language === "fr" ? "Aucune notification pour ce filtre" : "No notifications matching this filter"}
+                  {i18n.language === "fr" ? "Aucune notification" : "No notifications available"}
                 </div>
               ) : (
-                filteredNotifs.map((notif) => {
+                cappedNotifs.map((notif) => {
                   const isUnread = notif.unread && !readIds.includes(notif.id);
                   return (
                     <div
@@ -350,6 +324,20 @@ export function TopBar({
                   );
                 })
               )}
+            </div>
+
+            {/* View All Footer Link */}
+            <div className="pt-3 mt-2 border-t border-border-subtle flex justify-center">
+              <button
+                onClick={() => {
+                  if (onPageChange) onPageChange("alerts");
+                  setIsOpen(false);
+                }}
+                className="text-xs font-bold text-primary hover:text-navy-dark hover:underline cursor-pointer flex items-center gap-1.5 py-1"
+              >
+                <span>{i18n.language === "fr" ? "Voir toutes les alertes" : "View all alerts"}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
         )}

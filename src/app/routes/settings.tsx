@@ -562,9 +562,12 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                       <span className="font-display font-semibold text-sm text-on-surface">
                         {lang === "fr" ? "Nouveau domaine Cloudflare" : "New Cloudflare Integration"}
                       </span>
-                      <Button variant="outline" size="sm" onClick={() => setShowIntegrator(false)} className="text-xs cursor-pointer">
+                      <button
+                        onClick={() => setShowIntegrator(false)}
+                        className="text-xs font-bold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white cursor-pointer transition-colors duration-200"
+                      >
                         {lang === "fr" ? "Annuler" : "Cancel"}
-                      </Button>
+                      </button>
                     </div>
                     <div className="border border-border-subtle rounded-xl p-4 bg-surface-lowest">
                       <CloudflareIntegrator
