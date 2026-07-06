@@ -60,14 +60,14 @@ export function Sidebar({
   // Insert Audit Logs for admin users before the Settings link
   const mainNav = userRole === "admin"
     ? [
-        baseNav[0], // dashboard
-        baseNav[1], // threats
-        baseNav[2], // quarantine
-        baseNav[3], // alerts
-        baseNav[4], // domain-shield
-        { id: "logs", label: t("common.threat_log"), icon: History },
-        baseNav[5], // settings
-      ]
+      baseNav[0], // dashboard
+      baseNav[1], // threats
+      baseNav[2], // quarantine
+      baseNav[3], // alerts
+      baseNav[4], // domain-shield
+      { id: "logs", label: t("common.threat_log"), icon: History },
+      baseNav[5], // settings
+    ]
     : baseNav;
 
   const bottomNav = [

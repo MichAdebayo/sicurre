@@ -315,8 +315,8 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                   setShowIntegrator(false);
                 }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-bold transition-all cursor-pointer text-left border-l-2 outline-none ${isActive
-                    ? "bg-primary/[0.04] text-primary border-primary"
-                    : "text-on-surface-variant hover:bg-surface-low hover:text-on-surface border-transparent"
+                  ? "bg-primary/[0.04] text-primary border-primary"
+                  : "text-on-surface-variant hover:bg-surface-low hover:text-on-surface border-transparent"
                   }`}
               >
                 <IconComp className={`w-4.5 h-4.5 ${isActive ? "text-primary" : "text-on-surface-variant/70"}`} />
@@ -600,10 +600,10 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                                 <td className="px-4 py-3 font-semibold text-on-surface">{dom.zone_name}</td>
                                 <td className="px-4 py-3">
                                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${dom.status === "active"
-                                      ? "bg-safe/10 text-safe"
-                                      : dom.status === "error"
-                                        ? "bg-error/10 text-error"
-                                        : "bg-warning/10 text-warning"
+                                    ? "bg-safe/10 text-safe"
+                                    : dom.status === "error"
+                                      ? "bg-error/10 text-error"
+                                      : "bg-warning/10 text-warning"
                                     }`}>
                                     {dom.status === "active"
                                       ? t("settings.active_setup")
@@ -647,8 +647,8 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                         {lang === "fr" ? "Gestion des Intégrations" : "Integrations Management"}
                       </h3>
                       <p className="text-xs font-semibold text-on-surface-variant">
-                        {lang === "fr" 
-                          ? "Configurez vos clés API tierces pour piloter la protection automatique." 
+                        {lang === "fr"
+                          ? "Configurez vos clés API tierces pour piloter la protection automatique."
                           : "Configure third-party API tokens to power automatic domain security."}
                       </p>
                     </div>
@@ -759,7 +759,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                               {lang === "fr" ? "Connecté" : "Connected"}
                             </span>
                           </h4>
-                          
+
                           {/* Eyeballed Token Display */}
                           <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border-subtle/50 text-xs w-full">
                             <span className="font-bold text-on-surface-variant shrink-0">Token :</span>
