@@ -559,7 +559,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                 {showIntegrator ? (
                   <div className="space-y-4">
                     <div className="flex justify-between items-center bg-surface-low/50 p-3 rounded-lg border border-border-subtle/50">
-                      <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                      <span className="font-display font-semibold text-sm text-on-surface">
                         {lang === "fr" ? "Nouveau domaine Cloudflare" : "New Cloudflare Integration"}
                       </span>
                       <Button variant="outline" size="sm" onClick={() => setShowIntegrator(false)} className="text-xs cursor-pointer">

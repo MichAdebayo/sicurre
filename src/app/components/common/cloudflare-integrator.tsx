@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import {
   Cloud,
   CheckCircle2,
@@ -65,6 +66,7 @@ interface CloudflareIntegratorProps {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegratorProps) {
+  const { t, i18n } = useTranslation();
   const { data: cfStatus, isLoading: statusLoading, refetch } = useCloudflareStatus();
   const verifyMutation = useVerifyCloudflareToken();
   const setupMutation  = useSetupCloudflare();
@@ -529,14 +531,11 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
         <Button
           onClick={handleIntegrate}
           disabled={!isFormValid || verifyMutation.isPending || setupMutation.isPending}
-          className="w-full sm:w-auto gap-2 uppercase tracking-wider text-[12px] font-bold"
+          className="w-full sm:w-auto text-xs font-bold cursor-pointer"
         >
-          {verifyMutation.isPending || setupMutation.isPending ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Zap className="w-4 h-4" />
-          )}
-          Intégrer le domaine
+          {verifyMutation.isPending || setupMutation.isPending
+            ? (i18n.language === "fr" ? "Intégration en cours…" : "Integrating…")
+            : (i18n.language === "fr" ? "Intégrer le domaine" : "Integrate domain")}
         </Button>
       </div>
     </MotionDiv>
