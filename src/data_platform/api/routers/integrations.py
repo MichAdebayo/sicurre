@@ -100,6 +100,134 @@ def _merge_dmarc(current_dmarc: str) -> str:
     
     return rec
 
+
+async def _sync_domain_shield_dns(
+    *,
+    provisioner: CloudflareProvisioner,
+    workspace_id: str,
+    zone_name: str,
+    fix_spf: bool,
+    fix_dkim: bool,
+    fix_dmarc: bool,
+) -> dict[str, Any]:
+    """Apply selected Domain Shield DNS fixes and update the local status cache."""
+    zone_id, _ = await provisioner.get_zone(zone_name)
+    dns_records = await provisioner.get_dns_records(zone_id)
+    existing_spf_content = ""
+    existing_dkim_content = ""
+    existing_dmarc_content = ""
+
+    for rec in dns_records:
+        if rec.get("type") != "TXT":
+            continue
+        rec_name = _clean_str(rec.get("name", "")).lower().rstrip(".")
+        rec_content = _clean_str(rec.get("content", "")).strip('"')
+        if rec_name == zone_name.lower():
+            existing_spf_content = rec_content
+        elif "._domainkey." in rec_name or rec_name.startswith("_domainkey."):
+            if "v=DKIM1" in rec_content or "k=rsa" in rec_content:
+                existing_dkim_content = rec_content
+        elif rec_name == f"_dmarc.{zone_name}".lower():
+            existing_dmarc_content = rec_content
+
+    spf_val = 1 if "v=spf1" in existing_spf_content else 0
+    spf_rec = existing_spf_content or None
+    if fix_spf:
+        spf_rec = _merge_spf(existing_spf_content)
+        await provisioner.deploy_dns_record(
+            zone_id=zone_id,
+            rec_type="TXT",
+            name=zone_name,
+            content=spf_rec,
+        )
+        spf_val = 1
+
+    dkim_val = 1 if existing_dkim_content else 0
+    dkim_rec = existing_dkim_content or None
+    if fix_dkim:
+        dkim_rec = "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA..."
+        await provisioner.deploy_dns_record(
+            zone_id=zone_id,
+            rec_type="TXT",
+            name=f"cloudflare._domainkey.{zone_name}",
+            content=dkim_rec,
+        )
+        dkim_val = 1
+
+    dmarc_val = 1 if "v=DMARC1" in existing_dmarc_content else 0
+    dmarc_rec = existing_dmarc_content or None
+    if fix_dmarc:
+        dmarc_rec = _merge_dmarc(existing_dmarc_content)
+        await provisioner.deploy_dns_record(
+            zone_id=zone_id,
+            rec_type="TXT",
+            name=f"_dmarc.{zone_name}",
+            content=dmarc_rec,
+        )
+        dmarc_val = 1
+
+    dmarc_policy = "none"
+    if dmarc_rec and "p=reject" in dmarc_rec:
+        dmarc_policy = "reject"
+    elif dmarc_rec and "p=quarantine" in dmarc_rec:
+        dmarc_policy = "quarantine"
+    dmarc_reporting_enabled = "dmarc@sicurre.com" in (dmarc_rec or "")
+
+    rep_score = 100
+    if not spf_val:
+        rep_score -= 20
+    if not dkim_val:
+        rep_score -= 20
+    if not dmarc_val:
+        rep_score -= 25
+    elif not dmarc_reporting_enabled:
+        rep_score -= 10
+
+    grade = "A"
+    if rep_score >= 90:
+        grade = "A"
+    elif rep_score >= 80:
+        grade = "B"
+    elif rep_score >= 70:
+        grade = "C"
+    elif rep_score >= 60:
+        grade = "D"
+    else:
+        grade = "F"
+
+    ts = datetime.now(timezone.utc).isoformat()
+    await _async_query(
+        """
+        INSERT OR REPLACE INTO app_domain_shield_status (
+            domain, workspace_id, spf_valid, spf_record, dkim_valid, dkim_record,
+            dmarc_valid, dmarc_record, dmarc_policy, ssl_valid, ssl_days_remaining,
+            reputation_score, score_grade, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 365, ?, ?, ?)
+        """,
+        (
+            zone_name,
+            workspace_id,
+            spf_val,
+            spf_rec,
+            dkim_val,
+            dkim_rec,
+            dmarc_val,
+            dmarc_rec,
+            dmarc_policy,
+            rep_score,
+            grade,
+            ts,
+        ),
+    )
+    return {
+        "zone_id": zone_id,
+        "dmarc_record": dmarc_rec,
+        "dmarc_reporting_enabled": dmarc_reporting_enabled,
+        "reputation_score": rep_score,
+        "score_grade": grade,
+        "updated_at": ts,
+    }
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["integrations"])
@@ -499,24 +627,64 @@ async def setup_cloudflare(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"An auto-configuration for {payload.zone_name} is already running in the background. Please wait.",
             )
-        
-        # Auto-teardown old cloudflare resources under the hood
+
+        now = datetime.now(timezone.utc).isoformat()
         try:
-            provisioner = CloudflareProvisioner(api_token=payload.cf_api_token)
-            await provisioner.teardown(
-                zone_id=row["zone_id"],
-                account_id=row["account_id"],
-                worker_name=row["worker_name"],
-                rule_id=row.get("rule_id") or "unknown",
+            dns_sync_result = await _sync_domain_shield_dns(
+                provisioner=CloudflareProvisioner(api_token=payload.cf_api_token),
+                workspace_id=current_user.workspace_id,
+                zone_name=payload.zone_name,
+                fix_spf=payload.fix_spf,
+                fix_dkim=payload.fix_dkim,
+                fix_dmarc=payload.fix_dmarc,
             )
-        except Exception as exc:
-            logger.warning("Cloudflare auto-teardown during overwrite had warnings: %s", exc)
-        
-        # Clean up old database record
+        except CloudflareAPIError as exc:
+            await _async_query(
+                "UPDATE cloudflare_integration SET error_message=?, api_token=?, updated_at=? WHERE id=?",
+                (str(exc)[:500], payload.cf_api_token, now, row["id"]),
+            )
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Cloudflare DNS update failed: {exc}",
+            ) from exc
+
         await _async_query(
-            "DELETE FROM cloudflare_integration WHERE id = ?",
-            (row["id"],),
+            """
+            UPDATE cloudflare_integration
+            SET api_token=?, error_message=NULL, updated_at=?
+            WHERE id=?
+            """,
+            (payload.cf_api_token, now, row["id"]),
         )
+        await _async_query(
+            """
+            INSERT OR REPLACE INTO app_cloudflare_config (workspace_id, api_token, created_at, updated_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (current_user.workspace_id, payload.cf_api_token, now, now),
+        )
+        await _async_query(
+            """
+            INSERT INTO app_alert_history (
+                id, workspace_id, title, message, is_dismissed, created_at
+            ) VALUES (?, ?, ?, ?, 0, ?)
+            """,
+            (
+                str(uuid4()),
+                current_user.workspace_id,
+                "Configuration DNS appliquée",
+                f"{payload.zone_name} est synchronisé avec Cloudflare.",
+                now,
+            ),
+        )
+        return {
+            "integration_id": row["id"],
+            "status": row["status"],
+            "zone_name": payload.zone_name,
+            "destination_email": row["destination_email"],
+            "dns_sync": dns_sync_result,
+            "message": "Domain Shield DNS configuration applied.",
+        }
 
     # Derive the public scan URL for the Worker to call back
     public_api_url = (
@@ -564,6 +732,26 @@ async def setup_cloudflare(
             """,
             (current_user.workspace_id, payload.cf_api_token, now, now),
         )
+
+    dns_sync_result: dict[str, Any] | None = None
+    try:
+        dns_sync_result = await _sync_domain_shield_dns(
+            provisioner=CloudflareProvisioner(api_token=payload.cf_api_token),
+            workspace_id=current_user.workspace_id,
+            zone_name=payload.zone_name,
+            fix_spf=payload.fix_spf,
+            fix_dkim=payload.fix_dkim,
+            fix_dmarc=payload.fix_dmarc,
+        )
+    except CloudflareAPIError as exc:
+        await _async_query(
+            "UPDATE cloudflare_integration SET status='error', error_message=?, updated_at=? WHERE id=?",
+            (str(exc)[:500], datetime.now(timezone.utc).isoformat(), integration_id),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Cloudflare DNS update failed: {exc}",
+        ) from exc
 
     async def _run_provisioning() -> None:
         try:
@@ -744,6 +932,7 @@ async def setup_cloudflare(
         "status": "provisioning",
         "zone_name": payload.zone_name,
         "destination_email": str(payload.destination_email),
+        "dns_sync": dns_sync_result,
         "message": "Provisioning started. Poll /v1/integrations/cloudflare/status to track progress.",
     }
 

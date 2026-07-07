@@ -37,6 +37,7 @@ import {
   useRefreshDomainShieldStatus,
   useWorkspaceCloudflareToken,
   useDmarcReportSummary,
+  useCloudflareStatus,
   AuthSession,
 } from "../lib/api";
 
@@ -72,6 +73,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
     refetch: reloadShield,
   } = useDomainShieldStatus(selectedDomain, !!selectedDomain);
   const { data: dmarcReports } = useDmarcReportSummary(selectedDomain, !!selectedDomain);
+  const { refetch: refetchCloudflareStatus } = useCloudflareStatus();
 
   const refreshShieldMutation = useRefreshDomainShieldStatus();
 
@@ -257,6 +259,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
   const handleRunAutoFix = async () => {
     const token = wsTokenData?.api_token;
     if (!token) {
+      setSuccessNotification(null);
       setErrorNotification(
         isFR
           ? "Configuration Cloudflare requise : Veuillez d'abord ajouter votre jeton API Cloudflare dans les Paramètres > onglet Intégrations."
@@ -270,6 +273,8 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
 
     setAutoFixProgress("verify");
     setAutoFixErrorMsg("");
+    setSuccessNotification(null);
+    setErrorNotification(null);
 
     try {
       const payload = {
@@ -291,16 +296,28 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
           : (isFR ? "Configuration appliquée" : "Setup applied")
       );
 
-      const refreshAfterProvision = async () => {
+      const refreshCachedShield = async () => {
+        await refetchCloudflareStatus();
+        await reloadShield();
+      };
+
+      const refreshDnsShield = async () => {
         await refreshShieldMutation.mutateAsync(selectedDomain);
         await reloadShield();
       };
 
-      await refreshAfterProvision();
-      [8000, 16000, 30000, 60000].forEach((delayMs) => {
+      await refreshCachedShield();
+      [3000, 8000, 16000].forEach((delayMs) => {
         window.setTimeout(() => {
-          refreshAfterProvision().catch((refreshErr) => {
-            console.error("Domain Shield refresh failed:", refreshErr);
+          refreshCachedShield().catch((refreshErr) => {
+            console.error("Domain Shield cache refresh failed:", refreshErr);
+          });
+        }, delayMs);
+      });
+      [30000, 60000].forEach((delayMs) => {
+        window.setTimeout(() => {
+          refreshDnsShield().catch((refreshErr) => {
+            console.error("Domain Shield DNS refresh failed:", refreshErr);
           });
         }, delayMs);
       });
@@ -312,8 +329,12 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
 
     } catch (err: any) {
       setAutoFixProgress("error");
-      const msg = err.message || (isFR ? "Échec de l'initialisation." : "Failed to initialize setup.");
+      const rawMsg = err.message || "";
+      const msg = rawMsg.includes("Authentication error") || rawMsg.includes("Cloudflare DNS update failed")
+        ? t("domain_shield.cloudflare_dns_permission_error")
+        : rawMsg || (isFR ? "Échec de l'initialisation." : "Failed to initialize setup.");
       setAutoFixErrorMsg(msg);
+      setSuccessNotification(null);
       setErrorNotification(msg);
       setTimeout(() => {
         setErrorNotification(null);
@@ -900,7 +921,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     className={`inline-flex h-10 w-full min-w-[13rem] items-center justify-center gap-2 rounded-lg border px-4 text-xs font-bold transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${
                       isAutoFixRunning
                         ? "border-primary/25 bg-primary-container text-on-primary-container cursor-wait"
-                        : "border-transparent bg-[#2e6bb5] text-white hover:bg-[#255da0]"
+                        : "border-transparent bg-[#2e6bb5] text-white hover:bg-[#255da0] cursor-pointer"
                     }`}
                   >
                     {isAutoFixRunning ? (
@@ -1248,51 +1269,53 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   </div>
                 </div>
               </div>
-              <div className="rounded-xl border border-border-subtle bg-surface-low/40 p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <BarChart3 className="h-4 w-4 text-primary" />
-                      <p className="text-xs font-bold text-on-surface">{t("domain_shield.report_title")}</p>
-                    </div>
-                    <p className="max-w-2xl text-[11px] leading-relaxed text-on-surface-variant">
-                      {hasSicurreDmarcReporting ? t("domain_shield.report_enabled_desc") : t("domain_shield.report_missing_desc")}
-                    </p>
+            </div>
+
+            {/* DMARC Aggregate Reports */}
+            <div className="bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-primary" />
+                    <p className="text-xs font-bold text-on-surface">{t("domain_shield.report_title")}</p>
                   </div>
-                  <span className={`w-fit rounded-full border px-2.5 py-0.5 text-[10px] font-extrabold ${hasSicurreDmarcReporting ? "border-safe/20 bg-safe/10 text-safe" : "border-warning/25 bg-warning/10 text-warning"}`}>
-                    {hasSicurreDmarcReporting ? t("domain_shield.report_enabled") : t("domain_shield.status_partial")}
-                  </span>
+                  <p className="max-w-2xl text-[11px] leading-relaxed text-on-surface-variant">
+                    {hasSicurreDmarcReporting ? t("domain_shield.report_enabled_desc") : t("domain_shield.report_missing_desc")}
+                  </p>
                 </div>
-                <div className="mt-4 grid gap-3 sm:grid-cols-4">
-                  {[
-                    { label: t("domain_shield.report_count"), value: dmarcReports?.report_count ?? 0 },
-                    { label: t("domain_shield.report_messages"), value: dmarcReports?.total_messages ?? 0 },
-                    { label: t("domain_shield.report_aligned"), value: dmarcReports?.aligned_messages ?? 0 },
-                    { label: t("domain_shield.report_failed"), value: dmarcReports?.failed_messages ?? 0 },
-                  ].map((metric) => (
-                    <div key={metric.label} className="rounded-lg border border-border-subtle bg-surface-lowest p-3">
-                      <p className="text-[10px] font-bold uppercase text-on-surface-variant">{metric.label}</p>
-                      <p className="mt-1 font-mono text-lg font-extrabold text-on-surface">{metric.value}</p>
+                <span className={`w-fit rounded-full border px-2.5 py-0.5 text-[10px] font-extrabold ${hasSicurreDmarcReporting ? "border-safe/20 bg-safe/10 text-safe" : "border-warning/25 bg-warning/10 text-warning"}`}>
+                  {hasSicurreDmarcReporting ? t("domain_shield.report_enabled") : t("domain_shield.status_partial")}
+                </span>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-4">
+                {[
+                  { label: t("domain_shield.report_count"), value: dmarcReports?.report_count ?? 0 },
+                  { label: t("domain_shield.report_messages"), value: dmarcReports?.total_messages ?? 0 },
+                  { label: t("domain_shield.report_aligned"), value: dmarcReports?.aligned_messages ?? 0 },
+                  { label: t("domain_shield.report_failed"), value: dmarcReports?.failed_messages ?? 0 },
+                ].map((metric) => (
+                  <div key={metric.label} className="rounded-lg border border-border-subtle bg-surface-lowest p-3">
+                    <p className="text-[10px] font-bold uppercase text-on-surface-variant">{metric.label}</p>
+                    <p className="mt-1 font-mono text-lg font-extrabold text-on-surface">{metric.value}</p>
+                  </div>
+                ))}
+              </div>
+              {dmarcReports?.top_sources?.length ? (
+                <div className="mt-3 divide-y divide-border-subtle overflow-hidden rounded-lg border border-border-subtle bg-surface-lowest">
+                  {dmarcReports.top_sources.map((source) => (
+                    <div key={source.source_ip} className="grid grid-cols-[1fr_auto] gap-3 px-3 py-2 text-[11px]">
+                      <span className="font-mono text-on-surface">{source.source_ip}</span>
+                      <span className="font-semibold text-on-surface-variant">
+                        {source.message_count} · DKIM {source.dkim_result} · SPF {source.spf_result}
+                      </span>
                     </div>
                   ))}
                 </div>
-                {dmarcReports?.top_sources?.length ? (
-                  <div className="mt-3 divide-y divide-border-subtle overflow-hidden rounded-lg border border-border-subtle bg-surface-lowest">
-                    {dmarcReports.top_sources.map((source) => (
-                      <div key={source.source_ip} className="grid grid-cols-[1fr_auto] gap-3 px-3 py-2 text-[11px]">
-                        <span className="font-mono text-on-surface">{source.source_ip}</span>
-                        <span className="font-semibold text-on-surface-variant">
-                          {source.message_count} · DKIM {source.dkim_result} · SPF {source.spf_result}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-3 text-[11px] font-semibold text-on-surface-variant">
-                    {t("domain_shield.report_empty")}
-                  </p>
-                )}
-              </div>
+              ) : (
+                <p className="mt-3 text-[11px] font-semibold text-on-surface-variant">
+                  {t("domain_shield.report_empty")}
+                </p>
+              )}
             </div>
           </div>
 

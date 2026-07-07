@@ -44,7 +44,7 @@ function KPIBlock({
     default: "border-border-subtle bg-white text-on-surface",
     primary: "border-primary/30 bg-primary/[0.02] text-primary shadow-sm",
     phishing: "border-error/30 bg-error/[0.02] text-error shadow-sm",
-    spam: "border-secondary/30 bg-secondary/[0.02] text-secondary shadow-sm",
+    spam: "border-warning/25 bg-warning-bg/70 text-warning shadow-sm",
     legitimate: "border-safe/30 bg-safe/[0.02] text-safe shadow-sm",
   };
 
@@ -52,7 +52,7 @@ function KPIBlock({
     default: "text-on-surface",
     primary: "text-primary",
     phishing: "text-error",
-    spam: "text-secondary",
+    spam: "text-warning",
     legitimate: "text-safe",
   };
 
@@ -295,7 +295,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
             </p>
             <div className="space-y-4">
               <DistributionRow label="Légitime" count={legitimateCount} total={Math.max(totalScans, 1)} colorClass="bg-safe" />
-              <DistributionRow label="Spam" count={spamCount} total={Math.max(totalScans, 1)} colorClass="bg-secondary" />
+              <DistributionRow label="Spam" count={spamCount} total={Math.max(totalScans, 1)} colorClass="bg-warning" />
               <DistributionRow label="Phishing" count={phishingCount} total={Math.max(totalScans, 1)} colorClass="bg-error" />
             </div>
           </div>
@@ -487,7 +487,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                 {/* Vertical gaps spacing expanded to distribute elements more evenly in space */}
                 <div className="space-y-7 pt-4 pb-2">
                   <DistributionRow label={t("threats.badge_legitimate")} count={legitimateCount} total={Math.max(totalScans, 1)} colorClass="bg-safe" />
-                  <DistributionRow label={t("threats.badge_spam")} count={spamCount} total={Math.max(totalScans, 1)} colorClass="bg-secondary" />
+                  <DistributionRow label={t("threats.badge_spam")} count={spamCount} total={Math.max(totalScans, 1)} colorClass="bg-warning" />
                   <DistributionRow label={t("threats.badge_phishing")} count={phishingCount} total={Math.max(totalScans, 1)} colorClass="bg-error" />
                 </div>
               </div>

@@ -193,7 +193,8 @@
     "report_messages": "Messages",
     "report_aligned": "Aligned",
     "report_failed": "Failures",
-    "report_empty": "No DMARC reports imported yet."
+    "report_empty": "No DMARC reports imported yet.",
+    "cloudflare_dns_permission_error": "The Cloudflare token can read the domain, but it is missing permission to edit DNS records."
   },
   "settings": {
     "title": "Sicurre Configuration",

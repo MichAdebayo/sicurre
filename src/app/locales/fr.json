@@ -193,7 +193,8 @@
     "report_messages": "Messages",
     "report_aligned": "Alignés",
     "report_failed": "Échecs",
-    "report_empty": "Aucun rapport DMARC importé pour le moment."
+    "report_empty": "Aucun rapport DMARC importé pour le moment.",
+    "cloudflare_dns_permission_error": "Le token Cloudflare peut lire le domaine, mais il n'a pas la permission de modifier les DNS."
   },
   "settings": {
     "title": "Configuration de Sicurre",
