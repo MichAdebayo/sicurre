@@ -7,12 +7,12 @@ import {
   X,
   Mail,
   Trash2,
-  CheckCircle2,
   AlertCircle,
   Eye,
   ShieldCheck,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
+import { AppToast } from "../components/common/app-toast";
 import {
   useQuarantineItems,
   useReleaseQuarantine,
@@ -146,6 +146,19 @@ export default function QuarantineRoute() {
       transition={{ duration: 0.3 }}
       className="space-y-8 animate-in fade-in duration-200"
     >
+      <AppToast
+        tone="success"
+        message={actionSuccess}
+        visible={!!actionSuccess}
+        onClose={() => setActionSuccess("")}
+      />
+      <AppToast
+        tone="error"
+        message={actionError}
+        visible={!!actionError}
+        onClose={() => setActionError("")}
+      />
+
       {/* Header */}
       <div className="pb-6 border-b border-border-subtle">
         <h1 className="app-h1 flex items-center gap-3">
@@ -160,19 +173,6 @@ export default function QuarantineRoute() {
           {t("quarantine.subtitle")}
         </p>
       </div>
-
-      {actionSuccess && (
-        <div className="p-3.5 bg-safe/10 border border-safe/25 text-safe text-xs font-semibold rounded-lg flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          <span>{actionSuccess}</span>
-        </div>
-      )}
-      {actionError && (
-        <div className="p-3.5 bg-error/10 border border-error/25 text-error text-xs font-semibold rounded-lg flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{actionError}</span>
-        </div>
-      )}
 
       {/* Grid container representing items as cards */}
       {isLoading ? (

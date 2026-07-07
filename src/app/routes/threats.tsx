@@ -17,6 +17,7 @@ import {
 } from "../lib/api";
 import { VerdictBadge } from "../components/threats/verdict-badge";
 import { Button } from "../components/ui/button";
+import { AppToast } from "../components/common/app-toast";
 
 const MotionDiv = motion.div as any;
 
@@ -291,6 +292,19 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
       transition={{ duration: 0.3 }}
       className="space-y-6 animate-in fade-in duration-200"
     >
+      <AppToast
+        tone="success"
+        message={actionSuccess}
+        visible={!!actionSuccess}
+        onClose={() => setActionSuccess("")}
+      />
+      <AppToast
+        tone="error"
+        message={actionError}
+        visible={!!actionError}
+        onClose={() => setActionError("")}
+      />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border-subtle">
         <div>
@@ -330,17 +344,6 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
           </button>
         </div>
       </div>
-
-      {actionSuccess && (
-        <div className="p-3 bg-safe/10 border border-safe/25 text-safe text-xs font-semibold rounded-lg">
-          {actionSuccess}
-        </div>
-      )}
-      {actionError && (
-        <div className="p-3 bg-error/10 border border-error/25 text-error text-xs font-semibold rounded-lg">
-          {actionError}
-        </div>
-      )}
 
       {/* Latency Analysis Card */}
       <div className="bg-white rounded-xl border border-border-subtle p-6 shadow-sm relative min-h-[320px]">

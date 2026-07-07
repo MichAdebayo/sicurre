@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   ShieldCheck,
   ShieldAlert,
@@ -21,7 +21,6 @@ import {
   HelpCircle,
   FileCheck,
   BarChart3,
-  CheckCircle2,
   Lock as LockIcon,
   Server,
   Activity,
@@ -40,6 +39,7 @@ import {
   useCloudflareStatus,
   AuthSession,
 } from "../lib/api";
+import { AppToast } from "../components/common/app-toast";
 
 const MotionDiv = motion.div as any;
 
@@ -351,32 +351,18 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
 
   return (
     <>
-      <AnimatePresence>
-        {successNotification && (
-          <motion.div
-            initial={{ opacity: 0, y: -50, x: "-50%" }}
-            animate={{ opacity: 1, y: 0, x: "-50%" }}
-            exit={{ opacity: 0, y: -50, x: "-50%" }}
-            transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
-            className="fixed top-6 left-1/2 z-[9999] flex items-center gap-2.5 px-4 py-3 bg-safe-bg border border-safe/25 text-safe font-bold text-xs rounded-lg shadow-lg max-w-sm w-[90%] sm:w-auto"
-          >
-            <CheckCircle2 className="w-4.5 h-4.5 shrink-0 text-safe" />
-            <span className="flex-1 text-left">{successNotification}</span>
-          </motion.div>
-        )}
-        {errorNotification && (
-          <motion.div
-            initial={{ opacity: 0, y: -50, x: "-50%" }}
-            animate={{ opacity: 1, y: 0, x: "-50%" }}
-            exit={{ opacity: 0, y: -50, x: "-50%" }}
-            transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
-            className="fixed top-6 left-1/2 z-[9999] flex items-center gap-2.5 px-4 py-3 bg-error-container border border-error/25 text-on-error-container font-bold text-xs rounded-lg shadow-lg max-w-sm w-[90%] sm:w-auto"
-          >
-            <ShieldAlert className="w-4.5 h-4.5 shrink-0 text-error" />
-            <span className="flex-1 text-left">{errorNotification}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <AppToast
+        tone="success"
+        message={successNotification || ""}
+        visible={!!successNotification}
+        onClose={() => setSuccessNotification(null)}
+      />
+      <AppToast
+        tone="error"
+        message={errorNotification || ""}
+        visible={!!errorNotification}
+        onClose={() => setErrorNotification(null)}
+      />
 
       <MotionDiv
         initial={{ opacity: 0, y: 12 }}

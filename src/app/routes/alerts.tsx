@@ -10,11 +10,12 @@ import {
   Moon,
   History,
   AlertCircle,
-  Inbox,
-  Globe,
+  AlertTriangle,
+  XCircle,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { AppToast, type AppToastTone } from "../components/common/app-toast";
 import {
   useAlertPreferences,
   useUpdateAlertPreferences,
@@ -26,6 +27,34 @@ import {
 } from "../lib/api";
 
 const MotionDiv = motion.div as any;
+
+function getHistoryTone(title: string, message: string): AppToastTone {
+  const text = `${title} ${message}`.toLowerCase();
+  if (text.includes("échec") || text.includes("erreur") || text.includes("failed") || text.includes("error")) {
+    return "error";
+  }
+  if (text.includes("dmarc") || text.includes("expire") || text.includes("partiel") || text.includes("warning")) {
+    return "warning";
+  }
+  if (text.includes("appliqu") || text.includes("synchronis") || text.includes("reçu") || text.includes("saved") || text.includes("success")) {
+    return "success";
+  }
+  return "info";
+}
+
+function HistoryIcon({ tone }: { tone: AppToastTone }) {
+  if (tone === "success") return <CheckCircle2 className="w-4 h-4 text-safe shrink-0" />;
+  if (tone === "warning") return <AlertTriangle className="w-4 h-4 text-warning shrink-0" />;
+  if (tone === "error") return <XCircle className="w-4 h-4 text-error shrink-0" />;
+  return <Bell className="w-4 h-4 text-primary shrink-0" />;
+}
+
+function historyToneClass(tone: AppToastTone) {
+  if (tone === "success") return "border-safe/20 bg-safe-bg/80";
+  if (tone === "warning") return "border-warning/25 bg-warning-bg/80";
+  if (tone === "error") return "border-error/20 bg-error-container/35";
+  return "border-primary/15 bg-primary-fixed/50";
+}
 
 export default function AlertsRoute() {
   const { t, i18n } = useTranslation();
@@ -136,6 +165,22 @@ export default function AlertsRoute() {
       transition={{ duration: 0.3 }}
       className="space-y-8"
     >
+      <AppToast
+        tone="success"
+        message={prefsSuccess ? t("alerts.preferences_saved") : ""}
+        visible={prefsSuccess}
+        onClose={() => setPrefsSuccess(false)}
+      />
+      <AppToast
+        tone="error"
+        message={prefsError || ruleError}
+        visible={!!(prefsError || ruleError)}
+        onClose={() => {
+          setPrefsError("");
+          setRuleError("");
+        }}
+      />
+
       {/* Header */}
       <div className="pb-6 border-b border-border-subtle flex items-center justify-between">
         <div>
@@ -259,14 +304,6 @@ export default function AlertsRoute() {
               </div>
             </div>
 
-            {prefsSuccess && (
-              <div className="p-3 bg-safe/10 border border-safe/25 text-safe text-xs font-semibold rounded-lg flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4" />
-                <span>{t("alerts.preferences_saved")}</span>
-              </div>
-            )}
-            {prefsError && <p className="text-xs text-error font-semibold">{prefsError}</p>}
-
             <div className="flex justify-end pt-2">
               <Button type="submit" className="text-xs font-bold tracking-wide">
                 {t("alerts.save_preferences")}
@@ -315,8 +352,6 @@ export default function AlertsRoute() {
                 </Button>
               </div>
             </form>
-            {ruleError && <p className="text-xs text-error font-semibold px-2">{ruleError}</p>}
-
             <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
               {rulesLoading ? (
                 <div className="h-16 bg-surface-low rounded-xl animate-pulse" />
@@ -385,29 +420,32 @@ export default function AlertsRoute() {
             </div>
           ) : (
             <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
-              {history.map((alert) => (
-                <div
-                  key={alert.id}
-                  className="p-4 rounded-xl border border-border-subtle/80 bg-surface-low/30 hover:bg-surface-low/60 transition-colors flex items-start justify-between gap-3"
-                >
-                  <div className="space-y-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <AlertCircle className="w-3.5 h-3.5 text-error shrink-0" />
-                      <span className="font-mono text-[10px] text-on-surface-variant/60">
-                        {new Date(alert.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                    </div>
-                    <p className="text-xs font-bold text-on-surface truncate">{alert.title}</p>
-                    <p className="text-[11px] text-on-surface-variant/70 leading-relaxed">{alert.message}</p>
-                  </div>
-                  <button
-                    onClick={() => handleDismissAlert(alert.id)}
-                    className="text-[10px] font-bold text-primary hover:text-primary-hover px-2 py-1 rounded bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer shrink-0"
+              {history.map((alert) => {
+                const tone = getHistoryTone(alert.title, alert.message);
+                return (
+                  <div
+                    key={alert.id}
+                    className={`p-4 rounded-xl border transition-colors flex items-start justify-between gap-3 ${historyToneClass(tone)}`}
                   >
-                    {t("alerts.dismiss_alert")}
-                  </button>
-                </div>
-              ))}
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <HistoryIcon tone={tone} />
+                        <span className="font-mono text-[11px] text-on-surface-variant/75">
+                          {new Date(alert.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </div>
+                      <p className="text-sm font-bold text-on-surface truncate">{alert.title}</p>
+                      <p className="text-[13px] text-on-surface-variant leading-relaxed">{alert.message}</p>
+                    </div>
+                    <button
+                      onClick={() => handleDismissAlert(alert.id)}
+                      className="text-[12px] font-bold text-primary hover:text-primary-hover px-2 py-1 rounded bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer shrink-0"
+                    >
+                      {t("alerts.dismiss_alert")}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

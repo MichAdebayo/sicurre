@@ -29,6 +29,21 @@ import {
 
 const MotionDiv = motion.div as any;
 
+function formatCloudflareError(message?: string | null): string {
+  if (!message) return "Erreur inconnue.";
+  const lower = message.toLowerCase();
+  if (lower.includes("authentication error") || lower.includes("dns update failed")) {
+    return "Le token Cloudflare peut lire le domaine, mais il ne peut pas modifier les DNS. Ajoutez la permission DNS:Edit sur la zone puis réessayez.";
+  }
+  if (lower.includes("zone") && lower.includes("not found")) {
+    return "Le domaine est introuvable sur ce compte Cloudflare ou le token n'a pas accès à cette zone.";
+  }
+  if (lower.includes("token") && (lower.includes("failed") || lower.includes("invalid"))) {
+    return "Le token Cloudflare est invalide ou expiré. Créez un nouveau token puis réessayez.";
+  }
+  return message;
+}
+
 // ── Status badge ─────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
@@ -115,7 +130,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
           onSuccess?.();
         }, 1500);
       } else if (cfStatus?.status === "error") {
-        setStages(prev => prev.map(s => s.id === "routing" ? { ...s, status: "error", errorMsg: cfStatus.error_message || "Échec de la configuration finale." } : s));
+        setStages(prev => prev.map(s => s.id === "routing" ? { ...s, status: "error", errorMsg: formatCloudflareError(cfStatus.error_message || "Échec de la configuration finale.") } : s));
       }
     }
     return () => {
@@ -151,7 +166,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
       });
 
       if (!result.valid) {
-        setStages(prev => prev.map(s => s.id === "verify" ? { ...s, status: "error", errorMsg: result.error || "Token ou domaine invalide." } : s));
+        setStages(prev => prev.map(s => s.id === "verify" ? { ...s, status: "error", errorMsg: formatCloudflareError(result.error || "Token ou domaine invalide.") } : s));
         return;
       }
 
@@ -183,7 +198,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
     } catch (err: any) {
       setStages(prev => prev.map(s => {
         if (s.status === "loading") {
-          return { ...s, status: "error", errorMsg: err.message || "Une erreur est survenue lors de cette étape." };
+          return { ...s, status: "error", errorMsg: formatCloudflareError(err.message || "Une erreur est survenue lors de cette étape.") };
         }
         return s;
       }));
@@ -271,7 +286,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
                     {stage.description}
                   </p>
                   {stage.status === "error" && stage.errorMsg && (
-                    <p className="text-[11px] font-semibold text-error bg-error/[0.04] border border-error/10 rounded px-2.5 py-1.5 mt-2.5 max-w-xl font-mono break-all">
+                    <p className="mt-2.5 max-w-xl rounded border border-error/15 bg-error-container/40 px-3 py-2 text-[13px] font-semibold leading-5 text-on-error-container">
                       {stage.errorMsg}
                     </p>
                   )}
@@ -437,10 +452,10 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
           <AlertTriangle className="w-5 h-5 text-error shrink-0 mt-0.5" />
           <div>
             <p className="font-bold text-sm text-error mb-1">Échec du provisionnement</p>
-            <p className="text-xs text-error/80 font-mono break-all">{intStatus.error_message || "Erreur inconnue"}</p>
+            <p className="text-[13px] leading-5 text-on-error-container">{formatCloudflareError(intStatus.error_message)}</p>
           </div>
         </div>
-        <p className="text-xs text-on-surface-variant">Vérifiez le token et les permissions, puis réessayez.</p>
+        <p className="text-[13px] text-on-surface-variant">Vérifiez le token et les permissions, puis réessayez.</p>
         <Button
           variant="outline"
           size="sm"

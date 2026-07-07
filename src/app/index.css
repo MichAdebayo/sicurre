@@ -199,8 +199,8 @@
 
   .text-label-caps {
     font-family: var(--font-sans);
-    font-size: 12px;
-    line-height: 16px;
+    font-size: 13px;
+    line-height: 18px;
     letter-spacing: 0.05em;
     font-weight: 600;
   }
@@ -257,19 +257,19 @@
 
   .app-body-sub {
     font-family: var(--font-sans);
-    font-size: 12px;
-    line-height: 18px;
+    font-size: 13px;
+    line-height: 20px;
     font-weight: 500;
     color: var(--color-on-surface-variant);
   }
 
   .app-label-tiny {
     font-family: var(--font-sans);
-    font-size: 10px;
-    line-height: 14px;
+    font-size: 12px;
+    line-height: 16px;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.05em;
     color: var(--color-on-surface-variant);
   }
 
