@@ -1,10 +1,14 @@
 import asyncio
+import gzip
+import io
 import os
 import sqlite3
 import subprocess
+import zipfile
 from contextlib import suppress
 import uuid
 from datetime import datetime, timezone, timedelta
+import xml.etree.ElementTree as ET
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -38,6 +42,80 @@ class FeedbackCreate(BaseModel):
         pattern="^(phishing|spam|legitimate|quarantine)$",
     )
     reporter_note: str | None = Field(default=None, max_length=500)
+
+
+def _ensure_app_runtime_tables() -> None:
+    from data_platform.api.auth import ensure_runtime_tables
+
+    ensure_runtime_tables()
+
+
+def _extract_dmarc_xml_payload(payload: bytes) -> bytes:
+    if payload.startswith(b"\x1f\x8b"):
+        return gzip.decompress(payload)
+    if payload.startswith(b"PK"):
+        with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+            for name in archive.namelist():
+                if name.lower().endswith(".xml"):
+                    return archive.read(name)
+        raise HTTPException(status_code=400, detail="ZIP archive does not contain a DMARC XML file")
+    return payload
+
+
+def _text_or_none(node: ET.Element | None, path: str) -> str | None:
+    if node is None:
+        return None
+    found = node.find(path)
+    if found is None or found.text is None:
+        return None
+    return found.text.strip()
+
+
+def _epoch_to_iso(value: str | None) -> str | None:
+    if not value:
+        return None
+    with suppress(Exception):
+        return datetime.fromtimestamp(int(value), timezone.utc).isoformat()
+    return None
+
+
+def _parse_dmarc_report(xml_bytes: bytes, domain: str) -> list[dict]:
+    try:
+        root = ET.fromstring(xml_bytes)
+    except ET.ParseError as exc:
+        raise HTTPException(status_code=400, detail="Invalid DMARC XML report") from exc
+
+    metadata = root.find("report_metadata")
+    policy = root.find("policy_published")
+    header_domain = (_text_or_none(policy, "domain") or domain).lower()
+    if header_domain != domain.lower():
+        raise HTTPException(status_code=400, detail="DMARC report domain does not match selected domain")
+
+    report_org = _text_or_none(metadata, "org_name")
+    report_id = _text_or_none(metadata, "report_id")
+    period = metadata.find("date_range") if metadata is not None else None
+    period_begin = _epoch_to_iso(_text_or_none(period, "begin"))
+    period_end = _epoch_to_iso(_text_or_none(period, "end"))
+
+    parsed = []
+    for record in root.findall("record"):
+        row = record.find("row")
+        policy_evaluated = row.find("policy_evaluated") if row is not None else None
+        identifiers = record.find("identifiers")
+        auth_results = record.find("auth_results")
+        parsed.append({
+            "report_org": report_org,
+            "report_id": report_id,
+            "period_begin": period_begin,
+            "period_end": period_end,
+            "source_ip": _text_or_none(row, "source_ip") or "unknown",
+            "message_count": int(_text_or_none(row, "count") or "0"),
+            "disposition": _text_or_none(policy_evaluated, "disposition") or "none",
+            "dkim_result": _text_or_none(auth_results.find("dkim") if auth_results is not None else None, "result") or "unknown",
+            "spf_result": _text_or_none(auth_results.find("spf") if auth_results is not None else None, "result") or "unknown",
+            "header_from": _text_or_none(identifiers, "header_from") or domain,
+        })
+    return parsed
 
 
 async def _workspace_threat_count(workspace_id: str) -> int:
@@ -865,7 +943,7 @@ async def list_cloudflare_integrations(current_user: AuthUser = Depends(get_curr
                 "worker_name": r["worker_name"],
                 "status": r["status"],
                 "api_token": r.get("api_token"),
-                "error_message": r.get("error_message"),
+                "error_message": r.get("error_message") if r["status"] == "error" else None,
                 "created_at": r["created_at"],
                 "updated_at": r["updated_at"],
             }
@@ -935,8 +1013,8 @@ async def check_domain_shield_status(
     # Try fetching from DB cache first
     if not refresh:
         cached_rows = await async_query_auth_db(
-            "SELECT * FROM app_domain_shield_status WHERE domain = ? LIMIT 1",
-            (domain,)
+            "SELECT * FROM app_domain_shield_status WHERE domain = ? AND workspace_id = ? LIMIT 1",
+            (domain, current_user.workspace_id)
         )
         if cached_rows:
             row = cached_rows[0]
@@ -959,7 +1037,13 @@ async def check_domain_shield_status(
             return {
                 "spf": {"valid": bool(row["spf_valid"]), "record": row["spf_record"], "error": None if row["spf_valid"] else "Not configured"},
                 "dkim": {"valid": bool(row["dkim_valid"]), "record": row["dkim_record"], "error": None if row["dkim_valid"] else "Not configured"},
-                "dmarc": {"valid": bool(row["dmarc_valid"]), "record": row["dmarc_record"], "policy": row["dmarc_policy"] or "none", "error": None if row["dmarc_valid"] else "Not configured"},
+                "dmarc": {
+                    "valid": bool(row["dmarc_valid"]),
+                    "record": row["dmarc_record"],
+                    "policy": row["dmarc_policy"] or "none",
+                    "reporting_enabled": "dmarc@sicurre.com" in (row["dmarc_record"] or ""),
+                    "error": None if row["dmarc_valid"] else "Not configured",
+                },
                 "ssl": {"valid": bool(row["ssl_valid"]), "days_remaining": int(row["ssl_days_remaining"]), "auto_renew": True, "error": None},
                 "reputation_score": score,
                 "score_grade": grade,
@@ -967,14 +1051,15 @@ async def check_domain_shield_status(
                     "listed": len(blacklists_listed) > 0,
                     "matched": blacklists_listed,
                     "error": None
-                }
+                },
+                "updated_at": row["updated_at"],
             }
 
     import dns.resolver
     status = {
         "spf": {"valid": False, "record": None, "error": "Not configured"},
         "dkim": {"valid": False, "record": None, "error": "Not configured"},
-        "dmarc": {"valid": False, "record": None, "policy": "none", "error": "Not configured"},
+        "dmarc": {"valid": False, "record": None, "policy": "none", "reporting_enabled": False, "error": "Not configured"},
         "ssl": {"valid": False, "days_remaining": 0, "auto_renew": False, "error": "Not configured"},
         "reputation_score": 100,
         "score_grade": "A",
@@ -1061,16 +1146,15 @@ async def check_domain_shield_status(
                 status["dmarc"]["record"] = txt
                 status["dmarc"]["error"] = None
                 
-                # Check for partial setup (missing report feeding address)
-                if "dmarc@sicurre.com" not in txt:
-                    status["reputation_score"] -= 10
-                
                 if "p=reject" in txt:
                     status["dmarc"]["policy"] = "reject"
                 elif "p=quarantine" in txt:
                     status["dmarc"]["policy"] = "quarantine"
                 else:
                     status["dmarc"]["policy"] = "none"
+                    status["reputation_score"] -= 10
+                status["dmarc"]["reporting_enabled"] = "dmarc@sicurre.com" in txt
+                if not status["dmarc"]["reporting_enabled"]:
                     status["reputation_score"] -= 10
                 break
     except Exception as e:
@@ -1209,5 +1293,98 @@ async def check_domain_shield_status(
             now_str
         )
     )
-        
+    status["updated_at"] = now_str
     return status
+
+
+@router.get("/v1/domain-shield/{domain}/dmarc-reports")
+async def get_dmarc_report_summary(
+    domain: str,
+    current_user: AuthUser = Depends(get_current_user),
+):
+    _ensure_app_runtime_tables()
+    rows = await async_query_auth_db(
+        """
+        SELECT
+            COALESCE(SUM(message_count), 0) AS total_messages,
+            COALESCE(SUM(CASE WHEN dkim_result = 'pass' OR spf_result = 'pass' THEN message_count ELSE 0 END), 0) AS aligned_messages,
+            COALESCE(SUM(CASE WHEN dkim_result != 'pass' AND spf_result != 'pass' THEN message_count ELSE 0 END), 0) AS failed_messages,
+            COUNT(DISTINCT report_id) AS report_count,
+            MAX(created_at) AS last_report_at
+        FROM app_dmarc_report_summary
+        WHERE workspace_id = ? AND domain = ?
+        """,
+        (current_user.workspace_id, domain),
+    )
+    top_sources = await async_query_auth_db(
+        """
+        SELECT source_ip, SUM(message_count) AS message_count,
+               MAX(disposition) AS disposition,
+               MAX(dkim_result) AS dkim_result,
+               MAX(spf_result) AS spf_result
+        FROM app_dmarc_report_summary
+        WHERE workspace_id = ? AND domain = ?
+        GROUP BY source_ip
+        ORDER BY message_count DESC
+        LIMIT 5
+        """,
+        (current_user.workspace_id, domain),
+    )
+    summary = rows[0] if rows else {}
+    return {
+        "domain": domain,
+        "total_messages": int(summary.get("total_messages") or 0),
+        "aligned_messages": int(summary.get("aligned_messages") or 0),
+        "failed_messages": int(summary.get("failed_messages") or 0),
+        "report_count": int(summary.get("report_count") or 0),
+        "last_report_at": summary.get("last_report_at"),
+        "top_sources": [
+            {
+                "source_ip": row["source_ip"],
+                "message_count": int(row["message_count"] or 0),
+                "disposition": row["disposition"],
+                "dkim_result": row["dkim_result"],
+                "spf_result": row["spf_result"],
+            }
+            for row in top_sources
+        ],
+    }
+
+
+@router.post("/v1/domain-shield/{domain}/dmarc-reports/import")
+async def import_dmarc_report(
+    domain: str,
+    request: Request,
+    current_user: AuthUser = Depends(get_current_user),
+):
+    _ensure_app_runtime_tables()
+    xml_payload = _extract_dmarc_xml_payload(await request.body())
+    records = _parse_dmarc_report(xml_payload, domain)
+    now = datetime.now(timezone.utc).isoformat()
+    for record in records:
+        await async_query_auth_db(
+            """
+            INSERT INTO app_dmarc_report_summary (
+                id, workspace_id, domain, report_org, report_id, period_begin, period_end,
+                source_ip, message_count, disposition, dkim_result, spf_result,
+                header_from, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(uuid.uuid4()),
+                current_user.workspace_id,
+                domain,
+                record["report_org"],
+                record["report_id"],
+                record["period_begin"],
+                record["period_end"],
+                record["source_ip"],
+                record["message_count"],
+                record["disposition"],
+                record["dkim_result"],
+                record["spf_result"],
+                record["header_from"],
+                now,
+            ),
+        )
+    return {"status": "imported", "record_count": len(records)}

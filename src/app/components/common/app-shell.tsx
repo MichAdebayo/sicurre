@@ -14,6 +14,7 @@ interface AppShellProps {
   userName?: string;
   userEmail?: string;
   userRole?: string;
+  onboardingRequired?: boolean;
 }
 
 export function AppShell({
@@ -27,6 +28,7 @@ export function AppShell({
   userName,
   userEmail,
   userRole,
+  onboardingRequired = false,
 }: AppShellProps) {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-on-surface">
@@ -39,6 +41,7 @@ export function AppShell({
         userName={userName}
         userEmail={userEmail}
         userRole={userRole}
+        onboardingRequired={onboardingRequired}
       />
 
       {/* Main Content Area */}
@@ -52,7 +55,12 @@ export function AppShell({
         <div className="w-full flex-1 flex flex-col min-h-0 overflow-hidden">
           {/* Top Bar */}
           <div className="px-8">
-            <TopBar userName={userName} userRole={userRole} onPageChange={onPageChange} />
+            <TopBar
+              userName={userName}
+              userRole={userRole}
+              onboardingRequired={onboardingRequired}
+              onPageChange={onPageChange}
+            />
           </div>
 
           {/* Page Content */}

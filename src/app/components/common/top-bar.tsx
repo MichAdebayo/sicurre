@@ -7,6 +7,7 @@ import {
   Globe,
   Inbox,
   ArrowRight,
+  CheckCircle2,
 } from "lucide-react";
 import { SidebarPage } from "./sidebar";
 import {
@@ -14,17 +15,20 @@ import {
   useCloudflareList,
   useDomainShieldStatus,
   useQuarantineItems,
+  useAlertHistory,
 } from "../../lib/api";
 
 interface TopBarProps {
   userName?: string;
   userRole?: string;
+  onboardingRequired?: boolean;
   onPageChange?: (page: SidebarPage) => void;
 }
 
 export function TopBar({
   userName = "SA",
   userRole = "owner",
+  onboardingRequired = false,
   onPageChange,
 }: TopBarProps) {
   const { t, i18n } = useTranslation();
@@ -49,13 +53,13 @@ export function TopBar({
   }, [readIds]);
 
   const timeSince = (dateStr: string) => {
-    if (!dateStr) return i18n.language === "fr" ? "à l'instant" : "just now";
+    if (!dateStr) return i18n.language === "fr" ? "maintenant" : "now";
     const now = new Date();
     const diff = now.getTime() - new Date(dateStr).getTime();
-    if (isNaN(diff) || diff < 0) return i18n.language === "fr" ? "à l'instant" : "just now";
+    if (isNaN(diff) || diff < 0) return i18n.language === "fr" ? "maintenant" : "now";
     
     const mins = Math.floor(diff / 60000);
-    if (mins < 1) return i18n.language === "fr" ? "à l'instant" : "just now";
+    if (mins < 1) return i18n.language === "fr" ? "< 1 min" : "< 1m";
     if (mins < 60) return i18n.language === "fr" ? `il y a ${mins} min` : `${mins}m ago`;
     const hours = Math.floor(mins / 60);
     if (hours < 24) return i18n.language === "fr" ? `il y a ${hours} h` : `${hours}h ago`;
@@ -66,6 +70,7 @@ export function TopBar({
   const { data: threats } = useThreatLogs();
   const { data: domains } = useCloudflareList();
   const { data: quarantineItems } = useQuarantineItems();
+  const { data: alertHistory } = useAlertHistory();
 
   const activeDomain = domains && domains.length > 0
     ? (domains.find((d) => d.status === "active")?.zone_name || domains[0].zone_name)
@@ -93,9 +98,38 @@ export function TopBar({
     unread: boolean;
   }[] = [];
 
+  if (onboardingRequired && userRole !== "admin") {
+    notificationsList.push({
+      id: "onboarding_cloudflare_required",
+      title: i18n.language === "fr" ? "Connectez Cloudflare" : "Connect Cloudflare",
+      desc: i18n.language === "fr"
+        ? "Ajoutez votre token pour activer le routage email."
+        : "Add your token to enable email routing.",
+      time: i18n.language === "fr" ? "maintenant" : "now",
+      badge: "Setup",
+      category: "Domain" as const,
+      page: "settings" as const,
+      unread: true,
+    });
+  }
+
+  const recentAlertHistory = !onboardingRequired
+    ? (alertHistory || []).slice(0, 3).map((alert) => ({
+        id: `alert_history_${alert.id}`,
+        title: alert.title,
+        desc: alert.message,
+        time: timeSince(alert.created_at),
+        badge: i18n.language === "fr" ? "Alertes" : "Alerts",
+        category: "System" as const,
+        page: "alerts" as const,
+        unread: true,
+      }))
+    : [];
+  notificationsList.push(...recentAlertHistory);
+
   // 1. Phishing alerts
   const activePhishing = threats?.filter(t => t.verdict === "phishing" && t.status === "active") || [];
-  if (activePhishing.length > 0) {
+  if (!onboardingRequired && activePhishing.length > 0) {
     const latest = activePhishing[0];
     notificationsList.push({
       id: "phish_blocked_" + latest.id,
@@ -110,14 +144,14 @@ export function TopBar({
   }
 
   // 2. SSL Expiry Alert
-  if (shieldStatus && shieldStatus.ssl.valid && shieldStatus.ssl.days_remaining < 30) {
+  if (!onboardingRequired && shieldStatus && shieldStatus.ssl.valid && shieldStatus.ssl.days_remaining < 30) {
     notificationsList.push({
       id: "ssl_expiring",
       title: i18n.language === "fr" ? "Certificat SSL expirant bientôt" : "SSL certificate expiring soon",
       desc: i18n.language === "fr"
         ? `${activeDomain} expire dans ${shieldStatus.ssl.days_remaining} jours`
         : `${activeDomain} certificate expires in ${shieldStatus.ssl.days_remaining} days`,
-      time: i18n.language === "fr" ? "il y a 13 h" : "13h ago",
+      time: shieldStatus.updated_at ? timeSince(shieldStatus.updated_at) : "",
       badge: "Domain shield",
       category: "Domain" as const,
       page: "domain-shield" as const,
@@ -126,14 +160,14 @@ export function TopBar({
   }
 
   // 3. DMARC policy warning
-  if (shieldStatus && (!shieldStatus.dmarc.valid || shieldStatus.dmarc.policy === "none")) {
+  if (!onboardingRequired && shieldStatus && (!shieldStatus.dmarc.valid || shieldStatus.dmarc.policy === "none")) {
     notificationsList.push({
       id: "dmarc_none",
       title: i18n.language === "fr" ? 'Politique DMARC définie sur "none"' : 'DMARC policy is set to "none"',
       desc: i18n.language === "fr"
         ? `@${activeDomain} peut être usurpé. Modifiez la politique.`
         : `@${activeDomain} can be spoofed. Change the policy.`,
-      time: i18n.language === "fr" ? "hier" : "yesterday",
+      time: shieldStatus.updated_at ? timeSince(shieldStatus.updated_at) : "",
       badge: "Domain shield",
       category: "Domain" as const,
       page: "domain-shield" as const,
@@ -142,7 +176,7 @@ export function TopBar({
   }
 
   // 4. Quarantine waiting emails
-  if (quarantineItems && quarantineItems.length > 0) {
+  if (!onboardingRequired && quarantineItems && quarantineItems.length > 0) {
     notificationsList.push({
       id: "quarantine_held",
       title: i18n.language === "fr" ? `${quarantineItems.length} emails en quarantaine` : `${quarantineItems.length} emails waiting in quarantine`,
@@ -154,22 +188,6 @@ export function TopBar({
       category: "System" as const,
       page: "quarantine" as const,
       unread: true,
-    });
-  }
-
-  // 5. Generic system notification fallback
-  if (notificationsList.length === 0) {
-    notificationsList.push({
-      id: "system_ok",
-      title: i18n.language === "fr" ? "Périmètre protégé" : "All perimeters protected",
-      desc: i18n.language === "fr"
-        ? "Aucune menace active et configuration domaine stable."
-        : "No active threats, SSL and domain settings are stable.",
-      time: i18n.language === "fr" ? "à l'instant" : "just now",
-      badge: "System",
-      category: "System" as const,
-      page: "dashboard" as const,
-      unread: false,
     });
   }
 
@@ -195,6 +213,12 @@ export function TopBar({
     } else if (badge === "Quarantine") {
       bg = "bg-primary/10";
       icon = <Inbox className="w-4 h-4 text-primary" />;
+    } else if (badge === "Setup") {
+      bg = "bg-primary/10";
+      icon = <Globe className="w-4 h-4 text-primary" />;
+    } else if (badge === "Alertes" || badge === "Alerts") {
+      bg = "bg-primary/10";
+      icon = <Bell className="w-4 h-4 text-primary" />;
     } else {
       bg = "bg-surface-low";
       icon = <Cpu className="w-4 h-4 text-on-surface-variant" />;
@@ -209,6 +233,8 @@ export function TopBar({
   const getBadgeStyle = (badge: string) => {
     if (badge === "Threat log") return "bg-error/10 text-error border border-error/20";
     if (badge === "Domain shield") return "bg-amber-500/10 text-amber-700 border border-amber-500/20";
+    if (badge === "Setup") return "bg-primary/10 text-primary border border-primary/20";
+    if (badge === "Alertes" || badge === "Alerts") return "bg-primary/10 text-primary border border-primary/20";
     return "bg-primary/10 text-primary border border-primary/20";
   };
 
@@ -241,7 +267,7 @@ export function TopBar({
             e.stopPropagation();
             setIsOpen(!isOpen);
           }}
-          className="relative rounded-lg border border-border-subtle bg-surface-lowest/80 p-2 text-on-surface-variant transition-[background-color,border-color,transform] duration-200 hover:border-primary/35 hover:bg-primary-fixed hover:text-on-surface active:scale-[0.98] dark:bg-surface-low"
+          className="relative rounded-lg border border-border-subtle bg-surface-lowest/80 p-2 text-on-surface-variant transition-[background-color,border-color,transform] duration-200 hover:border-primary/35 hover:bg-primary-fixed hover:text-primary active:scale-[0.98] dark:bg-surface-low dark:hover:bg-primary-container dark:hover:text-on-primary-container"
           aria-label={i18n.language === "fr" ? "Ouvrir les notifications" : "Open notifications"}
         >
           <Bell className="w-[22px] h-[22px] stroke-[1.5]" />
@@ -277,8 +303,14 @@ export function TopBar({
             {/* Notification items list */}
             <div className="space-y-1.5 max-h-[340px] overflow-y-auto pt-3 select-none pr-1">
               {cappedNotifs.length === 0 ? (
-                <div className="text-center py-8 text-xs text-on-surface-variant">
-                  {i18n.language === "fr" ? "Aucune notification" : "No notifications available"}
+                <div className="py-8 text-center">
+                  <CheckCircle2 className="mx-auto mb-2 h-7 w-7 text-safe/60" />
+                  <p className="text-xs font-semibold text-on-surface">
+                    {i18n.language === "fr" ? "Aucune alerte active" : "No active alerts"}
+                  </p>
+                  <p className="mt-1 text-[11px] text-on-surface-variant">
+                    {i18n.language === "fr" ? "Les nouvelles alertes apparaîtront ici." : "New alerts will appear here."}
+                  </p>
                 </div>
               ) : (
                 cappedNotifs.map((notif) => {
@@ -330,12 +362,16 @@ export function TopBar({
             <div className="pt-3 mt-2 border-t border-border-subtle flex justify-center">
               <button
                 onClick={() => {
-                  if (onPageChange) onPageChange("alerts");
+                  if (onPageChange) onPageChange(onboardingRequired ? "settings" : "alerts");
                   setIsOpen(false);
                 }}
                 className="text-xs font-bold text-primary hover:text-navy-dark hover:underline cursor-pointer flex items-center gap-1.5 py-1"
               >
-                <span>{i18n.language === "fr" ? "Voir toutes les alertes" : "View all alerts"}</span>
+                <span>
+                  {onboardingRequired
+                    ? i18n.language === "fr" ? "Ouvrir la configuration" : "Open setup"
+                    : i18n.language === "fr" ? "Voir toutes les alertes" : "View all alerts"}
+                </span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>

@@ -377,6 +377,10 @@ export function useSetupCloudflare() {
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cf-integration"] });
+      queryClient.invalidateQueries({ queryKey: ["auth-session"] });
+      queryClient.invalidateQueries({ queryKey: ["cloudflare-list"] });
+      queryClient.invalidateQueries({ queryKey: ["cf-workspace-token"] });
+      queryClient.invalidateQueries({ queryKey: ["domain-shield"] });
     },
   });
 }
@@ -391,6 +395,7 @@ export function useTeardownCloudflare() {
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cf-integration"] });
+      queryClient.invalidateQueries({ queryKey: ["auth-session"] });
       queryClient.invalidateQueries({ queryKey: ["cloudflare-list"] });
       queryClient.invalidateQueries({ queryKey: ["cf-workspace-token"] });
       queryClient.invalidateQueries({ queryKey: ["domain-shield"] });
@@ -428,6 +433,7 @@ export function useDeleteWorkspaceCloudflareToken() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cf-workspace-token"] });
       queryClient.invalidateQueries({ queryKey: ["cf-integration"] });
+      queryClient.invalidateQueries({ queryKey: ["auth-session"] });
       queryClient.invalidateQueries({ queryKey: ["cloudflare-list"] });
       queryClient.invalidateQueries({ queryKey: ["domain-shield"] });
     },
@@ -631,11 +637,28 @@ export function useCloudflareList() {
 export interface DomainShieldStatus {
   spf: { valid: boolean; record: string | null; error: string | null };
   dkim: { valid: boolean; record: string | null; error: string | null };
-  dmarc: { valid: boolean; record: string | null; policy: string; error: string | null };
+  dmarc: { valid: boolean; record: string | null; policy: string; reporting_enabled?: boolean; error: string | null };
   ssl: { valid: boolean; days_remaining: number; auto_renew: boolean; error: string | null };
   reputation_score: number;
   score_grade: string;
   blacklists?: { listed: boolean; matched: string[]; error: string | null };
+  updated_at?: string;
+}
+
+export interface DmarcReportSummary {
+  domain: string;
+  total_messages: number;
+  aligned_messages: number;
+  failed_messages: number;
+  report_count: number;
+  last_report_at: string | null;
+  top_sources: {
+    source_ip: string;
+    message_count: number;
+    disposition: string;
+    dkim_result: string;
+    spf_result: string;
+  }[];
 }
 
 export function useDomainShieldStatus(domain: string, enabled = true) {
@@ -644,6 +667,14 @@ export function useDomainShieldStatus(domain: string, enabled = true) {
     queryFn: () => fetchJson<DomainShieldStatus>(`/domain-shield/${domain}/status`),
     enabled: enabled && !!domain,
     staleTime: 1000 * 60 * 60, // Consider data fresh for 1 hour to prevent unnecessary refetches
+  });
+}
+
+export function useDmarcReportSummary(domain: string, enabled = true) {
+  return useQuery<DmarcReportSummary>({
+    queryKey: ["dmarc-reports", domain],
+    queryFn: () => fetchJson<DmarcReportSummary>(`/domain-shield/${domain}/dmarc-reports`),
+    enabled: enabled && !!domain,
   });
 }
 

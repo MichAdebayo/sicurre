@@ -20,6 +20,7 @@ import {
   Send,
   HelpCircle,
   FileCheck,
+  BarChart3,
   CheckCircle2,
   Lock as LockIcon,
   Server,
@@ -35,6 +36,7 @@ import {
   useSetupCloudflare,
   useRefreshDomainShieldStatus,
   useWorkspaceCloudflareToken,
+  useDmarcReportSummary,
   AuthSession,
 } from "../lib/api";
 
@@ -69,11 +71,15 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
     error: shieldError,
     refetch: reloadShield,
   } = useDomainShieldStatus(selectedDomain, !!selectedDomain);
+  const { data: dmarcReports } = useDmarcReportSummary(selectedDomain, !!selectedDomain);
 
   const refreshShieldMutation = useRefreshDomainShieldStatus();
 
-  const isDmarcValid = !!(shieldStatus?.dmarc?.valid && (shieldStatus?.dmarc?.record || "").includes("dmarc@sicurre.com"));
-  const needsDnsSetup = !!(shieldStatus && (!shieldStatus.spf.valid || !shieldStatus.dkim.valid || !isDmarcValid));
+  const hasRestrictiveDmarcPolicy = shieldStatus?.dmarc?.policy === "reject" || shieldStatus?.dmarc?.policy === "quarantine";
+  const hasSicurreDmarcReporting = !!shieldStatus?.dmarc?.reporting_enabled || !!(shieldStatus?.dmarc?.record || "").includes("dmarc@sicurre.com");
+  const isDmarcValid = !!(shieldStatus?.dmarc?.valid && hasRestrictiveDmarcPolicy);
+  const isDmarcComplete = isDmarcValid && hasSicurreDmarcReporting;
+  const needsDnsSetup = !!(shieldStatus && (!shieldStatus.spf.valid || !shieldStatus.dkim.valid || !isDmarcValid || !hasSicurreDmarcReporting));
   const isShieldLoading = shieldLoading || refreshShieldMutation.isPending;
 
   const handleManualRefresh = async () => {
@@ -94,18 +100,18 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
 
   const getRecommendedDmarcRecord = () => {
     const activeRecord = shieldStatus?.dmarc?.record || "";
-    if (!activeRecord) {
-      return "v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc@sicurre.com";
-    }
     if (activeRecord.includes("dmarc@sicurre.com")) {
       return activeRecord;
     }
-    if (activeRecord.includes("rua=")) {
-      return activeRecord.replace(/(rua=[^;]+)/, "$1,mailto:dmarc@sicurre.com");
-    } else {
-      const base = activeRecord.endsWith(";") ? activeRecord.trim() : `${activeRecord.trim()};`;
-      return `${base} rua=mailto:dmarc@sicurre.com`;
+    if (!activeRecord) {
+      return "v=DMARC1; p=reject; rua=mailto:dmarc@sicurre.com";
     }
+    if (activeRecord.includes("rua=")) {
+      const withPolicy = activeRecord.replace(/p=[^;]+/, "p=reject");
+      return withPolicy.replace(/(rua=[^;]+)/, "$1,mailto:dmarc@sicurre.com");
+    }
+    const base = activeRecord.endsWith(";") ? activeRecord.trim() : `${activeRecord.trim()};`;
+    return `${base} rua=mailto:dmarc@sicurre.com`;
   };
 
   const handleCopy = (key: string, text: string) => {
@@ -227,32 +233,20 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
 
   const [successNotification, setSuccessNotification] = useState<string | null>(null);
   const [errorNotification, setErrorNotification] = useState<string | null>(null);
-  const [dots, setDots] = useState("");
-
-  // Animated dots for "configuring..." state
-  useEffect(() => {
-    if (autoFixProgress === "idle" || autoFixProgress === "success" || autoFixProgress === "error") {
-      setDots("");
-      return;
-    }
-    const interval = setInterval(() => {
-      setDots((prev) => (prev.length >= 3 ? "" : prev + "."));
-    }, 450);
-    return () => clearInterval(interval);
-  }, [autoFixProgress]);
+  const isAutoFixRunning = autoFixProgress !== "idle" && autoFixProgress !== "success" && autoFixProgress !== "error";
 
   const getAutoFixButtonText = () => {
     if (autoFixProgress === "verify") {
-      return isFR ? `Configuration en cours (vérification)${dots}` : `Configuring (verifying)${dots}`;
+      return isFR ? "Vérification" : "Verifying";
     }
     if (autoFixProgress === "dns") {
-      return isFR ? `Configuration en cours (écriture DNS)${dots}` : `Configuring (DNS records)${dots}`;
+      return isFR ? "Écriture DNS" : "Writing DNS";
     }
     if (autoFixProgress === "routing") {
-      return isFR ? `Configuration en cours (redirection)${dots}` : `Configuring (email routing)${dots}`;
+      return isFR ? "Routage email" : "Email routing";
     }
     if (autoFixProgress === "success") {
-      return isFR ? "Configuration appliquée !" : "Configuration applied!";
+      return isFR ? "Appliqué" : "Applied";
     }
     if (autoFixProgress === "error") {
       return isFR ? "Échec de la configuration" : "Configuration failed";
@@ -293,15 +287,23 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
 
       setSuccessNotification(
         result.status === "provisioning"
-          ? (isFR
-              ? "Provisionnement Cloudflare lancé. La vérification et la propagation DNS peuvent prendre quelques minutes."
-              : "Cloudflare provisioning started. Verification and DNS propagation can take a few minutes.")
-          : (isFR
-              ? "Configuration Cloudflare enregistrée."
-              : "Cloudflare configuration saved.")
+          ? (isFR ? "Configuration lancée" : "Setup started")
+          : (isFR ? "Configuration appliquée" : "Setup applied")
       );
 
-      reloadShield();
+      const refreshAfterProvision = async () => {
+        await refreshShieldMutation.mutateAsync(selectedDomain);
+        await reloadShield();
+      };
+
+      await refreshAfterProvision();
+      [8000, 16000, 30000, 60000].forEach((delayMs) => {
+        window.setTimeout(() => {
+          refreshAfterProvision().catch((refreshErr) => {
+            console.error("Domain Shield refresh failed:", refreshErr);
+          });
+        }, delayMs);
+      });
 
       setTimeout(() => {
         setSuccessNotification(null);
@@ -334,9 +336,10 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
             initial={{ opacity: 0, y: -50, x: "-50%" }}
             animate={{ opacity: 1, y: 0, x: "-50%" }}
             exit={{ opacity: 0, y: -50, x: "-50%" }}
-            className="fixed top-6 left-1/2 z-[9999] flex items-center gap-3 px-5 py-3.5 bg-safe/10 backdrop-blur-md border border-safe/25 text-safe font-bold text-xs rounded-xl shadow-xl max-w-md w-[90%] sm:w-full"
+            transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
+            className="fixed top-6 left-1/2 z-[9999] flex items-center gap-2.5 px-4 py-3 bg-safe-bg border border-safe/25 text-safe font-bold text-xs rounded-lg shadow-lg max-w-sm w-[90%] sm:w-auto"
           >
-            <CheckCircle2 className="w-5 h-5 shrink-0 text-safe animate-bounce" />
+            <CheckCircle2 className="w-4.5 h-4.5 shrink-0 text-safe" />
             <span className="flex-1 text-left">{successNotification}</span>
           </motion.div>
         )}
@@ -345,9 +348,10 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
             initial={{ opacity: 0, y: -50, x: "-50%" }}
             animate={{ opacity: 1, y: 0, x: "-50%" }}
             exit={{ opacity: 0, y: -50, x: "-50%" }}
-            className="fixed top-6 left-1/2 z-[9999] flex items-center gap-3 px-5 py-3.5 bg-error/10 backdrop-blur-md border border-error/25 text-error font-bold text-xs rounded-xl shadow-xl max-w-md w-[90%] sm:w-full"
+            transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
+            className="fixed top-6 left-1/2 z-[9999] flex items-center gap-2.5 px-4 py-3 bg-error-container border border-error/25 text-on-error-container font-bold text-xs rounded-lg shadow-lg max-w-sm w-[90%] sm:w-auto"
           >
-            <ShieldAlert className="w-5 h-5 shrink-0 text-error animate-pulse" />
+            <ShieldAlert className="w-4.5 h-4.5 shrink-0 text-error" />
             <span className="flex-1 text-left">{errorNotification}</span>
           </motion.div>
         )}
@@ -646,7 +650,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   labelEN: "DMARC Policy",
                   descFR: "Consignes de filtrage",
                   descEN: "Filtering instructions",
-                  valid: shieldStatus?.dmarc?.valid && (shieldStatus?.dmarc?.record || "").includes("dmarc@sicurre.com"),
+                  valid: isDmarcValid,
                 },
                 {
                   id: "ssl",
@@ -673,7 +677,8 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   if (step.id === "dmarc") {
                     if (!shieldStatus?.dmarc?.valid) return "error";
                     if (shieldStatus?.dmarc?.policy === "none") return "warning";
-                    if (!(shieldStatus?.dmarc?.record || "").includes("dmarc@sicurre.com")) return "warning";
+                    if (!hasRestrictiveDmarcPolicy) return "warning";
+                    if (!hasSicurreDmarcReporting) return "warning";
                     return "success";
                   }
                   if (step.id === "reputation") {
@@ -699,7 +704,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     statusBadge = (
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#047857] bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200">
                         <Check className="w-3.5 h-3.5" />
-                        {isFR ? "Conforme" : "Pass"}
+                        {t("domain_shield.status_conform")}
                       </span>
                     );
                   } else if (severity === "warning") {
@@ -707,7 +712,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     statusBadge = (
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#b45309] bg-amber-50 px-2.5 py-0.5 rounded-md border border-amber-200">
                         <AlertTriangle className="w-3.5 h-3.5" />
-                        {isFR ? "Partiel" : "Warning"}
+                        {t("domain_shield.status_partial")}
                       </span>
                     );
                   } else {
@@ -715,7 +720,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     statusBadge = (
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-2.5 py-0.5 rounded-md border border-red-200">
                         <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
-                        {isFR ? "Manquant" : "Missing"}
+                        {t("domain_shield.status_missing")}
                       </span>
                     );
                   }
@@ -816,7 +821,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                             <span className="text-on-surface">SPF (TXT @)</span>
                           </div>
                           <span className="text-error text-[11px] font-bold bg-error/[0.04] px-2 py-0.5 rounded border border-error/20">
-                            {isFR ? "Manquant / Incorrect" : "Missing / Incorrect"}
+                            {t("domain_shield.status_missing_incorrect")}
                           </span>
                         </div>
                       )}
@@ -834,13 +839,13 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                             <span className="text-on-surface">DKIM (TXT cloudflare._domainkey)</span>
                           </div>
                           <span className="text-error text-[11px] font-bold bg-error/[0.04] px-2 py-0.5 rounded border border-error/20">
-                            {isFR ? "Manquant / Incorrect" : "Missing / Incorrect"}
+                            {t("domain_shield.status_missing_incorrect")}
                           </span>
                         </div>
                       )}
 
                       {/* DMARC Record */}
-                      {!isDmarcValid && (
+                      {(!isDmarcValid || !hasSicurreDmarcReporting) && (
                         <div className="flex items-center justify-between font-semibold last:border-b-0">
                           <div className="flex items-center gap-2">
                             <input
@@ -853,11 +858,15 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                           </div>
                           {!shieldStatus.dmarc.valid ? (
                             <span className="text-error text-[11px] font-bold bg-error/[0.04] px-2 py-0.5 rounded border border-error/20">
-                              {isFR ? "Manquant / Incorrect" : "Missing / Incorrect"}
+                              {t("domain_shield.status_missing_incorrect")}
+                            </span>
+                          ) : isDmarcValid && !hasSicurreDmarcReporting ? (
+                            <span className="text-[#b45309] text-[11px] font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200/50">
+                              {t("domain_shield.reporting_missing")}
                             </span>
                           ) : (
                             <span className="text-[#b45309] text-[11px] font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200/50">
-                              {isFR ? "Configuration Partielle" : "Partial Configuration"}
+                              {t("domain_shield.status_partial")}
                             </span>
                           )}
                         </div>
@@ -884,23 +893,23 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
 
               <div className="pt-5 border-t border-border-subtle/50 mt-4 flex justify-end gap-3 select-none">
                 {needsDnsSetup && (
-                  <Button
-                    size="sm"
+                  <button
+                    type="button"
                     onClick={handleRunAutoFix}
                     disabled={autoFixProgress !== "idle" || !wsTokenData?.api_token}
-                    className={`w-full flex items-center justify-center gap-1.5 text-xs font-bold rounded-lg transition-all h-[38px] shadow-sm border ${
-                      autoFixProgress !== "idle"
-                        ? "bg-primary/10 border-primary/20 text-[#2e6bb5] cursor-wait"
-                        : "bg-[#2e6bb5] hover:bg-[#23589b] text-white border-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={`inline-flex h-10 w-full min-w-[13rem] items-center justify-center gap-2 rounded-lg border px-4 text-xs font-bold transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${
+                      isAutoFixRunning
+                        ? "border-primary/25 bg-primary-container text-on-primary-container cursor-wait"
+                        : "border-transparent bg-[#2e6bb5] text-white hover:bg-[#255da0]"
                     }`}
                   >
-                    {autoFixProgress !== "idle" && autoFixProgress !== "success" && autoFixProgress !== "error" ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#2e6bb5]" />
+                    {isAutoFixRunning ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-current" />
                     ) : (
                       <MousePointerClick className="w-3.5 h-3.5" />
                     )}
-                    <span>{getAutoFixButtonText()}</span>
-                  </Button>
+                    <span className="min-w-[8.5rem] text-center">{getAutoFixButtonText()}</span>
+                  </button>
                 )}
               </div>
             </div>
@@ -1042,13 +1051,13 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
           {/* DNS Record Verification Matrix */}
           <div className="space-y-6">
             <h3 className="font-display font-bold text-xl text-on-surface">
-              {isFR ? "Configuration DNS & Validation" : "DNS Configuration & Validation Records"}
+              {t("domain_shield.dns_validation_title")}
             </h3>
 
             {/* SPF Card Track */}
             <div className="bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border-subtle/50">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
                   <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider px-2 py-0.5 bg-surface-low rounded">
                     SPF
                   </span>
@@ -1057,11 +1066,11 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                 <div>
                   {shieldStatus.spf.valid ? (
                     <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-safe uppercase bg-safe/10 px-2.5 py-0.5 rounded-full">
-                      <ShieldCheck className="w-3.5 h-3.5" /> Valid
+                      <ShieldCheck className="w-3.5 h-3.5" /> {t("domain_shield.status_conform")}
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-warning uppercase bg-warning/10 px-2.5 py-0.5 rounded-full">
-                      <AlertTriangle className="w-3.5 h-3.5" /> Missing / Invalid
+                      <AlertTriangle className="w-3.5 h-3.5" /> {t("domain_shield.status_missing")}
                     </span>
                   )}
                 </div>
@@ -1070,7 +1079,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-1 text-xs">
                 <div className="space-y-2">
                   <span className="font-bold text-on-surface-variant uppercase tracking-wider text-[10px] block">
-                    Active DNS Entry
+                    {t("domain_shield.active_dns_entry")}
                   </span>
                   {shieldStatus.spf.record ? (
                     <code className="block p-3.5 bg-surface-low/50 border border-border-subtle rounded-xl font-mono text-[11px] text-on-surface truncate select-all" title={shieldStatus.spf.record}>
@@ -1078,14 +1087,14 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     </code>
                   ) : (
                     <p className="italic text-on-surface-variant/60 block p-3.5 bg-surface-low/30 rounded-xl">
-                      No SPF entry resolved in DNS.
+                      {t("domain_shield.no_spf_record")}
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-2">
                   <span className="font-bold text-on-surface-variant uppercase tracking-wider text-[10px] block">
-                    Required DNS Setup (TXT)
+                    {t("domain_shield.required_dns_setup")}
                   </span>
                   <div className="flex gap-2 items-center">
                     <code className="flex-1 block p-3.5 bg-surface-low/50 border border-border-subtle text-on-surface rounded-xl font-mono text-[11px] truncate select-all">
@@ -1120,11 +1129,11 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                 <div>
                   {shieldStatus.dkim.valid ? (
                     <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-safe uppercase bg-safe/10 px-2.5 py-0.5 rounded-full">
-                      <ShieldCheck className="w-3.5 h-3.5" /> Valid
+                      <ShieldCheck className="w-3.5 h-3.5" /> {t("domain_shield.status_conform")}
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-warning uppercase bg-warning/10 px-2.5 py-0.5 rounded-full">
-                      <AlertTriangle className="w-3.5 h-3.5" /> Missing / Invalid
+                      <AlertTriangle className="w-3.5 h-3.5" /> {t("domain_shield.status_missing")}
                     </span>
                   )}
                 </div>
@@ -1133,7 +1142,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-1 text-xs">
                 <div className="space-y-2">
                   <span className="font-bold text-on-surface-variant uppercase tracking-wider text-[10px] block">
-                    Active DNS Entry
+                    {t("domain_shield.active_dns_entry")}
                   </span>
                   {shieldStatus.dkim.record ? (
                     <code className="block p-3.5 bg-surface-low/50 border border-border-subtle rounded-xl font-mono text-[11px] text-on-surface truncate select-all" title={shieldStatus.dkim.record}>
@@ -1141,14 +1150,14 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     </code>
                   ) : (
                     <p className="italic text-on-surface-variant/60 block p-3.5 bg-surface-low/30 rounded-xl">
-                      No DKIM selector entry resolved in DNS.
+                      {t("domain_shield.no_dkim_record")}
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-2">
                   <span className="font-bold text-on-surface-variant uppercase tracking-wider text-[10px] block">
-                    Required DNS Setup (TXT)
+                    {t("domain_shield.required_dns_setup")}
                   </span>
                   <div className="flex gap-2 items-center">
                     <code className="flex-1 block p-3.5 bg-surface-low/50 border border-border-subtle text-on-surface rounded-xl font-mono text-[11px] truncate select-all">
@@ -1184,17 +1193,17 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   <span className={`text-[9px] font-extrabold font-mono px-2 py-0.5 rounded border uppercase select-none ${getDmarcPolicyClass(shieldStatus.dmarc.policy)}`}>
                     Policy: {shieldStatus.dmarc.policy}
                   </span>
-                  {isDmarcValid ? (
+                  {isDmarcComplete ? (
                     <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-safe bg-safe/10 px-2.5 py-0.5 rounded-full">
-                      <ShieldCheck className="w-3.5 h-3.5" /> Valid
+                      <ShieldCheck className="w-3.5 h-3.5" /> {t("domain_shield.status_conform")}
                     </span>
-                  ) : shieldStatus.dmarc.valid ? (
+                  ) : shieldStatus.dmarc.valid || isDmarcValid ? (
                     <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-warning bg-warning/10 px-2.5 py-0.5 rounded-full">
-                      <AlertTriangle className="w-3.5 h-3.5" /> {isFR ? "Configuration Partielle" : "Partial Configuration"}
+                      <AlertTriangle className="w-3.5 h-3.5" /> {t("domain_shield.status_partial")}
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-error bg-error/10 px-2.5 py-0.5 rounded-full">
-                      <AlertTriangle className="w-3.5 h-3.5" /> {isFR ? "Manquant / Incorrect" : "Missing / Invalid"}
+                      <AlertTriangle className="w-3.5 h-3.5" /> {t("domain_shield.status_missing")}
                     </span>
                   )}
                 </div>
@@ -1203,7 +1212,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-1 text-xs">
                 <div className="space-y-2">
                   <span className="font-bold text-on-surface-variant uppercase tracking-wider text-[10px] block">
-                    Active DNS Entry
+                    {t("domain_shield.active_dns_entry")}
                   </span>
                   {shieldStatus.dmarc.record ? (
                     <code className="block p-3.5 bg-surface-low/50 border border-border-subtle rounded-xl font-mono text-[11px] text-on-surface truncate select-all" title={shieldStatus.dmarc.record}>
@@ -1211,14 +1220,14 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     </code>
                   ) : (
                     <p className="italic text-on-surface-variant/60 block p-3.5 bg-surface-low/30 rounded-xl">
-                      No DMARC entry resolved in DNS.
+                      {t("domain_shield.no_dmarc_record")}
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-2">
                   <span className="font-bold text-on-surface-variant uppercase tracking-wider text-[10px] block">
-                    Required DNS Setup (TXT)
+                    {t("domain_shield.sicurre_recommendation")}
                   </span>
                   <div className="flex gap-2 items-center">
                     <code className="flex-1 block p-3.5 bg-surface-low/50 border border-border-subtle text-on-surface rounded-xl font-mono text-[11px] truncate select-all" title={getRecommendedDmarcRecord()}>
@@ -1238,6 +1247,51 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     </Button>
                   </div>
                 </div>
+              </div>
+              <div className="rounded-xl border border-border-subtle bg-surface-low/40 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4 text-primary" />
+                      <p className="text-xs font-bold text-on-surface">{t("domain_shield.report_title")}</p>
+                    </div>
+                    <p className="max-w-2xl text-[11px] leading-relaxed text-on-surface-variant">
+                      {hasSicurreDmarcReporting ? t("domain_shield.report_enabled_desc") : t("domain_shield.report_missing_desc")}
+                    </p>
+                  </div>
+                  <span className={`w-fit rounded-full border px-2.5 py-0.5 text-[10px] font-extrabold ${hasSicurreDmarcReporting ? "border-safe/20 bg-safe/10 text-safe" : "border-warning/25 bg-warning/10 text-warning"}`}>
+                    {hasSicurreDmarcReporting ? t("domain_shield.report_enabled") : t("domain_shield.status_partial")}
+                  </span>
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-4">
+                  {[
+                    { label: t("domain_shield.report_count"), value: dmarcReports?.report_count ?? 0 },
+                    { label: t("domain_shield.report_messages"), value: dmarcReports?.total_messages ?? 0 },
+                    { label: t("domain_shield.report_aligned"), value: dmarcReports?.aligned_messages ?? 0 },
+                    { label: t("domain_shield.report_failed"), value: dmarcReports?.failed_messages ?? 0 },
+                  ].map((metric) => (
+                    <div key={metric.label} className="rounded-lg border border-border-subtle bg-surface-lowest p-3">
+                      <p className="text-[10px] font-bold uppercase text-on-surface-variant">{metric.label}</p>
+                      <p className="mt-1 font-mono text-lg font-extrabold text-on-surface">{metric.value}</p>
+                    </div>
+                  ))}
+                </div>
+                {dmarcReports?.top_sources?.length ? (
+                  <div className="mt-3 divide-y divide-border-subtle overflow-hidden rounded-lg border border-border-subtle bg-surface-lowest">
+                    {dmarcReports.top_sources.map((source) => (
+                      <div key={source.source_ip} className="grid grid-cols-[1fr_auto] gap-3 px-3 py-2 text-[11px]">
+                        <span className="font-mono text-on-surface">{source.source_ip}</span>
+                        <span className="font-semibold text-on-surface-variant">
+                          {source.message_count} · DKIM {source.dkim_result} · SPF {source.spf_result}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-[11px] font-semibold text-on-surface-variant">
+                    {t("domain_shield.report_empty")}
+                  </p>
+                )}
               </div>
             </div>
           </div>

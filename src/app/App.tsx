@@ -172,6 +172,7 @@ export default function App() {
       userName={session.display_name}
       userEmail={session.email}
       userRole={session.is_platform_admin ? "admin" : session.role}
+      onboardingRequired={session.onboarding_required}
     >
       <AnimatePresence mode="wait">
         {activePage === "dashboard" && <DashboardRoute key="dashboard" session={session} onGoToSettings={handleGoToSettings} />}

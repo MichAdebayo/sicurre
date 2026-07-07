@@ -514,8 +514,8 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                     <p className="text-primary">{lang === "fr" ? "Configuration requise" : "Onboarding required"}</p>
                     <p className="mt-0.5 text-on-surface-variant font-normal">
                       {lang === "fr"
-                        ? "Connectez votre premier domaine via le wizard Cloudflare pour activer le routage e-mail."
-                        : "Configure your email routing zone using Cloudflare below to start protecting your inbox."}
+                        ? "Ajoutez un domaine Cloudflare pour déverrouiller l’app et commencer le routage e-mail."
+                        : "Add a Cloudflare domain to unlock the app and start email routing."}
                     </p>
                   </div>
                 </div>

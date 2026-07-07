@@ -83,7 +83,7 @@ def _merge_spf(current_spf: str) -> str:
 def _merge_dmarc(current_dmarc: str) -> str:
     cleaned = _clean_str(current_dmarc)
     if not cleaned:
-        return "v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc@sicurre.com"
+        return "v=DMARC1; p=reject; rua=mailto:dmarc@sicurre.com"
     
     policy = "quarantine"
     if "p=reject" in cleaned:
@@ -596,113 +596,134 @@ async def setup_cloudflare(
                 ),
             )
             
-            # 1. Fetch existing DNS records from Cloudflare to check values
-            dns_records = await provisioner.get_dns_records(result.zone_id)
-            existing_spf_content = ""
-            existing_dmarc_content = ""
-            
-            for rec in dns_records:
-                if rec.get("type") == "TXT":
-                    rec_name = _clean_str(rec.get("name", "")).lower().rstrip(".")
-                    if rec_name == payload.zone_name.lower():
-                        existing_spf_content = _clean_str(rec.get("content", ""))
-                    elif rec_name == f"_dmarc.{payload.zone_name}".lower():
-                        existing_dmarc_content = _clean_str(rec.get("content", ""))
+            try:
+                # Domain Shield DNS health writes are useful, but they are not the
+                # same as gateway provisioning. If they fail, keep the integration
+                # active/pending and surface the DNS issue separately.
+                dns_records = await provisioner.get_dns_records(result.zone_id)
+                existing_spf_content = ""
+                existing_dkim_content = ""
+                existing_dmarc_content = ""
 
-            # 2. Deploy SPF to Cloudflare DNS
-            spf_val = 0
-            spf_rec = None
-            if payload.fix_spf:
-                spf_rec = _merge_spf(existing_spf_content)
-                await provisioner.deploy_dns_record(
-                    zone_id=result.zone_id,
-                    rec_type="TXT",
-                    name=payload.zone_name,
-                    content=spf_rec,
-                )
-                spf_val = 1
-            else:
-                status_rows = await _async_query(
-                    "SELECT spf_valid, spf_record FROM app_domain_shield_status WHERE domain = ? LIMIT 1",
-                    (payload.zone_name,)
-                )
-                spf_val = status_rows[0]["spf_valid"] if (status_rows and status_rows[0]["spf_valid"]) else 0
-                spf_rec = status_rows[0]["spf_record"] if (status_rows and status_rows[0]["spf_record"]) else None
+                for rec in dns_records:
+                    if rec.get("type") == "TXT":
+                        rec_name = _clean_str(rec.get("name", "")).lower().rstrip(".")
+                        rec_content = _clean_str(rec.get("content", ""))
+                        if rec_name == payload.zone_name.lower():
+                            existing_spf_content = rec_content
+                        elif "._domainkey." in rec_name or rec_name.startswith("_domainkey."):
+                            if "v=DKIM1" in rec_content or "k=rsa" in rec_content:
+                                existing_dkim_content = rec_content
+                        elif rec_name == f"_dmarc.{payload.zone_name}".lower():
+                            existing_dmarc_content = rec_content
 
-            # 3. Deploy DKIM to Cloudflare DNS
-            dkim_val = 0
-            dkim_rec = None
-            if payload.fix_dkim:
-                dkim_rec = "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA..."
-                await provisioner.deploy_dns_record(
-                    zone_id=result.zone_id,
-                    rec_type="TXT",
-                    name=f"cloudflare._domainkey.{payload.zone_name}",
-                    content=dkim_rec,
-                )
-                dkim_val = 1
-            else:
-                status_rows = await _async_query(
-                    "SELECT dkim_valid, dkim_record FROM app_domain_shield_status WHERE domain = ? LIMIT 1",
-                    (payload.zone_name,)
-                )
-                dkim_val = status_rows[0]["dkim_valid"] if (status_rows and status_rows[0]["dkim_valid"]) else 0
-                dkim_rec = status_rows[0]["dkim_record"] if (status_rows and status_rows[0]["dkim_record"]) else None
+                spf_val = 1 if "v=spf1" in existing_spf_content else 0
+                spf_rec = existing_spf_content or None
+                if payload.fix_spf:
+                    spf_rec = _merge_spf(existing_spf_content)
+                    await provisioner.deploy_dns_record(
+                        zone_id=result.zone_id,
+                        rec_type="TXT",
+                        name=payload.zone_name,
+                        content=spf_rec,
+                    )
+                    spf_val = 1
 
-            # 4. Deploy DMARC to Cloudflare DNS
-            dmarc_val = 0
-            dmarc_rec = None
-            if payload.fix_dmarc:
-                dmarc_rec = _merge_dmarc(existing_dmarc_content)
-                await provisioner.deploy_dns_record(
-                    zone_id=result.zone_id,
-                    rec_type="TXT",
-                    name=f"_dmarc.{payload.zone_name}",
-                    content=dmarc_rec,
+                dkim_val = 1 if existing_dkim_content else 0
+                dkim_rec = existing_dkim_content or None
+                if payload.fix_dkim:
+                    dkim_rec = "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA..."
+                    await provisioner.deploy_dns_record(
+                        zone_id=result.zone_id,
+                        rec_type="TXT",
+                        name=f"cloudflare._domainkey.{payload.zone_name}",
+                        content=dkim_rec,
+                    )
+                    dkim_val = 1
+
+                dmarc_val = 1 if "v=DMARC1" in existing_dmarc_content else 0
+                dmarc_rec = existing_dmarc_content or None
+                if payload.fix_dmarc:
+                    dmarc_rec = _merge_dmarc(existing_dmarc_content)
+                    await provisioner.deploy_dns_record(
+                        zone_id=result.zone_id,
+                        rec_type="TXT",
+                        name=f"_dmarc.{payload.zone_name}",
+                        content=dmarc_rec,
+                    )
+                    dmarc_val = 1
+                dmarc_policy = "none"
+                if dmarc_rec and "p=reject" in dmarc_rec:
+                    dmarc_policy = "reject"
+                elif dmarc_rec and "p=quarantine" in dmarc_rec:
+                    dmarc_policy = "quarantine"
+                dmarc_reporting_enabled = "dmarc@sicurre.com" in (dmarc_rec or "")
+
+                rep_score = 100
+                if not spf_val:
+                    rep_score -= 20
+                if not dkim_val:
+                    rep_score -= 20
+                if not dmarc_val:
+                    rep_score -= 25
+                elif not dmarc_reporting_enabled:
+                    rep_score -= 10
+
+                grade = "A"
+                if rep_score >= 90:
+                    grade = "A"
+                elif rep_score >= 80:
+                    grade = "B"
+                elif rep_score >= 70:
+                    grade = "C"
+                elif rep_score >= 60:
+                    grade = "D"
+                else:
+                    grade = "F"
+
+                await _async_query(
+                    """
+                    INSERT OR REPLACE INTO app_domain_shield_status (
+                        domain, workspace_id, spf_valid, spf_record, dkim_valid, dkim_record,
+                        dmarc_valid, dmarc_record, dmarc_policy, ssl_valid, ssl_days_remaining,
+                        reputation_score, score_grade, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 365, ?, ?, ?)
+                    """,
+                    (
+                        payload.zone_name,
+                        current_user.workspace_id,
+                        spf_val,
+                        spf_rec,
+                        dkim_val,
+                        dkim_rec,
+                        dmarc_val,
+                        dmarc_rec,
+                        dmarc_policy,
+                        rep_score,
+                        grade,
+                        ts,
+                    ),
                 )
-                dmarc_val = 1
-            else:
-                status_rows = await _async_query(
-                    "SELECT dmarc_valid, dmarc_record FROM app_domain_shield_status WHERE domain = ? LIMIT 1",
-                    (payload.zone_name,)
+            except Exception as dns_exc:
+                logger.warning(
+                    "Cloudflare gateway provisioned, but Domain Shield DNS sync failed for %s: %s",
+                    payload.zone_name,
+                    dns_exc,
                 )
-                dmarc_val = status_rows[0]["dmarc_valid"] if (status_rows and status_rows[0]["dmarc_valid"]) else 0
-                dmarc_rec = status_rows[0]["dmarc_record"] if (status_rows and status_rows[0]["dmarc_record"]) else None
-            
-            rep_score = 100
-            if not spf_val: rep_score -= 20
-            if not dkim_val: rep_score -= 20
-            if not dmarc_val: rep_score -= 25
-            
-            grade = "A"
-            if rep_score >= 90: grade = "A"
-            elif rep_score >= 80: grade = "B"
-            elif rep_score >= 70: grade = "C"
-            elif rep_score >= 60: grade = "D"
-            else: grade = "F"
-            
+
             await _async_query(
                 """
-                INSERT OR REPLACE INTO app_domain_shield_status (
-                    domain, workspace_id, spf_valid, spf_record, dkim_valid, dkim_record,
-                    dmarc_valid, dmarc_record, dmarc_policy, ssl_valid, ssl_days_remaining,
-                    reputation_score, score_grade, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 365, ?, ?, ?)
+                INSERT INTO app_alert_history (
+                    id, workspace_id, title, message, is_dismissed, created_at
+                ) VALUES (?, ?, ?, ?, 0, ?)
                 """,
                 (
-                    payload.zone_name,
+                    str(uuid4()),
                     current_user.workspace_id,
-                    spf_val,
-                    spf_rec,
-                    dkim_val,
-                    dkim_rec,
-                    dmarc_val,
-                    dmarc_rec,
-                    "quarantine" if dmarc_val else "none",
-                    rep_score,
-                    grade,
-                    ts
-                )
+                    "Configuration Cloudflare appliquée",
+                    f"{payload.zone_name} est synchronisé avec Cloudflare.",
+                    ts,
+                ),
             )
 
             logger.info(
@@ -745,15 +766,16 @@ async def cloudflare_status(
     if not rows:
         return {"status": "not_configured"}
     row = rows[0]
+    status = row["status"]
     return {
         "id": row["id"],
         "user_email": row["user_email"],
         "zone_name": row["zone_name"],
         "destination_email": row["destination_email"],
         "worker_name": row["worker_name"],
-        "status": row["status"],
+        "status": status,
         "api_token": row.get("api_token"),
-        "error_message": row.get("error_message"),
+        "error_message": row.get("error_message") if status == "error" else None,
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
     }
@@ -937,4 +959,3 @@ async def delete_workspace_cloudflare_token(
         (current_user.workspace_id,),
     )
     return {"status": "deleted"}
-

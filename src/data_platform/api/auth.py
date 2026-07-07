@@ -221,6 +221,26 @@ def ensure_runtime_tables() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS ix_app_domain_shield_history_domain ON app_domain_shield_history(domain)")
 
         conn.execute("""
+            CREATE TABLE IF NOT EXISTS app_dmarc_report_summary (
+                id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                domain TEXT NOT NULL,
+                report_org TEXT,
+                report_id TEXT,
+                period_begin TEXT,
+                period_end TEXT,
+                source_ip TEXT NOT NULL,
+                message_count INTEGER NOT NULL,
+                disposition TEXT,
+                dkim_result TEXT,
+                spf_result TEXT,
+                header_from TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS ix_app_dmarc_report_summary_workspace_domain ON app_dmarc_report_summary(workspace_id, domain)")
+
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS app_feedback (
                 id TEXT PRIMARY KEY,
                 workspace_id TEXT NOT NULL,

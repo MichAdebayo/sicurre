@@ -11,6 +11,7 @@ import {
   Inbox,
   Bell,
   Shield,
+  LockKeyhole,
 } from "lucide-react";
 import sicurreLogo from "../../assets/sicurre.svg";
 
@@ -33,6 +34,7 @@ interface SidebarProps {
   userName?: string;
   userEmail?: string;
   userRole?: string;
+  onboardingRequired?: boolean;
   className?: string;
 }
 
@@ -44,9 +46,11 @@ export function Sidebar({
   userName = "Utilisateur",
   userEmail = "",
   userRole = "owner",
+  onboardingRequired = false,
   className,
 }: SidebarProps) {
   const { t } = useTranslation();
+  const isOnboardingLocked = onboardingRequired && userRole !== "admin";
 
   const baseNav = [
     { id: "dashboard", label: t("sidebar.nav_dashboard"), icon: LayoutDashboard },
@@ -98,19 +102,30 @@ export function Sidebar({
         {mainNav.map((item) => {
           const Icon = item.icon;
           const isActive = currentPage === item.id;
+          const isSettings = item.id === "settings";
+          const isLocked = isOnboardingLocked && !isSettings;
           return (
             <button
               key={item.id}
-              onClick={() => onPageChange(item.id as SidebarPage)}
+              onClick={() => {
+                if (isLocked) return;
+                onPageChange(item.id as SidebarPage);
+              }}
+              disabled={isLocked}
+              title={isLocked ? "Connectez Cloudflare pour déverrouiller cette page" : undefined}
+              aria-disabled={isLocked}
               className={clsx(
-                "w-full flex items-center gap-3 px-3.5 py-2.5 text-[13px] font-semibold rounded-lg transition-all duration-150 cursor-pointer select-none",
-                isActive
+                "w-full flex items-center gap-3 px-3.5 py-2.5 text-[13px] font-semibold rounded-lg transition-all duration-150 select-none",
+                isLocked
+                  ? "cursor-not-allowed text-on-surface-variant/35 opacity-70"
+                  : isActive
                   ? "bg-primary text-on-primary shadow-sm shadow-primary/20"
-                  : "text-on-surface-variant hover:bg-surface-low hover:text-on-surface",
+                  : "cursor-pointer text-on-surface-variant hover:bg-surface-low hover:text-on-surface",
               )}
             >
               <Icon className="w-[18px] h-[18px] stroke-[1.5]" />
-              <span>{item.label}</span>
+              <span className="flex-1 text-left">{item.label}</span>
+              {isLocked && <LockKeyhole className="h-3.5 w-3.5" />}
             </button>
           );
         })}
@@ -118,6 +133,13 @@ export function Sidebar({
 
       {/* Bottom Section */}
       <div className="px-3 pb-4 space-y-3 pt-3">
+        {isOnboardingLocked && (
+          <div className="rounded-lg border border-primary/15 bg-primary-fixed p-3 text-[11px] leading-5 text-on-primary-container dark:bg-primary-container">
+            <p className="font-bold">Setup en cours</p>
+            <p className="mt-1 opacity-80">Terminez la connexion Cloudflare dans Settings.</p>
+          </div>
+        )}
+
         {/* Support Link */}
         {bottomNav.map((item) => {
           const Icon = item.icon;

@@ -157,7 +157,7 @@ class CloudflareProvisioner:
     async def _get(self, path: str, **kw: Any) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=20.0) as client:
             r = await client.get(f"{CF_BASE}{path}", headers=self._headers, **kw)
-        return self._unwrap(r)
+        return self._unwrap(r, context=f"GET {path}")
 
     async def _post(
         self, path: str, body: dict[str, Any] | None = None
@@ -166,21 +166,21 @@ class CloudflareProvisioner:
             r = await client.post(
                 f"{CF_BASE}{path}", headers=self._headers, json=body or {}
             )
-        return self._unwrap(r)
+        return self._unwrap(r, context=f"POST {path}")
 
     async def _post_multipart(self, path: str, files: dict) -> dict[str, Any]:
         headers = {"Authorization": f"Bearer {self._token}"}
         async with httpx.AsyncClient(timeout=30.0) as client:
             r = await client.put(f"{CF_BASE}{path}", headers=headers, files=files)
-        return self._unwrap(r)
+        return self._unwrap(r, context=f"PUT {path}")
 
     async def _delete(self, path: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=20.0) as client:
             r = await client.delete(f"{CF_BASE}{path}", headers=self._headers)
-        return self._unwrap(r)
+        return self._unwrap(r, context=f"DELETE {path}")
 
     @staticmethod
-    def _unwrap(r: httpx.Response) -> dict[str, Any]:
+    def _unwrap(r: httpx.Response, *, context: str = "Cloudflare API") -> dict[str, Any]:
         try:
             data = r.json()
         except Exception:
@@ -189,7 +189,7 @@ class CloudflareProvisioner:
         if not data.get("success", True):
             errors = data.get("errors", [])
             msg = "; ".join(e.get("message", str(e)) for e in errors) or r.text
-            raise CloudflareAPIError(msg, status_code=r.status_code)
+            raise CloudflareAPIError(f"{context}: {msg}", status_code=r.status_code)
         return data
 
     # ── public API ──────────────────────────────────────────────────────────
@@ -212,7 +212,7 @@ class CloudflareProvisioner:
                 headers=self._headers,
                 params={"name": zone_name, "per_page": 5},
             )
-        data = self._unwrap(r)
+        data = self._unwrap(r, context="GET /zones")
         results: list[dict] = data.get("result", [])
         if not results:
             raise CloudflareAPIError(
@@ -256,7 +256,9 @@ class CloudflareProvisioner:
                     f"{CF_BASE}/accounts/{account_id}/email/routing/addresses",
                     headers=self._headers,
                 )
-            addresses_data = self._unwrap(r)
+            addresses_data = self._unwrap(
+                r, context=f"GET /accounts/{account_id}/email/routing/addresses"
+            )
             for addr in addresses_data.get("result", []):
                 if str(addr.get("email")).lower() == email.lower():
                     logger.info("Destination address %s already registered (tag=%s)", email, addr["tag"])
@@ -311,7 +313,9 @@ class CloudflareProvisioner:
                 headers=headers,
                 files=files,
             )
-        self._unwrap(r)
+        self._unwrap(
+            r, context=f"PUT /accounts/{account_id}/workers/scripts/{worker_name}"
+        )
         logger.info("Worker '%s' deployed to account %s", worker_name, account_id)
 
     async def create_email_routing_rule(
@@ -337,7 +341,9 @@ class CloudflareProvisioner:
                     f"{CF_BASE}/zones/{zone_id}/email/routing/rules",
                     headers=headers,
                 )
-            rules_data = self._unwrap(r)
+            rules_data = self._unwrap(
+                r, context=f"GET /zones/{zone_id}/email/routing/rules"
+            )
             for rule in rules_data.get("result", []):
                 matchers = rule.get("matchers", [])
                 for m in matchers:
@@ -394,7 +400,7 @@ class CloudflareProvisioner:
                 headers=self._headers,
                 params={"per_page": 100},
             )
-        data = self._unwrap(r)
+        data = self._unwrap(r, context=f"GET /zones/{zone_id}/dns_records")
         return data.get("result", [])
 
     # ── full provisioning flow ──────────────────────────────────────────────
@@ -432,7 +438,9 @@ class CloudflareProvisioner:
                     f"{CF_BASE}/zones/{zone_id}/email/routing/rules",
                     headers=self._headers,
                 )
-            rules_data = self._unwrap(r)
+            rules_data = self._unwrap(
+                r, context=f"GET /zones/{zone_id}/email/routing/rules"
+            )
             for rule in rules_data.get("result", []):
                 matchers = rule.get("matchers", [])
                 for m in matchers:
@@ -459,7 +467,9 @@ class CloudflareProvisioner:
                         f"{CF_BASE}/accounts/{account_id}/email/routing/addresses",
                         headers=self._headers,
                     )
-                addresses_data = self._unwrap(r)
+                addresses_data = self._unwrap(
+                    r, context=f"GET /accounts/{account_id}/email/routing/addresses"
+                )
                 for addr in addresses_data.get("result", []):
                     if addr.get("status") == "verified":
                         actual_forward_to = str(addr["email"])
@@ -496,7 +506,9 @@ class CloudflareProvisioner:
                     f"{CF_BASE}/accounts/{account_id}/email/routing/addresses",
                     headers=self._headers,
                 )
-            addresses_data = self._unwrap(r)
+            addresses_data = self._unwrap(
+                r, context=f"GET /accounts/{account_id}/email/routing/addresses"
+            )
             for addr in addresses_data.get("result", []):
                 if str(addr.get("email")).lower() == actual_forward_to.lower():
                     destination_verified = addr.get("status") == "verified"
@@ -557,7 +569,9 @@ class CloudflareProvisioner:
                     headers=self._headers,
                     json=body,
                 )
-            self._unwrap(r)
+            self._unwrap(
+                r, context=f"PUT /zones/{zone_id}/dns_records/{existing_id}"
+            )
         else:
             logger.info("Creating new DNS record (%s) with content: %s", name, content_clean)
             async with httpx.AsyncClient(timeout=20.0) as client:
@@ -566,7 +580,7 @@ class CloudflareProvisioner:
                     headers=self._headers,
                     json=body,
                 )
-            self._unwrap(r)
+            self._unwrap(r, context=f"POST /zones/{zone_id}/dns_records")
 
     async def teardown(
         self,
