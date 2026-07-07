@@ -64,7 +64,7 @@ export function AppShell({
           </div>
 
           {/* Page Content */}
-          <main className="flex-1 overflow-y-auto pt-8 pb-6 pl-8 pr-12">
+          <main className="app-readable flex-1 overflow-y-auto pt-8 pb-6 pl-8 pr-12">
             {children}
           </main>
         </div>

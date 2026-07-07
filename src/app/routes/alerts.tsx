@@ -11,6 +11,7 @@ import {
   History,
   AlertCircle,
   AlertTriangle,
+  HelpCircle,
   XCircle,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
@@ -95,17 +96,6 @@ export default function AlertsRoute() {
     }
   }, [preferences]);
 
-  // Sync state explicitly if query updates
-  const handlePrefsSync = () => {
-    if (preferences) {
-      setNotifyPhishing(preferences.notify_phishing);
-      setNotifySpam(preferences.notify_spam);
-      setQuietEnabled(preferences.quiet_hours_enabled);
-      setQuietStart(preferences.quiet_hours_start);
-      setQuietEnd(preferences.quiet_hours_end);
-    }
-  };
-
   const handleSavePrefs = async (e: React.FormEvent) => {
     e.preventDefault();
     setPrefsSuccess(false);
@@ -182,7 +172,7 @@ export default function AlertsRoute() {
       />
 
       {/* Header */}
-      <div className="pb-6 border-b border-border-subtle flex items-center justify-between">
+      <div className="pb-6 border-b border-border-subtle">
         <div>
           <h1 className="app-h1">
             {t("alerts.title")}
@@ -191,11 +181,6 @@ export default function AlertsRoute() {
             {t("alerts.subtitle")}
           </p>
         </div>
-        {preferences && (
-          <Button variant="outline" size="sm" onClick={handlePrefsSync} className="text-xs">
-            Reset Form
-          </Button>
-        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -335,12 +320,22 @@ export default function AlertsRoute() {
                 </select>
               </div>
               <div className="sm:col-span-5">
-                <label className="text-[11px] font-bold text-on-surface-variant uppercase block mb-1.5">
-                  {t("alerts.pattern")}
-                </label>
+                <div className="mb-1.5 flex items-center gap-1.5">
+                  <label className="text-[12px] font-bold text-on-surface-variant uppercase">
+                    {t("alerts.pattern")}
+                  </label>
+                  <div className="relative group">
+                    <HelpCircle className="h-3.5 w-3.5 cursor-help text-on-surface-variant/60" />
+                    <div className="absolute bottom-full left-1/2 z-40 mb-2 w-56 -translate-x-1/2 rounded-lg border border-border-subtle bg-surface-lowest p-2.5 text-[12px] font-semibold leading-5 text-on-surface-variant opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                      {i18n.language === "fr"
+                        ? "Saisissez une adresse complète ou un domaine, par exemple client@entreprise.fr ou entreprise.fr."
+                        : "Enter a full email address or a domain, for example client@company.com or company.com."}
+                    </div>
+                  </div>
+                </div>
                 <Input
                   type="text"
-                  placeholder="client@company.com or company.com"
+                  placeholder={i18n.language === "fr" ? "client@entreprise.fr ou entreprise.fr" : "client@company.com or company.com"}
                   value={rulePattern}
                   onChange={(e) => setRulePattern(e.target.value)}
                   className="bg-white"

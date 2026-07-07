@@ -8,8 +8,10 @@ import zipfile
 from contextlib import suppress
 import uuid
 from datetime import datetime, timezone, timedelta
+from urllib.parse import urlparse
 import xml.etree.ElementTree as ET
 
+import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
@@ -21,6 +23,7 @@ from core.database import get_async_session
 from data_platform.api.auth import AuthUser, async_query as auth_query, get_current_user
 
 router = APIRouter(tags=["app-ui-flows"])
+CF_BASE = "https://api.cloudflare.com/client/v4"
 
 
 class StatusUpdate(BaseModel):
@@ -457,6 +460,293 @@ async def _admin_rows(sql: str, params: tuple = ()) -> list[dict]:
         return await async_query_auth_db(sql, params)
     except Exception:
         return []
+
+
+def _runtime_status(
+    *,
+    component: str,
+    status: str,
+    message: str,
+    detail: str | None = None,
+    checked_url: str | None = None,
+    latency_ms: int | None = None,
+) -> dict:
+    return {
+        "component": component,
+        "status": status,
+        "message": message,
+        "detail": detail,
+        "checked_url": checked_url,
+        "latency_ms": latency_ms,
+    }
+
+
+def _component_rollup(components: list[dict]) -> str:
+    statuses = {component["status"] for component in components}
+    if "down" in statuses:
+        return "down"
+    if "degraded" in statuses:
+        return "degraded"
+    if "unknown" in statuses:
+        return "unknown"
+    return "ok"
+
+
+def _http_latency_ms(started_at: datetime) -> int:
+    return int((datetime.now(timezone.utc) - started_at).total_seconds() * 1000)
+
+
+async def _probe_inference_runtime(client: httpx.AsyncClient, inference_url: str | None) -> list[dict]:
+    if not inference_url:
+        return [
+            _runtime_status(
+                component="inference_api",
+                status="down",
+                message="SICURRE_INFERENCE_API_URL is not configured.",
+            )
+        ]
+
+    base_url = inference_url.rsplit("/v1/classify", 1)[0].rstrip("/")
+    health_url = f"{base_url}/v1/health"
+    ready_url = f"{base_url}/v1/ready"
+    results = []
+    for name, url in (("inference_health", health_url), ("inference_ready", ready_url)):
+        started = datetime.now(timezone.utc)
+        try:
+            response = await client.get(url)
+            latency = _http_latency_ms(started)
+            results.append(
+                _runtime_status(
+                    component=name,
+                    status="ok" if response.status_code == 200 else "degraded",
+                    message=f"{response.status_code} response from deployed classifier.",
+                    checked_url=url,
+                    latency_ms=latency,
+                )
+            )
+        except Exception as exc:
+            results.append(
+                _runtime_status(
+                    component=name,
+                    status="down",
+                    message="Classifier endpoint is unreachable.",
+                    detail=str(exc)[:220],
+                    checked_url=url,
+                )
+            )
+    return results
+
+
+async def _probe_public_app_runtime(client: httpx.AsyncClient, public_api_url: str | None) -> tuple[list[dict], str | None]:
+    if not public_api_url:
+        return [
+            _runtime_status(
+                component="public_app_api",
+                status="down",
+                message="SICURRE_PUBLIC_API_URL is not configured.",
+            )
+        ], None
+
+    base_url = public_api_url.rstrip("/")
+    scan_url = f"{base_url}/v1/email/scan"
+    health_url = f"{base_url}/health"
+    results = []
+
+    started = datetime.now(timezone.utc)
+    try:
+        response = await client.get(health_url)
+        results.append(
+            _runtime_status(
+                component="public_app_health",
+                status="ok" if response.status_code == 200 else "down",
+                message=f"{response.status_code} response from public Sicurre app API.",
+                checked_url=health_url,
+                latency_ms=_http_latency_ms(started),
+            )
+        )
+    except Exception as exc:
+        results.append(
+            _runtime_status(
+                component="public_app_health",
+                status="down",
+                message="Public Sicurre app API health endpoint is unreachable.",
+                detail=str(exc)[:220],
+                checked_url=health_url,
+            )
+        )
+
+    started = datetime.now(timezone.utc)
+    try:
+        response = await client.post(
+            scan_url,
+            json={
+                "subject": "Sicurre preflight probe",
+                "sender": "preflight@example.com",
+                "text": "Probe without Worker secret.",
+                "use_llm": False,
+                "use_virustotal": False,
+            },
+        )
+        status_value = "ok" if response.status_code == 401 else "down"
+        message = (
+            "Scan gateway exists and rejected the probe without Worker secret."
+            if response.status_code == 401
+            else f"{response.status_code} response from scan gateway; expected 401 without Worker secret."
+        )
+        results.append(
+            _runtime_status(
+                component="email_scan_gateway",
+                status=status_value,
+                message=message,
+                checked_url=scan_url,
+                latency_ms=_http_latency_ms(started),
+            )
+        )
+    except Exception as exc:
+        results.append(
+            _runtime_status(
+                component="email_scan_gateway",
+                status="down",
+                message="Worker scan gateway is unreachable.",
+                detail=str(exc)[:220],
+                checked_url=scan_url,
+            )
+        )
+
+    return results, scan_url
+
+
+async def _probe_cloudflare_runtime(
+    client: httpx.AsyncClient,
+    *,
+    expected_scan_url: str | None,
+) -> list[dict]:
+    rows = await _admin_rows(
+        """
+        SELECT zone_name, zone_id, account_id, worker_name, rule_id, api_token, status
+        FROM cloudflare_integration
+        WHERE status IN ('active', 'pending_verification', 'provisioning')
+        ORDER BY updated_at DESC
+        LIMIT 1
+        """
+    )
+    if not rows:
+        return [
+            _runtime_status(
+                component="cloudflare_worker",
+                status="unknown",
+                message="No active Cloudflare integration is configured.",
+            )
+        ]
+
+    row = rows[0]
+    api_token = row.get("api_token")
+    account_id = row.get("account_id")
+    worker_name = row.get("worker_name")
+    zone_id = row.get("zone_id")
+    rule_id = row.get("rule_id")
+    headers = {"Authorization": f"Bearer {api_token}"}
+    results: list[dict] = []
+
+    if not api_token or not account_id or not worker_name:
+        return [
+            _runtime_status(
+                component="cloudflare_worker",
+                status="down",
+                message="Cloudflare integration is missing token, account id, or Worker name.",
+                detail=f"zone={row.get('zone_name')} status={row.get('status')}",
+            )
+        ]
+
+    settings_url = f"{CF_BASE}/accounts/{account_id}/workers/scripts/{worker_name}/settings"
+    try:
+        response = await client.get(settings_url, headers=headers)
+        payload = response.json()
+        bindings = payload.get("result", {}).get("bindings", []) if response.status_code == 200 else []
+        scan_binding = next((binding for binding in bindings if binding.get("name") == "SICURRE_SCAN_URL"), {})
+        worker_scan_url = scan_binding.get("text")
+        matches_expected = bool(expected_scan_url and worker_scan_url == expected_scan_url)
+        results.append(
+            _runtime_status(
+                component="cloudflare_worker_binding",
+                status="ok" if matches_expected else "down",
+                message=(
+                    "Cloudflare Worker points to the configured public scan gateway."
+                    if matches_expected
+                    else "Cloudflare Worker scan URL does not match the configured public app API."
+                ),
+                detail=f"worker_scan_url={worker_scan_url or 'missing'}",
+                checked_url=worker_scan_url,
+            )
+        )
+    except Exception as exc:
+        results.append(
+            _runtime_status(
+                component="cloudflare_worker_binding",
+                status="down",
+                message="Could not read Cloudflare Worker bindings.",
+                detail=str(exc)[:220],
+                checked_url=settings_url,
+            )
+        )
+
+    if zone_id and rule_id:
+        rules_url = f"{CF_BASE}/zones/{zone_id}/email/routing/rules"
+        try:
+            response = await client.get(rules_url, headers=headers)
+            payload = response.json()
+            rules = payload.get("result", []) if response.status_code == 200 else []
+            rule = next((item for item in rules if item.get("id") == rule_id), None)
+            results.append(
+                _runtime_status(
+                    component="cloudflare_routing_rule",
+                    status="ok" if rule and rule.get("enabled") else "down",
+                    message=(
+                        "Cloudflare routing rule is enabled."
+                        if rule and rule.get("enabled")
+                        else "Cloudflare routing rule is missing or disabled."
+                    ),
+                    detail=f"rule_id={rule_id}",
+                )
+            )
+        except Exception as exc:
+            results.append(
+                _runtime_status(
+                    component="cloudflare_routing_rule",
+                    status="degraded",
+                    message="Could not verify Cloudflare routing rule.",
+                    detail=str(exc)[:220],
+                    checked_url=rules_url,
+                )
+            )
+
+    return results
+
+
+@router.get("/v1/admin/runtime-health")
+async def get_admin_runtime_health(current_user: AuthUser = Depends(get_current_user)):
+    if not current_user.is_platform_admin:
+        raise HTTPException(status_code=403, detail="Platform admin access required")
+
+    settings = get_settings()
+    async with httpx.AsyncClient(timeout=6.0) as client:
+        inference_components = await _probe_inference_runtime(client, settings.inference_api_url)
+        public_app_components, expected_scan_url = await _probe_public_app_runtime(client, settings.public_api_url)
+        cloudflare_components = await _probe_cloudflare_runtime(
+            client,
+            expected_scan_url=expected_scan_url,
+        )
+
+    components = inference_components + public_app_components + cloudflare_components
+    parsed_public = urlparse(settings.public_api_url or "")
+    return {
+        "status": _component_rollup(components),
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "public_api_host": parsed_public.netloc or None,
+        "inference_api_url": settings.inference_api_url,
+        "expected_worker_scan_url": expected_scan_url,
+        "components": components,
+    }
 
 
 @router.get("/v1/admin/overview")

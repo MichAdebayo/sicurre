@@ -39,9 +39,10 @@ import {
   useCloudflareStatus,
   AuthSession,
 } from "../lib/api";
-import { AppToast } from "../components/common/app-toast";
+import { AppToast, type AppToastTone } from "../components/common/app-toast";
 
 const MotionDiv = motion.div as any;
+type SpoofResult = { tone: AppToastTone; message: string };
 
 interface DomainShieldRouteProps {
   session?: AuthSession;
@@ -184,12 +185,20 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
   const [spoofStep, setSpoofStep] = useState<"idle" | "sending" | "analyzing" | "result">("idle");
   const [spoofProgress, setSpoofProgress] = useState(0);
   const [spoofLogs, setSpoofLogs] = useState<string[]>([]);
+  const [spoofResult, setSpoofResult] = useState<SpoofResult | null>(null);
+
+  useEffect(() => {
+    if (!spoofResult) return;
+    const timeoutId = window.setTimeout(() => setSpoofResult(null), 6500);
+    return () => window.clearTimeout(timeoutId);
+  }, [spoofResult]);
 
   const startSpoofSimulation = () => {
     if (spoofStep !== "idle") return;
     setSpoofStep("sending");
     setSpoofProgress(0);
     setSpoofLogs([]);
+    setSpoofResult(null);
 
     const steps = [
       isFR 
@@ -218,6 +227,28 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
       } else {
         clearInterval(interval);
         setSpoofStep("result");
+        if (shieldStatus?.dmarc.policy === "reject") {
+          setSpoofResult({
+            tone: "success",
+            message: isFR
+              ? "Attaque bloquée par DMARC reject."
+              : "Attack blocked by DMARC reject.",
+          });
+        } else if (shieldStatus?.dmarc.policy === "quarantine") {
+          setSpoofResult({
+            tone: "warning",
+            message: isFR
+              ? "Attaque isolée par DMARC quarantine."
+              : "Attack isolated by DMARC quarantine.",
+          });
+        } else {
+          setSpoofResult({
+            tone: "error",
+            message: isFR
+              ? "Domaine vulnérable : DMARC non restrictif."
+              : "Domain vulnerable: DMARC is not restrictive.",
+          });
+        }
       }
     }, 1200);
   };
@@ -347,6 +378,12 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
     if (policy === "reject") return "text-safe bg-safe/10 border-safe/25";
     if (policy === "quarantine") return "text-primary bg-primary/10 border-primary/25";
     return "text-warning bg-warning/10 border-warning/25";
+  };
+
+  const getSpoofResultClass = (tone: AppToastTone) => {
+    if (tone === "success") return "bg-safe-bg border-safe/25 text-safe";
+    if (tone === "error") return "bg-error/10 border-error/25 text-error";
+    return "bg-warning-bg border-warning/25 text-warning";
   };
 
   return (
@@ -556,27 +593,18 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
               <div className="pt-5 border-t border-border-subtle/50 mt-4 flex items-center justify-between">
                 {spoofStep === "result" ? (
                   <div className="flex flex-col gap-2 w-full">
-                    <div className={`p-3 rounded-lg border text-xs font-semibold ${
-                      shieldStatus.dmarc.policy === "reject" || shieldStatus.dmarc.policy === "quarantine"
-                        ? "bg-safe/5 border-safe/20 text-safe"
-                        : "bg-warning/5 border-warning/20 text-warning"
-                    }`}>
-                      {shieldStatus.dmarc.policy === "reject"
-                        ? (isFR 
-                            ? "✅ Attaque bloquée ! Votre politique DMARC 'reject' a rejeté le message falsifié." 
-                            : "✅ Attack Blocked! Your DMARC 'reject' policy discarded the forged email.")
-                        : shieldStatus.dmarc.policy === "quarantine"
-                        ? (isFR 
-                            ? "⚠️ Attaque filtrée : l'email falsifié a été envoyé dans le dossier spam." 
-                            : "⚠️ Attack Filtered: the forged email was routed to spam/quarantine folder.")
-                        : (isFR 
-                            ? "🚨 Vulnérable ! Aucune politique restrictive définie, l'email frauduleux serait délivré." 
-                            : "🚨 Vulnerable! No restrictive DMARC policy defined, the spoofed email would land in user inbox.")}
-                    </div>
+                    {spoofResult && (
+                      <div className={`p-3 rounded-lg border text-[13px] font-semibold leading-5 transition-opacity ${getSpoofResultClass(spoofResult.tone)}`}>
+                        {spoofResult.message}
+                      </div>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setSpoofStep("idle")}
+                      onClick={() => {
+                        setSpoofStep("idle");
+                        setSpoofResult(null);
+                      }}
                       className="w-fit self-end cursor-pointer bg-white text-xs font-bold"
                     >
                       {isFR ? "Recommencer" : "Reset Test"}

@@ -39,7 +39,7 @@ _WORKER_JS = """\
  *   1. Extract sender, subject and body from the inbound email
  *   2. POST to Sicurre scan endpoint (SICURRE_SCAN_URL)
  *   3. If verdict == "phishing"  → reject the message
- *   4. Otherwise                 → forward to FORWARD_TO
+ *   4. Otherwise                 → forward to FORWARD_TO with X-Sicurre trace headers
  *
  * Environment bindings (set via Cloudflare Workers secrets):
  *   SICURRE_SCAN_URL      – e.g. https://api.yourdomain.com/v1/email/scan
@@ -66,6 +66,9 @@ export default {
 
     // ── Call Sicurre scan endpoint ──────────────────────────────────────────
     let verdict = 'safe';
+    let scanStatus = 'unavailable';
+    let confidence = '';
+    let scanHttpStatus = '';
     try {
       const resp = await fetch(env.SICURRE_SCAN_URL, {
         method : 'POST',
@@ -82,11 +85,17 @@ export default {
         }),
         signal: AbortSignal.timeout(10_000),
       });
+      scanHttpStatus = String(resp.status);
       if (resp.ok) {
         const data = await resp.json();
         verdict = (data.verdict || 'safe').toLowerCase();
+        scanStatus = 'scanned';
+        confidence = data.confidence === undefined ? '' : String(data.confidence);
+      } else {
+        scanStatus = 'api-error';
       }
-    } catch (_) {
+    } catch (error) {
+      scanStatus = 'api-unreachable';
       // Fail-open: scan unavailable → forward the message
     }
 
@@ -100,8 +109,16 @@ export default {
       return;
     }
 
-    // Forward clean/spam mail to the verified destination inbox
-    await message.forward(env.FORWARD_TO);
+    // Forward clean/spam mail to the verified destination inbox.
+    // X-* headers are intentionally added so fail-open delivery remains visible
+    // in the destination mailbox headers when the scan API is unavailable.
+    const traceHeaders = new Headers();
+    traceHeaders.set('X-Sicurre-Gateway', 'cloudflare-email-worker');
+    traceHeaders.set('X-Sicurre-Scan-Status', scanStatus);
+    traceHeaders.set('X-Sicurre-Verdict', verdict);
+    traceHeaders.set('X-Sicurre-Scan-Http-Status', scanHttpStatus);
+    traceHeaders.set('X-Sicurre-Confidence', confidence);
+    await message.forward(env.FORWARD_TO, traceHeaders);
   },
 };
 """

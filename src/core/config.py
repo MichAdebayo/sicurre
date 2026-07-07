@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import urlparse
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -89,7 +90,8 @@ class Settings(BaseSettings):
         default=None, validation_alias="INFERENCE_API_KEY"
     )
     inference_api_url: str | None = Field(
-        default=None, validation_alias="INFERENCE_API_URL"
+        default=None,
+        validation_alias=AliasChoices("SICURRE_INFERENCE_API_URL", "INFERENCE_API_URL"),
     )
     # Public base URL of this API (used by Cloudflare Workers to call back)
     # Must be reachable from the internet, e.g. https://api.yourdomain.com
@@ -130,6 +132,33 @@ class Settings(BaseSettings):
         env_prefix="SICURRE_",
         extra="ignore",
     )
+
+    @field_validator("inference_api_url", "public_api_url")
+    @classmethod
+    def _validate_runtime_url(cls, value: str | None, info) -> str | None:
+        if value is None:
+            return value
+        normalized = value.strip().rstrip("/")
+        if not normalized:
+            return None
+
+        parsed = urlparse(normalized)
+        hostname = parsed.hostname or ""
+        if parsed.scheme not in {"http", "https"} or not hostname:
+            raise ValueError(f"{info.field_name} must be an absolute HTTP(S) URL")
+        if "." not in hostname and hostname not in {"localhost"} and not hostname.startswith("127."):
+            raise ValueError(
+                f"{info.field_name} host '{hostname}' is not valid; use a real host such as api.sicurre.com"
+            )
+
+        path = parsed.path.rstrip("/")
+        if info.field_name == "inference_api_url" and path != "/v1/classify":
+            raise ValueError("inference_api_url must point to the classifier endpoint ending in /v1/classify")
+        if info.field_name == "public_api_url" and path in {"/v1/classify", "/v1/email/scan"}:
+            raise ValueError(
+                "public_api_url must be the public Sicurre app API base URL, not a /v1 endpoint"
+            )
+        return normalized
 
     @property
     def sync_database_url(self) -> str:

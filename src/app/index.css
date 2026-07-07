@@ -77,7 +77,7 @@
   --color-tertiary-fixed-dim: #ffb59a;
 
   /* ── Semantic Verdict Colors (from brand-identity.md) ── */
-  --color-safe: #10b981;
+  --color-safe: #047857;
   --color-safe-bg: #ecfdf5;
   --color-danger: #ef4444;
   --color-danger-bg: #fef2f2;
@@ -233,8 +233,8 @@
 
   .app-h3 {
     font-family: var(--font-display);
-    font-size: 15px;
-    line-height: 22px;
+    font-size: 16px;
+    line-height: 24px;
     font-weight: 700;
     color: var(--color-on-surface);
   }
@@ -249,16 +249,16 @@
 
   .app-body-normal {
     font-family: var(--font-sans);
-    font-size: 13px;
-    line-height: 20px;
+    font-size: 14px;
+    line-height: 21px;
     font-weight: 500;
     color: var(--color-on-surface);
   }
 
   .app-body-sub {
     font-family: var(--font-sans);
-    font-size: 13px;
-    line-height: 20px;
+    font-size: 14px;
+    line-height: 21px;
     font-weight: 500;
     color: var(--color-on-surface-variant);
   }
@@ -275,9 +275,44 @@
 
   .app-mono-data {
     font-family: var(--font-mono);
-    font-size: 11px;
-    line-height: 16px;
+    font-size: 12px;
+    line-height: 18px;
     font-weight: 500;
+  }
+
+  .app-readable .text-xs {
+    font-size: 13px;
+    line-height: 18px;
+  }
+
+  .app-readable .text-\[9px\],
+  .app-readable .text-\[10px\],
+  .app-readable .text-\[11px\] {
+    font-size: 12px;
+    line-height: 16px;
+  }
+
+  .app-readable .text-\[12px\] {
+    font-size: 13px;
+    line-height: 18px;
+  }
+
+  .app-readable .font-mono:not(code):not(pre),
+  .app-readable .text-mono-data {
+    font-family: var(--font-sans);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .app-readable code,
+  .app-readable pre,
+  .app-readable kbd {
+    font-family: var(--font-mono);
+  }
+
+  .app-readable input::placeholder,
+  .app-readable textarea::placeholder {
+    color: color-mix(in srgb, var(--color-on-surface-variant) 82%, transparent);
+    opacity: 1;
   }
 }
 
@@ -413,6 +448,7 @@ html.dark {
   --color-error-container: #4a1414;
   --color-on-error-container: #ffe1e1;
   --color-safe-bg: #0d2c24;
+  --color-safe: #34d399;
   --color-danger-bg: #3a1215;
   --color-warning-bg: #332508;
 }

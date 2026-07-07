@@ -31,6 +31,7 @@
     "nav_quarantine": "Quarantine Zone",
     "nav_alerts": "Alerts & Rules",
     "nav_domain_shield": "Domain Shield",
+    "nav_admin_console": "Admin Console",
     "nav_settings": "Settings",
     "nav_support": "Support",
     "lockdown": "Emergency Lockdown"
@@ -132,7 +133,7 @@
     "quiet_hours_desc": "No email alerts will be sent during this window (default: 22:00 - 07:00).",
     "section_rules": "Custom Filtering Rules",
     "rule_type": "Rule Type",
-    "pattern": "Pattern (email or domain)",
+    "pattern": "Pattern",
     "add_rule": "Add Custom Rule",
     "whitelist": "Allow (Whitelist)",
     "blocklist": "Block (Blocklist)",

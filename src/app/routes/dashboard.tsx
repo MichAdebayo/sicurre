@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import {
@@ -25,6 +25,12 @@ import {
 } from "../lib/api";
 
 const MotionDiv = motion.div as any;
+const LAST_ACTIVE_DOMAIN_KEY = "sicurre_last_active_domain";
+
+const readLastActiveDomain = () => {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(LAST_ACTIVE_DOMAIN_KEY) || "";
+};
 
 interface DashboardRouteProps {
   session: AuthSession;
@@ -82,14 +88,22 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
 
   // Domains & Shield status check for security score
   const { data: domainsList } = useCloudflareList();
-  const hasActiveDomain = !!domainsList && domainsList.length > 0;
-  const showOnboarding = session.onboarding_required || !hasActiveDomain;
+  const [cachedActiveDomain, setCachedActiveDomain] = useState(readLastActiveDomain);
 
-  const activeDomain = hasActiveDomain
+  const cloudflareActiveDomain = domainsList && domainsList.length > 0
     ? (domainsList.find((d) => d.status === "active")?.zone_name || domainsList[0].zone_name)
     : "";
+  const activeDomain = cloudflareActiveDomain || cachedActiveDomain;
+  const hasActiveDomain = !!activeDomain;
+  const showOnboarding = session.onboarding_required || (domainsList ? domainsList.length === 0 : !activeDomain);
 
-  const { data: shieldStatus, isLoading: shieldLoading } = useDomainShieldStatus(
+  useEffect(() => {
+    if (!cloudflareActiveDomain || typeof window === "undefined") return;
+    window.localStorage.setItem(LAST_ACTIVE_DOMAIN_KEY, cloudflareActiveDomain);
+    setCachedActiveDomain(cloudflareActiveDomain);
+  }, [cloudflareActiveDomain]);
+
+  const { data: shieldStatus } = useDomainShieldStatus(
     activeDomain || "",
     !!activeDomain
   );
@@ -211,10 +225,8 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
     : [];
 
   const securityScoreGrade = () => {
-    if (!domainsList || domainsList.length === 0) return "—";
-    if (shieldLoading) return "L";
     if (shieldStatus) return shieldStatus.score_grade;
-    return "A";
+    return "—";
   };
 
   const grade = securityScoreGrade();
@@ -450,11 +462,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                 </div>
               </div>
               <div className="w-28 h-28 rounded-full bg-primary/[0.04] border border-primary/10 flex items-center justify-center font-display font-extrabold text-5xl text-primary shadow-inner">
-                {grade === "L" ? (
-                  <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin text-primary" />
-                ) : (
-                  grade
-                )}
+                {grade}
               </div>
             </div>
 
@@ -478,7 +486,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                     <h3 className="font-display font-semibold text-[17px] text-on-surface">
                       {t("dashboard.verdict_distribution")}
                     </h3>
-                    <p className="text-[11px] text-on-surface-variant font-medium">
+                    <p className="text-[13px] text-on-surface-variant font-medium leading-5">
                       {i18n.language === "fr" ? "Répartition des emails par classification IA" : "Distribution of emails by AI safety classification"}
                     </p>
                   </div>
@@ -503,7 +511,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                       <h3 className="font-display font-semibold text-[17px] text-on-surface">
                         {i18n.language === "fr" ? "Analyse des Tendances" : "Trend Analysis"}
                       </h3>
-                      <p className="text-[11px] text-on-surface-variant font-medium">
+                      <p className="text-[13px] text-on-surface-variant font-medium leading-5">
                         {t("dashboard.scans_over_time")}
                       </p>
                     </div>
@@ -518,7 +526,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                           setDateRange(r);
                           setHoveredBarIndex(null);
                         }}
-                        className={`px-2.5 py-1 text-[10px] font-bold rounded transition-all cursor-pointer ${
+                      className={`px-2.5 py-1 text-[12px] font-bold rounded transition-all cursor-pointer ${
                           dateRange === r
                             ? "bg-white text-primary shadow-sm"
                             : "text-on-surface-variant hover:text-on-surface"
@@ -537,7 +545,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                 {/* Stacked interactive bars chart wrapped in overflow container (Height increased to h-56) */}
                 <div className="w-full overflow-x-auto select-none scrollbar-none pb-1">
                   <div 
-                    className={`h-56 pt-2 flex items-end justify-between gap-2.5 w-full font-sans text-[10px] font-bold text-on-surface-variant select-none ${
+                    className={`h-56 pt-2 flex items-end justify-between gap-2.5 w-full font-sans text-[12px] font-bold text-on-surface-variant select-none ${
                       dateRange !== "7d" ? "min-w-[650px]" : ""
                     }`}
                   >
@@ -559,7 +567,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                           onMouseLeave={() => setHoveredBarIndex(null)}
                         >
                           {/* Daily total value displayed above the bar */}
-                          <span className="font-extrabold text-[12px] text-primary/80 mb-0.5 group-hover:text-primary transition-colors">
+                          <span className="font-extrabold text-[13px] text-primary/85 mb-0.5 group-hover:text-primary transition-colors tabular-nums">
                             {total}
                           </span>
 
@@ -583,7 +591,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                               />
                             )}
                           </div>
-                          <span className="text-[10px] uppercase tracking-wider text-on-surface-variant truncate w-full text-center font-bold">
+                          <span className="text-[12px] text-on-surface-variant truncate w-full text-center font-bold">
                             {label}
                           </span>
                         </div>
@@ -594,7 +602,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
 
                 {/* Absolute Floating Tooltip Card (Only displays breakdown counts, no date/totals) */}
                 {hoveredBarIndex !== null && (
-                  <div className="absolute top-16 right-6 z-35 p-3 bg-white border border-border-subtle text-on-surface rounded-xl text-[11px] shadow-xl flex flex-col gap-1.5 w-44 font-sans select-none pointer-events-none animate-in fade-in duration-100">
+                  <div className="absolute top-16 right-6 z-35 p-3 bg-white border border-border-subtle text-on-surface rounded-xl text-[13px] shadow-xl flex flex-col gap-1.5 w-48 font-sans select-none pointer-events-none animate-in fade-in duration-100">
                     <div className="flex items-center justify-between gap-2 font-bold text-safe border-b border-border-subtle/40 pb-1.5 mb-0.5">
                       <span className="flex items-center gap-1.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-safe" />
@@ -698,7 +706,7 @@ function DistributionRow({ label, count, total, colorClass }: { label: string; c
     <div className="space-y-1.5 animate-in fade-in duration-300">
       <div className="flex justify-between text-sm">
         <span className="font-semibold text-on-surface">{label}</span>
-        <span className="text-on-surface font-mono text-[12px] font-bold">
+        <span className="text-on-surface text-sm font-bold tabular-nums">
           {count.toLocaleString()} · {pct} %
         </span>
       </div>

@@ -107,6 +107,22 @@ export interface AdminOverview {
   }[];
 }
 
+export interface AdminRuntimeHealth {
+  status: "ok" | "degraded" | "down" | "unknown";
+  checked_at: string;
+  public_api_host: string | null;
+  inference_api_url: string | null;
+  expected_worker_scan_url: string | null;
+  components: {
+    component: string;
+    status: "ok" | "degraded" | "down" | "unknown";
+    message: string;
+    detail: string | null;
+    checked_url: string | null;
+    latency_ms: number | null;
+  }[];
+}
+
 export interface CloudflareStatus {
   status: "not_configured" | "provisioning" | "pending_verification" | "active" | "error";
   id?: string;
@@ -308,6 +324,15 @@ export function useAdminOverview() {
     queryKey: ["admin-overview"],
     queryFn: () => fetchJson<AdminOverview>("/admin/overview"),
     refetchInterval: 15000,
+  });
+}
+
+export function useAdminRuntimeHealth(enabled = true) {
+  return useQuery<AdminRuntimeHealth>({
+    queryKey: ["admin-runtime-health"],
+    queryFn: () => fetchJson<AdminRuntimeHealth>("/admin/runtime-health"),
+    enabled,
+    refetchInterval: 30000,
   });
 }
 
@@ -645,6 +670,27 @@ export interface DomainShieldStatus {
   updated_at?: string;
 }
 
+const domainShieldCacheKey = (domain: string) => `sicurre_domain_shield_status:${domain}`;
+
+function readCachedDomainShieldStatus(domain: string): DomainShieldStatus | undefined {
+  if (!domain || typeof window === "undefined") return undefined;
+  try {
+    const raw = window.localStorage.getItem(domainShieldCacheKey(domain));
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw) as DomainShieldStatus;
+    if (typeof parsed?.reputation_score !== "number" || !parsed?.score_grade) return undefined;
+    return parsed;
+  } catch {
+    window.localStorage.removeItem(domainShieldCacheKey(domain));
+    return undefined;
+  }
+}
+
+function persistDomainShieldStatus(domain: string, status: DomainShieldStatus): void {
+  if (!domain || typeof window === "undefined") return;
+  window.localStorage.setItem(domainShieldCacheKey(domain), JSON.stringify(status));
+}
+
 export interface DmarcReportSummary {
   domain: string;
   total_messages: number;
@@ -664,9 +710,17 @@ export interface DmarcReportSummary {
 export function useDomainShieldStatus(domain: string, enabled = true) {
   return useQuery<DomainShieldStatus>({
     queryKey: ["domain-shield", domain],
-    queryFn: () => fetchJson<DomainShieldStatus>(`/domain-shield/${domain}/status`),
+    queryFn: async () => {
+      const status = await fetchJson<DomainShieldStatus>(`/domain-shield/${domain}/status`);
+      persistDomainShieldStatus(domain, status);
+      return status;
+    },
     enabled: enabled && !!domain,
+    initialData: () => readCachedDomainShieldStatus(domain),
     staleTime: 1000 * 60 * 60, // Consider data fresh for 1 hour to prevent unnecessary refetches
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }
 
@@ -684,6 +738,7 @@ export function useRefreshDomainShieldStatus() {
     mutationFn: (domain: string) =>
       fetchJson<DomainShieldStatus>(`/domain-shield/${domain}/status?refresh=true`),
     onSuccess: (data, domain) => {
+      persistDomainShieldStatus(domain, data);
       queryClient.setQueryData(["domain-shield", domain], data);
     },
   });

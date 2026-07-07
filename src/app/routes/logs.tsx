@@ -7,10 +7,11 @@ import {
   Flag,
   Inbox,
   RefreshCw,
+  Server,
   ShieldCheck,
   Users,
 } from "lucide-react";
-import { useAdminOverview } from "../lib/api";
+import { useAdminOverview, useAdminRuntimeHealth, type AdminRuntimeHealth } from "../lib/api";
 
 const MotionDiv = motion.div as any;
 
@@ -58,9 +59,95 @@ function EmptyPanel({ title, body }: { title: string; body: string }) {
   );
 }
 
+function statusLabel(status: AdminRuntimeHealth["status"]) {
+  if (status === "ok") return "Opérationnel";
+  if (status === "degraded") return "Dégradé";
+  if (status === "down") return "Incident";
+  return "Inconnu";
+}
+
+function statusClass(status: AdminRuntimeHealth["status"]) {
+  if (status === "ok") return "border-safe/25 bg-safe-bg text-safe dark:bg-safe-bg";
+  if (status === "degraded") return "border-warning/25 bg-warning-bg text-warning dark:bg-warning-bg";
+  if (status === "down") return "border-error/25 bg-error/10 text-error";
+  return "border-border-subtle bg-surface-low text-on-surface-variant";
+}
+
+function RuntimeHealthPanel({
+  health,
+  isLoading,
+}: {
+  health?: AdminRuntimeHealth;
+  isLoading: boolean;
+}) {
+  return (
+    <section className="rounded-lg border border-border-subtle bg-surface-lowest p-5 dark:bg-surface-low">
+      <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-fixed text-primary dark:bg-primary-container dark:text-on-primary-container">
+            <Server className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="app-h2">Santé runtime</h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-on-surface-variant">
+              Préflight admin des dépendances critiques: API publique de scan, classifier déployé, Worker Cloudflare et règle de routage.
+            </p>
+          </div>
+        </div>
+        <span className={`w-fit rounded-full border px-3 py-1 text-sm font-bold ${statusClass(health?.status || "unknown")}`}>
+          {isLoading ? "Vérification" : statusLabel(health?.status || "unknown")}
+        </span>
+      </div>
+
+      {isLoading && !health ? (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {[0, 1, 2, 3].map((item) => (
+            <div key={item} className="h-28 animate-pulse rounded-lg bg-surface-low dark:bg-surface" />
+          ))}
+        </div>
+      ) : health ? (
+        <>
+          <div className="mb-4 grid gap-3 text-sm md:grid-cols-2">
+            <div className="rounded-lg bg-surface-low p-3 dark:bg-surface">
+              <p className="font-bold text-on-surface">Gateway Worker attendu</p>
+              <p className="mt-1 break-all text-on-surface-variant">{health.expected_worker_scan_url || "Non configuré"}</p>
+            </div>
+            <div className="rounded-lg bg-surface-low p-3 dark:bg-surface">
+              <p className="font-bold text-on-surface">Classifier app runtime</p>
+              <p className="mt-1 break-all text-on-surface-variant">{health.inference_api_url || "Non configuré"}</p>
+            </div>
+          </div>
+          <div className="grid gap-3 xl:grid-cols-2">
+            {health.components.map((component) => (
+              <div key={component.component} className={`rounded-lg border p-4 ${statusClass(component.status)}`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-bold text-on-surface">{component.component.replaceAll("_", " ")}</p>
+                  <span className="rounded-full bg-white/70 px-2.5 py-0.5 text-xs font-bold text-current dark:bg-black/15">
+                    {statusLabel(component.status)}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm leading-6 text-current">{component.message}</p>
+                {component.detail && (
+                  <p className="mt-2 break-all text-xs font-semibold text-current/80">{component.detail}</p>
+                )}
+                {component.latency_ms !== null && (
+                  <p className="mt-2 text-xs font-bold text-current/75">{component.latency_ms} ms</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <EmptyPanel title="Préflight indisponible" body="La santé runtime sera affichée ici dès que l’endpoint admin répond." />
+      )}
+    </section>
+  );
+}
+
 export default function LogsRoute() {
   const reduceMotion = useReducedMotion();
   const { data, isLoading, isError, refetch, isFetching } = useAdminOverview();
+  const runtimeHealth = useAdminRuntimeHealth();
 
   return (
     <MotionDiv
@@ -109,6 +196,8 @@ export default function LogsRoute() {
 
       {data && (
         <>
+          <RuntimeHealthPanel health={runtimeHealth.data} isLoading={runtimeHealth.isLoading} />
+
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <AdminMetric icon={<Users className="h-5 w-5" />} label="Workspaces" value={data.summary.workspaces_count} help="Espaces client connus par le runtime." />
             <AdminMetric icon={<Activity className="h-5 w-5" />} label="Événements" value={data.summary.threat_events_count} help="Verdicts enregistrés sans messages supprimés." />

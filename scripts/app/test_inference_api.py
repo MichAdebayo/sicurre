@@ -54,7 +54,9 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parents[2] / ".env", override=True)
 
 BASE_URL = (
-    os.getenv("INFERENCE_API_URL") or "http://localhost:8000/v1/classify"
+    os.getenv("SICURRE_INFERENCE_API_URL")
+    or os.getenv("INFERENCE_API_URL")
+    or "http://localhost:8000/v1/classify"
 ).rsplit("/classify", 1)[0]
 API_KEY = os.getenv("INFERENCE_API_KEY") or ""
 CLASSIFY_URL = f"{BASE_URL}/classify"

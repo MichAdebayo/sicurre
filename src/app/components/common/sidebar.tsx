@@ -69,7 +69,7 @@ export function Sidebar({
       baseNav[2], // quarantine
       baseNav[3], // alerts
       baseNav[4], // domain-shield
-      { id: "logs", label: t("common.threat_log"), icon: History },
+      { id: "logs", label: t("sidebar.nav_admin_console"), icon: History },
       baseNav[5], // settings
     ]
     : baseNav;

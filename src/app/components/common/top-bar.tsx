@@ -16,6 +16,7 @@ import {
   useDomainShieldStatus,
   useQuarantineItems,
   useAlertHistory,
+  useAdminRuntimeHealth,
 } from "../../lib/api";
 
 interface TopBarProps {
@@ -33,6 +34,7 @@ export function TopBar({
 }: TopBarProps) {
   const { t, i18n } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
+  const runtimeHealth = useAdminRuntimeHealth(userRole === "admin");
 
   // Persistent notification read IDs using localStorage
   const [readIds, setReadIds] = useState<string[]>(() => {
@@ -251,12 +253,28 @@ export function TopBar({
         {userRole === "admin" && (
           <div className="flex items-center gap-2 pr-2 border-r border-border-subtle/50">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-safe" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-safe" />
+              {runtimeHealth.data?.status === "ok" && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-safe" />
+              )}
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${
+                runtimeHealth.data?.status === "down"
+                  ? "bg-error"
+                  : runtimeHealth.data?.status === "degraded"
+                  ? "bg-warning"
+                  : runtimeHealth.data?.status === "unknown"
+                  ? "bg-on-surface-variant"
+                  : "bg-safe"
+              }`} />
             </span>
             <span className="text-[9px] font-bold text-on-surface-variant/80 uppercase flex items-center gap-1">
               <Cpu className="w-3 h-3 text-primary" />
-              {i18n.language === "fr" ? "Système Actif" : "System Operational"}
+              {runtimeHealth.data?.status === "down"
+                ? (i18n.language === "fr" ? "Incident Runtime" : "Runtime Incident")
+                : runtimeHealth.data?.status === "degraded"
+                ? (i18n.language === "fr" ? "Runtime Dégradé" : "Runtime Degraded")
+                : runtimeHealth.isLoading
+                ? (i18n.language === "fr" ? "Vérification" : "Checking")
+                : (i18n.language === "fr" ? "Système Actif" : "System Operational")}
             </span>
           </div>
         )}

@@ -24,6 +24,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import secrets
 import sqlite3
 from datetime import datetime, timezone, timedelta
 from typing import Any
@@ -614,6 +615,12 @@ async def setup_cloudflare(
     """
     _ensure_tables()
     settings = get_settings()
+    public_api_url = (
+        settings.public_api_url.rstrip("/")
+        if settings.public_api_url
+        else str(request.base_url).rstrip("/")
+    )
+    scan_url = f"{public_api_url}/v1/email/scan"
 
     # Check for an existing active integration for this zone
     existing = await _async_query(
@@ -630,8 +637,9 @@ async def setup_cloudflare(
 
         now = datetime.now(timezone.utc).isoformat()
         try:
+            provisioner = CloudflareProvisioner(api_token=payload.cf_api_token)
             dns_sync_result = await _sync_domain_shield_dns(
-                provisioner=CloudflareProvisioner(api_token=payload.cf_api_token),
+                provisioner=provisioner,
                 workspace_id=current_user.workspace_id,
                 zone_name=payload.zone_name,
                 fix_spf=payload.fix_spf,
@@ -647,6 +655,41 @@ async def setup_cloudflare(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=f"Cloudflare DNS update failed: {exc}",
             ) from exc
+
+        worker_update_result: dict[str, Any] | None = None
+        if row.get("account_id") and row.get("worker_name") and row.get("destination_email"):
+            try:
+                shared_secret = secrets.token_urlsafe(40)
+                shared_secret_hash = hashlib.sha256(shared_secret.encode()).hexdigest()
+                await provisioner.deploy_email_worker(
+                    account_id=row["account_id"],
+                    worker_name=row["worker_name"],
+                    scan_url=scan_url,
+                    shared_secret=shared_secret,
+                    forward_to=row["destination_email"],
+                )
+                await _async_query(
+                    """
+                    UPDATE cloudflare_integration
+                    SET shared_secret_hash=?, api_token=?, error_message=NULL, updated_at=?
+                    WHERE id=?
+                    """,
+                    (shared_secret_hash, payload.cf_api_token, now, row["id"]),
+                )
+                worker_update_result = {
+                    "updated": True,
+                    "scan_url": scan_url,
+                    "worker_name": row["worker_name"],
+                }
+            except CloudflareAPIError as exc:
+                await _async_query(
+                    "UPDATE cloudflare_integration SET error_message=?, api_token=?, updated_at=? WHERE id=?",
+                    (str(exc)[:500], payload.cf_api_token, now, row["id"]),
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Cloudflare Worker update failed: {exc}",
+                ) from exc
 
         await _async_query(
             """
@@ -683,16 +726,9 @@ async def setup_cloudflare(
             "zone_name": payload.zone_name,
             "destination_email": row["destination_email"],
             "dns_sync": dns_sync_result,
+            "worker_update": worker_update_result,
             "message": "Domain Shield DNS configuration applied.",
         }
-
-    # Derive the public scan URL for the Worker to call back
-    public_api_url = (
-        settings.public_api_url.rstrip("/")
-        if settings.public_api_url
-        else str(request.base_url).rstrip("/")
-    )
-    scan_url = f"{public_api_url}/v1/email/scan"
 
     # Insert a "provisioning" record so the UI can poll while setup runs
     integration_id = str(uuid4())

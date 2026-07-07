@@ -29,3 +29,12 @@ def test_database_historical_cron_counts_are_configurable() -> None:
 
     assert settings.database_historical_cron_total_count == 500
     assert settings.database_historical_cron_max_total_count == 1000
+
+
+def test_sicurre_inference_url_overrides_local_fallback(monkeypatch) -> None:
+    monkeypatch.setenv("INFERENCE_API_URL", "http://localhost:8000/v1/classify")
+    monkeypatch.setenv("SICURRE_INFERENCE_API_URL", "https://api.sicurre.com/v1/classify")
+
+    settings = Settings(_env_file=None)
+
+    assert settings.inference_api_url == "https://api.sicurre.com/v1/classify"

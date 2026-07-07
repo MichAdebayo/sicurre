@@ -31,6 +31,7 @@
     "nav_quarantine": "Zone de Quarantaine",
     "nav_alerts": "Alertes & Règles",
     "nav_domain_shield": "Bouclier de Domaine",
+    "nav_admin_console": "Console admin",
     "nav_settings": "Paramètres",
     "nav_support": "Support",
     "lockdown": "Verrouillage d'urgence"
@@ -132,7 +133,7 @@
     "quiet_hours_desc": "Aucune alerte email ne sera envoyée durant cette plage horaire (par défaut : 22h00 - 07h00).",
     "section_rules": "Filtres et Règles sur Mesure",
     "rule_type": "Type de Règle",
-    "pattern": "Motif (adresse email ou nom de domaine)",
+    "pattern": "Motif",
     "add_rule": "Ajouter la Règle",
     "whitelist": "Autoriser (Liste blanche)",
     "blocklist": "Bloquer (Liste noire)",
