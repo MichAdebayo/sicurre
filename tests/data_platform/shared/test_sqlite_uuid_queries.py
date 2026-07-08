@@ -134,7 +134,7 @@ async def test_dataset_export_join_matches_hyphenated_and_hex_uuid_storage(
                  'training', 'frozen', 1, :now)
             """
         ),
-        {"id": dataset_id.hex, "now": now},
+        {"id": str(dataset_id), "now": now},
     )
     await session.execute(
         text(
@@ -148,7 +148,7 @@ async def test_dataset_export_join_matches_hyphenated_and_hex_uuid_storage(
             """
         ),
         {
-            "dataset_id": dataset_id.hex,
+            "dataset_id": str(dataset_id),
             "normalized_message_id": normalized_hex,
             "now": now,
         },

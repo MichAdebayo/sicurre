@@ -60,9 +60,34 @@ Recommended production cadence:
 - `sekoia`: weekly by default; daily during active phishing campaign monitoring
 - `certfr`: weekly
 - `database_historical`: monthly
-- `common_crawl`: monthly with resumable checkpoints
+- `common_crawl`: monthly with resumable checkpoints; scans recent indexes first
+  across a bounded lookback window (`SICURRE_CC_CRON_LOOKBACK_INDICES`, default
+  `18`) and skips completed indexes. `CC-MAIN-2025-08` is the base cutoff: the
+  frozen base artifacts cover selected historical CC indexes through that point,
+  and cron territory starts with newer indexes.
 - `dataset_release`: monthly after all selected source jobs, normalization, and
   annotation complete successfully
+
+Common Crawl checkpoint semantics:
+
+- A CC index is written to `completed_indices` only after the whole index
+  finishes.
+- If the job times out mid-index, partial R2 snapshots may still be flushed, but
+  the index is recorded under `timed_out_indices` and retried by a later cron.
+- Hard index-level failures retry with
+  `SICURRE_CC_CRON_INDEX_MAX_ATTEMPTS` (default `3`) and
+  `SICURRE_CC_CRON_INDEX_RETRY_BACKOFF_SECONDS` (default `60`). Exhausted
+  failures are recorded under `failed_indices`, not treated as complete.
+
+As of July 8, 2026, live Common Crawl `collinfo.json` starts at
+`CC-MAIN-2026-25`. With the default lookback of `18`, the cron can see the full
+current post-base backlog:
+`CC-MAIN-2026-25`, `2026-21`, `2026-17`, `2026-12`, `2026-08`, `2026-04`,
+`2025-51`, `2025-47`, `2025-43`, `2025-38`, `2025-33`, `2025-30`,
+`2025-26`, `2025-21`, `2025-18`, and `2025-13`.
+Setting a minimum around January 2025 is reasonable as a human policy boundary,
+but the operational cutoff should remain `CC-MAIN-2025-08` because that is the
+known base index already represented in the frozen Common Crawl base artifacts.
 
 The monthly release should be gate-based:
 
@@ -81,7 +106,7 @@ at PostgreSQL/Neon once the flow is stable.
 
 ## Kaggle Placeholder Artifact
 
-The existing single-file Kaggle `train.csv` was a connectivity smoke test, not a
-valid training dataset release. It should be superseded by the first real
-monthly release containing all expected train/val/test artifacts generated from
-the frozen database dataset.
+The original single-file Kaggle `train.csv` was a connectivity smoke test, not
+a valid training dataset release. It has been superseded by a frozen replay
+publish containing `train.csv`, `val.csv`, and `test.csv` generated from
+`data_dataset.version_tag = 20260506-075504`.

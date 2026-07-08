@@ -1,0 +1,22 @@
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app/src \
+    UV_CACHE_DIR=/tmp/uv-cache
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir uv
+
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --group backend --group dev --group storage
+
+COPY alembic.ini ./
+COPY src ./src
+COPY scripts ./scripts
+
+RUN mkdir -p data/local data/raw
+
+EXPOSE 8001
+
+CMD ["uv", "run", "uvicorn", "data_platform.api.main:app", "--host", "0.0.0.0", "--port", "8001"]

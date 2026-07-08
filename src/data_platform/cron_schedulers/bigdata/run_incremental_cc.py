@@ -126,6 +126,8 @@ async def run_incremental_cc_cron() -> None:
     extractor = IncrementalCommonCrawlExtractor(
         max_runtime_seconds=max_runtime,
         lookback_indices=settings.cc_cron_lookback_indices,
+        max_index_attempts=settings.cc_cron_index_max_attempts,
+        index_retry_backoff_seconds=settings.cc_cron_index_retry_backoff_seconds,
     )
 
     ingestion_results: list[CommonCrawlIngestionResult] = []
@@ -141,6 +143,7 @@ async def run_incremental_cc_cron() -> None:
     logger.info("--- CC Cron Summary ---")
     logger.info("Indices attempted: %s", result.indices_attempted)
     logger.info("Indices completed: %s", result.indices_completed)
+    logger.info("Indices failed:    %s", result.indices_failed)
     logger.info("Total extracted:   %d", result.total_extracted)
     logger.info("Timed out:         %s", result.timed_out)
     logger.info("R2 URIs:           %s", result.r2_uris)

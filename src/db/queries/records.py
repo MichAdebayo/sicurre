@@ -84,9 +84,29 @@ def _uuid_text_match(left: object, right: object) -> object:
     keeps local exports and split filters stable while remaining valid on
     PostgreSQL via explicit text casts.
     """
+    if isinstance(left, UUID):
+        left = str(left)
+    if isinstance(right, UUID):
+        right = str(right)
     left_text = func.lower(func.replace(sa.cast(left, sa.Text()), "-", ""))
     right_text = func.lower(func.replace(sa.cast(right, sa.Text()), "-", ""))
     return left_text == right_text
+
+
+def _uuid_string_variants(value: object) -> set[str]:
+    text = str(value)
+    compact = text.replace("-", "").lower()
+    if len(compact) == 32:
+        hyphenated = (
+            f"{compact[0:8]}-{compact[8:12]}-{compact[12:16]}-"
+            f"{compact[16:20]}-{compact[20:32]}"
+        )
+        return {compact, hyphenated}
+    return {text}
+
+
+def _uuid_canonical(value: object) -> str:
+    return str(value).replace("-", "").lower()
 
 
 def _compute_split_counts(
@@ -454,11 +474,17 @@ class DatasetQueries:
         kaggle_version_id: int,
         published_at: datetime,
     ) -> None:
-        dataset = await session.get(DataDataset, dataset_id)
-        if dataset is None:
+        result = await session.execute(
+            sa.update(DataDataset)
+            .where(sa.cast(DataDataset.id, sa.Text()).in_(_uuid_string_variants(dataset_id)))
+            .values(
+                kaggle_version_id=kaggle_version_id,
+                published_at=published_at,
+            )
+        )
+        if result.rowcount == 0:
+            await session.rollback()
             raise DatasetNotFoundError(dataset_id)
-        dataset.kaggle_version_id = kaggle_version_id
-        dataset.published_at = published_at
         await session.commit()
 
     async def list_items_for_export(
@@ -469,26 +495,46 @@ class DatasetQueries:
         split_name: str,
     ) -> list[tuple[str, str]]:
         """Return (normalized_text, label) pairs for the given split."""
-        result = await session.execute(
-            select(
-                DataNormalizedMessage.normalized_text,
-                DataNormalizedMessage.current_label,
+        item_result = await session.execute(
+            select(DataDatasetItem.normalized_message_id)
+            .where(
+                sa.cast(DataDatasetItem.dataset_id, sa.Text()).in_(
+                    _uuid_string_variants(dataset_id)
+                )
             )
-            .join(
-                DataDatasetItem,
-                _uuid_text_match(
-                    DataDatasetItem.normalized_message_id,
-                    DataNormalizedMessage.id,
-                ),
-            )
-            .where(DataDatasetItem.dataset_id == dataset_id)
             .where(DataDatasetItem.split_name == split_name)
             .order_by(
                 DataDatasetItem.row_order.asc().nulls_last(),
                 DataDatasetItem.created_at.asc(),
             )
         )
-        return [(str(row[0]), str(row[1])) for row in result.all()]
+        item_ids = list(item_result.scalars().all())
+        if not item_ids:
+            return []
+
+        message_variants: list[str] = []
+        for item_id in item_ids:
+            message_variants.extend(sorted(_uuid_string_variants(item_id)))
+
+        message_rows: dict[str, tuple[str, str]] = {}
+        batch_size = 500
+        for start in range(0, len(message_variants), batch_size):
+            batch = message_variants[start : start + batch_size]
+            result = await session.execute(
+                select(
+                    DataNormalizedMessage.id,
+                    DataNormalizedMessage.normalized_text,
+                    DataNormalizedMessage.current_label,
+                ).where(sa.cast(DataNormalizedMessage.id, sa.Text()).in_(batch))
+            )
+            for row in result.all():
+                message_rows[_uuid_canonical(row[0])] = (str(row[1]), str(row[2]))
+
+        return [
+            message_rows[_uuid_canonical(item_id)]
+            for item_id in item_ids
+            if _uuid_canonical(item_id) in message_rows
+        ]
 
     async def list_items(
         self, session: AsyncSession, dataset_id: UUID, *, limit: int, offset: int
@@ -499,7 +545,11 @@ class DatasetQueries:
 
         items_result = await session.execute(
             select(DataDatasetItem)
-            .where(DataDatasetItem.dataset_id == dataset_id)
+            .where(
+                sa.cast(DataDatasetItem.dataset_id, sa.Text()).in_(
+                    _uuid_string_variants(dataset_id)
+                )
+            )
             .order_by(
                 DataDatasetItem.row_order.asc().nulls_last(),
                 DataDatasetItem.created_at.asc(),
@@ -510,6 +560,10 @@ class DatasetQueries:
         total_result = await session.execute(
             select(func.count())
             .select_from(DataDatasetItem)
-            .where(DataDatasetItem.dataset_id == dataset_id)
+            .where(
+                sa.cast(DataDatasetItem.dataset_id, sa.Text()).in_(
+                    _uuid_string_variants(dataset_id)
+                )
+            )
         )
         return list(items_result.scalars().all()), int(total_result.scalar_one())

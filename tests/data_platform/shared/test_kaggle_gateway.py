@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import os
 import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -85,7 +86,9 @@ def test_parse_version_number_first_numeric_wins(gateway: KaggleGateway) -> None
     assert gateway._parse_version_number(stdout) == 3
 
 
-def test_push_sync_success(gateway: KaggleGateway, tmp_path: Path) -> None:
+def test_push_sync_success(gateway: KaggleGateway, tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("KAGGLE_API_TOKEN", raising=False)
+    monkeypatch.delenv("KAGGLE_KEY", raising=False)
     mock_api = MagicMock()
     mock_api.dataset_create_version.return_value = MagicMock(versionNumber=7)
 
@@ -94,6 +97,8 @@ def test_push_sync_success(gateway: KaggleGateway, tmp_path: Path) -> None:
 
     assert version == 7
     mock_api.authenticate.assert_called_once()
+    assert os.environ["KAGGLE_API_TOKEN"] == "testkey"
+    assert "KAGGLE_KEY" not in os.environ
     mock_api.dataset_create_version.assert_called_once_with(
         folder=str(tmp_path),
         version_notes="Test message",

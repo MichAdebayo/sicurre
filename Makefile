@@ -1,5 +1,6 @@
 .PHONY: help install test dev-api test-inference \
         ingest-all-base \
+        data-platform-staging-smoke \
         phishtank-ingest-base \
         file-ingest-base \
         scraping-ingest-base \
@@ -38,6 +39,7 @@ help:
 	@echo "  make test                      - Run backend test suite"
 	@echo "  make test-inference            - Smoke-test the inference API (localhost:8000)"
 	@echo "  make dev-api                   - Start data platform API on http://localhost:8001"
+	@echo "  make data-platform-staging-smoke - Build and smoke-test data platform container"
 	@echo ""
 	@echo "  Base Ingestion  (deterministic, frozen snapshots — used to build sicurre.db from scratch)"
 	@echo "  make ingest-all-base           - Wipe DB and run ALL base ingestion steps in order"
@@ -91,6 +93,9 @@ dev-app:
 
 dev:
 	npx --yes concurrently --kill-others "make dev-api" "make dev-app" "npm run auth:dev"
+
+data-platform-staging-smoke:
+	docker compose -f docker-compose.data-platform-smoke.yml up --build --abort-on-container-exit --exit-code-from data-platform-smoke
 
 test-inference:
 	uv run scripts/app/test_inference_api.py

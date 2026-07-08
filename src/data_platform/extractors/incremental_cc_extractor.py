@@ -5,7 +5,7 @@ This module is a standalone extractor that:
 2. Reads completed indices from the ``pipeline_state`` DB table.
 3. Looks at the newest configured indices first and skips completed ones.
 4. Enforces a maximum runtime; partial results are flushed to R2.
-5. Updates the checkpoint after each completed index.
+5. Updates the completed checkpoint only after a full index finishes.
 
 It does NOT modify or import the original ``common_crawl_archive.py``
 which is reserved for the immutable base dataset.
@@ -150,6 +150,7 @@ DEFAULT_QUERIES: tuple[CrawlQuery, ...] = (
 @dataclass(slots=True)
 class IncrementalCCStats:
     indices_processed: int = 0
+    index_errors: int = 0
     total_index_hits: int = 0
     total_downloaded: int = 0
     extracted: int = 0
@@ -166,6 +167,7 @@ class IncrementalCCStats:
 class IncrementalCCResult:
     indices_attempted: list[str]
     indices_completed: list[str]
+    indices_failed: list[str]
     total_extracted: int
     timed_out: bool
     r2_uris: list[str]
@@ -176,14 +178,16 @@ class IncrementalCCResult:
 class CommonCrawlCheckpoint:
     last_completed_index: str | None
     completed_indices: frozenset[str]
+    failed_indices: frozenset[str] = frozenset()
+    timed_out_indices: frozenset[str] = frozenset()
 
 
 class IncrementalCommonCrawlExtractor:
     """Resumable, time-bounded Common Crawl extractor for cron jobs.
 
-    Processes one CC index at a time. After each index, flushes results
-    to R2 and updates the checkpoint in the database. If the time limit
-    is reached during an index, the partial results are still flushed.
+    Processes one CC index at a time. Completed checkpoints are written only
+    after a full index finishes. If the time limit is reached during an index,
+    partial results are flushed but the index remains eligible for retry.
     """
 
     def __init__(
@@ -194,7 +198,9 @@ class IncrementalCommonCrawlExtractor:
         snapshot_store: SnapshotStore | None = None,
         max_results_per_query: int = 5_000,
         max_warc_downloads_per_index: int = 50_000,
-        lookback_indices: int = 12,
+        lookback_indices: int = 18,
+        max_index_attempts: int = 3,
+        index_retry_backoff_seconds: int = 60,
         async_concurrency: int = 40,
         min_text_length: int = 100,
         max_text_length: int = 10_000,
@@ -205,6 +211,8 @@ class IncrementalCommonCrawlExtractor:
         self.max_results_per_query = max_results_per_query
         self.max_warc_downloads_per_index = max_warc_downloads_per_index
         self.lookback_indices = max(1, lookback_indices)
+        self.max_index_attempts = max(1, max_index_attempts)
+        self.index_retry_backoff_seconds = max(0, index_retry_backoff_seconds)
         self.async_concurrency = async_concurrency
         self.min_text_length = min_text_length
         self.max_text_length = max_text_length
@@ -268,6 +276,7 @@ class IncrementalCommonCrawlExtractor:
             return IncrementalCCResult(
                 indices_attempted=[],
                 indices_completed=[],
+                indices_failed=[],
                 total_extracted=0,
                 timed_out=False,
                 r2_uris=[],
@@ -277,6 +286,7 @@ class IncrementalCommonCrawlExtractor:
         # 4. Process indices one by one
         indices_attempted: list[str] = []
         indices_completed: list[str] = []
+        indices_failed: list[str] = []
         r2_uris: list[str] = []
 
         for crawl_id in missing_indices:
@@ -292,11 +302,27 @@ class IncrementalCommonCrawlExtractor:
             logger.info("--- Processing index: %s ---", crawl_id)
 
             try:
-                pages = await self._process_single_index(crawl_id, stats, start_time)
+                pages = await self._process_single_index_with_retries(
+                    crawl_id,
+                    stats,
+                    start_time,
+                )
             except Exception as exc:
-                logger.error("Failed to process index %s: %s", crawl_id, exc)
-                # Still flush whatever we got
-                pages = []
+                logger.error(
+                    "Failed to process index %s after %d attempts: %s",
+                    crawl_id,
+                    self.max_index_attempts,
+                    exc,
+                )
+                stats.index_errors += 1
+                indices_failed.append(crawl_id)
+                await self._record_incomplete_index(
+                    session,
+                    crawl_id,
+                    reason="failed",
+                    detail=str(exc),
+                )
+                continue
 
             # Flush results to R2 even if partial
             if pages:
@@ -313,9 +339,11 @@ class IncrementalCommonCrawlExtractor:
                     int(elapsed),
                 )
                 stats.timed_out = True
-                # Still update checkpoint since we flushed what we had
-                await self._update_checkpoint(session, crawl_id)
-                indices_completed.append(crawl_id)
+                await self._record_incomplete_index(
+                    session,
+                    crawl_id,
+                    reason="timed_out",
+                )
                 break
 
             # Full index completed — update checkpoint
@@ -337,6 +365,7 @@ class IncrementalCommonCrawlExtractor:
         return IncrementalCCResult(
             indices_attempted=indices_attempted,
             indices_completed=indices_completed,
+            indices_failed=indices_failed,
             total_extracted=stats.extracted,
             timed_out=stats.timed_out,
             r2_uris=r2_uris,
@@ -380,6 +409,8 @@ class IncrementalCommonCrawlExtractor:
     ) -> CommonCrawlCheckpoint:
         last_completed = state_data.get("last_completed_index")
         raw_completed = state_data.get("completed_indices") or []
+        raw_failed = state_data.get("failed_indices") or []
+        raw_timed_out = state_data.get("timed_out_indices") or []
         completed = {str(item) for item in raw_completed if item}
         completed.update(
             cls._completed_indices_from_legacy_checkpoint(
@@ -390,6 +421,8 @@ class IncrementalCommonCrawlExtractor:
         return CommonCrawlCheckpoint(
             last_completed_index=str(last_completed) if last_completed else None,
             completed_indices=frozenset(completed),
+            failed_indices=frozenset(str(item) for item in raw_failed if item),
+            timed_out_indices=frozenset(str(item) for item in raw_timed_out if item),
         )
 
     @staticmethod
@@ -498,6 +531,35 @@ class IncrementalCommonCrawlExtractor:
                 )
 
         return extracted_pages
+
+    async def _process_single_index_with_retries(
+        self,
+        crawl_id: str,
+        stats: IncrementalCCStats,
+        start_time: float,
+    ) -> list[dict[str, Any]]:
+        """Process one index with bounded retries for hard index-level failures."""
+        for attempt in range(1, self.max_index_attempts + 1):
+            try:
+                return await self._process_single_index(crawl_id, stats, start_time)
+            except Exception as exc:
+                if attempt >= self.max_index_attempts:
+                    raise
+                delay = min(
+                    self.index_retry_backoff_seconds * (2 ** (attempt - 1)),
+                    300,
+                )
+                logger.warning(
+                    "Index %s failed on attempt %d/%d: %s. Retrying in %d s.",
+                    crawl_id,
+                    attempt,
+                    self.max_index_attempts,
+                    exc,
+                    delay,
+                )
+                if delay:
+                    await asyncio.sleep(delay)
+        return []
 
     async def _collect_index_hits_for_crawl(
         self, crawl_id: str
@@ -761,11 +823,57 @@ class IncrementalCommonCrawlExtractor:
             )
             session.add(row)
         else:
-            completed = list(dict.fromkeys([*row.state_data.get("completed_indices", []), crawl_id]))
+            completed = list(
+                dict.fromkeys([*row.state_data.get("completed_indices", []), crawl_id])
+            )
             row.state_data = {
                 **row.state_data,
                 "last_completed_index": crawl_id,
                 "completed_indices": completed[-200:],
+                "updated_at": now.isoformat(),
+            }
+        await session.commit()
+
+    @staticmethod
+    async def _record_incomplete_index(
+        session: AsyncSession,
+        crawl_id: str,
+        *,
+        reason: str,
+        detail: str | None = None,
+    ) -> None:
+        """Record a failed or timed-out index without marking it completed."""
+        stmt = select(PipelineState).where(PipelineState.pipeline_name == PIPELINE_NAME)
+        row = await session.scalar(stmt)
+        now = datetime.now(timezone.utc)
+        failure_key = "timed_out_indices" if reason == "timed_out" else "failed_indices"
+        attempt = {
+            "index": crawl_id,
+            "reason": reason,
+            "detail": detail,
+            "recorded_at": now.isoformat(),
+        }
+        if row is None:
+            row = PipelineState(
+                pipeline_name=PIPELINE_NAME,
+                state_data={
+                    "last_completed_index": None,
+                    "completed_indices": [],
+                    failure_key: [crawl_id],
+                    "incomplete_attempts": [attempt],
+                    "updated_at": now.isoformat(),
+                },
+            )
+            session.add(row)
+        else:
+            flagged = list(
+                dict.fromkeys([*row.state_data.get(failure_key, []), crawl_id])
+            )
+            attempts = [*row.state_data.get("incomplete_attempts", []), attempt]
+            row.state_data = {
+                **row.state_data,
+                failure_key: flagged[-200:],
+                "incomplete_attempts": attempts[-200:],
                 "updated_at": now.isoformat(),
             }
         await session.commit()

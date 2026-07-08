@@ -66,8 +66,16 @@ class Settings(BaseSettings):
         description="'short' = 30 min, 'standard' = 8 hours max runtime for CC cron.",
     )
     cc_cron_lookback_indices: int = Field(
-        default=12,
+        default=18,
         description="How many recent Common Crawl indexes the cron scans for missed work.",
+    )
+    cc_cron_index_max_attempts: int = Field(
+        default=3,
+        description="Per-index retry attempts before recording a Common Crawl failure.",
+    )
+    cc_cron_index_retry_backoff_seconds: int = Field(
+        default=60,
+        description="Initial retry backoff for Common Crawl index-level failures.",
     )
     cc_input_backend: str = Field(
         default="prod",

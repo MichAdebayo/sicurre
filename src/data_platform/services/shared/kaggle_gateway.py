@@ -62,18 +62,23 @@ class KaggleGateway:
             if not metadata_file.exists():
                 logger.info("Writing dataset-metadata.json dynamically")
                 title = slug.split("/")[-1].replace("-", " ").title()
+                resources = [
+                    {"path": item.name, "description": f"Sicurre {item.stem} split"}
+                    for item in sorted(export_dir.glob("*.csv"))
+                ]
                 with open(metadata_file, "w") as f:
-                    json.dump({"id": slug, "title": title}, f)
+                    json.dump({"id": slug, "title": title, "resources": resources}, f)
 
             from kaggle import KaggleApi
             api = KaggleApi()
 
             # Try authenticating using settings credentials first
             try:
-                if self._username:
-                    os.environ["KAGGLE_USERNAME"] = self._username
                 if self._key:
-                    os.environ["KAGGLE_KEY"] = self._key
+                    os.environ["KAGGLE_API_TOKEN"] = self._key
+                    os.environ.pop("KAGGLE_KEY", None)
+                elif self._username:
+                    os.environ["KAGGLE_USERNAME"] = self._username
                 api.authenticate()
                 # Test credentials by checking status of target dataset
                 api.dataset_status(slug)
@@ -84,6 +89,7 @@ class KaggleGateway:
                 )
                 os.environ.pop("KAGGLE_USERNAME", None)
                 os.environ.pop("KAGGLE_KEY", None)
+                os.environ.pop("KAGGLE_API_TOKEN", None)
                 api = KaggleApi()
                 api.authenticate()
 
@@ -106,7 +112,14 @@ class KaggleGateway:
                         version_num = int(parts[-1])
             return int(version_num) if version_num else 0
         except Exception as exc:
-            raise KagglePushError(f"Kaggle push failed: {exc}") from exc
+            response = getattr(exc, "response", None)
+            response_text = ""
+            if response is not None:
+                response_text = getattr(response, "text", "") or ""
+            detail = f"Kaggle push failed: {exc}"
+            if response_text:
+                detail = f"{detail} — response: {response_text[:1000]}"
+            raise KagglePushError(detail) from exc
         finally:
             socket.getaddrinfo = orig_getaddrinfo
 

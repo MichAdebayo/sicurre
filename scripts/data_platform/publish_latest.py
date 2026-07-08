@@ -7,6 +7,12 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+ROOT_DIR = Path(__file__).resolve().parents[2]
+SRC_ROOT = ROOT_DIR / "src"
+
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
 from core.config import get_settings
 from core.database import AsyncSessionFactory
 from data_platform.services.dataset_publish import (
@@ -72,15 +78,20 @@ async def _publish_kaggle_only(
     )
     with tempfile.TemporaryDirectory() as tmp:
         export_dir = Path(tmp)
+        split_counts: dict[str, int] = {}
         for split in (item.value for item in SplitName):
             rows_raw = await queries.list_items_for_export(
                 session,
                 dataset.id,
                 split_name=split,
             )
+            split_counts[split] = len(rows_raw)
             if rows_raw:
                 rows = [{"text": text, "label": label} for text, label in rows_raw]
                 write_split_csv(rows, export_dir / f"{split}.csv")
+        exported_files = sorted(item.name for item in export_dir.glob("*.csv"))
+        print(f"Export split counts: {split_counts}")
+        print(f"Exported files: {exported_files}")
         kaggle_version_id = await gateway.push_version(
             slug=settings.kaggle_dataset_slug,
             export_dir=export_dir,
