@@ -123,7 +123,10 @@ async def run_incremental_cc_cron() -> None:
         engine, expire_on_commit=False, class_=AsyncSession
     )
 
-    extractor = IncrementalCommonCrawlExtractor(max_runtime_seconds=max_runtime)
+    extractor = IncrementalCommonCrawlExtractor(
+        max_runtime_seconds=max_runtime,
+        lookback_indices=settings.cc_cron_lookback_indices,
+    )
 
     ingestion_results: list[CommonCrawlIngestionResult] = []
     async with session_factory() as session:

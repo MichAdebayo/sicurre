@@ -2,8 +2,8 @@
 
 This module is a standalone extractor that:
 1. Dynamically discovers all available CC indices from collinfo.json.
-2. Reads the last completed index from the ``pipeline_state`` DB table.
-3. Processes missing indices one-by-one from oldest to newest.
+2. Reads completed indices from the ``pipeline_state`` DB table.
+3. Looks at the newest configured indices first and skips completed ones.
 4. Enforces a maximum runtime; partial results are flushed to R2.
 5. Updates the checkpoint after each completed index.
 
@@ -172,6 +172,12 @@ class IncrementalCCResult:
     stats: IncrementalCCStats
 
 
+@dataclass(frozen=True, slots=True)
+class CommonCrawlCheckpoint:
+    last_completed_index: str | None
+    completed_indices: frozenset[str]
+
+
 class IncrementalCommonCrawlExtractor:
     """Resumable, time-bounded Common Crawl extractor for cron jobs.
 
@@ -188,6 +194,7 @@ class IncrementalCommonCrawlExtractor:
         snapshot_store: SnapshotStore | None = None,
         max_results_per_query: int = 5_000,
         max_warc_downloads_per_index: int = 50_000,
+        lookback_indices: int = 12,
         async_concurrency: int = 40,
         min_text_length: int = 100,
         max_text_length: int = 10_000,
@@ -197,6 +204,7 @@ class IncrementalCommonCrawlExtractor:
         self.queries = tuple(queries or DEFAULT_QUERIES)
         self.max_results_per_query = max_results_per_query
         self.max_warc_downloads_per_index = max_warc_downloads_per_index
+        self.lookback_indices = max(1, lookback_indices)
         self.async_concurrency = async_concurrency
         self.min_text_length = min_text_length
         self.max_text_length = max_text_length
@@ -237,16 +245,22 @@ class IncrementalCommonCrawlExtractor:
         )
 
         # 2. Read checkpoint from DB
-        last_completed = await self._read_checkpoint(session)
+        checkpoint = await self._read_checkpoint(session, all_indices=all_indices)
         logger.info(
-            "Last completed index (checkpoint): %s", last_completed or BASE_CUTOFF_INDEX
+            "Last completed index (checkpoint): %s",
+            checkpoint.last_completed_index or BASE_CUTOFF_INDEX,
         )
 
-        # 3. Compute the missing indices (after base cutoff or last checkpoint)
-        cutoff = last_completed or BASE_CUTOFF_INDEX
-        missing_indices = self._compute_missing_indices(all_indices, cutoff)
+        # 3. Compute recent missing indices, newest first, within bounded lookback.
+        missing_indices = self._compute_missing_indices(
+            all_indices,
+            checkpoint=checkpoint,
+            lookback_indices=self.lookback_indices,
+        )
         logger.info(
-            "Missing indices to process: %d — %s", len(missing_indices), missing_indices
+            "Recent missing indices to process: %d — %s",
+            len(missing_indices),
+            missing_indices,
         )
 
         if not missing_indices:
@@ -345,18 +359,60 @@ class IncrementalCommonCrawlExtractor:
             return [item["id"] for item in resp.json() if "id" in item]
 
     @staticmethod
-    def _compute_missing_indices(all_indices: list[str], cutoff: str) -> list[str]:
-        """Return indices that are newer than the cutoff, from oldest to newest."""
+    def _completed_indices_from_legacy_checkpoint(
+        all_indices: list[str],
+        last_completed_index: str | None,
+    ) -> frozenset[str]:
+        if last_completed_index is None:
+            return frozenset()
         try:
-            cutoff_pos = all_indices.index(cutoff)
+            completed_pos = all_indices.index(last_completed_index)
         except ValueError:
-            # Cutoff not found — treat everything as potentially missing
-            cutoff_pos = len(all_indices)
+            return frozenset({last_completed_index})
+        return frozenset(all_indices[completed_pos:])
 
-        # all_indices is newest-first, so everything before cutoff_pos is newer
-        missing = all_indices[:cutoff_pos]
-        missing.reverse()  # oldest first so we process chronologically
-        return missing
+    @classmethod
+    def _checkpoint_from_state(
+        cls,
+        state_data: dict[str, Any],
+        *,
+        all_indices: list[str],
+    ) -> CommonCrawlCheckpoint:
+        last_completed = state_data.get("last_completed_index")
+        raw_completed = state_data.get("completed_indices") or []
+        completed = {str(item) for item in raw_completed if item}
+        completed.update(
+            cls._completed_indices_from_legacy_checkpoint(
+                all_indices,
+                str(last_completed) if last_completed else None,
+            )
+        )
+        return CommonCrawlCheckpoint(
+            last_completed_index=str(last_completed) if last_completed else None,
+            completed_indices=frozenset(completed),
+        )
+
+    @staticmethod
+    def _compute_missing_indices(
+        all_indices: list[str],
+        *,
+        checkpoint: CommonCrawlCheckpoint,
+        lookback_indices: int,
+        base_cutoff_index: str = BASE_CUTOFF_INDEX,
+    ) -> list[str]:
+        """Return recent unprocessed indices, newest to older, within lookback."""
+        try:
+            base_cutoff_pos = all_indices.index(base_cutoff_index)
+        except ValueError:
+            base_cutoff_pos = len(all_indices)
+
+        # collinfo is newest-first. Only cron territory is newer than base cutoff.
+        recent_cron_candidates = all_indices[:base_cutoff_pos][: max(1, lookback_indices)]
+        return [
+            crawl_id
+            for crawl_id in recent_cron_candidates
+            if crawl_id not in checkpoint.completed_indices
+        ]
 
     # ------------------------------------------------------------------
     # Single index processing
@@ -671,18 +727,26 @@ class IncrementalCommonCrawlExtractor:
     # Checkpoint (DB-backed)
     # ------------------------------------------------------------------
 
-    @staticmethod
-    async def _read_checkpoint(session: AsyncSession) -> str | None:
-        """Read the last completed CC index from the pipeline_state table."""
+    @classmethod
+    async def _read_checkpoint(
+        cls,
+        session: AsyncSession,
+        *,
+        all_indices: list[str],
+    ) -> CommonCrawlCheckpoint:
+        """Read completed CC indices from the pipeline_state table."""
         stmt = select(PipelineState).where(PipelineState.pipeline_name == PIPELINE_NAME)
         row = await session.scalar(stmt)
         if row is None:
-            return None
-        return row.state_data.get("last_completed_index")
+            return CommonCrawlCheckpoint(
+                last_completed_index=None,
+                completed_indices=frozenset(),
+            )
+        return cls._checkpoint_from_state(row.state_data, all_indices=all_indices)
 
     @staticmethod
     async def _update_checkpoint(session: AsyncSession, crawl_id: str) -> None:
-        """Update the checkpoint with the last completed CC index."""
+        """Update the checkpoint with the completed CC index."""
         stmt = select(PipelineState).where(PipelineState.pipeline_name == PIPELINE_NAME)
         row = await session.scalar(stmt)
         now = datetime.now(timezone.utc)
@@ -691,14 +755,17 @@ class IncrementalCommonCrawlExtractor:
                 pipeline_name=PIPELINE_NAME,
                 state_data={
                     "last_completed_index": crawl_id,
+                    "completed_indices": [crawl_id],
                     "updated_at": now.isoformat(),
                 },
             )
             session.add(row)
         else:
+            completed = list(dict.fromkeys([*row.state_data.get("completed_indices", []), crawl_id]))
             row.state_data = {
                 **row.state_data,
                 "last_completed_index": crawl_id,
+                "completed_indices": completed[-200:],
                 "updated_at": now.isoformat(),
             }
         await session.commit()

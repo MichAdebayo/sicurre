@@ -70,15 +70,15 @@ Status: done
 
 ### Resolution note
 
-- The Bloc 1 physical schema now exists as executable SQLAlchemy models and an Alembic baseline migration
-- The canonical PostgreSQL reference DDL is versioned in `sql/sicurre.sql`
+- The Bloc 1 physical schema exists as executable SQLAlchemy models and a current one-pass Alembic baseline migration
+- The canonical PostgreSQL reference DDL is versioned in `src/db/sql/sicurre.sql`
 - The same logical schema is validated on SQLite for dev and CI through the backend test suite
 - The baseline was exercised through ORM schema creation and Alembic migration execution before route work continued
 
 ### Evidence
 
 - `src/db/models/lineage.py`
-- `src/db/migrations/versions/20260306_0001_bloc1_baseline.py`
+- `src/db/migrations/versions/20260708_0001_current_baseline.py`
 - `alembic.ini`
 - `src/db/sql/sicurre.sql`
 - `tests/data_platform/api/test_bloc1_schema.py`
@@ -89,7 +89,7 @@ Status: done
 
 ### Resolution note
 
-- `data_source_system` and `data_ingestion_run` now have executable SQLAlchemy models and an Alembic baseline in the backend codebase
+- `data_source_system` and `data_ingestion_run` have executable SQLAlchemy models and are part of the current data-platform baseline
 - The one-to-many linkage is implemented through `data_ingestion_run.source_system_id -> data_source_system.id`
 - `/v1/data/sources` and `/v1/data/ingestion-runs` are implemented in the FastAPI backend and aligned with `docs/api/openapi.yaml`
 - API-level tests validate source creation/listing, ingestion run creation/listing, and rejection of ingestion runs referencing a missing source system
@@ -99,7 +99,7 @@ Status: done
 - `src/db/models/lineage.py`
 - `src/data_platform/api/routers/source_systems.py`
 - `src/data_platform/api/routers/ingestion_runs.py`
-- `src/db/migrations/versions/20260306_0001_bloc1_baseline.py`
+- `src/db/migrations/versions/20260708_0001_current_baseline.py`
 - `tests/data_platform/api/test_lineage_api.py`
 
 ## Issue #13 — Bloc 0 notebook classification
@@ -123,8 +123,8 @@ Status: done
 
 ### Resolution note
 
-- The canonical PostgreSQL evidence is versioned in `sql/sicurre.sql`
-- The executable migration baseline remains `20260306_0001_bloc1_baseline.py`
+- The canonical PostgreSQL evidence is versioned in `src/db/sql/sicurre.sql`
+- The executable migration baseline is `20260708_0001_current_baseline.py`
 - A dedicated runbook now documents the dev SQLite path, the preferred PostgreSQL Alembic path, and the manual PostgreSQL import path
 - The runbook includes the exact commands used to execute the baseline and validate it with the Bloc 1 backend test suite
 
@@ -133,7 +133,7 @@ Status: done
 - `docs/ops/bloc1-sql-runbook.md`
 - `src/db/sql/sicurre.sql`
 - `alembic.ini`
-- `src/db/migrations/versions/20260306_0001_bloc1_baseline.py`
+- `src/db/migrations/versions/20260708_0001_current_baseline.py`
 - `tests/data_platform/api/test_bloc1_schema.py`
 
 ## Issue #38 — Clarify recurring ingestion architecture and source cadence
@@ -143,14 +143,15 @@ Status: done
 ### Resolution note
 
 - Bloc 1 architecture now states that automation means recurring, sustainable collection rather than synthetic data volume.
-- The frozen primary recurring-source matrix is documented with source-specific cadence.
+- The current recurring-source matrix is documented with source-specific cadence and the separate monthly dataset release path.
 - Cadence is justified by source behavior, so weekly and batch-based jobs remain valid recurring evidence.
-- Candidate secondary scraping sources, including Reddit, are explicitly separated from the frozen primary perimeter.
+- Candidate secondary scraping sources, including Reddit, are explicitly separated from the current implemented perimeter.
 
 ### Evidence
 
 - `docs/architecture/component-design.md`
 - `docs/architecture/backend-plan.md`
+- `docs/architecture/data-platform-cadence.md`
 - `tasks/bloc1-automation-issues.md`
 
 ## Issue #39 — Document ingestion trigger semantics in data design and API contract

@@ -163,21 +163,22 @@ The related issue note for the Bloc 1 source perimeter is documented in [issue-a
 |---|---|---|---|---|
 | PhishTank | API REST | scheduled pull | daily | Fast-moving source and the clearest daily refresh candidate. |
 | CERT-FR publications | scraping | scheduled pull | weekly | Poll `actualite`, `alerte`, `avis`, and `cti` RSS feeds; apply relevance filtering before detailed extraction and avoid browser automation in the first version. |
-| BigQuery public datasets | big data | scheduled batch | weekly | Use query-driven refreshes against remote large-scale datasets. |
-| Common Crawl extracts | big data | scheduled batch | weekly or ad hoc batch | Use targeted extraction runs rather than constant polling. |
-| SQL read-back extraction | SQL database | scheduled snapshot/export | weekly or on demand | Demonstrates recurring programmatic SQL extraction. |
-| File sources | file | periodic scan/refresh | periodic | Current file corpora are mostly static; refresh is triggered when a source archive changes. |
+| SEKOIA Community IOC | scraping | scheduled pull | weekly, daily during active campaigns | Public phishing/abuse IOCs ingested as raw intelligence for blocklist and inference support. |
+| Common Crawl extracts | big data | scheduled batch | monthly | Use targeted extraction runs with resumable checkpoints rather than constant polling. |
+| SQL read-back extraction | SQL database | scheduled snapshot/export | monthly or on demand | Demonstrates recurring programmatic SQL extraction. |
+| File sources | file | periodic scan/refresh | daily scan or operator-triggered | Current file corpora are mostly static; refresh is triggered when a source archive changes. |
 
 #### Frozen perimeter rule
 
-- The frozen primary perimeter for recurring Bloc 1 automation remains PhishTank, CERT-FR, BigQuery/Common Crawl, SQL read-back extraction, and file refresh.
+- The current primary perimeter for recurring Bloc 1 automation is PhishTank, CERT-FR, SEKOIA Community IOC, Common Crawl, SQL read-back extraction, and file refresh.
+- Dataset publication is a separate monthly release job after source cron jobs, normalization, annotation, export, Kaggle publish, and GitHub `workflow_dispatch`.
 - Synthetic French generation remains secondary and does not count as the recurring automation evidence for C1.
 
 #### Candidate secondary scraping sources
 
 - Reddit, including `r/arnaques`, is a candidate secondary scraping source for later backlog work.
 - Its current intended role is pattern discovery, screenshot-assisted text extraction, and synthetic prompt enrichment.
-- Reddit is intentionally outside the frozen primary perimeter and does not currently justify changes to the MCD, MLD, or MPD.
+- Reddit is intentionally outside the current implemented perimeter and does not currently justify changes to the MCD, MLD, or MPD.
 
 ### 3. Cleaning and normalization pipeline
 

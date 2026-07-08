@@ -20,25 +20,25 @@ logger = logging.getLogger(__name__)
 async def run_scheduler_loop() -> None:
     settings = get_settings()
     logger.info(
-        "Scheduler daemon background task initialized. Sleeping 10s before first run."
+        "Scheduler daemon initialized for source ingestion only. Sleeping 10s before first run."
     )
     await asyncio.sleep(10)
     while True:
         logger.info(
-            "Background scheduler: triggering scheduled pipeline execution (make run-pipeline)..."
+            "Background scheduler: triggering scheduled ingestion execution (make run-scheduler)..."
         )
         try:
             process = await asyncio.create_subprocess_exec(
-                "make", "run-pipeline", stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                "make", "run-scheduler", stdout=subprocess.PIPE, stderr=subprocess.PIPE
             )
             stdout, stderr = await process.communicate()
             if process.returncode == 0:
                 logger.info(
-                    "Background scheduler: pipeline run completed successfully."
+                    "Background scheduler: source ingestion run completed successfully."
                 )
             else:
                 logger.error(
-                    f"Background scheduler: pipeline run failed with code {process.returncode}. "
+                    f"Background scheduler: source ingestion run failed with code {process.returncode}. "
                     f"Stderr: {stderr.decode('utf-8', errors='replace')}"
                 )
         except Exception as exc:

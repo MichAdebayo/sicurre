@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import UUID
 
+import sqlalchemy as sa
 from sqlalchemy import Select, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -73,6 +74,19 @@ def _stable_dataset_rank(text_sha256: str) -> str:
     return hashlib.sha256(
         f"{DATASET_BUILD_SEED}:{text_sha256}".encode("utf-8")
     ).hexdigest()
+
+
+def _uuid_text_match(left: object, right: object) -> object:
+    """Compare UUID columns safely across SQLite 32-char/36-char storage.
+
+    SQLite has seen both SQLAlchemy UUID hex storage and reconstructed
+    hyphenated text in local POC/data-platform DBs. Normalizing both sides
+    keeps local exports and split filters stable while remaining valid on
+    PostgreSQL via explicit text casts.
+    """
+    left_text = func.lower(func.replace(sa.cast(left, sa.Text()), "-", ""))
+    right_text = func.lower(func.replace(sa.cast(right, sa.Text()), "-", ""))
+    return left_text == right_text
 
 
 def _compute_split_counts(
@@ -155,11 +169,17 @@ class NormalizedMessageQueries:
         if split is not None:
             query = query.join(
                 DataDatasetItem,
-                DataDatasetItem.normalized_message_id == DataNormalizedMessage.id,
+                _uuid_text_match(
+                    DataDatasetItem.normalized_message_id,
+                    DataNormalizedMessage.id,
+                ),
             ).where(DataDatasetItem.split_name == split)
             count_query = count_query.join(
                 DataDatasetItem,
-                DataDatasetItem.normalized_message_id == DataNormalizedMessage.id,
+                _uuid_text_match(
+                    DataDatasetItem.normalized_message_id,
+                    DataNormalizedMessage.id,
+                ),
             ).where(DataDatasetItem.split_name == split)
 
         if label is not None:
@@ -321,7 +341,10 @@ class DatasetQueries:
             )
             .join(
                 latest_annotations,
-                latest_annotations.c.normalized_message_id == DataNormalizedMessage.id,
+                _uuid_text_match(
+                    latest_annotations.c.normalized_message_id,
+                    DataNormalizedMessage.id,
+                ),
             )
             .where(latest_annotations.c.annotation_rank == 1)
             .where(latest_annotations.c.annotation_label.in_(include_labels))
@@ -453,7 +476,10 @@ class DatasetQueries:
             )
             .join(
                 DataDatasetItem,
-                DataDatasetItem.normalized_message_id == DataNormalizedMessage.id,
+                _uuid_text_match(
+                    DataDatasetItem.normalized_message_id,
+                    DataNormalizedMessage.id,
+                ),
             )
             .where(DataDatasetItem.dataset_id == dataset_id)
             .where(DataDatasetItem.split_name == split_name)

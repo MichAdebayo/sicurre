@@ -1,0 +1,77 @@
+"""Run the scheduled SEKOIA Community IOC ingestion delegate.
+
+Forces R2 storage under cron/scraping/sekoia_ioc/ prefix.
+Pass --reserved to write under cron/reserved/scraping/sekoia_ioc/ instead.
+"""
+
+from __future__ import annotations
+
+import argparse as _argparse
+import asyncio
+import logging
+import os
+import sys
+from pathlib import Path
+
+# Reserved-slot routing must happen before settings are loaded.
+_parser = _argparse.ArgumentParser(add_help=False)
+_parser.add_argument("--reserved", action="store_true", default=False)
+_reserved_args, _ = _parser.parse_known_args()
+
+os.environ["SICURRE_SEKOIA_SNAPSHOT_STORAGE_BACKEND"] = "prod"
+os.environ["SICURRE_SEKOIA_SNAPSHOT_PREFIX"] = (
+    "cron/reserved/scraping/sekoia_ioc"
+    if _reserved_args.reserved
+    else "cron/scraping/sekoia_ioc"
+)
+
+ROOT_DIR = Path(__file__).resolve().parents[4]
+SRC_ROOT = ROOT_DIR / "src"
+
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from core.config import get_settings
+from core.database import Base
+from data_platform.extractors.sekoia_ioc import SekoiaIocIngestionService
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+
+async def run_ingestion(*, trigger_mode: str = "scheduled") -> object:
+    settings = get_settings()
+    engine = create_async_engine(settings.data_platform_database_url, echo=False)
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    session_factory = async_sessionmaker(
+        engine,
+        expire_on_commit=False,
+        class_=AsyncSession,
+    )
+    service = SekoiaIocIngestionService(
+        snapshot_prefix=settings.sekoia_snapshot_prefix
+    )
+    try:
+        async with session_factory() as session:
+            return await service.run(session, trigger_mode=trigger_mode)
+    finally:
+        await engine.dispose()
+
+
+async def main() -> None:
+    r2_prefix = os.environ["SICURRE_SEKOIA_SNAPSHOT_PREFIX"]
+    logger.info("Starting SEKOIA IOC cron (R2 target: %s)", r2_prefix)
+    result = await run_ingestion(trigger_mode="scheduled")
+    logger.info("SEKOIA IOC cron completed: %s", result)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

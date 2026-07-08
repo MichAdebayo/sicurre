@@ -1,537 +1,303 @@
-# Data design
+# Data Design
 
-## Purpose
+## Status
 
-This document now separates two distinct but related schemas:
+This document is the current schema reference for the Sicurre data platform as
+of 2026-07-08. It replaces the earlier migration-story documentation: the data
+platform is still pre-production, so the database can be rebuilt from a single
+current baseline instead of replaying historical exploratory migrations.
 
-1. the certification-facing data platform schema for Bloc 1
-2. the product runtime schema for the SaaS application
+Canonical implementation sources:
 
-The certification schema is the primary source of truth for MCD, MLD, and MPD.
-The runtime schema remains necessary, but it is downstream from the data platform.
+- ORM: `src/db/models/lineage.py`
+- Alembic baseline: `src/db/migrations/versions/20260708_0001_current_baseline.py`
+- PostgreSQL reference: `src/db/sql/sicurre.sql`
 
-## Generation analytics extension
+Local development and the Streamlit POC use SQLite. Production remains
+PostgreSQL-compatible through SQLAlchemy and Alembic.
 
-Generation lineage is now a standard DB-backed part of the data platform for persistence-grade generation flows. Local JSON/Markdown artifacts can still exist for debugging or audits, but they are no longer the defining boundary of the model.
+## Scope
 
-The lineage extension is now split across four surfaces:
+The data platform owns the dataset-production chain:
 
-- `data_generation_run`: one row per generation or evaluation pass, storing source, parent source, artifact URIs, and aggregate review counts
-- `data_generation_sample`: one row per generated draft variant, storing review state, theme, `text_sha256`, and nearest-reference review linkage
-- `data_generation_sample_source_link`: bridge rows from one generated sample to the raw records that actually fed generation or were sampled as supporting inputs
-- `data_raw_record.generation_sample_id`: nullable promoted-lineage link so curated generated rows can be traced back to the staged generation sample that produced them
+1. collect raw data from API, file, scraping, database, and big-data sources
+2. persist raw objects and raw records with lineage
+3. normalize usable message-like records
+4. annotate and validate labels
+5. build frozen dataset versions
+6. export train/val/test artifacts
+7. publish the frozen version to Kaggle
+8. dispatch the ML repository retraining workflow
 
-This separates three concepts that were previously blurred together:
+Product runtime tables for the TypeScript application are intentionally outside
+this schema. The only user table here is `poc_user`, which exists for the
+Streamlit POC.
 
-- generation input lineage
-- nearest review/reference linkage
-- downstream curated promotion lineage
+## Source Coverage
 
-Rich monitoring and comparison metrics can still remain artifact-backed JSON/Markdown outputs and be referenced from the run row through artifact URIs.
+| Parent category | Implemented child sources | Runtime shape |
+|---|---|---|
+| API | PhishTank online valid feed | base ingestion + scheduled cron |
+| File | local/R2 CSV and TXT datasets | base ingestion + scheduled R2 dropzone cron |
+| Scraping | CERT-FR CTI, SAP Labs base snapshots, SEKOIA Community IOC | base ingestion where static, scheduled cron where dynamic |
+| Database | seeded historical external threat DB | base ingestion + scheduled generated SQL feed |
+| Big data | Common Crawl extracts | base ingestion + scheduled resumable extractor |
 
-## Scope of the Bloc 1 data platform
+SEKOIA Community IOC is represented as a scraping child source named
+`sekoia-community-ioc`. It stores public indicators of compromise as raw
+intelligence records for blocklist/inference support. It is not treated as
+email-body training text until a later reviewed promotion step explicitly
+converts an item into a normalized message.
 
-The data platform must prove the following chain end to end:
+## Conceptual Model
 
-- collect data from multiple source types
-- aggregate and clean the data
-- normalize and label usable NLP records
-- store lineage in a relational database
-- expose the curated data through a REST API
-
-For this reason, the central business object is not the end user account.
-It is the curated message dataset derived from heterogeneous sources.
-
-## Frozen table naming convention
-
-Table names are now frozen and must follow domain prefixes.
-
-- `data_` for Bloc 1 data platform tables
-- `ml_` for model lifecycle and evaluation tables
-- `app_` for runtime application tables
-
-This naming rule is part of the architecture baseline and should not be changed during implementation unless a new architecture decision record explicitly supersedes it.
-
-## Merise MCD (conceptual model)
-
-### Conceptual entities
-
-| Entity | Main attributes | Identifier |
-|--------|-----------------|------------|
-| SOURCE_SYSTEM | name, source_type, description, owner_name, legal_basis, contains_personal_data, retention_days, is_active | id |
-| INGESTION_RUN | started_at, finished_at, status, trigger_mode, raw_object_count, raw_record_count, log_message | id |
-| RAW_OBJECT | external_ref, object_type, storage_uri, content_hash, collected_at, size_bytes, source_format, source_metadata | id |
-| RAW_RECORD | record_key, raw_content, detected_language, extracted_at, is_usable | id |
-| PROCESSING_RUN | started_at, finished_at, pipeline_version, status, normalized_count, rejected_count, report_uri | id |
-| NORMALIZED_MESSAGE | normalized_text, text_sha256, language, current_label, quality_score, contains_pii, redaction_status, text_length, normalized_at | id |
-| ANNOTATION | label, label_source, confidence, comment, annotated_at, is_validated | id |
-| DATASET | name, version_tag, target_usage, frozen_at, status | id |
-| DATASET_ITEM | split_name, sample_weight, row_order | id |
-
-### Conceptual associations
-
-- SOURCE_SYSTEM (1,1) — PRODUCES — (0,n) INGESTION_RUN
-- INGESTION_RUN (1,1) — COLLECTS — (0,n) RAW_OBJECT
-- RAW_OBJECT (1,1) — CONTAINS — (0,n) RAW_RECORD
-- PROCESSING_RUN (1,1) — PROCESSES — (0,n) RAW_RECORD
-- RAW_RECORD (0,1) — BECOMES — (1,1) NORMALIZED_MESSAGE
-- PROCESSING_RUN (1,1) — GENERATES — (0,n) NORMALIZED_MESSAGE
-- NORMALIZED_MESSAGE (1,1) — RECEIVES — (0,n) ANNOTATION
-- DATASET (1,1) — COMPOSES — (1,n) DATASET_ITEM
-- NORMALIZED_MESSAGE (1,1) — BELONGS_TO — (0,n) DATASET_ITEM
-
-### Conceptual notes
-
-- `SOURCE_SYSTEM` captures RGPD and governance information at the source level (e.g. PhishTank API, CERT-FR scrape, manual upload).
-- `RAW_OBJECT` represents the collected payload or snapshot (file, API response, HTML page).
-- `RAW_RECORD` represents a row, page, message, or extracted item inside a raw object.
-- `PROCESSING_RUN` both processes raw records (tracking which records were attempted, including rejections) and generates normalized messages (its output). The GENERATES association justifies `processing_run_id` as a FK on `data_normalized_message`.
-- `NORMALIZED_MESSAGE` is the reusable NLP unit after cleaning, deduplication, and redaction. Its `text_sha256` unique key prevents duplicate content across ingestion runs.
-- `DATASET` and `DATASET_ITEM` allow versioned train, validation, and test sets. A normalized message can belong to multiple datasets over time.
-- Interim skipped-corpus persistence rule: source-specific derived candidates from Common Crawl and CERT-FR are persisted as structured review artifacts first. They do not become `data_normalized_message` rows unless a later reviewed promotion step approves them.
-
-### MCD diagram
-
-```mermaid
-flowchart TD
-    SS[SOURCE_SYSTEM]
-    IR[INGESTION_RUN]
-    RO[RAW_OBJECT]
-    RR[RAW_RECORD]
-    PR[PROCESSING_RUN]
-    NM[NORMALIZED_MESSAGE]
-    AN[ANNOTATION]
-    DS[DATASET]
-    DI[DATASET_ITEM]
-
-    SS -->|"(1,1) PRODUCES (0,n)"| IR
-    IR -->|"(1,1) COLLECTS (0,n)"| RO
-    RO -->|"(1,1) CONTAINS (0,n)"| RR
-    PR -->|"(1,1) PROCESSES (0,n)"| RR
-    RR -->|"(0,1) BECOMES (1,1)"| NM
-    PR -->|"(1,1) GENERATES (0,n)"| NM
-    NM -->|"(1,1) RECEIVES (0,n)"| AN
-    DS -->|"(1,1) COMPOSES (1,n)"| DI
-    NM -->|"(1,1) BELONGS_TO (0,n)"| DI
-```
-
-## MLD diagram
+| Entity | Role |
+|---|---|
+| `data_source_system` | source catalog and governance metadata |
+| `data_ingestion_run` | one collection execution for one source |
+| `data_raw_object` | fetched file, API payload, HTML page, PDF, SQL export, or big-data extract |
+| `data_raw_record` | row, IOC, page candidate, message, or other item extracted from a raw object |
+| `data_processing_run` | normalization execution |
+| `data_normalized_message` | NLP-ready message text with current label and quality metadata |
+| `data_annotation` | validation and label evidence for normalized messages |
+| `data_dataset` | versioned dataset metadata and publish state |
+| `data_dataset_item` | membership of normalized messages in train/val/test/holdout splits |
+| `data_generation_run` | generation/evaluation execution metadata |
+| `data_generation_sample` | staged generated draft with review state |
+| `data_generation_sample_source_link` | provenance bridge from generated drafts to raw records |
+| `pipeline_state` | durable JSON checkpoint for resumable cron jobs |
+| `poc_user` | Streamlit POC authentication table |
 
 ```mermaid
 erDiagram
-    data_source_system {
-        uuid id PK
-        text name UK
-        text source_type
-        text owner_name
-        text legal_basis
-        boolean contains_personal_data
-        integer retention_days
-        boolean is_active
-        timestamptz created_at
-        timestamptz updated_at
-    }
-
-    data_ingestion_run {
-        uuid id PK
-        uuid source_system_id FK
-        timestamptz started_at
-        timestamptz finished_at
-        text status
-        text trigger_mode
-        integer raw_object_count
-        integer raw_record_count
-        text log_message
-        timestamptz created_at
-    }
-
-    data_raw_object {
-        uuid id PK
-        uuid ingestion_run_id FK
-        text external_ref
-        text object_type
-        text storage_uri
-        text source_format
-        text content_hash
-        bigint size_bytes
-        jsonb source_metadata
-        timestamptz collected_at
-        timestamptz retention_until
-        timestamptz created_at
-    }
-
-    data_raw_record {
-        uuid id PK
-        uuid raw_object_id FK
-        text record_key
-        text raw_content
-        text detected_language
-        boolean is_usable
-        text rejection_reason
-        timestamptz extracted_at
-        timestamptz created_at
-    }
-
-    data_processing_run {
-        uuid id PK
-        text pipeline_version
-        timestamptz started_at
-        timestamptz finished_at
-        text status
-        integer normalized_count
-        integer rejected_count
-        text report_uri
-        timestamptz created_at
-    }
-
-    data_normalized_message {
-        uuid id PK
-        uuid raw_record_id FK
-        uuid processing_run_id FK
-        text normalized_text
-        text text_sha256 UK
-        text language
-        text current_label
-        real quality_score
-        boolean contains_pii
-        text redaction_status
-        integer text_length
-        timestamptz normalized_at
-        timestamptz created_at
-        timestamptz updated_at
-    }
-
-    data_annotation {
-        uuid id PK
-        uuid normalized_message_id FK
-        text label
-        text label_source
-        real confidence
-        text comment
-        boolean is_validated
-        timestamptz annotated_at
-        timestamptz created_at
-    }
-
-    data_dataset {
-        uuid id PK
-        text name
-        text version_tag UK
-        text target_usage
-        text status
-        timestamptz frozen_at
-        integer item_count
-        timestamptz created_at
-        timestamptz updated_at
-    }
-
-    data_dataset_item {
-        uuid id PK
-        uuid dataset_id FK
-        uuid normalized_message_id FK
-        text split_name
-        real sample_weight
-        integer row_order
-        timestamptz created_at
-    }
-
     data_source_system ||--o{ data_ingestion_run : produces
     data_ingestion_run ||--o{ data_raw_object : collects
     data_raw_object ||--o{ data_raw_record : contains
+    data_source_system ||--o{ data_raw_record : attributes
+    data_generation_sample ||--o{ data_raw_record : promotes
     data_processing_run ||--o{ data_normalized_message : generates
-    data_processing_run ||--o{ data_raw_record : processes
-    data_raw_record ||--o| data_normalized_message : becomes
+    data_raw_record ||--o{ data_normalized_message : becomes
     data_normalized_message ||--o{ data_annotation : receives
     data_dataset ||--o{ data_dataset_item : composes
     data_normalized_message ||--o{ data_dataset_item : belongs_to
+    data_generation_run ||--o{ data_generation_sample : contains
+    data_generation_sample ||--o{ data_generation_sample_source_link : cites
+    data_raw_record ||--o{ data_generation_sample_source_link : supports
 ```
 
-## MLD (logical relational model)
+## Current Physical Tables
 
-### Logical table list
+### `data_source_system`
 
-| Table | Role | Key relationships |
-|-------|------|-------------------|
-| `data_source_system` | source catalog and governance registry | parent of ingestion runs |
-| `data_ingestion_run` | execution trace for one collection run | child of source system |
-| `data_raw_object` | collected file, payload, or snapshot | child of ingestion run |
-| `data_raw_record` | extracted row, message, page, or unit | child of raw object |
-| `data_processing_run` | execution trace for normalization pipeline | linked to raw records (processed) and normalized messages (generated) |
-| `data_normalized_message` | curated NLP-ready message | child of raw record and processing run |
-| `data_annotation` | labels and validation metadata | child of normalized message |
-| `data_dataset` | frozen dataset version | parent of dataset items |
-| `data_dataset_item` | membership of a message in a dataset split | child of dataset and normalized message |
-| `data_generation_run` | lineage row for one generation/evaluation pass | parent of generation samples |
-| `data_generation_sample` | one row per generated draft variant | child of generation run |
-| `data_generation_sample_source_link` | source provenance bridge for generated samples | child of generated sample and raw record |
+Catalogs every upstream source and its governance metadata.
 
-### Logical constraints
+Key columns: `id`, `name`, `source_type`, `description`, `owner_name`,
+`legal_basis`, `contains_personal_data`, `retention_days`, `is_active`,
+`created_at`, `updated_at`.
 
-- one source system can generate many ingestion runs
-- one ingestion run can generate many raw objects
-- one raw object can contain many raw records
-- one raw record can yield zero or one normalized message
-- one processing run processes many raw records and generates many normalized messages
-- one normalized message can receive many annotations
-- one dataset contains many dataset items
-- one normalized message can belong to several datasets over time
-- one generation run contains many generation samples
-- one generation sample can link to zero, one, or many raw-record inputs through `data_generation_sample_source_link`
-- one promoted generated raw record can point back to the generation sample that produced it
-- structured skipped-corpus review artifacts are outside the relational curated schema until a future reviewed `data_*` staging table is explicitly added
+Allowed `source_type` values: `api`, `file`, `scraping`, `sql`, `bigdata`,
+`manual`.
 
-### Logical enums
+### `data_ingestion_run`
 
-Controlled vocabularies for CHECK constraints:
+Tracks one source collection attempt.
 
-- `source_type`: `api`, `file`, `scraping`, `sql`, `bigdata`, `manual`
-- `status` for runs: `pending`, `running`, `completed`, `failed`, `partial`
-- `object_type`: `file`, `api_payload`, `html_page`, `sql_export`, `bigdata_extract`
-- `current_label` and `label`: `phishing`, `spam`, `legitimate`, `unknown`
-- `split_name`: `train`, `val`, `test`, `holdout`
-- `redaction_status`: `not_required`, `redacted`, `review_needed`
+Key columns: `id`, `source_system_id`, `started_at`, `finished_at`, `status`,
+`trigger_mode`, `raw_object_count`, `raw_record_count`, `log_message`,
+`created_at`.
 
-### Logical interpretation
+Allowed `status` values: `pending`, `running`, `completed`, `failed`,
+`partial`.
 
-- The MLD keeps a strict lineage from source system to dataset item.
-- The curated NLP object is `data_normalized_message`.
-- The relational model supports SQL queries for lineage, quality control, dataset composition, and API exposure.
+`trigger_mode` is operational text. Current values are `manual` and
+`scheduled`.
 
-## MPD (physical model for PostgreSQL)
+### `data_raw_object`
 
-### Target RDBMS
+Stores one collected object or snapshot.
 
-- Production target: PostgreSQL
-- Local development and CI: SQLite via dialect abstraction
-- Migration tool: Alembic
+Key columns: `id`, `ingestion_run_id`, `external_ref`, `object_type`,
+`storage_uri`, `source_format`, `content_hash`, `size_bytes`,
+`source_metadata`, `collected_at`, `retention_until`, `created_at`.
 
-### MPD diagram
+Allowed `object_type` values: `file`, `api_payload`, `html_page`,
+`pdf_document`, `sql_export`, `bigdata_extract`.
 
-```mermaid
-erDiagram
-    data_source_system ||--o{ data_ingestion_run : source_system_id
-    data_ingestion_run ||--o{ data_raw_object : ingestion_run_id
-    data_raw_object ||--o{ data_raw_record : raw_object_id
-    data_processing_run ||--o{ data_normalized_message : processing_run_id
-    data_raw_record ||--o| data_normalized_message : raw_record_id
-    data_normalized_message ||--o{ data_annotation : normalized_message_id
-    data_dataset ||--o{ data_dataset_item : dataset_id
-    data_normalized_message ||--o{ data_dataset_item : normalized_message_id
+Uniqueness: `(content_hash, external_ref)`.
+
+### `data_raw_record`
+
+Stores the extracted units inside a raw object.
+
+Key columns: `id`, `raw_object_id`, `source_system_id`,
+`generation_sample_id`, `record_key`, `raw_content`, `detected_language`,
+`is_usable`, `rejection_reason`, `extracted_at`, `created_at`.
+
+`source_system_id` is nullable for backward compatibility but should be set by
+new ingestion code. `generation_sample_id` links a promoted generated row to the
+reviewed generation sample that produced it.
+
+Uniqueness: `(raw_object_id, record_key)`.
+
+### `data_processing_run`
+
+Tracks one normalization pass.
+
+Key columns: `id`, `pipeline_version`, `started_at`, `finished_at`, `status`,
+`normalized_count`, `rejected_count`, `report_uri`, `created_at`.
+
+### `data_normalized_message`
+
+Stores reusable NLP-ready message text.
+
+Key columns: `id`, `raw_record_id`, `processing_run_id`, `normalized_text`,
+`text_sha256`, `language`, `current_label`, `quality_score`, `contains_pii`,
+`redaction_status`, `text_length`, `normalized_at`, `created_at`,
+`updated_at`.
+
+Allowed labels: `phishing`, `spam`, `legitimate`, `unknown`.
+Allowed redaction states: `not_required`, `redacted`, `review_needed`.
+
+Uniqueness: `text_sha256`.
+
+### `data_annotation`
+
+Stores label evidence and validation state.
+
+Key columns: `id`, `normalized_message_id`, `label`, `label_source`,
+`confidence`, `comment`, `is_validated`, `annotated_at`, `created_at`.
+
+Allowed labels: `phishing`, `spam`, `legitimate`, `unknown`.
+`confidence` must be between 0 and 1 when present.
+
+### `data_dataset`
+
+Stores frozen dataset versions and publish state.
+
+Key columns: `id`, `name`, `version_tag`, `target_usage`, `status`,
+`frozen_at`, `item_count`, `kaggle_version_id`, `published_at`, `created_at`,
+`updated_at`.
+
+Allowed statuses: `draft`, `frozen`, `archived`.
+`kaggle_version_id` and `published_at` are written only after Kaggle publish
+succeeds.
+
+### `data_dataset_item`
+
+Stores the split membership for a dataset version.
+
+Key columns: `id`, `dataset_id`, `normalized_message_id`, `split_name`,
+`sample_weight`, `row_order`, `created_at`.
+
+Allowed split names: `train`, `val`, `test`, `holdout`.
+Uniqueness: `(dataset_id, normalized_message_id)`.
+
+### `data_generation_run`
+
+Stores one generation or evaluation pass.
+
+Key columns: `id`, `generator_name`, `source_name`, `parent_source`,
+`reference_selection_mode`, artifact URI fields, `status`,
+`total_draft_count`, `usable_draft_count`, `needs_prompt_tuning_count`,
+`dropped_draft_count`, `created_at`, `started_at`, `finished_at`.
+
+### `data_generation_sample`
+
+Stores one generated draft variant and its review state.
+
+Key columns: `id`, `generation_run_id`, `draft_id`, `scenario_id`,
+`variant_index`, `source_name`, `parent_source`, `target_label`,
+`primary_theme`, `review_state`, `review_notes`, `text_sha256`,
+`nearest_reference_raw_record_id`, `nearest_similarity`, `created_at`.
+
+Allowed review states: `usable`, `needs_prompt_tuning`, `drop`.
+Uniqueness: `(generation_run_id, draft_id, variant_index)`.
+
+### `data_generation_sample_source_link`
+
+Stores provenance from a generated sample back to raw records used as seeds,
+inputs, or nearest references.
+
+Key columns: `id`, `generation_sample_id`, `raw_record_id`, `link_role`,
+`link_order`, `created_at`.
+
+Allowed link roles: `generation_seed`, `sample_input`, `nearest_reference`.
+Uniqueness: `(generation_sample_id, raw_record_id, link_role)`.
+
+### `pipeline_state`
+
+Stores resumable cron checkpoints, currently used by long-running pipelines
+such as Common Crawl.
+
+Key columns: `id`, `pipeline_name`, `state_data`, `updated_at`, `created_at`.
+
+### `poc_user`
+
+Stores POC-only users for the Streamlit application.
+
+Key columns: `id`, `email`, `display_name`, `password_hash`, `role`,
+`created_at`, `last_login_at`.
+
+Allowed roles by convention: `admin`, `viewer`.
+
+## SQLite UUID Rule
+
+SQLite can hold SQLAlchemy UUID values as either 32-character hex strings or
+36-character hyphenated strings depending on how rows were produced. Local POC
+and replay flows therefore compare UUIDs through normalized text joins in the
+dataset and normalized-message query layer:
+
+```sql
+lower(replace(CAST(left_uuid AS TEXT), '-', '')) =
+lower(replace(CAST(right_uuid AS TEXT), '-', ''))
 ```
 
-### Physical table definitions
+This is a compatibility guard for local SQLite only. PostgreSQL still stores
+and compares true UUID values.
 
-#### `data_source_system`
+## Dataset Publishing
 
-| Column | Type | Constraints |
-|--------|------|------------|
-| id | uuid | PK, DEFAULT gen_random_uuid() |
-| name | text | NOT NULL, UNIQUE |
-| source_type | text | NOT NULL, CHECK(source_type IN ('api','file','scraping','sql','bigdata','manual')) |
-| description | text | |
-| owner_name | text | |
-| legal_basis | text | |
-| contains_personal_data | boolean | NOT NULL, DEFAULT false |
-| retention_days | integer | |
-| is_active | boolean | NOT NULL, DEFAULT true |
-| created_at | timestamptz | NOT NULL, DEFAULT now() |
-| updated_at | timestamptz | |
+Publishing is a deliberate release action, not a side effect of every source
+cron run.
 
-#### `data_ingestion_run`
+1. A dataset must be `frozen`.
+2. The export service writes train/val/test artifacts.
+3. The publish service pushes a new Kaggle dataset version.
+4. `data_dataset.kaggle_version_id` and `data_dataset.published_at` are written.
+5. The service dispatches the ML repository training workflow through GitHub
+   Actions `workflow_dispatch`.
 
-| Column | Type | Constraints |
-|--------|------|------------|
-| id | uuid | PK |
-| source_system_id | uuid | NOT NULL, FK -> data_source_system(id) ON DELETE RESTRICT |
-| started_at | timestamptz | NOT NULL |
-| finished_at | timestamptz | |
-| status | text | NOT NULL, CHECK(status IN ('pending','running','completed','failed','partial')) |
-| trigger_mode | text | NOT NULL, intended values currently `manual` or `scheduled` |
-| raw_object_count | integer | NOT NULL, DEFAULT 0 |
-| raw_record_count | integer | NOT NULL, DEFAULT 0 |
-| log_message | text | |
-| created_at | timestamptz | NOT NULL, DEFAULT now() |
+The current placeholder `train.csv` in Kaggle was only a connectivity smoke
+test. The real workflow is the frozen dataset export plus publish endpoint.
 
-Index strategy:
+## CRUD Policy
 
-- `idx_ingestion_source_started` on `(source_system_id, started_at DESC)`
-
-Trigger mode semantics:
-
-- `manual`: operator-launched or ad hoc execution
-- `scheduled`: recurring execution launched by a cron or external scheduler
-
-This documentation freeze does not change the current physical schema. It clarifies how Bloc 1 recurring automation is represented in ingestion lineage.
-
-#### `data_raw_object`
-
-| Column | Type | Constraints |
-|--------|------|------------|
-| id | uuid | PK |
-| ingestion_run_id | uuid | NOT NULL, FK -> data_ingestion_run(id) ON DELETE CASCADE |
-| external_ref | text | |
-| object_type | text | NOT NULL, CHECK(object_type IN ('file','api_payload','html_page','sql_export','bigdata_extract')) |
-| storage_uri | text | |
-| source_format | text | |
-| content_hash | text | NOT NULL |
-| size_bytes | bigint | |
-| source_metadata | jsonb | NOT NULL, DEFAULT '{}' |
-| collected_at | timestamptz | NOT NULL |
-| retention_until | timestamptz | |
-| created_at | timestamptz | NOT NULL, DEFAULT now() |
-
-Index strategy:
-
-- `idx_raw_object_ingestion` on `(ingestion_run_id)`
-- `uq_raw_object_hash` UNIQUE `(content_hash, external_ref)`
-
-#### `data_raw_record`
-
-| Column | Type | Constraints |
-|--------|------|------------|
-| id | uuid | PK |
-| raw_object_id | uuid | NOT NULL, FK -> data_raw_object(id) ON DELETE CASCADE |
-| record_key | text | NOT NULL |
-| raw_content | text | NOT NULL |
-| detected_language | text | |
-| is_usable | boolean | NOT NULL, DEFAULT true |
-| rejection_reason | text | |
-| extracted_at | timestamptz | NOT NULL |
-| created_at | timestamptz | NOT NULL, DEFAULT now() |
-
-Index strategy:
-
-- `uq_raw_record_key` UNIQUE `(raw_object_id, record_key)`
-
-#### `data_processing_run`
-
-| Column | Type | Constraints |
-|--------|------|------------|
-| id | uuid | PK |
-| pipeline_version | text | NOT NULL |
-| started_at | timestamptz | NOT NULL |
-| finished_at | timestamptz | |
-| status | text | NOT NULL, CHECK(status IN ('pending','running','completed','failed','partial')) |
-| normalized_count | integer | NOT NULL, DEFAULT 0 |
-| rejected_count | integer | NOT NULL, DEFAULT 0 |
-| report_uri | text | |
-| created_at | timestamptz | NOT NULL, DEFAULT now() |
-
-#### `data_normalized_message`
-
-| Column | Type | Constraints |
-|--------|------|------------|
-| id | uuid | PK |
-| raw_record_id | uuid | NOT NULL, FK -> data_raw_record(id) ON DELETE RESTRICT |
-| processing_run_id | uuid | NOT NULL, FK -> data_processing_run(id) ON DELETE RESTRICT |
-| normalized_text | text | NOT NULL |
-| text_sha256 | text | NOT NULL, UNIQUE |
-| language | text | NOT NULL |
-| current_label | text | NOT NULL, CHECK(current_label IN ('phishing','spam','legitimate','unknown')) |
-| quality_score | real | |
-| contains_pii | boolean | NOT NULL, DEFAULT false |
-| redaction_status | text | NOT NULL, DEFAULT 'not_required', CHECK(redaction_status IN ('not_required','redacted','review_needed')) |
-| text_length | integer | NOT NULL |
-| normalized_at | timestamptz | NOT NULL |
-| created_at | timestamptz | NOT NULL, DEFAULT now() |
-| updated_at | timestamptz | |
-
-Index strategy:
-
-- `idx_message_label_lang` on `(current_label, language)`
-- `idx_message_processing_run` on `(processing_run_id)`
-
-#### `data_annotation`
-
-| Column | Type | Constraints |
-|--------|------|------------|
-| id | uuid | PK |
-| normalized_message_id | uuid | NOT NULL, FK -> data_normalized_message(id) ON DELETE CASCADE |
-| label | text | NOT NULL, CHECK(label IN ('phishing','spam','legitimate','unknown')) |
-| label_source | text | NOT NULL |
-| confidence | real | CHECK(confidence BETWEEN 0 AND 1) |
-| comment | text | |
-| is_validated | boolean | NOT NULL, DEFAULT false |
-| annotated_at | timestamptz | NOT NULL |
-| created_at | timestamptz | NOT NULL, DEFAULT now() |
-
-Index strategy:
-
-- `idx_annotation_message_date` on `(normalized_message_id, annotated_at DESC)`
-
-#### `data_dataset`
-
-| Column | Type | Constraints |
-|--------|------|------------|
-| id | uuid | PK |
-| name | text | NOT NULL |
-| version_tag | text | NOT NULL, UNIQUE |
-| target_usage | text | NOT NULL |
-| status | text | NOT NULL, CHECK(status IN ('draft','frozen','archived')) |
-| frozen_at | timestamptz | |
-| item_count | integer | NOT NULL, DEFAULT 0 |
-| created_at | timestamptz | NOT NULL, DEFAULT now() |
-| updated_at | timestamptz | |
-
-#### `data_dataset_item`
-
-| Column | Type | Constraints |
-|--------|------|------------|
-| id | uuid | PK |
-| dataset_id | uuid | NOT NULL, FK -> data_dataset(id) ON DELETE CASCADE |
-| normalized_message_id | uuid | NOT NULL, FK -> data_normalized_message(id) ON DELETE RESTRICT |
-| split_name | text | NOT NULL, CHECK(split_name IN ('train','val','test','holdout')) |
-| sample_weight | real | NOT NULL, DEFAULT 1.0 |
-| row_order | integer | |
-| created_at | timestamptz | NOT NULL, DEFAULT now() |
-
-Index strategy:
-
-- `uq_dataset_message` UNIQUE `(dataset_id, normalized_message_id)`
-- `idx_dataset_split` on `(dataset_id, split_name)`
-
-## CRUD policy for the data platform
-
-Not every table should be equally mutable.
-
-### Full CRUD
+Full CRUD:
 
 - `data_source_system`
 - `data_annotation`
-- `data_dataset`
-- `data_dataset_item` while the dataset is still in `draft`
+- draft `data_dataset` and `data_dataset_item`
+- `poc_user`
 
-### Create and read, controlled updates only
+Controlled updates:
 
-- `data_normalized_message`
-  - allowed updates: corrected label, redaction status, quality metadata
+- `data_normalized_message`: corrected label, redaction, and quality metadata
+- `data_dataset`: publish fields after a successful Kaggle push
+- `pipeline_state`: checkpoint replacement by the owning pipeline
 
-### Append-only with retention-driven deletion
+Append-only except for retention or full local rebuild:
 
 - `data_ingestion_run`
 - `data_raw_object`
 - `data_raw_record`
 - `data_processing_run`
+- generation lineage tables
 
-This preserves lineage and makes the SQL platform defensible during evaluation.
+## Retention and Privacy
 
-## RGPD and retention rules
-
-- raw content is retained only as long as necessary for reproducibility and audit
-- normalized text must be redacted before long-term retention
-- source-level legal basis and retention are tracked in `data_source_system`
-- records may be deleted by retention policy from raw tables without breaking dataset history if curated text is preserved lawfully
-
-## Secondary schema: product runtime model
-
-The following runtime entities remain valid for the final SaaS application, but they are not the primary MCD for Bloc 1:
-
-- `app_user`
-- `app_oauth_token`
-- `app_watch_state`
-- `app_threat_log`
-- `app_feedback`
-- `ml_model_version`
-- `app_session`
-
-These runtime tables should be documented and implemented as a separate application-domain schema after the data platform baseline is established.
+- Raw data is retained only as long as needed for reproducibility and audit.
+- Personal data flags live on the source and normalized-message layers.
+- PII-bearing text should be redacted before it becomes normalized training
+  data.
+- SEKOIA IOC records are public threat-intelligence indicators and are stored
+  as raw intelligence, not as user email content.

@@ -53,6 +53,8 @@ class Settings(BaseSettings):
     phishtank_snapshot_prefix: str = "phishtank"
     certfr_snapshot_storage_backend: str | None = None
     certfr_snapshot_prefix: str = "cert-fr"
+    sekoia_snapshot_storage_backend: str | None = None
+    sekoia_snapshot_prefix: str = "sekoia-community-ioc"
     sap_labs_snapshot_storage_backend: str | None = None
     common_crawl_snapshot_storage_backend: str | None = None
     database_historical_snapshot_storage_backend: str | None = None
@@ -62,6 +64,10 @@ class Settings(BaseSettings):
     cc_cron_duration_mode: str = Field(
         default="short",
         description="'short' = 30 min, 'standard' = 8 hours max runtime for CC cron.",
+    )
+    cc_cron_lookback_indices: int = Field(
+        default=12,
+        description="How many recent Common Crawl indexes the cron scans for missed work.",
     )
     cc_input_backend: str = Field(
         default="prod",

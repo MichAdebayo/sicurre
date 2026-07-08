@@ -11,11 +11,12 @@ Two planning lenses coexist and must not be confused:
 
 1. Delivery model and bloc mapping: [delivery-bloc-mapping.md](delivery-bloc-mapping.md)
 2. Bloc 1 backbone: [data-design.md](data-design.md)
-3. Issue artifacts: [issue-artifact.md](issue-artifact.md)
-4. Cross-bloc component architecture: [component-design.md](component-design.md)
-5. Backend target organization: [backend-plan.md](backend-plan.md)
-6. Public monitoring architecture: [monitoring-design.md](monitoring-design.md)
-7. Product runtime context: [system-context.md](system-context.md)
+3. Source cadence and dataset release: [data-platform-cadence.md](data-platform-cadence.md)
+4. Issue artifacts: [issue-artifact.md](issue-artifact.md)
+5. Cross-bloc component architecture: [component-design.md](component-design.md)
+6. Backend target organization: [backend-plan.md](backend-plan.md)
+7. Public monitoring architecture: [monitoring-design.md](monitoring-design.md)
+8. Product runtime context: [system-context.md](system-context.md)
 
 ## Architectural stance
 

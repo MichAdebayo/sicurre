@@ -39,7 +39,9 @@ class DatasetExportService:
                 nm.current_label as label
             FROM data_dataset d
             JOIN data_dataset_item di ON d.id = di.dataset_id
-            JOIN data_normalized_message nm ON di.normalized_message_id = nm.id
+            JOIN data_normalized_message nm
+              ON lower(replace(CAST(di.normalized_message_id AS TEXT), '-', ''))
+               = lower(replace(CAST(nm.id AS TEXT), '-', ''))
             WHERE d.version_tag = :version_tag
             ORDER BY di.row_order ASC
         """)

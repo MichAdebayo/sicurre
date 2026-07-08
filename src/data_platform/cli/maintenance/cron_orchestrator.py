@@ -55,6 +55,13 @@ CRON_JOBS: tuple[CronJobSpec, ...] = (
         source_names=("cert-fr-cti",),
     ),
     CronJobSpec(
+        name="sekoia",
+        label="SEKOIA Community IOC",
+        script_path=ROOT_DIR
+        / "src/data_platform/cron_schedulers/scraping/run_sekoia_ioc.py",
+        source_names=("sekoia-community-ioc",),
+    ),
+    CronJobSpec(
         name="csv",
         label="CSV File Sources",
         script_path=ROOT_DIR

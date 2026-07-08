@@ -201,7 +201,10 @@ class DataRawObject(Base):
     content_hash: Mapped[str] = mapped_column(sa.Text(), nullable=False)
     size_bytes: Mapped[int | None] = mapped_column(sa.BigInteger())
     source_metadata: Mapped[dict[str, Any]] = mapped_column(
-        JSON_VARIANT, nullable=False, default=dict
+        JSON_VARIANT,
+        nullable=False,
+        default=dict,
+        server_default=sa.text("'{}'"),
     )
     collected_at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True), nullable=False
@@ -551,7 +554,10 @@ class DataGenerationSample(Base):
     primary_theme: Mapped[str | None] = mapped_column(sa.Text())
     review_state: Mapped[str] = mapped_column(sa.Text(), nullable=False)
     review_notes: Mapped[list[str]] = mapped_column(
-        JSON_VARIANT, nullable=False, default=list
+        JSON_VARIANT,
+        nullable=False,
+        default=list,
+        server_default=sa.text("'[]'"),
     )
     text_sha256: Mapped[str | None] = mapped_column(sa.Text())
     nearest_reference_raw_record_id: Mapped[uuid.UUID | None] = mapped_column(sa.Uuid())
@@ -633,7 +639,10 @@ class PipelineState(Base):
     )
     pipeline_name: Mapped[str] = mapped_column(sa.Text(), nullable=False, unique=True)
     state_data: Mapped[dict[str, Any]] = mapped_column(
-        JSON_VARIANT, nullable=False, default=dict
+        JSON_VARIANT,
+        nullable=False,
+        default=dict,
+        server_default=sa.text("'{}'"),
     )
     updated_at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now

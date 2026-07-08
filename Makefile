@@ -5,14 +5,14 @@
         scraping-ingest-base \
         db-ingest-base \
         bigdata-ingest-base \
-        phishtank-cron file-cron scraping-cron db-cron bigdata-cron \
-        phishtank-cron-reserved file-cron-reserved scraping-cron-reserved \
+        phishtank-cron file-cron scraping-cron sekoia-cron db-cron bigdata-cron \
+        phishtank-cron-reserved file-cron-reserved scraping-cron-reserved sekoia-cron-reserved \
         db-cron-reserved bigdata-cron-reserved \
         cron-orchestrate ingest-all-cron run-scheduler \
         bigdata-crawl bigdata-ingest bigdata-reviewed-promote \
         normalize normalize-dry \
         annotate \
-        generate-data dataset-build dataset-export \
+        generate-data dataset-build dataset-export publish-latest dataset-release monthly-release \
         seed-frozen-dataset \
 		poc-replay-frozen \
         pipeline-push run-pipeline demo-v1 demo-v2 \
@@ -51,14 +51,16 @@ help:
 	@echo "  make phishtank-cron            - Scheduled PhishTank ingestion  (set CRON_ARGS=--reserved for reserved slot)"
 	@echo "  make file-cron                 - Scheduled CSV ingestion         (set CRON_ARGS=--reserved for reserved slot)"
 	@echo "  make scraping-cron             - Scheduled CERT-FR scraping      (set CRON_ARGS=--reserved for reserved slot)"
+	@echo "  make sekoia-cron               - Scheduled SEKOIA IOC ingestion  (set CRON_ARGS=--reserved for reserved slot)"
 	@echo "  make db-cron                   - Scheduled DB feed                (set CRON_ARGS=--reserved for reserved slot)"
 	@echo "  make bigdata-cron              - Scheduled Common Crawl pipeline  (set CRON_ARGS=--reserved for reserved slot)"
 	@echo "  make *-cron-reserved           - Shorthand for CRON_ARGS=--reserved make *-cron"
 	@echo "  make run-scheduler             - Run all scheduled ingestion tasks sequentially"
 	@echo ""
 	@echo "  Pipeline Execution"
-	@echo "  make pipeline-push             - Normalize raw records, annotate them, build a dataset, and export it"
-	@echo "  make run-pipeline              - Run full cron suite and push updates to Kaggle/R2 (incremental end-to-end)"
+	@echo "  make pipeline-push             - Normalize, annotate, build a dataset, and export it locally/R2"
+	@echo "  make dataset-release           - Monthly release: normalize, annotate, build, export, publish, dispatch ML"
+	@echo "  make run-pipeline              - Legacy manual all-in-one: cron suite + dataset-release"
 	@echo "  make demo-v1                   - Legacy/demo alias: base ingestion + pipeline push"
 	@echo "  make demo-v2                   - Legacy/demo alias: run-pipeline with mock delta generator"
 	@echo ""
@@ -163,6 +165,13 @@ scraping-cron:
 scraping-cron-reserved:
 	$(MAKE) scraping-cron CRON_ARGS=--reserved
 
+sekoia-cron:
+	@echo "Running scheduled SEKOIA IOC ingestion$(if $(CRON_ARGS), [args: $(CRON_ARGS)])..."
+	uv run python src/data_platform/cron_schedulers/scraping/run_sekoia_ioc.py $(CRON_ARGS)
+
+sekoia-cron-reserved:
+	$(MAKE) sekoia-cron CRON_ARGS=--reserved
+
 db-cron:
 	@echo "Running scheduled DB feed$(if $(CRON_ARGS), [args: $(CRON_ARGS)])..."
 	uv run python src/data_platform/cron_schedulers/database/run_sql_ingestion.py $(CRON_ARGS)
@@ -240,6 +249,10 @@ dataset-export:
 		--version-tag "$(DATASET_VERSION_TAG)" \
 		$(EXPORT_ARGS)
 
+publish-latest:
+	@echo "Publishing latest frozen dataset to Kaggle and dispatching ML training..."
+	uv run python scripts/data_platform/publish_latest.py
+
 seed-frozen-dataset:
 	@echo "Seeding current_frozen provenance into data_dataset + data_dataset_item..."
 	uv run python scripts/data_platform/seed_frozen_dataset.py $(SEED_ARGS)
@@ -265,9 +278,14 @@ poc-replay-frozen:
 pipeline-push: normalize annotate dataset-build dataset-export
 	@echo "Data pushed through normalization, annotation, dataset build, and dataset export."
 
+dataset-release: normalize annotate dataset-build dataset-export publish-latest
+	@echo "Monthly dataset release completed."
+
+monthly-release: dataset-release
+
 run-pipeline: run-scheduler
-	$(MAKE) pipeline-push DATASET_TAG_PREFIX=cron
-	@echo "End-to-end scheduler run and pipeline push completed."
+	$(MAKE) dataset-release DATASET_TAG_PREFIX=cron
+	@echo "Legacy end-to-end scheduler run and dataset release completed."
 
 demo-v1: ingest-all-base
 	@echo "Running canonical generation lanes before pipeline push..."

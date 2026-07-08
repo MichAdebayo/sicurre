@@ -869,7 +869,7 @@ async def list_datasets_alias(session: AsyncSession = Depends(get_async_session)
 
 def execute_pipeline():
     try:
-        subprocess.run(["make", "run-pipeline"], check=True)
+        subprocess.run(["make", "run-scheduler"], check=True)
     except Exception as exc:
         print(f"Pipeline execution failed: {exc}")
 
