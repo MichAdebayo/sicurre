@@ -1,11 +1,31 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { authClient } from "./auth-client";
+import { authBaseURL, authClient } from "./auth-client";
 
 const API_BASE_URL = "/v1";
 const USER_NAME_KEY = "sicurre_user_name";
 const USER_EMAIL_KEY = "sicurre_user_email";
 const USER_ROLE_KEY = "sicurre_user_role";
 const AUTH_PROVIDER_KEY = "sicurre_auth_provider";
+
+export type AuthFailureReason =
+  | "unknown_account"
+  | "invalid_password"
+  | "email_taken"
+  | "invalid_email"
+  | "weak_password"
+  | "service_unavailable"
+  | "login_failed"
+  | "signup_failed";
+
+export class AuthFlowError extends Error {
+  readonly reason: AuthFailureReason;
+
+  constructor(reason: AuthFailureReason, fallbackMessage: string) {
+    super(fallbackMessage);
+    this.name = "AuthFlowError";
+    this.reason = reason;
+  }
+}
 
 export type AuthProvider = "password" | "google";
 
@@ -203,6 +223,57 @@ async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function checkAuthEmailExists(email: string): Promise<boolean | null> {
+  try {
+    const response = await fetch(`${authBaseURL}/check-email`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const body = await response.json().catch(() => ({}));
+    return Boolean(body.exists);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeAuthProviderError(
+  rawError: unknown,
+  fallback: AuthFailureReason,
+): AuthFailureReason {
+  const errorLike = rawError as { code?: string; message?: string; statusText?: string } | null | undefined;
+  const text = `${errorLike?.code ?? ""} ${errorLike?.message ?? ""} ${errorLike?.statusText ?? ""}`.toLowerCase();
+
+  if (text.includes("user already exists") || text.includes("already exist") || text.includes("email already")) {
+    return "email_taken";
+  }
+  if (text.includes("invalid email")) {
+    return "invalid_email";
+  }
+  if (text.includes("password") && (text.includes("short") || text.includes("weak") || text.includes("length"))) {
+    return "weak_password";
+  }
+  if (text.includes("invalid password") || text.includes("invalid email or password")) {
+    return "invalid_password";
+  }
+  if (text.includes("user not found")) {
+    return "unknown_account";
+  }
+  if (text.includes("fetch") || text.includes("network") || text.includes("failed to")) {
+    return "service_unavailable";
+  }
+
+  return fallback;
+}
+
+function createAuthError(reason: AuthFailureReason): AuthFlowError {
+  return new AuthFlowError(reason, reason);
+}
+
 export function useCurrentSession(enabled = true) {
   return useQuery<AuthSession>({
     queryKey: ["auth-session"],
@@ -216,12 +287,20 @@ export function useLogin() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (payload: { email: string; password: string }) => {
+      const accountExists = await checkAuthEmailExists(payload.email);
+      if (accountExists === false) {
+        throw createAuthError("unknown_account");
+      }
+
       const result = await authClient.signIn.email({
         email: payload.email,
         password: payload.password,
       });
       if (result.error) {
-        throw new Error(result.error.message || "Connexion impossible.");
+        const reason = accountExists === true
+          ? normalizeAuthProviderError(result.error, "invalid_password")
+          : normalizeAuthProviderError(result.error, "login_failed");
+        throw createAuthError(reason);
       }
       return result;
     },
@@ -241,13 +320,18 @@ export function useSignup() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (payload: { name: string; email: string; password: string }) => {
+      const accountExists = await checkAuthEmailExists(payload.email);
+      if (accountExists === true) {
+        throw createAuthError("email_taken");
+      }
+
       const result = await authClient.signUp.email({
         name: payload.name,
         email: payload.email,
         password: payload.password,
       });
       if (result.error) {
-        throw new Error(result.error.message || "Inscription impossible.");
+        throw createAuthError(normalizeAuthProviderError(result.error, "signup_failed"));
       }
       return result;
     },

@@ -6,7 +6,7 @@ import sicurreLogo from "../assets/sicurre.svg";
 import { loginSchema, signUpSchema } from "../lib/schemas";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
-import { useLogin, useSignup } from "../lib/api";
+import { AuthFlowError, type AuthFailureReason, useLogin, useSignup } from "../lib/api";
 
 const MotionDiv = motion.div as any;
 
@@ -15,6 +15,13 @@ interface LoginRouteProps {
   initialMode?: "login" | "signup";
   onNavigateToLanding?: () => void;
 }
+
+const getAuthFailureReason = (error: unknown, fallback: AuthFailureReason): AuthFailureReason => {
+  if (error instanceof AuthFlowError) {
+    return error.reason;
+  }
+  return fallback;
+};
 
 export default function LoginRoute({
   onLoginSuccess,
@@ -51,7 +58,8 @@ export default function LoginRoute({
         await signupMutation.mutateAsync({ name, email, password });
         onLoginSuccess();
       } catch (error) {
-        setAuthError(error instanceof Error ? error.message : "Inscription impossible.");
+        const reason = getAuthFailureReason(error, "signup_failed");
+        setAuthError(t(`login.errors.${reason}`));
       }
     } else {
       const validation = loginSchema.safeParse({ email, password });
@@ -63,7 +71,8 @@ export default function LoginRoute({
         await loginMutation.mutateAsync({ email, password });
         onLoginSuccess();
       } catch (error) {
-        setAuthError(error instanceof Error ? error.message : (t("login.error_invalid") || "Identifiants incorrects."));
+        const reason = getAuthFailureReason(error, "login_failed");
+        setAuthError(t(`login.errors.${reason}`));
       }
     }
   };

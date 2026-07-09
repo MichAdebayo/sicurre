@@ -20,7 +20,17 @@
     "email_label": "Professional email address",
     "password_label": "Password",
     "button": "Sign In",
-    "error_invalid": "Invalid credentials. Please check your entries."
+    "error_invalid": "Invalid credentials. Please check your entries.",
+    "errors": {
+      "unknown_account": "No Sicurre account is associated with this email address. Check the address or create an account.",
+      "invalid_password": "The password does not match this account.",
+      "email_taken": "An account already exists with this email address. Sign in or use password recovery.",
+      "invalid_email": "This email address is not valid.",
+      "weak_password": "Choose a stronger password.",
+      "service_unavailable": "The authentication service is not responding. Try again in a moment.",
+      "login_failed": "Sign-in is unavailable right now. Check your details or try again in a moment.",
+      "signup_failed": "Account creation is unavailable right now. Check your details or try again in a moment."
+    }
   },
   "sidebar": {
     "status_active": "Shield Active",

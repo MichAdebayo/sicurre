@@ -1,6 +1,8 @@
 .PHONY: help install test dev-api test-inference \
         ingest-all-base \
         data-platform-staging-smoke \
+        app-stack-smoke \
+        grafana-provision \
         phishtank-ingest-base \
         file-ingest-base \
         scraping-ingest-base \
@@ -40,6 +42,8 @@ help:
 	@echo "  make test-inference            - Smoke-test the inference API (localhost:8000)"
 	@echo "  make dev-api                   - Start data platform API on http://localhost:8001"
 	@echo "  make data-platform-staging-smoke - Build and smoke-test data platform container"
+	@echo "  make app-stack-smoke           - Build and smoke-test app + auth + API containers"
+	@echo "  make grafana-provision         - Provision Sicurre Grafana dashboard"
 	@echo ""
 	@echo "  Base Ingestion  (deterministic, frozen snapshots — used to build sicurre.db from scratch)"
 	@echo "  make ingest-all-base           - Wipe DB and run ALL base ingestion steps in order"
@@ -96,6 +100,12 @@ dev:
 
 data-platform-staging-smoke:
 	docker compose -f docker-compose.data-platform-smoke.yml up --build --abort-on-container-exit --exit-code-from data-platform-smoke
+
+app-stack-smoke:
+	docker compose -f docker-compose.app-smoke.yml up --build --abort-on-container-exit --exit-code-from app-smoke
+
+grafana-provision:
+	node scripts/deploy/provision_grafana_dashboard.mjs
 
 test-inference:
 	uv run scripts/app/test_inference_api.py

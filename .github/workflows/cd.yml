@@ -1,0 +1,200 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Docker image tag to deploy. Defaults to the validated commit SHA."
+        required: false
+        default: ""
+
+concurrency:
+  group: sicurre-production-deploy
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-push:
+    name: Build and push images
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      owner: ${{ steps.image.outputs.owner }}
+      tag: ${{ steps.tag.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Resolve lowercase GHCR owner
+        id: image
+        run: |
+          owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
+          echo "owner=${owner}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve image tag
+        id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            echo "tag=${{ github.event.inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "workflow_run" ]; then
+            echo "tag=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push app gateway
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.app
+          target: web
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.image.outputs.owner }}/sicurre-app:${{ steps.tag.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ steps.image.outputs.owner }}/sicurre-app:latest
+          cache-from: type=gha,scope=sicurre-app
+          cache-to: type=gha,mode=max,scope=sicurre-app
+
+      - name: Build and push auth sidecar
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.app
+          target: auth
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.image.outputs.owner }}/sicurre-auth:${{ steps.tag.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ steps.image.outputs.owner }}/sicurre-auth:latest
+          cache-from: type=gha,scope=sicurre-auth
+          cache-to: type=gha,mode=max,scope=sicurre-auth
+
+      - name: Build and push API/data platform
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.data-platform
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.image.outputs.owner }}/sicurre-api:${{ steps.tag.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ steps.image.outputs.owner }}/sicurre-api:latest
+          cache-from: type=gha,scope=sicurre-api
+          cache-to: type=gha,mode=max,scope=sicurre-api
+
+  deploy:
+    name: Deploy to Hetzner
+    runs-on: ubuntu-latest
+    needs: build-push
+    environment: production
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Copy stack config to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USER }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          source: "docker-compose.prod.yml,deploy/alloy/config.alloy,deploy/nginx/conf.d/sicurre.com.conf,deploy/env.compose.example,deploy/env.api.example,deploy/env.auth.example,deploy/env.alloy.example"
+          target: ${{ secrets.DEPLOY_PATH }}
+
+      - name: Pull images and restart app stack
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USER }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd "${{ secrets.DEPLOY_PATH }}"
+
+            if [ ! -f .env ]; then
+              echo ".env is missing in ${{ secrets.DEPLOY_PATH }}. Seed it from deploy/env.compose.example before first deploy."
+              exit 1
+            fi
+            if [ ! -f deploy/env.api ]; then
+              echo "deploy/env.api is missing. Seed it from deploy/env.api.example before first deploy."
+              exit 1
+            fi
+            if [ ! -f deploy/env.auth ]; then
+              echo "deploy/env.auth is missing. Seed it from deploy/env.auth.example before first deploy."
+              exit 1
+            fi
+
+            if grep -q '^IMAGE_TAG=' .env; then
+              sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${{ needs.build-push.outputs.tag }}|" .env
+            else
+              echo "IMAGE_TAG=${{ needs.build-push.outputs.tag }}" >> .env
+            fi
+
+            if grep -q '^GHCR_OWNER=' .env; then
+              sed -i "s|^GHCR_OWNER=.*|GHCR_OWNER=${{ needs.build-push.outputs.owner }}|" .env
+            else
+              echo "GHCR_OWNER=${{ needs.build-push.outputs.owner }}" >> .env
+            fi
+
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+            docker compose -f docker-compose.prod.yml pull sicurre-app sicurre-api auth-service
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            docker run --rm \
+              -v /opt/nginx-proxy/conf.d:/target \
+              -v "${{ secrets.DEPLOY_PATH }}/deploy/nginx/conf.d/sicurre.com.conf:/src/sicurre.com.conf:ro" \
+              alpine cp /src/sicurre.com.conf /target/sicurre.com.conf
+
+            docker exec nginx-proxy nginx -t
+            docker exec nginx-proxy nginx -s reload
+            docker image prune -f
+
+  health-check:
+    name: Health check
+    runs-on: ubuntu-latest
+    needs: deploy
+
+    steps:
+      - name: Wait for app gateway and API
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USER }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            for i in $(seq 1 30); do
+              app_status=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8002/__app/health 2>/dev/null || true)
+              api_status=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8002/health 2>/dev/null || true)
+              if [ "$app_status" = "200" ] && [ "$api_status" = "200" ]; then
+                echo "Sicurre app stack healthy on attempt $i"
+                exit 0
+              fi
+              echo "Attempt $i/30: app=$app_status api=$api_status"
+              sleep 10
+            done
+            exit 1

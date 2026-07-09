@@ -1,0 +1,98 @@
+name: sicurre-app-stack-smoke
+
+services:
+  data-platform-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.data-platform
+    environment:
+      SICURRE_ENVIRONMENT: app-stack-smoke
+      SICURRE_AUTH_ENABLED: "false"
+      SICURRE_SCHEDULER_ENABLED: "false"
+      SICURRE_DATABASE_URL: sqlite+aiosqlite:////app/data/local/app-stack-smoke.db
+      SICURRE_DATA_PLATFORM_DATABASE_URL: sqlite+aiosqlite:////app/data/local/app-stack-smoke.db
+      SICURRE_BETTER_AUTH_BASE_URL: http://auth-service:3005
+    command:
+      - sh
+      - -c
+      - uv run alembic upgrade head && uv run uvicorn data_platform.api.main:app --host 0.0.0.0 --port 8001
+    expose:
+      - "8001"
+    healthcheck:
+      test:
+        - CMD
+        - uv
+        - run
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=5).read()"
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+      target: auth
+    environment:
+      SICURRE_BETTER_AUTH_PORT: "3005"
+      SICURRE_BETTER_AUTH_URL: http://localhost:5174
+      BETTER_AUTH_URL: http://localhost:5174
+      SICURRE_FRONTEND_ORIGIN: http://localhost:5174
+      SICURRE_BETTER_AUTH_SECRET: app-stack-smoke-change-me-please-1234567890
+      SICURRE_BETTER_AUTH_DB_PATH: /app/data/local/auth-smoke.db
+    expose:
+      - "3005"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3005/api/auth/health').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+
+  sicurre-app:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+      target: web
+    environment:
+      PORT: "5173"
+      API_SERVICE_URL: http://data-platform-api:8001
+      AUTH_SERVICE_URL: http://auth-service:3005
+    depends_on:
+      data-platform-api:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    ports:
+      - "5174:5173"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:5173/__app/health').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 10s
+
+  app-smoke:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+      target: web
+    depends_on:
+      sicurre-app:
+        condition: service_healthy
+    environment:
+      SICURRE_APP_SMOKE_URL: http://sicurre-app:5173
+    command:
+      - node
+      - scripts/app/app_stack_smoke.mjs

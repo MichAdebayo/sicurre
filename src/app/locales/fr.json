@@ -20,7 +20,17 @@
     "email_label": "Adresse email professionnelle",
     "password_label": "Mot de passe",
     "button": "Se connecter",
-    "error_invalid": "Identifiants incorrects. Veuillez vérifier vos saisies."
+    "error_invalid": "Identifiants incorrects. Veuillez vérifier vos saisies.",
+    "errors": {
+      "unknown_account": "Aucun compte Sicurre n’est associé à cette adresse e-mail. Vérifiez l’adresse ou créez un compte.",
+      "invalid_password": "Le mot de passe ne correspond pas à ce compte.",
+      "email_taken": "Un compte existe déjà avec cette adresse e-mail. Connectez-vous ou utilisez la récupération de mot de passe.",
+      "invalid_email": "Cette adresse e-mail n’est pas valide.",
+      "weak_password": "Choisissez un mot de passe plus robuste.",
+      "service_unavailable": "Le service d’authentification ne répond pas. Réessayez dans quelques instants.",
+      "login_failed": "Connexion impossible pour le moment. Vérifiez vos informations ou réessayez dans quelques instants.",
+      "signup_failed": "Création du compte impossible pour le moment. Vérifiez vos informations ou réessayez dans quelques instants."
+    }
   },
   "sidebar": {
     "status_active": "Bouclier actif",

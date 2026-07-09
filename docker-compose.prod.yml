@@ -1,0 +1,124 @@
+name: sicurre-prod
+
+x-logging: &default-logging
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  sicurre-api:
+    image: ghcr.io/${GHCR_OWNER:-michaeladebayo99}/sicurre-api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - ${SICURRE_API_ENV_FILE:-./deploy/env.api}
+    environment:
+      SICURRE_ENVIRONMENT: production
+      SICURRE_AUTH_ENABLED: "true"
+      SICURRE_SCHEDULER_ENABLED: ${SICURRE_SCHEDULER_ENABLED:-true}
+      SICURRE_BETTER_AUTH_BASE_URL: http://auth-service:3005
+      SICURRE_INFERENCE_API_URL: ${SICURRE_INFERENCE_API_URL:-https://api.sicurre.com/v1/classify}
+    expose:
+      - "8001"
+    command:
+      - sh
+      - -c
+      - uv run alembic upgrade head && uv run uvicorn data_platform.api.main:app --host 0.0.0.0 --port 8001
+    healthcheck:
+      test:
+        - CMD
+        - uv
+        - run
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=5).read()
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - sicurre-internal
+    <<: *default-logging
+
+  auth-service:
+    image: ghcr.io/${GHCR_OWNER:-michaeladebayo99}/sicurre-auth:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - ${SICURRE_AUTH_ENV_FILE:-./deploy/env.auth}
+    environment:
+      SICURRE_BETTER_AUTH_PORT: "3005"
+      SICURRE_BETTER_AUTH_URL: ${SICURRE_PUBLIC_APP_URL:-https://sicurre.com}
+      BETTER_AUTH_URL: ${SICURRE_PUBLIC_APP_URL:-https://sicurre.com}
+      SICURRE_FRONTEND_ORIGIN: ${SICURRE_PUBLIC_APP_URL:-https://sicurre.com}
+      SICURRE_BETTER_AUTH_DB_PATH: /app/data/local/better-auth.db
+    expose:
+      - "3005"
+    volumes:
+      - better_auth_data:/app/data/local
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3005/api/auth/health').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    networks:
+      - sicurre-internal
+    <<: *default-logging
+
+  sicurre-app:
+    image: ghcr.io/${GHCR_OWNER:-michaeladebayo99}/sicurre-app:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      sicurre-api:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    environment:
+      PORT: "5173"
+      API_SERVICE_URL: http://sicurre-api:8001
+      AUTH_SERVICE_URL: http://auth-service:3005
+    ports:
+      - "127.0.0.1:${SICURRE_APP_HOST_PORT:-8002}:5173"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:5173/__app/health').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    networks:
+      - sicurre-internal
+    <<: *default-logging
+
+  alloy:
+    profiles: ["observability"]
+    image: grafana/alloy:latest
+    restart: unless-stopped
+    env_file:
+      - ${SICURRE_ALLOY_ENV_FILE:-./deploy/env.alloy}
+    volumes:
+      - ./deploy/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: ["run", "/etc/alloy/config.alloy"]
+    depends_on:
+      sicurre-app:
+        condition: service_healthy
+    networks:
+      - sicurre-internal
+    <<: *default-logging
+
+networks:
+  sicurre-internal:
+    driver: bridge
+
+volumes:
+  better_auth_data:

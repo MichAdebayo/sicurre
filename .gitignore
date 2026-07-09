@@ -122,4 +122,10 @@ src/app/assets/
 src/app/task.md
 src/app/walkthrough.md
 
-experiment/
+env.api
+env.auth
+env.alloy
+deploy/README.md
+deploy/alloy/*.md
+deploy/grafana/*.md
+deploy/nginx/*.md

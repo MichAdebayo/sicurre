@@ -19,6 +19,7 @@ const authSecret =
 const sqlitePath =
   process.env.SICURRE_BETTER_AUTH_DB_PATH ??
   path.resolve(process.cwd(), "data/local/sicurre.db");
+export const authDatabase = new Database(sqlitePath);
 
 const trustedOrigins = [
   process.env.SICURRE_FRONTEND_ORIGIN,
@@ -31,7 +32,7 @@ export const auth = betterAuth({
   baseURL: authBaseUrl,
   basePath: "/api/auth",
   trustedOrigins,
-  database: new Database(sqlitePath),
+  database: authDatabase,
   emailAndPassword: {
     enabled: true,
     autoSignIn: true,

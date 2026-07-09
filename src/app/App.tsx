@@ -25,6 +25,28 @@ import {
 
 type ViewState = "landing" | "login" | "signup" | "cgu" | "mentions-legales" | "confidentialite" | "contact";
 
+const publicViewPaths: Record<ViewState, string> = {
+  landing: "/",
+  login: "/login",
+  signup: "/signup",
+  cgu: "/cgu",
+  "mentions-legales": "/mentions-legales",
+  confidentialite: "/confidentialite",
+  contact: "/contact",
+};
+
+const publicPathViews = new Map<string, ViewState>(
+  Object.entries(publicViewPaths).map(([view, path]) => [path, view as ViewState]),
+);
+
+const isPublicViewState = (value: string | null): value is ViewState =>
+  Boolean(value && value in publicViewPaths);
+
+const getViewStateFromPath = (): ViewState | null => {
+  const normalizedPath = window.location.pathname.replace(/\/$/, "") || "/";
+  return publicPathViews.get(normalizedPath) ?? null;
+};
+
 const getInitialLoginState = () => {
   const params = new URLSearchParams(window.location.search);
   if (params.get("auth_provider") || params.get("email") || params.get("username")) {
@@ -41,9 +63,14 @@ const getInitialLoginState = () => {
 };
 
 const getInitialViewState = (): ViewState => {
+  const pathView = getViewStateFromPath();
+  if (pathView) {
+    sessionStorage.setItem("sicurre_view_state", pathView);
+    return pathView;
+  }
   const saved = sessionStorage.getItem("sicurre_view_state");
-  if (saved && ["landing", "login", "signup", "cgu", "mentions-legales", "confidentialite", "contact"].includes(saved)) {
-    return saved as ViewState;
+  if (isPublicViewState(saved)) {
+    return saved;
   }
   return "landing";
 };
@@ -54,6 +81,10 @@ export default function App() {
 
   const setViewState = (view: ViewState) => {
     sessionStorage.setItem("sicurre_view_state", view);
+    const nextPath = publicViewPaths[view];
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState({ sicurreViewState: view }, "", nextPath);
+    }
     setViewStateState(view);
   };
   const [activePage, setActivePage] = useState<SidebarPage>("dashboard");
@@ -90,6 +121,19 @@ export default function App() {
       setActivePage("settings");
     }
   }, [session?.onboarding_required, activePage]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const pathView = getViewStateFromPath();
+      if (pathView) {
+        sessionStorage.setItem("sicurre_view_state", pathView);
+        setViewStateState(pathView);
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   useEffect(() => {
     if (session && !session.is_platform_admin && activePage === "logs") {

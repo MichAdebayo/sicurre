@@ -27,3 +27,8 @@ Container files live at the repository root:
 
 - `Dockerfile.data-platform`
 - `docker-compose.data-platform-smoke.yml`
+
+The full app stack smoke lives beside it:
+
+- `Dockerfile.app`
+- `docker-compose.app-smoke.yml`

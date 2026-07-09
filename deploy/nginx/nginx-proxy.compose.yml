@@ -1,0 +1,18 @@
+name: sicurre-nginx-proxy
+
+services:
+  nginx-proxy:
+    image: nginx:1.27-alpine
+    container_name: nginx-proxy
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /opt/nginx-proxy/conf.d:/etc/nginx/conf.d:ro
+      - /opt/nginx-proxy/ssl:/etc/nginx/ssl:ro
+      - /opt/nginx-proxy/logs:/var/log/nginx
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
