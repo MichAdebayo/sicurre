@@ -6,7 +6,6 @@ services:
       context: .
       dockerfile: Dockerfile.data-platform
     environment:
-      SICURRE_ENVIRONMENT: test
       SICURRE_ENVIRONMENT: app-stack-smoke
       SICURRE_AUTH_ENABLED: "false"
       SICURRE_SCHEDULER_ENABLED: "false"
