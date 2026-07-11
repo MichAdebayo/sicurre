@@ -1,0 +1,54 @@
+
+graph MCD {
+    rankdir=LR;
+    node [fontname="Helvetica,Arial,sans-serif", fontsize=10];
+    edge [fontname="Helvetica,Arial,sans-serif", fontsize=9];
+
+    // Entities
+    node [shape=record, style=filled, fillcolor="#E3E8EE"];
+    SOURCE_SYSTEM [label="{SOURCE_SYSTEM|id_source\nname\nsource_type\ndescription\nowner_name\nlegal_basis\ncontains_personal_data\nretention_days\nis_active}"];
+    INGESTION_RUN [label="{INGESTION_RUN|id_ingestion\nstarted_at\nfinished_at\nstatus\ntrigger_mode\nraw_object_count\nraw_record_count\nlog_message}"];
+    RAW_OBJECT [label="{RAW_OBJECT|id_raw_object\nexternal_ref\nobject_type\nstorage_uri\ncontent_hash\ncollected_at\nsize_bytes\nsource_format\nsource_metadata}"];
+    RAW_RECORD [label="{RAW_RECORD|id_raw_record\nrecord_key\nraw_content\ndetected_language\nextracted_at\nis_usable\nrejection_reason}"];
+    PROCESSING_RUN [label="{PROCESSING_RUN|id_processing\nstarted_at\nfinished_at\npipeline_version\nstatus\nnormalized_count\nrejected_count\nreport_uri}"];
+    NORMALIZED_MESSAGE [label="{NORMALIZED_MESSAGE|id_message\nnormalized_text\ntext_sha256\nlanguage\ncurrent_label\nquality_score\ncontains_pii\nredaction_status\ntext_length\nnormalized_at}"];
+    ANNOTATION [label="{ANNOTATION|id_annotation\nlabel\nlabel_source\nconfidence\ncomment\nis_validated\nannotated_at}"];
+    DATASET [label="{DATASET|id_dataset\nname\nversion_tag\ntarget_usage\nstatus\nfrozen_at\nitem_count}"];
+    DATASET_ITEM [label="{DATASET_ITEM|id_dataset_item\nsplit_name\nsample_weight\nrow_order}"];
+
+    // Associations
+    node [shape=ellipse, style=filled, fillcolor="#D1E8E2"];
+    PRODUCES [label="PRODUCES"];
+    COLLECTS [label="COLLECTS"];
+    CONTAINS [label="CONTAINS"];
+    TRANSFORMS [label="TRANSFORMS"];
+    BECOMES [label="BECOMES"];
+    RECEIVES [label="RECEIVES"];
+    COMPOSES [label="COMPOSES"];
+    BELONGS_TO [label="BELONGS_TO"];
+
+    // Relationships (Edges without arrows)
+    SOURCE_SYSTEM -- PRODUCES [label=" 1,1"];
+    PRODUCES -- INGESTION_RUN [label=" 0,n"];
+    
+    INGESTION_RUN -- COLLECTS [label=" 1,1"];
+    COLLECTS -- RAW_OBJECT [label=" 0,n"];
+    
+    RAW_OBJECT -- CONTAINS [label=" 1,1"];
+    CONTAINS -- RAW_RECORD [label=" 0,n"];
+    
+    PROCESSING_RUN -- TRANSFORMS [label=" 1,1"];
+    TRANSFORMS -- RAW_RECORD [label=" 0,n"];
+    
+    RAW_RECORD -- BECOMES [label=" 0,1"];
+    BECOMES -- NORMALIZED_MESSAGE [label=" 0,1"];
+    
+    NORMALIZED_MESSAGE -- RECEIVES [label=" 1,1"];
+    RECEIVES -- ANNOTATION [label=" 0,n"];
+    
+    DATASET -- COMPOSES [label=" 1,1"];
+    COMPOSES -- DATASET_ITEM [label=" 1,n"];
+    
+    DATASET_ITEM -- BELONGS_TO [label=" 1,1"];
+    BELONGS_TO -- NORMALIZED_MESSAGE [label=" 0,n"];
+}

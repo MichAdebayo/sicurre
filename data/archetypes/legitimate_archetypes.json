@@ -1,0 +1,266 @@
+{
+  "meta": {
+    "class_label": 2,
+    "class_name": "legitimate",
+    "description": "French legitimate email archetypes for synthetic generation - includes hard-tier emails that mimic spam/phishing patterns",
+    "tier_distribution": {"simple": 0.30, "medium": 0.40, "hard": 0.30}
+  },
+  "archetypes": [
+    {
+      "id": "l_simple_confirmation_commande",
+      "tier": "simple",
+      "name": "Confirmation de commande",
+      "weight": 1.0,
+      "description": "Standard order confirmation from e-commerce",
+      "templates": [
+        "Objet : Confirmation de votre commande n°{ref}\n\n{boutique}\n\nBonjour {prenom},\n\nMerci pour votre commande ! Voici le récapitulatif :\n\nCommande n°{ref}\nDate : {date}\n\n{produit_1} × {qte_1} - {prix_1}\n{produit_2} × {qte_2} - {prix_2}\n\nSous-total : {sous_total}\nLivraison : {livraison}\nTotal : {total}\n\nMode de livraison : {mode_livraison}\nAdresse de livraison : {adresse}\n\nVous recevrez un email de confirmation d'expédition avec votre numéro de suivi dès que votre colis sera pris en charge.\n\nUne question ? Contactez notre service client au {phone} ou par email à {email_support}.\n\nÀ bientôt,\nL'équipe {boutique}",
+        "Objet : Votre commande {ref} chez {boutique} a bien été enregistrée\n\nBonjour {prenom} {nom},\n\nNous vous confirmons la bonne réception de votre commande.\n\nRéférence : {ref}\nMontant : {total}\nPaiement : Carte bancaire se terminant par ****{digits}\n\nRécapitulatif :\n• {produit_1} - {prix_1}\n• {produit_2} - {prix_2}\n\nDélai de livraison estimé : {delai_livraison}\n\nSuivre ma commande : [URL]\n\nMerci de votre confiance !\n{boutique}"
+      ],
+      "variables": {
+        "boutique": ["Amazon.fr", "Fnac", "Cdiscount", "Darty", "Leroy Merlin", "Cultura", "Boulanger"],
+        "ref": ["FR-20260304-78841", "CMD-2026-55123", "W789456123", "ORD-FR-8834521"],
+        "produit_1": ["Câble USB-C 2m", "Livre 'Le Petit Prince'", "Casque Audio Sony WH-1000XM5", "Lot de 3 ampoules LED", "Clavier mécanique Logitech"],
+        "produit_2": ["Housse de protection", "Marque-page artisanal", "Adaptateur Bluetooth", "Rallonge électrique 3m", "Repose-poignet ergonomique"],
+        "qte_1": ["1", "2", "1"],
+        "qte_2": ["1", "1", "2"],
+        "prix_1": ["12,99 EUR", "8,50 EUR", "299,99 EUR", "15,90 EUR"],
+        "prix_2": ["9,99 EUR", "4,50 EUR", "24,99 EUR", "11,90 EUR"],
+        "sous_total": ["22,98 EUR", "13,00 EUR", "324,98 EUR", "27,80 EUR"],
+        "livraison": ["Gratuite", "4,99 EUR", "6,90 EUR", "Offerte"],
+        "total": ["22,98 EUR", "17,99 EUR", "324,98 EUR", "34,70 EUR"],
+        "mode_livraison": ["Colissimo domicile", "Point Relais Mondial Relay", "Chronopost Express", "Livraison standard"],
+        "adresse": ["12 rue des Lilas, 75011 Paris", "45 avenue Foch, 69003 Lyon", "8 place de la Mairie, 33000 Bordeaux"],
+        "delai_livraison": ["2-3 jours ouvrés", "3-5 jours ouvrés", "Demain avant 13h", "sous 48h"],
+        "digits": ["4821", "7793", "3156", "9408"]
+      }
+    },
+    {
+      "id": "l_simple_expedition",
+      "tier": "simple",
+      "name": "Notification d'expédition / livraison",
+      "weight": 1.0,
+      "description": "Legitimate shipping notification",
+      "templates": [
+        "Objet : Votre colis {ref} est en cours de livraison\n\n{transporteur}\n\nBonjour {prenom},\n\nVotre colis est en chemin !\n\nNuméro de suivi : {tracking}\nExpéditeur : {expediteur}\nEstimation de livraison : {date_livraison}\n\nSuivre mon colis : [URL]\n\nVous pouvez modifier votre créneau de livraison ou choisir un point relais directement depuis le lien ci-dessus.\n\nBonne réception !\n{transporteur}",
+        "Objet : Votre livraison {transporteur} est prévue pour le {date_livraison}\n\nBonjour,\n\nVotre colis expédié par {expediteur} sera livré le {date_livraison} entre {creneau}.\n\nRéférence : {tracking}\nPoids : {poids}\n\nOptions disponibles :\n• Modifier la date de livraison\n• Choisir un point de retrait\n• Autoriser le dépôt devant la porte\n\n→ Gérer ma livraison : [URL]\n\n{transporteur} - Service Client"
+      ],
+      "variables": {
+        "transporteur": ["Colissimo", "Chronopost", "Mondial Relay", "DPD France", "GLS", "UPS"],
+        "tracking": ["8R12345678901", "FR98765432100", "6A88412390127"],
+        "expediteur": ["Amazon.fr", "Fnac.com", "Vinted", "Le Bon Coin", "Cdiscount"],
+        "date_livraison": ["mercredi 5 mars", "demain", "jeudi 6 mars entre 9h et 12h", "vendredi 7 mars"],
+        "creneau": ["8h et 12h", "14h et 18h", "10h et 14h", "9h et 13h"],
+        "poids": ["0,8 kg", "2,3 kg", "0,4 kg", "5,1 kg"]
+      }
+    },
+    {
+      "id": "l_simple_accuse_reception",
+      "tier": "simple",
+      "name": "Accusé de réception / ticket support",
+      "weight": 0.8,
+      "description": "Simple acknowledgment email from customer support",
+      "templates": [
+        "Objet : [Ticket #{ref}] Votre demande a bien été reçue\n\n{entreprise} - Support Client\n\nBonjour {prenom},\n\nNous avons bien reçu votre demande.\n\nRéférence du ticket : #{ref}\nSujet : {sujet}\nDate de création : {date}\n\nNotre équipe prendra en charge votre demande dans un délai de {delai}.\n\nVous pouvez suivre l'avancement de votre ticket :\n→ [URL]\n\nMerci de votre patience.\n\nService Client\n{entreprise}",
+        "Objet : Accusé de réception : {sujet}\n\nBonjour {prenom},\n\nMerci de nous avoir contactés. Votre message a bien été pris en compte.\n\nUn conseiller vous répondra sous {delai}.\n\nPour accélérer le traitement, merci de ne pas créer une nouvelle demande pour le même sujet.\n\nCordialement,\n{entreprise} - Support"
+      ],
+      "variables": {
+        "entreprise": ["Free", "Orange", "SFR", "Bouygues Telecom", "OVHcloud", "Maif", "Macif"],
+        "ref": ["48821", "55134", "77291", "33451"],
+        "sujet": ["Problème de connexion internet", "Demande de résiliation", "Modification de forfait", "Question sur ma facture", "Changement d'adresse"],
+        "delai": ["24 heures ouvrées", "48 heures", "2 jours ouvrés", "72 heures"]
+      }
+    },
+    {
+      "id": "l_medium_newsletter_saas",
+      "tier": "medium",
+      "name": "Newsletter SaaS légitime",
+      "weight": 1.0,
+      "description": "Legitimate SaaS product newsletter - based on Snowflake trial tips pattern from Spam (1).txt reclassified as legit",
+      "templates": [
+        "Objet : L'actualité {service} concernant {sujet}\n\n{service}\n\nBonjour {prenom},\n\n{intro}\n\n{section_1_titre}\n{section_1_contenu}\n\n{section_2_titre}\n{section_2_contenu}\n\n{cta_texte}\n→ {cta_label} : [URL]\n\nBesoin d'aide ? Notre équipe support est disponible du lundi au vendredi de 9h à 18h.\n\nÀ bientôt,\nL'équipe {service}\n\nVous recevez cet email car vous êtes inscrit(e) à {service}.\nGérer mes préférences : [URL] | Se désinscrire : [URL]",
+        "Objet : Premiers pas pour bien démarrer sur {service}\n\n{service}\n\nSalut {prenom} 👋\n\nBienvenue ! Voici 3 étapes pour bien démarrer :\n\n1️⃣ {etape_1}\n2️⃣ {etape_2}\n3️⃣ {etape_3}\n\nBesoin d'inspiration ? Consultez nos tutoriels :\n→ Centre d'aide : [URL]\n\nVotre essai gratuit expire dans {jours} jours. Profitez de toutes les fonctionnalités !\n\nL'équipe {service}"
+      ],
+      "variables": {
+        "service": ["Notion", "Snowflake", "Figma", "Linear", "Vercel", "Stripe Dashboard", "Crisp"],
+        "sujet": ["Astuce de la semaine", "Nouveautés de mars 2026", "5 fonctionnalités que vous n'utilisez peut-être pas", "Votre récap hebdomadaire"],
+        "intro": ["Voici votre récapitulatif hebdomadaire et les nouveautés à ne pas manquer.", "On a quelques astuces pour vous aider à tirer le meilleur parti de votre espace."],
+        "section_1_titre": ["📊 Nouvelle fonctionnalité : tableaux de bord", "🚀 Performance améliorée", "🔧 Mise à jour de l'API v3"],
+        "section_1_contenu": ["Créez des dashboards personnalisés en quelques clics.", "Les temps de chargement ont été réduits de 40%.", "De nouveaux endpoints sont disponibles pour l'automatisation."],
+        "section_2_titre": ["📚 Tutoriel : automatisez vos workflows", "💡 Astuce pro", "🎯 Bonnes pratiques"],
+        "section_2_contenu": ["Découvrez comment connecter vos outils préférés via notre API.", "Utilisez les raccourcis clavier pour gagner du temps : Ctrl+K pour la recherche rapide.", "Structurez vos projets avec des labels et des priorités pour un meilleur suivi."],
+        "cta_texte": ["Découvrez toutes les nouveautés dans votre tableau de bord.", "Essayez ces fonctionnalités dès maintenant."],
+        "cta_label": ["Accéder à mon espace", "Découvrir les nouveautés", "Essayer maintenant"],
+        "etape_1": ["Complétez votre profil", "Importez vos données", "Créez votre premier projet"],
+        "etape_2": ["Invitez votre équipe", "Configurez vos intégrations", "Personnalisez vos paramètres"],
+        "etape_3": ["Explorez les templates", "Lancez votre premier dashboard", "Consultez notre documentation"],
+        "jours": ["14", "30", "7"]
+      }
+    },
+    {
+      "id": "l_medium_facture_legitime",
+      "tier": "medium",
+      "name": "Facture légitime / reçu de paiement",
+      "weight": 1.0,
+      "description": "Legitimate invoice or payment receipt",
+      "templates": [
+        "Objet : Votre facture {entreprise} n°{ref}\n\n{entreprise}\n\nBonjour {prenom} {nom},\n\nVeuillez trouver ci-joint votre facture pour la période du {periode}.\n\nFacture n° : {ref}\nMontant HT : {montant_ht}\nTVA ({taux_tva}%) : {tva}\nMontant TTC : {montant_ttc}\nDate d'échéance : {date_echeance}\n\nMode de paiement : {paiement}\n\nTélécharger ma facture : [URL]\n\nPour toute question relative à votre facturation, contactez-nous à {email_support}.\n\nCordialement,\nService Facturation\n{entreprise}",
+        "Objet : Votre reçu pour le paiement de {montant_ttc}\n\n{entreprise}\n\nBonjour {prenom},\n\nNous vous confirmons la bonne réception de votre paiement.\n\nMontant : {montant_ttc}\nDate : {date}\nRéférence : {ref}\nMode de paiement : {paiement}\n\nVotre prochain prélèvement est prévu le {date_prochain}.\n\nConsulter mon historique de facturation : [URL]\n\nMerci de votre confiance.\n{entreprise}"
+      ],
+      "variables": {
+        "entreprise": ["OVHcloud", "Scaleway", "Orange Pro", "Free Pro", "Adobe", "Spotify", "Netflix"],
+        "ref": ["FA-2026-03-0047", "INV-8834521", "FACT-2026-0312", "REC-FR-55123"],
+        "periode": ["1er au 28 février 2026", "1er au 31 janvier 2026", "mars 2026"],
+        "montant_ht": ["41,58 EUR", "19,92 EUR", "83,25 EUR", "9,99 EUR"],
+        "tva": ["8,32 EUR", "3,98 EUR", "16,65 EUR", "2,00 EUR"],
+        "taux_tva": ["20", "20", "20", "20"],
+        "montant_ttc": ["49,90 EUR", "23,90 EUR", "99,90 EUR", "11,99 EUR"],
+        "date_echeance": ["15 mars 2026", "31 mars 2026", "10 avril 2026"],
+        "date_prochain": ["1er avril 2026", "15 avril 2026", "1er mai 2026"],
+        "paiement": ["Prélèvement automatique SEPA", "Carte bancaire ****4821", "Virement bancaire"]
+      }
+    },
+    {
+      "id": "l_medium_convocation",
+      "tier": "medium",
+      "name": "Convocation / rendez-vous professionnel",
+      "weight": 0.8,
+      "description": "Professional meeting or appointment invitation",
+      "templates": [
+        "Objet : Votre convocation pour {sujet} le {date}\n\nBonjour {prenom},\n\nVous êtes convoqué(e) à {sujet} qui se tiendra :\n\n📅 Date : {date}\n🕐 Heure : {heure}\n📍 Lieu : {lieu}\n\nOrdre du jour :\n1. {point_1}\n2. {point_2}\n3. {point_3}\n4. Questions diverses\n\nMerci de confirmer votre présence avant le {date_confirmation}.\n\nCordialement,\n{expediteur}\n{titre}\n{organisation}",
+        "Objet : Rappel concernant votre rendez-vous du {date} à {heure}\n\n{organisation}\n\nBonjour {prenom} {nom},\n\nNous vous rappelons votre rendez-vous :\n\nDate : {date}\nHeure : {heure}\nAvec : {expediteur}\nLieu : {lieu}\n\nDocuments à apporter :\n• {document_1}\n• {document_2}\n\nPour modifier ou annuler votre rendez-vous :\n→ [URL]\n\nÀ bientôt,\n{organisation}"
+      ],
+      "variables": {
+        "sujet": ["la réunion trimestrielle", "l'assemblée générale", "l'entretien annuel", "la formation sécurité", "la réunion d'équipe"],
+        "lieu": ["Salle Voltaire, 3e étage", "En visioconférence (lien Teams ci-joint)", "Bureau 204, bâtiment B", "15 rue de la Paix, 75002 Paris"],
+        "heure": ["10h00", "14h30", "9h00", "16h00"],
+        "point_1": ["Bilan d'activité du trimestre", "Présentation des comptes annuels", "Retour sur les objectifs", "État des lieux du projet"],
+        "point_2": ["Prévisions pour le prochain trimestre", "Vote des résolutions", "Plan de développement", "Planification des sprints"],
+        "point_3": ["Planning des congés", "Nomination des administrateurs", "Formation continue", "Roadmap produit"],
+        "date_confirmation": ["lundi 3 mars", "vendredi 28 février", "mercredi 5 mars"],
+        "expediteur": ["Marie Dupont", "Jean-Luc Martin", "Dr. Lefèvre", "Me Moreau"],
+        "titre": ["Directrice des Ressources Humaines", "Responsable d'équipe", "Médecin du travail", "Avocat associé"],
+        "organisation": ["Votre entreprise", "Cabinet Médical du Parc", "Étude Moreau & Associés", "Mairie de Lyon"],
+        "document_1": ["Pièce d'identité", "Dernier bulletin de salaire", "Carte Vitale", "Contrat signé"],
+        "document_2": ["Justificatif de domicile", "Rapport d'activité", "Résultats d'analyse", "Statuts de la société"]
+      }
+    },
+    {
+      "id": "l_medium_france_travail",
+      "tier": "medium",
+      "name": "Notification France Travail / Pôle Emploi",
+      "weight": 0.8,
+      "description": "Legitimate notification from French employment services",
+      "templates": [
+        "Objet : Un nouveau message est disponible dans votre espace France Travail\n\nFrance Travail\n\nBonjour {prenom} {nom},\n\nUn nouveau message est disponible dans votre espace personnel France Travail.\n\nObjet : {sujet}\nDate : {date}\nExpéditeur : {expediteur}\n\nPour consulter ce message, connectez-vous à votre espace :\n→ francetravail.fr\n\nRappel : ne communiquez jamais vos identifiants par email. France Travail ne vous demandera jamais votre mot de passe.\n\nCordialement,\nFrance Travail",
+        "Objet : N'oubliez pas votre actualisation mensuelle\n\nFrance Travail\n\nBonjour {prenom},\n\nN'oubliez pas de procéder à votre actualisation mensuelle avant le {date}.\n\nRappel : l'actualisation est obligatoire pour maintenir vos droits.\n\nPour vous actualiser :\n→ Connectez-vous sur francetravail.fr\n→ Rubrique \"Mon actualisation\"\n\nSi vous avez repris une activité, même partielle, pensez à la déclarer.\n\nVotre conseiller : {expediteur}\nAgence : {agence}\n\nFrance Travail"
+      ],
+      "variables": {
+        "sujet": ["Convocation à un atelier", "Proposition de formation", "Mise à jour de votre dossier", "Offre d'emploi correspondant à votre profil"],
+        "expediteur": ["Votre conseiller dédié", "Service des prestations", "Équipe recrutement", "Pôle accompagnement"],
+        "agence": ["France Travail Paris 11e", "France Travail Lyon Part-Dieu", "France Travail Bordeaux Centre", "France Travail Marseille Prado"]
+      }
+    },
+    {
+      "id": "l_hard_politique_confidentialite",
+      "tier": "hard",
+      "name": "Mise à jour politique confidentialité",
+      "weight": 1.0,
+      "description": "Privacy policy update notification - looks like phishing (urgent action, policy changes) but is legitimate. Based on OpenAI privacy update from Spam (1).txt.",
+      "templates": [
+        "Objet : Mise à jour de notre politique de confidentialité\n\n{entreprise}\n\nBonjour {prenom},\n\nNous mettons à jour notre politique de confidentialité à compter du {date}.\n\nPrincipaux changements :\n\n1. {changement_1}\n2. {changement_2}\n3. {changement_3}\n\nCe que cela signifie pour vous :\n{explication}\n\nVous pouvez consulter la politique complète ici :\n→ [URL]\n\nSi vous ne souhaitez pas accepter ces modifications, vous pouvez supprimer votre compte avant le {date_limite}.\n\nPour toute question, contactez notre DPO à {email_dpo}.\n\nCordialement,\nÉquipe Juridique\n{entreprise}",
+        "Objet : Mise à jour des conditions d'utilisation de {entreprise}\n\nBonjour,\n\nNous souhaitons vous informer de modifications importantes apportées à nos conditions d'utilisation, effectives à partir du {date}.\n\nRésumé des changements :\n• {changement_1}\n• {changement_2}\n\nEn continuant à utiliser nos services après le {date}, vous acceptez les nouvelles conditions.\n\nLire les conditions mises à jour : [URL]\n\nÉquipe {entreprise}\n\nVous recevez cet email car vous avez un compte {entreprise}.\nGérer mes préférences : [URL]"
+      ],
+      "variables": {
+        "entreprise": ["OpenAI", "Google", "Microsoft", "Meta", "Spotify", "Netflix", "Slack", "Notion"],
+        "changement_1": ["Clarification de l'utilisation des données pour l'amélioration de nos services", "Ajout d'une section sur les transferts de données internationaux", "Mise à jour des droits de suppression de données"],
+        "changement_2": ["Nouveau mécanisme de consentement conforme au RGPD", "Précisions sur le partage de données avec nos sous-traitants", "Introduction d'un délai de conservation réduit à 12 mois"],
+        "changement_3": ["Possibilité de télécharger l'intégralité de vos données", "Ajout d'un mécanisme d'opt-out pour la publicité ciblée", "Nouvelle procédure de suppression de compte simplifiée"],
+        "explication": ["Votre utilisation du service reste inchangée. Ces modifications visent à mieux protéger vos données.", "Ces changements n'affectent pas les fonctionnalités que vous utilisez au quotidien."],
+        "date_limite": ["31 mars 2026", "15 avril 2026", "1er mai 2026"],
+        "email_dpo": ["dpo@entreprise.com", "privacy@entreprise.com", "rgpd@entreprise.com"]
+      }
+    },
+    {
+      "id": "l_hard_notification_bancaire",
+      "tier": "hard",
+      "name": "Notification bancaire légitime",
+      "weight": 1.0,
+      "description": "Real bank notification that looks similar to phishing bank emails but is legitimate",
+      "templates": [
+        "Objet : Nouveau virement reçu sur votre compte\n\n{banque}\n\nBonjour {prenom},\n\nUn virement a été crédité sur votre compte.\n\nMontant : {montant}\nExpéditeur : {expediteur}\nDate : {date}\nRéférence : {ref}\n\nConsultez le détail dans votre espace client :\n→ {banque_url}\n\nRappel : {banque} ne vous demandera jamais de communiquer vos identifiants ou mots de passe par email.\n\n{banque} - Banque en ligne",
+        "Objet : Le récapitulatif mensuel de votre compte {banque}\n\nBonjour {prenom} {nom},\n\nVoici le récapitulatif de votre compte {type_compte} pour le mois de {mois} :\n\nSolde au {date} : {solde}\nTotal des entrées : +{entrees}\nTotal des sorties : -{sorties}\n\nOpérations notables :\n• {operation_1}\n• {operation_2}\n• {operation_3}\n\nConsulter le détail : {banque_url}\n\nBonne gestion financière !\n{banque}",
+        "Objet : Votre carte bancaire expire bientôt\n\n{banque}\n\nBonjour {prenom},\n\nVotre carte bancaire se terminant par ****{digits} expire le {date_expiration}.\n\nVotre nouvelle carte a été commandée et sera envoyée à votre adresse postale dans un délai de {delai}.\n\nVous n'avez rien à faire. Votre code PIN restera le même.\n\nSi vous avez changé d'adresse, mettez-la à jour dans votre espace client avant l'envoi :\n→ {banque_url}\n\n{banque} - Service Cartes"
+      ],
+      "variables": {
+        "banque": ["BNP Paribas", "Crédit Agricole", "Société Générale", "La Banque Postale", "Boursorama", "LCL", "Caisse d'Épargne"],
+        "banque_url": ["mabanque.bnpparibas", "mon-espace.credit-agricole.fr", "particuliers.sg.fr", "labanquepostale.fr", "boursorama.com"],
+        "montant": ["1 247,50 EUR", "850,00 EUR", "2 340,00 EUR", "456,78 EUR"],
+        "expediteur": ["URSSAF ILE DE FRANCE", "POLE EMPLOI", "DGFiP IMPOTS", "SCI HABITAT LOGEMENT"],
+        "ref": ["VIR-2026-03-8841", "SEPA-FR-55123", "TRF-20260304"],
+        "type_compte": ["courant", "professionnel", "joint"],
+        "mois": ["février 2026", "janvier 2026", "mars 2026"],
+        "solde": ["3 456,78 EUR", "12 890,45 EUR", "1 234,56 EUR", "8 765,32 EUR"],
+        "entrees": ["4 500,00 EUR", "2 890,00 EUR", "6 120,00 EUR"],
+        "sorties": ["3 210,00 EUR", "1 950,00 EUR", "4 870,00 EUR"],
+        "operation_1": ["Virement reçu - Salaire", "Prélèvement - EDF", "CB - Carrefour"],
+        "operation_2": ["Prélèvement - Loyer", "Virement émis - Épargne", "CB - Amazon.fr"],
+        "operation_3": ["CB - SNCF", "Prélèvement - Assurance", "Virement reçu - Remboursement"],
+        "digits": ["4821", "7793", "3156"],
+        "date_expiration": ["04/2026", "05/2026", "06/2026"],
+        "delai": ["5 à 10 jours ouvrés", "7 jours", "2 semaines"]
+      }
+    },
+    {
+      "id": "l_hard_urssaf_reel",
+      "tier": "hard",
+      "name": "URSSAF notification réelle auto-entrepreneur",
+      "weight": 1.0,
+      "description": "Real URSSAF notification for auto-entrepreneurs - very similar to phishing version but legitimate. Core Sicurre audience.",
+      "templates": [
+        "Objet : Échéance proche pour votre déclaration URSSAF de T{trimestre} {annee}\n\nURSSAF\n\nBonjour {prenom} {nom},\n\nVotre déclaration de chiffre d'affaires pour le trimestre T{trimestre} {annee} est à effectuer avant le {date}.\n\nRappel : même si votre chiffre d'affaires est nul, vous devez effectuer cette déclaration.\n\nDéclarer mon chiffre d'affaires :\n→ autoentrepreneur.urssaf.fr\n\nMontant de vos cotisations estimées : {montant}\n\nBesoin d'aide ? Consultez notre guide en ligne ou contactez votre URSSAF régionale.\n\nCordialement,\nURSSAF - Espace Auto-Entrepreneur",
+        "Objet : Nous avons bien reçu votre déclaration (T{trimestre} {annee})\n\nURSSAF - Espace Auto-Entrepreneur\n\nBonjour {prenom},\n\nNous accusons réception de votre déclaration de chiffre d'affaires :\n\nPériode : T{trimestre} {annee}\nChiffre d'affaires déclaré : {ca}\nCotisations calculées : {montant}\nDate de prélèvement : {date_prelevement}\n\nVos cotisations seront prélevées sur le compte bancaire enregistré.\n\nConsulter mon historique de déclarations :\n→ autoentrepreneur.urssaf.fr\n\nCordialement,\nURSSAF"
+      ],
+      "variables": {
+        "trimestre": ["1", "2", "3", "4"],
+        "annee": ["2025", "2026"],
+        "montant": ["487,50 EUR", "234,80 EUR", "0,00 EUR", "1 123,45 EUR", "89,40 EUR"],
+        "ca": ["2 250,00 EUR", "1 080,00 EUR", "0,00 EUR", "5 175,00 EUR", "412,00 EUR"],
+        "date_prelevement": ["5 avril 2026", "5 juillet 2026", "5 octobre 2026", "5 janvier 2027"]
+      }
+    },
+    {
+      "id": "l_hard_enquete_satisfaction",
+      "tier": "hard",
+      "name": "Enquête satisfaction légitime",
+      "weight": 0.8,
+      "description": "Legitimate survey/feedback request - very similar to spam survey but from actual service used. Based on Fiverr survey from Spam (1).txt.",
+      "templates": [
+        "Objet : Donnez votre avis pour améliorer les services de {entreprise}\n\nBonjour {prenom},\n\nVous avez récemment {action} chez {entreprise}. Nous aimerions connaître votre avis !\n\nCette enquête prend environ {duree} et nous aide à améliorer nos services.\n\n→ Donner mon avis : [URL]\n\nVotre retour est anonyme et confidentiel.\n\nMerci pour votre temps !\nÉquipe Qualité\n{entreprise}\n\nSi vous ne souhaitez plus recevoir nos enquêtes de satisfaction : [URL]",
+        "Objet : Comment s'est passée votre expérience avec {entreprise} ?\n\n{entreprise}\n\nBonjour {prenom},\n\nVotre commande du {date} a-t-elle répondu à vos attentes ?\n\n😊 Très satisfait(e)\n🙂 Satisfait(e)\n😐 Neutre\n😕 Insatisfait(e)\n😟 Très insatisfait(e)\n\n→ Évaluer mon expérience : [URL]\n\nMerci,\n{entreprise}"
+      ],
+      "variables": {
+        "entreprise": ["Fiverr", "SNCF", "Booking.com", "Doctolib", "Vinted", "Leroy Merlin", "Decathlon"],
+        "action": ["effectué un achat", "utilisé nos services", "contacté notre support", "fait une réservation", "passé une commande"],
+        "duree": ["2 minutes", "3 minutes", "1 minute", "30 secondes"]
+      }
+    },
+    {
+      "id": "l_hard_alerte_securite_reelle",
+      "tier": "hard",
+      "name": "Alerte sécurité réelle (connexion)",
+      "weight": 0.8,
+      "description": "Real security alert from a service - looks like phishing but is actually protecting the user",
+      "templates": [
+        "Objet : Nouvelle connexion à votre compte {service}\n\n{service} - Alerte de sécurité\n\nBonjour {prenom},\n\nUne nouvelle connexion à votre compte a été détectée :\n\n📍 Lieu : {lieu}\n💻 Appareil : {appareil}\n🌐 Navigateur : {navigateur}\n📅 Date : {date} à {heure}\n\nSi c'était vous, aucune action n'est nécessaire.\n\nSi vous ne reconnaissez pas cette connexion :\n→ Sécuriser mon compte : [URL]\n\nConseils de sécurité :\n• Changez votre mot de passe\n• Activez l'authentification à deux facteurs\n• Vérifiez les appareils connectés\n\n{service} - Équipe Sécurité",
+        "Objet : Votre mot de passe {service} a été modifié\n\n{service}\n\nBonjour {prenom},\n\nLe mot de passe de votre compte {service} ({email}) a été modifié le {date} à {heure}.\n\nSi vous êtes à l'origine de cette modification, vous pouvez ignorer cet email.\n\nSi vous n'avez pas effectué cette modification, veuillez sécuriser votre compte immédiatement :\n→ Réinitialiser mon mot de passe : [URL]\n\nL'équipe Sécurité {service}"
+      ],
+      "variables": {
+        "service": ["Google", "Microsoft", "GitHub", "Slack", "LinkedIn", "Twitter", "Notion"],
+        "lieu": ["Paris, France", "Lyon, France", "Non reconnu - Moscou, Russie", "Marseille, France"],
+        "appareil": ["MacBook Pro", "iPhone 15", "Windows 11 PC", "Android - Samsung Galaxy S24"],
+        "navigateur": ["Chrome 122", "Safari 17", "Firefox 124", "Edge 122"],
+        "heure": ["14h23", "09h45", "22h17", "07h02"]
+      }
+    }
+  ]
+}

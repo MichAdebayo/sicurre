@@ -1,0 +1,141 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.hypothesis/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.venv312/
+venv312/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Coverage reports
+.coverage
+.coverage.*
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment and secrets
+.env
+.env.*
+*.local
+.python-version
+
+# Logs and runtime files
+*.log
+*.pid
+*.seed
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE/editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# UV lock and cache
+.uv/
+
+
+*.db
+
+# Data files (CSVs, JSONs, model weights — too large / PII-sensitive for git)
+data/raw/**/*.csv
+data/raw/**/*.json
+data/raw/**/*.pdf
+# Cron run snapshots (local backend) — separate from immutable raw seed data
+data/cron/**/*.csv
+data/cron/**/*.json
+data/cron/**/*.pdf
+data/cron/**/*.txt
+data/processed/**/*.csv
+data/processed/**/*.json
+data/final/**/*.csv
+data/final/**/*.json
+data/models/**/*.onnx
+data/models/**/*.bin
+data/models/**/*.pt
+data/models/**/*.safetensors
+# Keep folder structure and READMEs
+!data/README.md
+!data/**/.gitkeep
+data/raw/
+data/cron/
+data/local/
+
+# Private-by-default documentation (internal only)
+docs/ops/
+docs/architecture/notebook-*.md
+docs/architecture/threat-model.md
+docs/architecture/privacy-rgpd.md
+docs/architecture/data-platform-cadence.md
+docs/architecture/diagrams/*.dot
+docs/adr/0001-post-delivery-gmail.md
+docs/adr/0006-scope-selection-gmail.md
+docs/adr/0007-idempotency-pubsub-history.md
+docs/raw_sources/
+docs/simplon/
+docs/model/
+docs/brand/
+docs/deployment/
+docs/email-intercept.md
+deploy/hetzner/*.md
+deploy/nginx/ssl/*.md
+deploy/README.md
+tasks/
+scratch/
+
+research/
+
+# Added by ggshield
+.cache_ggshield
+
+
+notebook.md
+results.md
+sicurre-*.ipynb
+sicurre-ml-bootstrap.md
+
+relay.md
+data/exports/
+simplon-coverage-checklist.md
+*.png
+.streamlit/
+node_modules/
+assets/
+ui-ideas/
+# Frontend source assets must be committed so clean CI builds match local builds.
+!src/app/assets/
+!src/app/assets/*.svg
+
+src/app/task.md
+src/app/walkthrough.md
+
+env.api
+env.auth
+env.alloy
+deploy/README.md
+deploy/alloy/*.md
+deploy/grafana/*.md
+deploy/nginx/*.md
+
+DEPLOYMENT_BLOCKERS.md
