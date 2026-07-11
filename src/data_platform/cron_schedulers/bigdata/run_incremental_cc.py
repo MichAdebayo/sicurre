@@ -7,6 +7,8 @@ Duration is controlled by SICURRE_CC_CRON_DURATION_MODE:
   - 'standard' → 8 hours    (for overnight runs)
 """
 
+# ruff: noqa: E402
+
 from __future__ import annotations
 
 import argparse as _argparse
@@ -15,8 +17,8 @@ import io
 import logging
 import os
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 import pandas as pd
 
@@ -28,9 +30,7 @@ _reserved_args, _ = _parser.parse_known_args()
 # Force snapshot storage to R2 under the appropriate cron prefix
 os.environ["SICURRE_COMMON_CRAWL_SNAPSHOT_STORAGE_BACKEND"] = "prod"
 os.environ["SICURRE_COMMON_CRAWL_SNAPSHOT_PREFIX"] = (
-    "cron/reserved/bigdata/common_crawl"
-    if _reserved_args.reserved
-    else "cron/bigdata/common_crawl"
+    "cron/reserved/bigdata/common_crawl" if _reserved_args.reserved else "cron/bigdata/common_crawl"
 )
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -63,13 +63,17 @@ logger = logging.getLogger(__name__)
 
 
 class R2CronSnapshotCommonCrawlClient(LocalCommonCrawlClient):
+    """Read a scheduled Common Crawl snapshot from R2 for DB ingestion."""
+
     def __init__(self, *, snapshot_key: str) -> None:
+        """Bind the read client to one R2 snapshot object."""
         super().__init__()
         self.snapshot_key = snapshot_key
         self.r2 = R2ReadClient()
         self.full_table_id = f"r2://{self.r2.bucket}/{snapshot_key}"
 
     def fetch_latest_parquet_from_r2(self) -> pd.DataFrame:
+        """Download the configured R2 parquet snapshot into a data frame."""
         logger.info(
             "R2CronSnapshotCommonCrawlClient: reading r2://%s/%s",
             self.r2.bucket,
@@ -84,6 +88,7 @@ async def _ingest_snapshot_keys(
     *,
     snapshot_keys: Sequence[str],
 ) -> list[CommonCrawlIngestionResult]:
+    """Ingest newly flushed scheduled R2 snapshots into the data platform."""
     results: list[CommonCrawlIngestionResult] = []
     for snapshot_key in snapshot_keys:
         service = CommonCrawlIngestionService(
@@ -96,6 +101,7 @@ async def _ingest_snapshot_keys(
 
 
 async def run_incremental_cc_cron() -> None:
+    """Run one bounded Common Crawl extraction and ingest its snapshots."""
     settings = get_settings()
     duration_mode = settings.cc_cron_duration_mode.strip().lower()
     max_runtime = DURATION_MAP.get(duration_mode)
@@ -119,15 +125,21 @@ async def run_incremental_cc_cron() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    session_factory = async_sessionmaker(
-        engine, expire_on_commit=False, class_=AsyncSession
-    )
+    session_factory = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
     extractor = IncrementalCommonCrawlExtractor(
         max_runtime_seconds=max_runtime,
         lookback_indices=settings.cc_cron_lookback_indices,
         max_index_attempts=settings.cc_cron_index_max_attempts,
         index_retry_backoff_seconds=settings.cc_cron_index_retry_backoff_seconds,
+        max_results_per_query=settings.cc_max_results_per_query,
+        max_warc_downloads_per_index=settings.cc_max_warc_downloads,
+        async_concurrency=settings.cc_async_concurrency,
+        min_text_length=settings.cc_min_text_length,
+        max_text_length=settings.cc_max_text_length,
+        request_timeout=settings.cc_request_timeout,
+        warc_max_retries=settings.cc_warc_max_retries,
+        warc_retry_delay_seconds=settings.cc_warc_retry_delay_seconds,
     )
 
     ingestion_results: list[CommonCrawlIngestionResult] = []
@@ -157,6 +169,7 @@ async def run_incremental_cc_cron() -> None:
 
 
 async def main() -> None:
+    """Launch the scheduled Common Crawl job after logging its R2 target."""
     _r2_prefix = os.environ["SICURRE_COMMON_CRAWL_SNAPSHOT_PREFIX"]
     logger.info("Starting Common Crawl cron (R2 target: %s)", _r2_prefix)
     await run_incremental_cc_cron()

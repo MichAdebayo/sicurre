@@ -6,6 +6,7 @@ const checks = [
   { name: "landing shell", path: "/", expect: "Sicurre" },
   { name: "login route", path: "/login", expect: "Sicurre" },
   { name: "auth sidecar proxy", path: "/api/auth/health", expect: "better-auth" },
+  { name: "auth public config", path: "/api/auth/config", expect: '"enabled":false' },
   { name: "api health proxy", path: "/health", expect: "app-stack-smoke" },
   { name: "data sources proxy", path: "/v1/data/sources?limit=1", expect: "\"items\"" },
   { name: "openapi proxy", path: "/openapi.json", expect: "\"openapi\"" },

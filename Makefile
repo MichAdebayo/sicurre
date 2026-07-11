@@ -44,6 +44,7 @@ help:
 	@echo "  make data-platform-staging-smoke - Build and smoke-test data platform container"
 	@echo "  make app-stack-smoke           - Build and smoke-test app + auth + API containers"
 	@echo "  make grafana-provision         - Provision Sicurre Grafana dashboard"
+	@echo "  make ci-data-quality           - Run critical Python lint, typing, docs, and coverage gates"
 	@echo ""
 	@echo "  Base Ingestion  (deterministic, frozen snapshots — used to build sicurre.db from scratch)"
 	@echo "  make ingest-all-base           - Wipe DB and run ALL base ingestion steps in order"
@@ -106,6 +107,13 @@ app-stack-smoke:
 
 grafana-provision:
 	node scripts/deploy/provision_grafana_dashboard.mjs
+
+ci-data-quality:
+	uv run --group backend --group dev --group storage ruff check src/core/config.py src/data_platform/extractors/incremental_cc_extractor.py src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py tests/data_platform/common_crawl/test_incremental_cc_checkpoint.py tests/data_platform/common_crawl/test_cc_runtime_config.py
+	uv run --group backend --group dev --group storage ruff format --check src/core/config.py src/data_platform/extractors/incremental_cc_extractor.py src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py tests/data_platform/common_crawl/test_incremental_cc_checkpoint.py tests/data_platform/common_crawl/test_cc_runtime_config.py
+	uv run --group backend --group dev --group storage mypy --config-file mypy.ini --follow-imports=skip
+	uv run --group backend --group dev --group storage interrogate -f 90 src/core/config.py src/data_platform/extractors/incremental_cc_extractor.py src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py
+	uv run --group backend --group dev --group storage pytest tests/data_platform --cov=src --cov-report=term-missing --cov-fail-under=50
 
 test-inference:
 	uv run scripts/app/test_inference_api.py

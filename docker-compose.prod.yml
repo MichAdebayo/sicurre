@@ -16,9 +16,7 @@ services:
     environment:
       SICURRE_ENVIRONMENT: production
       SICURRE_AUTH_ENABLED: "true"
-      SICURRE_SCHEDULER_ENABLED: ${SICURRE_SCHEDULER_ENABLED:-true}
       SICURRE_BETTER_AUTH_BASE_URL: http://auth-service:3005
-      SICURRE_INFERENCE_API_URL: ${SICURRE_INFERENCE_API_URL:-https://api.sicurre.com/v1/classify}
     expose:
       - "8001"
     command:
@@ -112,6 +110,9 @@ services:
     depends_on:
       sicurre-app:
         condition: service_healthy
+    expose:
+      - "4317"
+      - "4318"
     networks:
       - sicurre-internal
     <<: *default-logging

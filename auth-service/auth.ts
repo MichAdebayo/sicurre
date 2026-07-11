@@ -3,6 +3,7 @@ import path from "node:path";
 import Database from "better-sqlite3";
 import { config as loadEnv } from "dotenv";
 import { betterAuth } from "better-auth";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 
 loadEnv({ path: path.resolve(process.cwd(), ".env") });
 
@@ -21,6 +22,32 @@ const sqlitePath =
   path.resolve(process.cwd(), "data/local/sicurre.db");
 export const authDatabase = new Database(sqlitePath);
 
+type TurnstileVerification = {
+  success: boolean;
+  "error-codes"?: string[];
+};
+
+async function verifyTurnstileToken(token: string, remoteIp: string | null): Promise<boolean> {
+  const secret = process.env.TURNSTILE_SECRET_KEY?.trim();
+  if (!secret) return true;
+
+  const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      secret,
+      response: token,
+      remoteip: remoteIp || undefined,
+      idempotency_key: crypto.randomUUID(),
+    }),
+    signal: AbortSignal.timeout(8_000),
+  });
+
+  if (!response.ok) return false;
+  const result = await response.json() as TurnstileVerification;
+  return result.success === true;
+}
+
 const trustedOrigins = [
   process.env.SICURRE_FRONTEND_ORIGIN,
   "http://127.0.0.1:5173",
@@ -33,6 +60,31 @@ export const auth = betterAuth({
   basePath: "/api/auth",
   trustedOrigins,
   database: authDatabase,
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== "/sign-up/email" || !process.env.TURNSTILE_SECRET_KEY?.trim()) {
+        return;
+      }
+
+      const token = ctx.headers?.get("x-turnstile-token")?.trim();
+      if (!token) {
+        throw new APIError("BAD_REQUEST", { message: "TURNSTILE_REQUIRED" });
+      }
+
+      const forwardedFor = ctx.headers?.get("cf-connecting-ip")
+        ?? ctx.headers?.get("x-forwarded-for")?.split(",")[0]?.trim()
+        ?? null;
+      let verified = false;
+      try {
+        verified = await verifyTurnstileToken(token, forwardedFor);
+      } catch {
+        verified = false;
+      }
+      if (!verified) {
+        throw new APIError("BAD_REQUEST", { message: "TURNSTILE_FAILED" });
+      }
+    }),
+  },
   emailAndPassword: {
     enabled: true,
     autoSignIn: true,

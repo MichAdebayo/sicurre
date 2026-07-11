@@ -129,3 +129,5 @@ deploy/README.md
 deploy/alloy/*.md
 deploy/grafana/*.md
 deploy/nginx/*.md
+
+DEPLOYMENT_BLOCKERS.md

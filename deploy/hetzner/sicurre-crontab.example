@@ -1,0 +1,20 @@
+# Install as the sicurre-prod Linux user after the first successful deploy.
+# Logs stay under the dedicated application's home directory.
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+COMPOSE="docker compose -f /home/sicurre-prod/sicurre/docker-compose.prod.yml"
+
+# Daily API and file deltas, staggered to avoid competing DB/R2 work.
+15 2 * * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run python src/data_platform/cron_schedulers/api/run_phishtank_ingestion.py >> /home/sicurre-prod/sicurre/cron-phishtank.log 2>&1
+35 2 * * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run python src/data_platform/cron_schedulers/file/run_csv_ingestion.py >> /home/sicurre-prod/sicurre/cron-file.log 2>&1
+
+# Weekly scraping source deltas.
+20 3 * * 1 cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run python src/data_platform/cron_schedulers/scraping/run_sekoia_ioc.py >> /home/sicurre-prod/sicurre/cron-sekoia.log 2>&1
+45 3 * * 2 cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run python src/data_platform/cron_schedulers/scraping/run_certfr_cti.py >> /home/sicurre-prod/sicurre/cron-certfr.log 2>&1
+
+# Monthly controlled source and resumable Common Crawl work.
+10 4 1 * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run python src/data_platform/cron_schedulers/database/run_sql_ingestion.py >> /home/sicurre-prod/sicurre/cron-database.log 2>&1
+10 5 2 * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run python src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py >> /home/sicurre-prod/sicurre/cron-common-crawl.log 2>&1
+
+# Enable only after release gates are enforced in code and manually proven.
+# 30 6 3 * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api sh -lc 'uv run python src/data_platform/cli/normalize/messages.py --all-pending && uv run python src/data_platform/cli/maintenance/annotation_backfill.py --write && ...' >> /home/sicurre-prod/sicurre/cron-dataset-release.log 2>&1

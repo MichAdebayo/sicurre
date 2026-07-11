@@ -19,10 +19,10 @@ import io
 import json
 import logging
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Sequence
+from datetime import UTC, datetime
+from typing import Any
 
 import httpx
 import pandas as pd
@@ -69,6 +69,8 @@ EXCLUDED_DOMAINS = frozenset(
 
 @dataclass(frozen=True, slots=True)
 class CrawlQuery:
+    """A Common Crawl URL pattern and its intended training classification."""
+
     pattern: str
     category: str
     label: str
@@ -80,23 +82,15 @@ PHISHING_QUERIES: tuple[CrawlQuery, ...] = (
     CrawlQuery("cybermalveillance.gouv.fr/*", "phishing_related", "cert_gov_fr"),
     CrawlQuery("zataz.com/*", "phishing_related", "security_news_fr"),
     CrawlQuery("undernews.fr/*", "phishing_related", "security_news_fr"),
-    CrawlQuery(
-        "internet-signalement.gouv.fr/*", "phishing_related", "reporting_gov_fr"
-    ),
+    CrawlQuery("internet-signalement.gouv.fr/*", "phishing_related", "reporting_gov_fr"),
     CrawlQuery("urlscan.io/result/*", "phishing_related", "url_scanning"),
     CrawlQuery("openphish.com/*", "phishing_related", "phishing_feed"),
     CrawlQuery("abuse.ch/*", "phishing_related", "abuse_ch"),
-    CrawlQuery(
-        "forum.quechoisir.org/*arnaque*", "phishing_related", "consumer_forum_fr"
-    ),
-    CrawlQuery(
-        "forum.quechoisir.org/*phishing*", "phishing_related", "consumer_forum_fr"
-    ),
+    CrawlQuery("forum.quechoisir.org/*arnaque*", "phishing_related", "consumer_forum_fr"),
+    CrawlQuery("forum.quechoisir.org/*phishing*", "phishing_related", "consumer_forum_fr"),
     CrawlQuery("commentcamarche.net/*phishing*", "phishing_related", "tech_forum_fr"),
     CrawlQuery("commentcamarche.net/*arnaque*", "phishing_related", "tech_forum_fr"),
-    CrawlQuery(
-        "forums.futura-sciences.com/*arnaque*", "phishing_related", "science_forum_fr"
-    ),
+    CrawlQuery("forums.futura-sciences.com/*arnaque*", "phishing_related", "science_forum_fr"),
     CrawlQuery("signal-spam.fr/*", "phishing_related", "signal_spam_fr"),
     CrawlQuery("blog.sekoia.io/*", "phishing_related", "threat_intel_fr"),
     CrawlQuery("therecord.media/*phishing*", "phishing_related", "security_news"),
@@ -149,6 +143,8 @@ DEFAULT_QUERIES: tuple[CrawlQuery, ...] = (
 
 @dataclass(slots=True)
 class IncrementalCCStats:
+    """Mutable counters accumulated during one incremental Common Crawl run."""
+
     indices_processed: int = 0
     index_errors: int = 0
     total_index_hits: int = 0
@@ -165,6 +161,8 @@ class IncrementalCCStats:
 
 @dataclass(frozen=True, slots=True)
 class IncrementalCCResult:
+    """Persistable outcome of an incremental Common Crawl extraction run."""
+
     indices_attempted: list[str]
     indices_completed: list[str]
     indices_failed: list[str]
@@ -176,6 +174,8 @@ class IncrementalCCResult:
 
 @dataclass(frozen=True, slots=True)
 class CommonCrawlCheckpoint:
+    """Completed and incomplete Common Crawl indexes restored from pipeline state."""
+
     last_completed_index: str | None
     completed_indices: frozenset[str]
     failed_indices: frozenset[str] = frozenset()
@@ -205,7 +205,10 @@ class IncrementalCommonCrawlExtractor:
         min_text_length: int = 100,
         max_text_length: int = 10_000,
         request_timeout: int = 45,
+        warc_max_retries: int = 3,
+        warc_retry_delay_seconds: float = 1.5,
     ) -> None:
+        """Configure bounded extraction, retry, and content-filtering behavior."""
         self.max_runtime_seconds = max_runtime_seconds
         self.queries = tuple(queries or DEFAULT_QUERIES)
         self.max_results_per_query = max_results_per_query
@@ -213,10 +216,12 @@ class IncrementalCommonCrawlExtractor:
         self.lookback_indices = max(1, lookback_indices)
         self.max_index_attempts = max(1, max_index_attempts)
         self.index_retry_backoff_seconds = max(0, index_retry_backoff_seconds)
-        self.async_concurrency = async_concurrency
+        self.async_concurrency = max(1, async_concurrency)
         self.min_text_length = min_text_length
         self.max_text_length = max_text_length
         self.request_timeout = request_timeout
+        self.warc_max_retries = max(1, warc_max_retries)
+        self.warc_retry_delay_seconds = max(0.0, warc_retry_delay_seconds)
         self.snapshot_store = snapshot_store or build_snapshot_store(
             local_root_dir=ROOT_DIR / "data",
             repo_root=ROOT_DIR,
@@ -244,13 +249,9 @@ class IncrementalCommonCrawlExtractor:
         # 1. Discover all available indices
         all_indices = await self._fetch_available_indices()
         if not all_indices:
-            raise RuntimeError(
-                "Failed to fetch Common Crawl index list from collinfo.json"
-            )
+            raise RuntimeError("Failed to fetch Common Crawl index list from collinfo.json")
 
-        logger.info(
-            "Available CC indices: %d (latest: %s)", len(all_indices), all_indices[0]
-        )
+        logger.info("Available CC indices: %d (latest: %s)", len(all_indices), all_indices[0])
 
         # 2. Read checkpoint from DB
         checkpoint = await self._read_checkpoint(session, all_indices=all_indices)
@@ -292,9 +293,7 @@ class IncrementalCommonCrawlExtractor:
         for crawl_id in missing_indices:
             elapsed = time.monotonic() - start_time
             if elapsed >= self.max_runtime_seconds:
-                logger.info(
-                    "Time limit reached (%d s). Stopping gracefully.", int(elapsed)
-                )
+                logger.info("Time limit reached (%d s). Stopping gracefully.", int(elapsed))
                 stats.timed_out = True
                 break
 
@@ -392,6 +391,7 @@ class IncrementalCommonCrawlExtractor:
         all_indices: list[str],
         last_completed_index: str | None,
     ) -> frozenset[str]:
+        """Translate a legacy single-index checkpoint into completed index IDs."""
         if last_completed_index is None:
             return frozenset()
         try:
@@ -407,6 +407,7 @@ class IncrementalCommonCrawlExtractor:
         *,
         all_indices: list[str],
     ) -> CommonCrawlCheckpoint:
+        """Build the current checkpoint representation from persisted JSON state."""
         last_completed = state_data.get("last_completed_index")
         raw_completed = state_data.get("completed_indices") or []
         raw_failed = state_data.get("failed_indices") or []
@@ -457,8 +458,8 @@ class IncrementalCommonCrawlExtractor:
         stats: IncrementalCCStats,
         start_time: float,
     ) -> list[dict[str, Any]]:
+        """Fetch and parse one query page from a Common Crawl index endpoint."""
         """Fetch index hits and download WARC pages for a single CC index."""
-        from warcio.archiveiterator import ArchiveIterator
 
         # Phase 1: Collect index hits
         index_hits = await self._collect_index_hits_for_crawl(crawl_id)
@@ -469,11 +470,7 @@ class IncrementalCommonCrawlExtractor:
         stats.total_index_hits += len(index_hits)
 
         # Phase 2: Download WARC pages
-        df = (
-            pd.DataFrame(index_hits)
-            .drop_duplicates(subset=["url"])
-            .reset_index(drop=True)
-        )
+        df = pd.DataFrame(index_hits).drop_duplicates(subset=["url"]).reset_index(drop=True)
 
         # Filter for 200s and HTML
         if "status" in df.columns:
@@ -483,9 +480,7 @@ class IncrementalCommonCrawlExtractor:
 
         limit = min(self.max_warc_downloads_per_index, len(df))
         df = df.head(limit).reset_index(drop=True)
-        logger.info(
-            "Index %s: %d unique URLs ready for WARC download.", crawl_id, len(df)
-        )
+        logger.info("Index %s: %d unique URLs ready for WARC download.", crawl_id, len(df))
 
         extracted_pages: list[dict[str, Any]] = []
         limits = httpx.Limits(
@@ -507,17 +502,12 @@ class IncrementalCommonCrawlExtractor:
                 # Check time budget before each batch
                 elapsed = time.monotonic() - start_time
                 if elapsed >= self.max_runtime_seconds:
-                    logger.info(
-                        "Time limit reached during WARC downloads for %s", crawl_id
-                    )
+                    logger.info("Time limit reached during WARC downloads for %s", crawl_id)
                     break
 
-                batch_rows = df.iloc[batch_start : batch_start + batch_size].to_dict(
-                    "records"
-                )
+                batch_rows = df.iloc[batch_start : batch_start + batch_size].to_dict("records")
                 tasks = [
-                    self._fetch_warc_record(client, row, semaphore, stats)
-                    for row in batch_rows
+                    self._fetch_warc_record(client, row, semaphore, stats) for row in batch_rows
                 ]
                 results = await asyncio.gather(*tasks)
                 extracted_pages.extend(page for page in results if page is not None)
@@ -538,6 +528,7 @@ class IncrementalCommonCrawlExtractor:
         stats: IncrementalCCStats,
         start_time: float,
     ) -> list[dict[str, Any]]:
+        """Parse index records and attach Sicurre source metadata."""
         """Process one index with bounded retries for hard index-level failures."""
         for attempt in range(1, self.max_index_attempts + 1):
             try:
@@ -561,9 +552,7 @@ class IncrementalCommonCrawlExtractor:
                     await asyncio.sleep(delay)
         return []
 
-    async def _collect_index_hits_for_crawl(
-        self, crawl_id: str
-    ) -> list[dict[str, Any]]:
+    async def _collect_index_hits_for_crawl(self, crawl_id: str) -> list[dict[str, Any]]:
         """Query the CC index API for all configured queries against a single crawl."""
         all_records: list[dict[str, Any]] = []
         limits = httpx.Limits(max_keepalive_connections=10, max_connections=15)
@@ -577,8 +566,7 @@ class IncrementalCommonCrawlExtractor:
         ) as client:
             semaphore = asyncio.Semaphore(3)
             tasks = [
-                self._fetch_index_page(client, query, crawl_id, semaphore)
-                for query in self.queries
+                self._fetch_index_page(client, query, crawl_id, semaphore) for query in self.queries
             ]
             results = await asyncio.gather(*tasks)
             for records in results:
@@ -616,9 +604,7 @@ class IncrementalCommonCrawlExtractor:
                     )
                 except Exception as exc:
                     if attempt == 3:
-                        logger.debug(
-                            "Failed query %s on %s: %s", query.pattern, crawl_id, exc
-                        )
+                        logger.debug("Failed query %s on %s: %s", query.pattern, crawl_id, exc)
                     await asyncio.sleep(2**attempt)
         return []
 
@@ -644,9 +630,7 @@ class IncrementalCommonCrawlExtractor:
                     "_label": query.label,
                     "_query": query.pattern,
                     "_crawl_id": crawl_id,
-                    "_url_priority_score": CommonCrawlContentService.score_url(
-                        url, query.category
-                    ),
+                    "_url_priority_score": CommonCrawlContentService.score_url(url, query.category),
                 }
             )
             records.append(record)
@@ -659,6 +643,7 @@ class IncrementalCommonCrawlExtractor:
         semaphore: asyncio.Semaphore,
         stats: IncrementalCCStats,
     ) -> dict[str, Any] | None:
+        """Download, parse, deduplicate, and classify one WARC byte range."""
         from warcio.archiveiterator import ArchiveIterator
 
         offset = int(row["offset"])
@@ -671,7 +656,7 @@ class IncrementalCommonCrawlExtractor:
 
         async with semaphore:
             try:
-                response = await client.get(warc_url, headers=headers)
+                response = await self._request_warc_range(client, warc_url, headers)
                 if response.status_code not in (200, 206):
                     stats.download_errors += 1
                     return None
@@ -681,9 +666,7 @@ class IncrementalCommonCrawlExtractor:
                 for record in ArchiveIterator(stream):
                     if record.rec_type != "response":
                         continue
-                    html_text = (
-                        record.content_stream().read().decode("utf-8", errors="replace")
-                    )
+                    html_text = record.content_stream().read().decode("utf-8", errors="replace")
                     text = CommonCrawlContentService.extract_text_from_html(
                         html_text,
                         max_length=self.max_text_length,
@@ -699,9 +682,7 @@ class IncrementalCommonCrawlExtractor:
 
                     stats.seen_hashes.add(content_hash)
                     language = self._detect_language(text)
-                    stats.per_language[language] = (
-                        stats.per_language.get(language, 0) + 1
-                    )
+                    stats.per_language[language] = stats.per_language.get(language, 0) + 1
                     stats.per_category[row["_category"]] = (
                         stats.per_category.get(row["_category"], 0) + 1
                     )
@@ -723,6 +704,44 @@ class IncrementalCommonCrawlExtractor:
                 return None
         return None
 
+    async def _request_warc_range(
+        self,
+        client: httpx.AsyncClient,
+        url: str,
+        headers: dict[str, str],
+    ) -> httpx.Response:
+        """Request a WARC byte range with bounded retries for transient failures."""
+        retryable_statuses = {429, 500, 502, 503, 504}
+        last_error: httpx.HTTPError | None = None
+
+        for attempt in range(1, self.warc_max_retries + 1):
+            try:
+                response = await client.get(url, headers=headers)
+            except httpx.HTTPError as exc:
+                last_error = exc
+                if attempt >= self.warc_max_retries:
+                    raise
+            else:
+                if response.status_code not in retryable_statuses:
+                    return response
+                if attempt >= self.warc_max_retries:
+                    return response
+
+            delay = self.warc_retry_delay_seconds * (2 ** (attempt - 1))
+            logger.warning(
+                "Transient WARC request failure for %s on attempt %d/%d; retrying in %.1fs.",
+                url,
+                attempt,
+                self.warc_max_retries,
+                delay,
+            )
+            if delay:
+                await asyncio.sleep(delay)
+
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("WARC retry loop exhausted without a response")
+
     # ------------------------------------------------------------------
     # R2 flush
     # ------------------------------------------------------------------
@@ -730,15 +749,17 @@ class IncrementalCommonCrawlExtractor:
     async def _flush_to_r2(self, crawl_id: str, pages: list[dict[str, Any]]) -> str:
         """Write extracted pages to R2 mirroring the base dataset structure (raw, fr_usable, quality)."""
         df = pd.DataFrame(pages)
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         base_prefix = f"cron/bigdata/common_crawl/{crawl_id}/{timestamp}"
 
         # 1. Save raw data
         raw_buffer = io.BytesIO()
         df.to_parquet(raw_buffer, index=False, engine="pyarrow")
-        raw_key = self.snapshot_store.build_object_key(
-            source_prefix=f"{base_prefix}/raw",
-            filename=f"cc_incremental_raw_{len(df)}_{timestamp}.parquet",
+        raw_key = str(
+            self.snapshot_store.build_object_key(
+                source_prefix=f"{base_prefix}/raw",
+                filename=f"cc_incremental_raw_{len(df)}_{timestamp}.parquet",
+            )
         )
         await self.snapshot_store.write_snapshot(
             object_key=raw_key,
@@ -811,7 +832,7 @@ class IncrementalCommonCrawlExtractor:
         """Update the checkpoint with the completed CC index."""
         stmt = select(PipelineState).where(PipelineState.pipeline_name == PIPELINE_NAME)
         row = await session.scalar(stmt)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if row is None:
             row = PipelineState(
                 pipeline_name=PIPELINE_NAME,
@@ -845,7 +866,7 @@ class IncrementalCommonCrawlExtractor:
         """Record a failed or timed-out index without marking it completed."""
         stmt = select(PipelineState).where(PipelineState.pipeline_name == PIPELINE_NAME)
         row = await session.scalar(stmt)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         failure_key = "timed_out_indices" if reason == "timed_out" else "failed_indices"
         attempt = {
             "index": crawl_id,
@@ -866,9 +887,7 @@ class IncrementalCommonCrawlExtractor:
             )
             session.add(row)
         else:
-            flagged = list(
-                dict.fromkeys([*row.state_data.get(failure_key, []), crawl_id])
-            )
+            flagged = list(dict.fromkeys([*row.state_data.get(failure_key, []), crawl_id]))
             attempts = [*row.state_data.get("incomplete_attempts", []), attempt]
             row.state_data = {
                 **row.state_data,
@@ -884,6 +903,7 @@ class IncrementalCommonCrawlExtractor:
 
     @staticmethod
     def _is_excluded_domain(url: str) -> bool:
+        """Return whether a URL belongs to a source excluded from CC collection."""
         try:
             domain = url.split("//", 1)[-1].split("/", 1)[0].lower()
         except Exception:
@@ -892,7 +912,8 @@ class IncrementalCommonCrawlExtractor:
 
     @staticmethod
     def _detect_language(text: str) -> str:
+        """Detect a page language without failing the extraction on short text."""
         try:
-            return detect(text[:1500])
+            return str(detect(text[:1500]))
         except LangDetectException:
             return "unknown"

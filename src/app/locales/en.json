@@ -27,6 +27,9 @@
       "email_taken": "An account already exists with this email address. Sign in or use password recovery.",
       "invalid_email": "This email address is not valid.",
       "weak_password": "Choose a stronger password.",
+      "bot_verification_required": "Complete the anti-bot check before creating your account.",
+      "bot_verification_failed": "The anti-bot check failed. Try again.",
+      "bot_verification_unavailable": "The anti-bot check is unavailable. Reload the page in a moment.",
       "service_unavailable": "The authentication service is not responding. Try again in a moment.",
       "login_failed": "Sign-in is unavailable right now. Check your details or try again in a moment.",
       "signup_failed": "Account creation is unavailable right now. Check your details or try again in a moment."

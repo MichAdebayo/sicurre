@@ -13,6 +13,8 @@ export type AuthFailureReason =
   | "email_taken"
   | "invalid_email"
   | "weak_password"
+  | "bot_verification_required"
+  | "bot_verification_failed"
   | "service_unavailable"
   | "login_failed"
   | "signup_failed";
@@ -263,6 +265,12 @@ function normalizeAuthProviderError(
   if (text.includes("user not found")) {
     return "unknown_account";
   }
+  if (text.includes("turnstile_required")) {
+    return "bot_verification_required";
+  }
+  if (text.includes("turnstile_failed")) {
+    return "bot_verification_failed";
+  }
   if (text.includes("fetch") || text.includes("network") || text.includes("failed to")) {
     return "service_unavailable";
   }
@@ -319,7 +327,7 @@ export function useLogin() {
 export function useSignup() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { name: string; email: string; password: string }) => {
+    mutationFn: async (payload: { name: string; email: string; password: string; turnstileToken?: string }) => {
       const accountExists = await checkAuthEmailExists(payload.email);
       if (accountExists === true) {
         throw createAuthError("email_taken");
@@ -329,6 +337,9 @@ export function useSignup() {
         name: payload.name,
         email: payload.email,
         password: payload.password,
+        fetchOptions: payload.turnstileToken
+          ? { headers: { "x-turnstile-token": payload.turnstileToken } }
+          : undefined,
       });
       if (result.error) {
         throw createAuthError(normalizeAuthProviderError(result.error, "signup_failed"));

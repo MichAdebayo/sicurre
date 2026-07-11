@@ -27,6 +27,9 @@
       "email_taken": "Un compte existe déjà avec cette adresse e-mail. Connectez-vous ou utilisez la récupération de mot de passe.",
       "invalid_email": "Cette adresse e-mail n’est pas valide.",
       "weak_password": "Choisissez un mot de passe plus robuste.",
+      "bot_verification_required": "Terminez la vérification anti-robot avant de créer votre compte.",
+      "bot_verification_failed": "La vérification anti-robot a échoué. Réessayez.",
+      "bot_verification_unavailable": "La vérification anti-robot ne répond pas. Rechargez la page dans quelques instants.",
       "service_unavailable": "Le service d’authentification ne répond pas. Réessayez dans quelques instants.",
       "login_failed": "Connexion impossible pour le moment. Vérifiez vos informations ou réessayez dans quelques instants.",
       "signup_failed": "Création du compte impossible pour le moment. Vérifiez vos informations ou réessayez dans quelques instants."

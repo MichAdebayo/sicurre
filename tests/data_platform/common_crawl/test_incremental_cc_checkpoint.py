@@ -1,17 +1,18 @@
 from __future__ import annotations
 
+import httpx
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
+from core.database import Base
 from data_platform.extractors.incremental_cc_extractor import (
+    PIPELINE_NAME,
     CommonCrawlCheckpoint,
     IncrementalCCStats,
     IncrementalCommonCrawlExtractor,
-    PIPELINE_NAME,
 )
-from core.database import Base
 from db.models import PipelineState
 
 
@@ -129,3 +130,32 @@ async def test_common_crawl_index_retry_helper_retries_before_success(
 
     assert calls == 3
     assert result == [{"url": "https://example.test", "text": "ok"}]
+
+
+@pytest.mark.asyncio
+async def test_warc_requests_retry_transient_responses_before_returning_success() -> None:
+    extractor = IncrementalCommonCrawlExtractor(
+        warc_max_retries=3,
+        warc_retry_delay_seconds=0,
+    )
+    request = httpx.Request("GET", "https://data.commoncrawl.org/example.warc.gz")
+
+    class FlakyClient:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def get(self, _url: str, *, headers: dict[str, str]) -> httpx.Response:
+            assert headers["Range"] == "bytes=0-10"
+            self.calls += 1
+            status_code = 503 if self.calls < 3 else 206
+            return httpx.Response(status_code, request=request)
+
+    client = FlakyClient()
+    response = await extractor._request_warc_range(
+        client,  # type: ignore[arg-type]
+        str(request.url),
+        {"Range": "bytes=0-10"},
+    )
+
+    assert response.status_code == 206
+    assert client.calls == 3

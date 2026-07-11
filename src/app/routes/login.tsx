@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Home, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -7,6 +7,8 @@ import { loginSchema, signUpSchema } from "../lib/schemas";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { AuthFlowError, type AuthFailureReason, useLogin, useSignup } from "../lib/api";
+import { authBaseURL } from "../lib/auth-client";
+import { Turnstile } from "../components/auth/turnstile";
 
 const MotionDiv = motion.div as any;
 
@@ -35,6 +37,12 @@ export default function LoginRoute({
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
+  const [turnstileConfig, setTurnstileConfig] = useState<{
+    status: "idle" | "loading" | "enabled" | "disabled" | "error";
+    siteKey: string;
+  }>({ status: "idle", siteKey: "" });
   const [activeLegalModal, setActiveLegalModal] = useState<"cgu" | "privacy" | null>(null);
   const loginMutation = useLogin();
   const signupMutation = useSignup();
@@ -42,24 +50,64 @@ export default function LoginRoute({
   useEffect(() => {
     setIsSignUp(initialMode === "signup");
     setAuthError("");
+    setTurnstileToken("");
   }, [initialMode]);
+
+  useEffect(() => {
+    if (!isSignUp || turnstileConfig.status !== "idle") return;
+
+    setTurnstileConfig({ status: "loading", siteKey: "" });
+    void fetch(`${authBaseURL}/config`, { credentials: "include" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Auth config unavailable");
+        return response.json() as Promise<{
+          turnstile?: { enabled?: boolean; siteKey?: string | null };
+        }>;
+      })
+      .then(({ turnstile }) => {
+        if (turnstile?.enabled && turnstile.siteKey) {
+          setTurnstileConfig({ status: "enabled", siteKey: turnstile.siteKey });
+          return;
+        }
+        setTurnstileConfig({ status: "disabled", siteKey: "" });
+      })
+      .catch(() => setTurnstileConfig({ status: "error", siteKey: "" }));
+  }, [isSignUp, turnstileConfig.status]);
+
+  const handleTurnstileVerify = useCallback((token: string) => {
+    setTurnstileToken(token);
+    setAuthError("");
+  }, []);
+  const handleTurnstileExpire = useCallback(() => setTurnstileToken(""), []);
+  const handleTurnstileError = useCallback(() => {
+    setTurnstileToken("");
+    setAuthError(t("login.errors.bot_verification_failed"));
+  }, [t]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
 
     if (isSignUp) {
+      if (turnstileConfig.status === "enabled" && !turnstileToken) {
+        setAuthError(t("login.errors.bot_verification_required"));
+        return;
+      }
       const validation = signUpSchema.safeParse({ name, email, password });
       if (!validation.success) {
         setAuthError(validation.error.errors[0].message);
         return;
       }
       try {
-        await signupMutation.mutateAsync({ name, email, password });
+        await signupMutation.mutateAsync({ name, email, password, turnstileToken });
         onLoginSuccess();
       } catch (error) {
         const reason = getAuthFailureReason(error, "signup_failed");
         setAuthError(t(`login.errors.${reason}`));
+        if (turnstileConfig.status === "enabled") {
+          setTurnstileToken("");
+          setTurnstileResetSignal((value) => value + 1);
+        }
       }
     } else {
       const validation = loginSchema.safeParse({ email, password });
@@ -78,6 +126,11 @@ export default function LoginRoute({
   };
 
   const isSubmitting = loginMutation.isPending || signupMutation.isPending;
+  const isTurnstileBlocking = isSignUp && (
+    turnstileConfig.status === "loading"
+    || turnstileConfig.status === "error"
+    || (turnstileConfig.status === "enabled" && !turnstileToken)
+  );
 
   const handleGoogleLogin = () => {
     window.location.href = "/auth/login/google";
@@ -135,7 +188,11 @@ export default function LoginRoute({
           <p className="text-[13px] text-slate-400 mt-2.5">
             {isSignUp ? "Vous avez déjà un compte ? " : "Vous n'avez pas de compte ? "}
             <button
-              onClick={() => { setIsSignUp(!isSignUp); setAuthError(""); }}
+              onClick={() => {
+                setIsSignUp(!isSignUp);
+                setAuthError("");
+                setTurnstileToken("");
+              }}
               className="text-white hover:underline font-semibold cursor-pointer ml-1"
             >
               {isSignUp ? "Se connecter" : "S'inscrire"}
@@ -229,6 +286,26 @@ export default function LoginRoute({
               />
             </div>
 
+            {isSignUp && turnstileConfig.status === "loading" && (
+              <div className="min-h-[65px] w-full animate-pulse rounded-lg bg-white/[0.06]" aria-label="Chargement de la vérification anti-robot" />
+            )}
+
+            {isSignUp && turnstileConfig.status === "enabled" && (
+              <Turnstile
+                siteKey={turnstileConfig.siteKey}
+                resetSignal={turnstileResetSignal}
+                onVerify={handleTurnstileVerify}
+                onExpire={handleTurnstileExpire}
+                onError={handleTurnstileError}
+              />
+            )}
+
+            {isSignUp && turnstileConfig.status === "error" && (
+              <div className="rounded-lg border border-red-900/40 bg-red-950/30 p-3 text-sm font-medium text-red-300" role="alert">
+                {t("login.errors.bot_verification_unavailable")}
+              </div>
+            )}
+
             {authError && (
               <div className="p-3 bg-red-950/20 border border-red-900/30 text-red-400 text-sm rounded-lg font-medium">
                 {authError}
@@ -238,10 +315,10 @@ export default function LoginRoute({
             <Button
               type="submit"
               fullWidth
-              disabled={isSubmitting}
+              disabled={isSubmitting || isTurnstileBlocking}
               className="mt-2 flex items-center justify-center gap-2.5 !py-3 bg-white/[0.08] text-white border border-white/15 hover:bg-primary hover:text-white hover:border-primary hover:shadow-[0_0_25px_rgba(74,144,217,0.4)] text-sm font-semibold rounded-xl transition-all duration-200 cursor-pointer active:scale-[0.98] disabled:opacity-70"
             >
-              <span>{isSubmitting ? "Connexion en cours…" : isSignUp ? "Créer mon compte" : "Se connecter"}</span>
+              <span>{isSubmitting ? (isSignUp ? "Création en cours…" : "Connexion en cours…") : isSignUp ? "Créer mon compte" : "Se connecter"}</span>
               <ArrowRight className="w-4 h-4" />
             </Button>
           </form>

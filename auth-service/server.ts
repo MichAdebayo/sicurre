@@ -28,6 +28,12 @@ app.get("/api/auth/health", (_req: Request, res: Response) => {
   res.json({ status: "ok", service: "better-auth" });
 });
 
+app.get("/api/auth/config", (_req: Request, res: Response) => {
+  const siteKey = process.env.TURNSTILE_SITE_KEY?.trim() ?? "";
+  const enabled = Boolean(siteKey && process.env.TURNSTILE_SECRET_KEY?.trim());
+  res.json({ turnstile: { enabled, siteKey: enabled ? siteKey : null } });
+});
+
 app.post("/api/auth/check-email", express.json(), (req: Request, res: Response) => {
   const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
   if (!email || !email.includes("@")) {

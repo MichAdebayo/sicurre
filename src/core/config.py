@@ -1,10 +1,12 @@
+"""Typed runtime configuration for Sicurre services and data jobs."""
+
 from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlparse
 
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import AliasChoices, Field, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -16,6 +18,8 @@ _DEFAULT_DB_URL = f"sqlite+aiosqlite:///{_DB_PATH.as_posix()}"
 
 
 class Settings(BaseSettings):
+    """Resolve validated settings from Sicurre environment files."""
+
     app_name: str = "Sicurre API"
     environment: str = "dev"
     database_url: str = _DEFAULT_DB_URL
@@ -77,18 +81,65 @@ class Settings(BaseSettings):
         default=60,
         description="Initial retry backoff for Common Crawl index-level failures.",
     )
+    cc_max_warc_downloads: int = Field(
+        default=50_000,
+        validation_alias="CC_MAX_WARC_DOWNLOADS",
+        ge=1,
+        description="Maximum WARC byte-range downloads attempted for one CC index.",
+    )
+    cc_max_results_per_query: int = Field(
+        default=5_000,
+        validation_alias="CC_MAX_RESULTS_PER_QUERY",
+        ge=1,
+        description="Maximum Common Crawl index hits collected for one query.",
+    )
+    cc_async_concurrency: int = Field(
+        default=40,
+        validation_alias="CC_ASYNC_CONCURRENCY",
+        ge=1,
+        description="Concurrent HTTP requests used by the incremental CC extractor.",
+    )
+    cc_min_text_length: int = Field(
+        default=100,
+        validation_alias="CC_MIN_TEXT_LENGTH",
+        ge=1,
+        description="Minimum extracted text length retained from a CC WARC response.",
+    )
+    cc_max_text_length: int = Field(
+        default=10_000,
+        validation_alias="CC_MAX_TEXT_LENGTH",
+        ge=1,
+        description="Maximum extracted text length retained from a CC WARC response.",
+    )
+    cc_request_timeout: int = Field(
+        default=45,
+        validation_alias="CC_REQUEST_TIMEOUT",
+        ge=1,
+        description="HTTP timeout in seconds for Common Crawl index and WARC requests.",
+    )
+    cc_warc_max_retries: int = Field(
+        default=3,
+        validation_alias=AliasChoices("CC_WARC_MAX_RETRIES", "CC_S3_MAX_RETRIES"),
+        ge=1,
+        description="Attempts for transient Common Crawl WARC download failures.",
+    )
+    cc_warc_retry_delay_seconds: float = Field(
+        default=1.5,
+        validation_alias=AliasChoices(
+            "CC_WARC_RETRY_DELAY_SECONDS",
+            "CC_S3_RETRY_DELAY",
+        ),
+        ge=0,
+        description="Initial exponential retry delay for transient CC WARC failures.",
+    )
     cc_input_backend: str = Field(
         default="prod",
         validation_alias="CC_INPUT_BACKEND",
     )
     # ── Dataset publish / Kaggle sync ─────────────────────────────────────────
-    kaggle_username: str | None = Field(
-        default=None, validation_alias="KAGGLE_USERNAME"
-    )
+    kaggle_username: str | None = Field(default=None, validation_alias="KAGGLE_USERNAME")
     kaggle_key: str | None = Field(default=None, validation_alias="KAGGLE_API_TOKEN")
-    kaggle_dataset_slug: str | None = Field(
-        default=None, validation_alias="KAGGLE_DATASET_SLUG"
-    )
+    kaggle_dataset_slug: str | None = Field(default=None, validation_alias="KAGGLE_DATASET_SLUG")
     github_ml_repo_owner: str | None = Field(
         default=None, validation_alias="SICURRE_GITHUB_ML_REPO_OWNER"
     )
@@ -100,9 +151,7 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("INTERNAL_API_KEY", "SICURRE_INTERNAL_API_KEY"),
     )
-    inference_api_key: str | None = Field(
-        default=None, validation_alias="INFERENCE_API_KEY"
-    )
+    inference_api_key: str | None = Field(default=None, validation_alias="INFERENCE_API_KEY")
     inference_api_url: str | None = Field(
         default=None,
         validation_alias=AliasChoices("SICURRE_INFERENCE_API_URL", "INFERENCE_API_URL"),
@@ -114,7 +163,12 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("PUBLIC_API_URL", "SICURRE_PUBLIC_API_URL"),
     )
     scheduler_enabled: bool = False
-    scheduler_interval_seconds: int = 604800
+    scheduler_interval_seconds: int = Field(
+        default=604800,
+        validation_alias="SICURRE_SCHEDULER_INTERVAL_SECONDS",
+        ge=60,
+        description="Legacy in-process scheduler interval; production uses source-specific host cron.",
+    )
     sla_latency_ms: int = 10000
 
     # Google OAuth credentials configuration
@@ -133,12 +187,24 @@ class Settings(BaseSettings):
 
     # Loops Email API Configuration
     loops_api_key: str | None = Field(default=None, validation_alias="LOOPS_API_KEY")
-    loops_sign_up_transaction_id: str | None = Field(default=None, validation_alias="LOOPS_SIGN_UP_TRANSACTION_ID")
-    loops_reset_password_transaction_id: str | None = Field(default=None, validation_alias="LOOPS_RESET_PASSWORD_TRANSACTION_ID")
-    loops_threat_quarantined_transaction_id: str | None = Field(default=None, validation_alias="LOOPS_THREAT_QUARANTINED_TRANSACTION_ID")
-    loops_dns_shield_alert_transaction_id: str | None = Field(default=None, validation_alias="LOOPS_DNS_SHIELD_ALERT_TRANSACTION_ID")
-    loops_emergency_lockdown_transaction_id: str | None = Field(default=None, validation_alias="LOOPS_EMERGECNY_LOCKDOWN_TRANSACTION_ID")
-    loops_quota_warning_transaction_id: str | None = Field(default=None, validation_alias="LOOPS_QUOTA_WARNING_TRANSACTION_ID")
+    loops_sign_up_transaction_id: str | None = Field(
+        default=None, validation_alias="LOOPS_SIGN_UP_TRANSACTION_ID"
+    )
+    loops_reset_password_transaction_id: str | None = Field(
+        default=None, validation_alias="LOOPS_RESET_PASSWORD_TRANSACTION_ID"
+    )
+    loops_threat_quarantined_transaction_id: str | None = Field(
+        default=None, validation_alias="LOOPS_THREAT_QUARANTINED_TRANSACTION_ID"
+    )
+    loops_dns_shield_alert_transaction_id: str | None = Field(
+        default=None, validation_alias="LOOPS_DNS_SHIELD_ALERT_TRANSACTION_ID"
+    )
+    loops_emergency_lockdown_transaction_id: str | None = Field(
+        default=None, validation_alias="LOOPS_EMERGECNY_LOCKDOWN_TRANSACTION_ID"
+    )
+    loops_quota_warning_transaction_id: str | None = Field(
+        default=None, validation_alias="LOOPS_QUOTA_WARNING_TRANSACTION_ID"
+    )
 
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),
@@ -149,7 +215,12 @@ class Settings(BaseSettings):
 
     @field_validator("inference_api_url", "public_api_url")
     @classmethod
-    def _validate_runtime_url(cls, value: str | None, info) -> str | None:
+    def _validate_runtime_url(
+        cls,
+        value: str | None,
+        info: ValidationInfo,
+    ) -> str | None:
+        """Reject malformed public and inference endpoint URLs at startup."""
         if value is None:
             return value
         normalized = value.strip().rstrip("/")
@@ -160,14 +231,20 @@ class Settings(BaseSettings):
         hostname = parsed.hostname or ""
         if parsed.scheme not in {"http", "https"} or not hostname:
             raise ValueError(f"{info.field_name} must be an absolute HTTP(S) URL")
-        if "." not in hostname and hostname not in {"localhost"} and not hostname.startswith("127."):
+        if (
+            "." not in hostname
+            and hostname not in {"localhost"}
+            and not hostname.startswith("127.")
+        ):
             raise ValueError(
                 f"{info.field_name} host '{hostname}' is not valid; use a real host such as api.sicurre.com"
             )
 
         path = parsed.path.rstrip("/")
         if info.field_name == "inference_api_url" and path != "/v1/classify":
-            raise ValueError("inference_api_url must point to the classifier endpoint ending in /v1/classify")
+            raise ValueError(
+                "inference_api_url must point to the classifier endpoint ending in /v1/classify"
+            )
         if info.field_name == "public_api_url" and path in {"/v1/classify", "/v1/email/scan"}:
             raise ValueError(
                 "public_api_url must be the public Sicurre app API base URL, not a /v1 endpoint"
@@ -176,6 +253,7 @@ class Settings(BaseSettings):
 
     @property
     def sync_database_url(self) -> str:
+        """Return the main database URL with a synchronous SQLAlchemy driver."""
         match True:
             case _ if self.database_url.startswith("sqlite+aiosqlite://"):
                 return self.database_url.replace("sqlite+aiosqlite://", "sqlite://", 1)
@@ -188,14 +266,14 @@ class Settings(BaseSettings):
 
     @property
     def sync_data_platform_database_url(self) -> str:
+        """Return the data-platform URL with a synchronous SQLAlchemy driver."""
         if self.data_platform_database_url.startswith("sqlite+aiosqlite://"):
-            return self.data_platform_database_url.replace(
-                "sqlite+aiosqlite://", "sqlite://", 1
-            )
+            return self.data_platform_database_url.replace("sqlite+aiosqlite://", "sqlite://", 1)
         # postgresql+psycopg:// is valid for both sync and async with psycopg3
         return self.data_platform_database_url
 
     def resolve_snapshot_storage_backend(self, *, source_key: str | None = None) -> str:
+        """Return the effective snapshot backend for an optional source override."""
         override = self._resolve_source_snapshot_override(
             source_key=source_key,
             setting_name="storage_backend",
@@ -209,31 +287,31 @@ class Settings(BaseSettings):
         source_key: str | None,
         setting_name: str,
     ) -> str | Path | None:
+        """Read a source-scoped snapshot setting when the model exposes it."""
         if not source_key:
             return None
 
-        normalized_source_key = (
-            source_key.strip().lower().replace("-", "_").replace(" ", "_")
-        )
+        normalized_source_key = source_key.strip().lower().replace("-", "_").replace(" ", "_")
         attribute_name = f"{normalized_source_key}_snapshot_{setting_name}"
         return getattr(self, attribute_name, None)
 
     @property
     def dev_bearer_tokens(self) -> frozenset[str]:
+        """Return normalized development bearer tokens."""
         return frozenset(
-            token.strip()
-            for token in self.auth_dev_bearer_tokens.split(",")
-            if token.strip()
+            token.strip() for token in self.auth_dev_bearer_tokens.split(",") if token.strip()
         )
 
     @property
     def allow_dev_tokens(self) -> bool:
+        """Whether development bearer tokens are allowed in this environment."""
         if self.auth_allow_dev_tokens is not None:
             return self.auth_allow_dev_tokens
         return self.environment in {"dev", "test"}
 
     @property
     def platform_admin_email_set(self) -> frozenset[str]:
+        """Return normalized platform administrator email addresses."""
         return frozenset(
             email.strip().lower()
             for email in self.platform_admin_emails.split(",")
@@ -243,4 +321,5 @@ class Settings(BaseSettings):
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
+    """Return the process-wide cached settings instance."""
     return Settings()
