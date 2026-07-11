@@ -49,6 +49,7 @@ services:
     env_file:
       - ${SICURRE_AUTH_ENV_FILE:-./deploy/env.auth}
     environment:
+      SICURRE_ENVIRONMENT: production
       SICURRE_BETTER_AUTH_PORT: "3005"
       SICURRE_BETTER_AUTH_URL: ${SICURRE_PUBLIC_APP_URL:-https://sicurre.com}
       BETTER_AUTH_URL: ${SICURRE_PUBLIC_APP_URL:-https://sicurre.com}

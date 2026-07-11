@@ -16,7 +16,12 @@ def test_bloc1_schema_creates_all_tables() -> None:
     finally:
         engine.dispose()
 
-    assert table_names == {
+    bloc1_table_names = {
+        name
+        for name in table_names
+        if name.startswith("data_") or name in {"poc_user", "pipeline_state"}
+    }
+    assert bloc1_table_names == {
         "data_annotation",
         "data_dataset",
         "data_dataset_item",

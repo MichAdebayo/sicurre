@@ -24,7 +24,11 @@ def test_common_crawl_bigquery_client_uses_settings_for_configuration(
         captured.update(kwargs)
         return object()
 
-    monkeypatch.setattr(module.bigquery, "Client", lambda: _FakeBigQueryClient())
+    monkeypatch.setattr(
+        module.CommonCrawlBigQueryClient,
+        "_create_bigquery_client",
+        staticmethod(lambda: (_FakeBigQueryClient(), object())),
+    )
     monkeypatch.setattr(module.boto3, "client", fake_boto3_client)
 
     settings = module.CommonCrawlIngestionSettings(

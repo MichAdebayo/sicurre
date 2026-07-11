@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import boto3
-import hashlib
 import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -115,9 +115,7 @@ class LocalCommonCrawlClient:
         settings: Settings | None = None,
     ) -> None:
         settings or get_settings()
-        self.local_parquet_dir: Path = (
-            local_parquet_dir or DEFAULT_CC_SNAPSHOT_DIR / "fr_usable"
-        )
+        self.local_parquet_dir: Path = local_parquet_dir or DEFAULT_CC_SNAPSHOT_DIR / "fr_usable"
         # Mirrors the attribute used in _build_raw_object external_ref
         self.full_table_id = f"local://{self.local_parquet_dir}"
 
@@ -128,9 +126,7 @@ class LocalCommonCrawlClient:
             key=lambda p: p.stat().st_mtime,
         )
         if not parquet_files:
-            raise FileNotFoundError(
-                f"No .parquet files found in {self.local_parquet_dir}"
-            )
+            raise FileNotFoundError(f"No .parquet files found in {self.local_parquet_dir}")
         latest = parquet_files[-1]
         logger.info("LocalCommonCrawlClient: reading %s", latest)
         df = pd.read_parquet(latest)
@@ -142,9 +138,7 @@ class LocalCommonCrawlClient:
         if df.empty:
             return []
         if "text" not in df.columns:
-            logger.warning(
-                "LocalCommonCrawlClient: DataFrame has no 'text' column — 0 records"
-            )
+            logger.warning("LocalCommonCrawlClient: DataFrame has no 'text' column — 0 records")
             return []
 
         # Deterministic fingerprint: sha256 hex of text (same text = same key across runs)
@@ -209,11 +203,7 @@ class CommonCrawlRecoverySnapshotBuilder:
 
         prefix = "raw-snapshots/bigdata/common_crawl/fr_usable/"
         response = self.s3_client.list_objects_v2(Bucket=self.r2_bucket, Prefix=prefix)
-        objects = [
-            obj
-            for obj in response.get("Contents", [])
-            if obj["Key"].endswith(".parquet")
-        ]
+        objects = [obj for obj in response.get("Contents", []) if obj["Key"].endswith(".parquet")]
         if len(objects) < parquet_count:
             raise FileNotFoundError(
                 f"Expected at least {parquet_count} parquet files in r2://{self.r2_bucket}/{prefix}, found {len(objects)}"
@@ -235,7 +225,7 @@ class CommonCrawlRecoverySnapshotBuilder:
 
         merged = pd.concat(frames, ignore_index=True)
         merged = self._deduplicate_frame(merged)
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
 
         self.fr_usable_dir.mkdir(parents=True, exist_ok=True)
         self.quality_dir.mkdir(parents=True, exist_ok=True)
@@ -246,16 +236,14 @@ class CommonCrawlRecoverySnapshotBuilder:
         merged.to_parquet(local_parquet_path, index=False, engine="pyarrow")
 
         manifest = {
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
             "mode": "local_recovery",
             "row_count": len(merged),
             "bucket": self.r2_bucket,
             "selected_object_keys": [obj["Key"] for obj in selected],
             "local_parquet_path": str(local_parquet_path),
         }
-        manifest_path = self.quality_dir / (
-            f"common_crawl_recovery_manifest_{timestamp}.json"
-        )
+        manifest_path = self.quality_dir / (f"common_crawl_recovery_manifest_{timestamp}.json")
         manifest_path.write_text(
             json.dumps(manifest, ensure_ascii=False, indent=2),
             encoding="utf-8",
@@ -273,9 +261,7 @@ class CommonCrawlRecoverySnapshotBuilder:
         if dataframe.empty:
             return dataframe
         if "content_hash" in dataframe.columns:
-            return dataframe.drop_duplicates(subset=["content_hash"]).reset_index(
-                drop=True
-            )
+            return dataframe.drop_duplicates(subset=["content_hash"]).reset_index(drop=True)
         if "text" in dataframe.columns:
             return dataframe.drop_duplicates(subset=["text"]).reset_index(drop=True)
         return dataframe.drop_duplicates().reset_index(drop=True)
@@ -293,11 +279,8 @@ class CommonCrawlBigQueryClient:
         self,
         settings: CommonCrawlIngestionSettings | None = None,
     ) -> None:
-        from google.cloud import bigquery
-
         self.settings = settings or CommonCrawlIngestionSettings.from_app_settings()
-        self._bigquery = bigquery
-        self.bq_client = bigquery.Client()
+        self.bq_client, self._bigquery = self._create_bigquery_client()
         self.project_id = self.settings.gcp_project
         self.dataset_id = self.settings.dataset_id
         self.table_name = "common_crawl_raw"
@@ -312,27 +295,26 @@ class CommonCrawlBigQueryClient:
             region_name=self.settings.raw_snapshot_r2_region,
         )
 
+    @staticmethod
+    def _create_bigquery_client() -> tuple[Any, Any]:
+        """Load the optional BigQuery SDK only for the BigQuery execution path."""
+        from google.cloud import bigquery
+
+        return bigquery.Client(), bigquery
+
     def fetch_latest_parquet_from_r2(self) -> pd.DataFrame:
         """Finds the most recently created fr_usable parquet file in R2 and downloads it into Pandas."""
-        logger.info(
-            f"Searching R2 bucket '{self.r2_bucket}' for latest Common Crawl parquet..."
-        )
+        logger.info(f"Searching R2 bucket '{self.r2_bucket}' for latest Common Crawl parquet...")
         prefix = "raw-snapshots/bigdata/common_crawl/fr_usable/"
 
         response = self.s3_client.list_objects_v2(Bucket=self.r2_bucket, Prefix=prefix)
         if "Contents" not in response:
-            raise FileNotFoundError(
-                f"No objects found in r2://{self.r2_bucket}/{prefix}"
-            )
+            raise FileNotFoundError(f"No objects found in r2://{self.r2_bucket}/{prefix}")
 
         # Find the most recent .parquet file
-        objects = [
-            obj for obj in response["Contents"] if obj["Key"].endswith(".parquet")
-        ]
+        objects = [obj for obj in response["Contents"] if obj["Key"].endswith(".parquet")]
         if not objects:
-            raise FileNotFoundError(
-                f"No .parquet files found in r2://{self.r2_bucket}/{prefix}"
-            )
+            raise FileNotFoundError(f"No .parquet files found in r2://{self.r2_bucket}/{prefix}")
 
         latest_obj = max(objects, key=lambda x: x["LastModified"])
         object_key = latest_obj["Key"]
@@ -355,9 +337,7 @@ class CommonCrawlBigQueryClient:
         dataset_ref.location = self.settings.gcp_region
         self.bq_client.create_dataset(dataset_ref, exists_ok=True)
 
-        logger.info(
-            f"Pushing {len(df)} rows to BigQuery native table: {self.full_table_id}"
-        )
+        logger.info(f"Pushing {len(df)} rows to BigQuery native table: {self.full_table_id}")
         job_config = self._bigquery.LoadJobConfig(
             write_disposition=self._bigquery.WriteDisposition.WRITE_TRUNCATE
         )
@@ -369,9 +349,7 @@ class CommonCrawlBigQueryClient:
         load_job.result()  # Wait for upload completion
 
         logger.info("Executing analytical Big Data SQL Deduplication Query...")
-        query_label_select = (
-            "\n            query_label," if "query_label" in df.columns else ""
-        )
+        query_label_select = "\n            query_label," if "query_label" in df.columns else ""
         # Big SQL Query demonstrating competency C1
         sql = f"""
         SELECT
@@ -425,7 +403,7 @@ class CommonCrawlIngestionService:
     def __init__(
         self,
         *,
-        bq_client: "CommonCrawlBigQueryClient | LocalCommonCrawlClient | None" = None,
+        bq_client: CommonCrawlBigQueryClient | LocalCommonCrawlClient | None = None,
         snapshot_dir: Path = DEFAULT_CC_SNAPSHOT_DIR,
         snapshot_store: SnapshotStore | None = None,
         snapshot_prefix: str = DEFAULT_CC_SNAPSHOT_PREFIX,
@@ -436,9 +414,7 @@ class CommonCrawlIngestionService:
         self.snapshot_prefix = snapshot_prefix
 
         local_snapshot_root = (
-            snapshot_dir.parent
-            if snapshot_dir.name == snapshot_prefix
-            else snapshot_dir
+            snapshot_dir.parent if snapshot_dir.name == snapshot_prefix else snapshot_dir
         )
         self.snapshot_store = snapshot_store or build_snapshot_store(
             local_root_dir=local_snapshot_root,
@@ -463,7 +439,7 @@ class CommonCrawlIngestionService:
         trigger_mode: str = "manual",
         started_at: datetime | None = None,
     ) -> CommonCrawlIngestionResult:
-        run_started_at = started_at or datetime.now(timezone.utc)
+        run_started_at = started_at or datetime.now(UTC)
         self.trace.trace(
             stage="orchestration",
             status="start",
@@ -503,7 +479,7 @@ class CommonCrawlIngestionService:
             )
 
             if not entries:
-                ingestion_run.finished_at = datetime.now(timezone.utc)
+                ingestion_run.finished_at = datetime.now(UTC)
                 ingestion_run.status = IngestionStatus.COMPLETED
                 ingestion_run.log_message = "BigQuery pipeline returned 0 entries"
                 self.trace.trace(
@@ -516,13 +492,11 @@ class CommonCrawlIngestionService:
 
             # 2. Dedup against Sicurre DB
             existing_keys = await self._existing_record_keys(session)
-            new_entries = [
-                e for e in entries if self._entry_key(e) not in existing_keys
-            ]
+            new_entries = [e for e in entries if self._entry_key(e) not in existing_keys]
             skipped_count = len(entries) - len(new_entries)
 
             if not new_entries:
-                ingestion_run.finished_at = datetime.now(timezone.utc)
+                ingestion_run.finished_at = datetime.now(UTC)
                 ingestion_run.status = IngestionStatus.COMPLETED
                 ingestion_run.log_message = (
                     f"All {len(entries)} Common Crawl entries already processed."
@@ -579,7 +553,7 @@ class CommonCrawlIngestionService:
             session.add_all(raw_records)
 
             log_message = f"Common Crawl ingestion completed: {len(raw_records)} new entries, {skipped_count} skipped."
-            ingestion_run.finished_at = datetime.now(timezone.utc)
+            ingestion_run.finished_at = datetime.now(UTC)
             ingestion_run.status = IngestionStatus.COMPLETED
             ingestion_run.raw_object_count = 1
             ingestion_run.raw_record_count = len(raw_records)
@@ -614,7 +588,7 @@ class CommonCrawlIngestionService:
             )
 
         except Exception as exc:
-            ingestion_run.finished_at = datetime.now(timezone.utc)
+            ingestion_run.finished_at = datetime.now(UTC)
             ingestion_run.status = IngestionStatus.FAILED
             ingestion_run.log_message = f"Common Crawl ingestion failed: {exc}"
             self.trace.trace(
@@ -688,12 +662,8 @@ class CommonCrawlIngestionService:
 
         return str(entry.get("record_key", "")).strip()
 
-    async def _get_or_create_source_system(
-        self, session: AsyncSession
-    ) -> DataSourceSystem:
-        source_system = await self.source_repository.get_by_name(
-            session, self.source_name
-        )
+    async def _get_or_create_source_system(self, session: AsyncSession) -> DataSourceSystem:
+        source_system = await self.source_repository.get_by_name(session, self.source_name)
         if source_system is not None:
             return source_system
 
@@ -716,9 +686,9 @@ class CommonCrawlIngestionService:
         ingestion_run: DataIngestionRun,
         payload: dict[str, Any],
     ) -> SnapshotWriteResult:
-        snapshot_bytes = json.dumps(
-            payload, ensure_ascii=False, indent=2, sort_keys=True
-        ).encode("utf-8")
+        snapshot_bytes = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True).encode(
+            "utf-8"
+        )
         date_str = ingestion_run.started_at.strftime("%Y%m%d")
         filename = f"common_crawl_extract_{date_str}_{ingestion_run.id}.json"
 
@@ -763,7 +733,7 @@ class CommonCrawlIngestionService:
         entries: list[dict[str, Any]],
         source_system: DataSourceSystem,
     ) -> list[DataRawRecord]:
-        extracted_at = datetime.now(timezone.utc)
+        extracted_at = datetime.now(UTC)
         raw_records: list[DataRawRecord] = []
 
         for entry in entries:
@@ -773,9 +743,7 @@ class CommonCrawlIngestionService:
             url = entry.get("url", "")
             raw_text = entry.get("text", "")
             original_label = str(entry.get("label") or "").strip() or None
-            query_label = (
-                str(entry.get("query_label") or original_label or "").strip() or None
-            )
+            query_label = str(entry.get("query_label") or original_label or "").strip() or None
             category = str(entry.get("category") or "").strip() or None
 
             binary_label: int | None

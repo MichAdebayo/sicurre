@@ -123,7 +123,9 @@ simplon-coverage-checklist.md
 node_modules/
 assets/
 ui-ideas/
-src/app/assets/
+# Frontend source assets must be committed so clean CI builds match local builds.
+!src/app/assets/
+!src/app/assets/*.svg
 
 src/app/task.md
 src/app/walkthrough.md

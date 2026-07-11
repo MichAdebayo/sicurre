@@ -16,7 +16,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: rhysd/actionlint@v1
+      - name: Run actionlint
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color
 
   secret-scan:
     name: Secret scan
@@ -67,7 +68,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install Python dependencies
-        run: uv sync --frozen --group backend --group dev --group storage
+        run: uv sync --frozen --group runtime --group backend --group dev --group storage
 
       - name: Audit production Python dependency set
         run: |

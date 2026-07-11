@@ -22,7 +22,10 @@ const authSecret =
 const environment = (process.env.SICURRE_ENVIRONMENT ?? "development").trim().toLowerCase();
 const isProduction = environment === "production";
 const localDatabasePath = process.env.SICURRE_LOCAL_BETTER_AUTH_DB_PATH?.trim();
-const productionDatabaseUrl = process.env.SICURRE_BETTER_AUTH_DATABASE_URL?.trim();
+const configuredProductionDatabaseUrl = process.env.SICURRE_BETTER_AUTH_DATABASE_URL?.trim();
+const productionDatabaseUrl = configuredProductionDatabaseUrl
+  ?.replace(/^postgresql\+psycopg:\/\//, "postgresql://")
+  .replace(/^postgresql\+asyncpg:\/\//, "postgresql://");
 const authSchema = (process.env.SICURRE_BETTER_AUTH_SCHEMA ?? "auth").trim();
 
 if (!/^[a-z_][a-z0-9_]*$/.test(authSchema)) {

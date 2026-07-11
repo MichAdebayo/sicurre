@@ -1,11 +1,9 @@
 import asyncio
-from contextlib import asynccontextmanager
 import logging
 import subprocess
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from slowapi import _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
@@ -13,13 +11,15 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.sdk.trace.sampling import ParentBased, TraceIdRatioBased
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from core.config import get_settings
 from core.rate_limit import limiter
 from data_platform.api.routers import router as data_platform_router
-from data_platform.api.routers.internal import router as internal_router
 from data_platform.api.routers.app_routes import router as app_routes_router
 from data_platform.api.routers.integrations import router as integrations_router
+from data_platform.api.routers.internal import router as internal_router
 
 logger = logging.getLogger(__name__)
 
@@ -64,18 +64,14 @@ async def run_scheduler_loop() -> None:
             )
             stdout, stderr = await process.communicate()
             if process.returncode == 0:
-                logger.info(
-                    "Background scheduler: source ingestion run completed successfully."
-                )
+                logger.info("Background scheduler: source ingestion run completed successfully.")
             else:
                 logger.error(
                     f"Background scheduler: source ingestion run failed with code {process.returncode}. "
                     f"Stderr: {stderr.decode('utf-8', errors='replace')}"
                 )
         except Exception as exc:
-            logger.exception(
-                f"Background scheduler encountered an unexpected error: {exc}"
-            )
+            logger.exception(f"Background scheduler encountered an unexpected error: {exc}")
 
         logger.info(
             f"Background scheduler: sleeping for {settings.scheduler_interval_seconds} seconds."
