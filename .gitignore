@@ -97,6 +97,9 @@ docs/model/
 docs/brand/
 docs/deployment/
 docs/email-intercept.md
+deploy/hetzner/*.md
+deploy/nginx/ssl/*.md
+deploy/README.md
 tasks/
 scratch/
 
