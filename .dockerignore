@@ -1,0 +1,14 @@
+.git
+.venv
+.pytest_cache
+.cache_ggshield
+.DS_Store
+.env
+node_modules
+dist
+data
+scratch
+notebooks
+*.ipynb
+vite-dev.log
+Screenshot*.png

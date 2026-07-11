@@ -1,0 +1,129 @@
+
+digraph MLD {
+    rankdir=LR;
+    node [shape=none, fontname="Helvetica,Arial,sans-serif", fontsize=10];
+    edge [fontname="Helvetica,Arial,sans-serif", fontsize=9, dir=both, arrowtail=crow, arrowhead=tee];
+
+    SourceSystem [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+        <tr><td bgcolor="#B4C6E7"><b>data_source_system</b></td></tr>
+        <tr><td align="left"><u>id</u> (UUID)</td></tr>
+        <tr><td align="left">name (String)</td></tr>
+        <tr><td align="left">source_type (String)</td></tr>
+        <tr><td align="left">owner_name (String)</td></tr>
+        <tr><td align="left">legal_basis (String)</td></tr>
+        <tr><td align="left">contains_personal_data (Boolean)</td></tr>
+        <tr><td align="left">retention_days (Integer)</td></tr>
+        <tr><td align="left">is_active (Boolean)</td></tr>
+    </table>>];
+
+    IngestionRun [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+        <tr><td bgcolor="#B4C6E7"><b>data_ingestion_run</b></td></tr>
+        <tr><td align="left"><u>id</u> (UUID)</td></tr>
+        <tr><td align="left"><i>source_system_id</i> (UUID)</td></tr>
+        <tr><td align="left">started_at (DateTime)</td></tr>
+        <tr><td align="left">finished_at (DateTime)</td></tr>
+        <tr><td align="left">status (String)</td></tr>
+        <tr><td align="left">trigger_mode (String)</td></tr>
+        <tr><td align="left">raw_object_count (Integer)</td></tr>
+        <tr><td align="left">raw_record_count (Integer)</td></tr>
+        <tr><td align="left">log_message (String)</td></tr>
+    </table>>];
+
+    RawObject [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+        <tr><td bgcolor="#B4C6E7"><b>data_raw_object</b></td></tr>
+        <tr><td align="left"><u>id</u> (UUID)</td></tr>
+        <tr><td align="left"><i>ingestion_run_id</i> (UUID)</td></tr>
+        <tr><td align="left">external_ref (String)</td></tr>
+        <tr><td align="left">object_type (String)</td></tr>
+        <tr><td align="left">storage_uri (String)</td></tr>
+        <tr><td align="left">source_format (String)</td></tr>
+        <tr><td align="left">content_hash (String)</td></tr>
+        <tr><td align="left">size_bytes (BigInt)</td></tr>
+        <tr><td align="left">source_metadata (JSON)</td></tr>
+        <tr><td align="left">collected_at (DateTime)</td></tr>
+        <tr><td align="left">retention_until (DateTime)</td></tr>
+    </table>>];
+
+    RawRecord [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+        <tr><td bgcolor="#B4C6E7"><b>data_raw_record</b></td></tr>
+        <tr><td align="left"><u>id</u> (UUID)</td></tr>
+        <tr><td align="left"><i>raw_object_id</i> (UUID)</td></tr>
+        <tr><td align="left">record_key (String)</td></tr>
+        <tr><td align="left">raw_content (String)</td></tr>
+        <tr><td align="left">detected_language (String)</td></tr>
+        <tr><td align="left">is_usable (Boolean)</td></tr>
+        <tr><td align="left">rejection_reason (String)</td></tr>
+        <tr><td align="left">extracted_at (DateTime)</td></tr>
+    </table>>];
+
+    ProcessingRun [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+        <tr><td bgcolor="#B4C6E7"><b>data_processing_run</b></td></tr>
+        <tr><td align="left"><u>id</u> (UUID)</td></tr>
+        <tr><td align="left">pipeline_version (String)</td></tr>
+        <tr><td align="left">started_at (DateTime)</td></tr>
+        <tr><td align="left">finished_at (DateTime)</td></tr>
+        <tr><td align="left">status (String)</td></tr>
+        <tr><td align="left">normalized_count (Integer)</td></tr>
+        <tr><td align="left">rejected_count (Integer)</td></tr>
+        <tr><td align="left">report_uri (String)</td></tr>
+    </table>>];
+
+    NormalizedMessage [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+        <tr><td bgcolor="#B4C6E7"><b>data_normalized_message</b></td></tr>
+        <tr><td align="left"><u>id</u> (UUID)</td></tr>
+        <tr><td align="left"><i>raw_record_id</i> (UUID)</td></tr>
+        <tr><td align="left"><i>processing_run_id</i> (UUID)</td></tr>
+        <tr><td align="left">normalized_text (String)</td></tr>
+        <tr><td align="left">text_sha256 (String)</td></tr>
+        <tr><td align="left">language (String)</td></tr>
+        <tr><td align="left">current_label (String)</td></tr>
+        <tr><td align="left">quality_score (Float)</td></tr>
+        <tr><td align="left">contains_pii (Boolean)</td></tr>
+        <tr><td align="left">redaction_status (String)</td></tr>
+        <tr><td align="left">text_length (Integer)</td></tr>
+        <tr><td align="left">normalized_at (DateTime)</td></tr>
+    </table>>];
+
+    Annotation [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+        <tr><td bgcolor="#B4C6E7"><b>data_annotation</b></td></tr>
+        <tr><td align="left"><u>id</u> (UUID)</td></tr>
+        <tr><td align="left"><i>normalized_message_id</i> (UUID)</td></tr>
+        <tr><td align="left">label (String)</td></tr>
+        <tr><td align="left">label_source (String)</td></tr>
+        <tr><td align="left">confidence (Float)</td></tr>
+        <tr><td align="left">comment (String)</td></tr>
+        <tr><td align="left">is_validated (Boolean)</td></tr>
+        <tr><td align="left">annotated_at (DateTime)</td></tr>
+    </table>>];
+
+    Dataset [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+        <tr><td bgcolor="#B4C6E7"><b>data_dataset</b></td></tr>
+        <tr><td align="left"><u>id</u> (UUID)</td></tr>
+        <tr><td align="left">name (String)</td></tr>
+        <tr><td align="left">version_tag (String)</td></tr>
+        <tr><td align="left">target_usage (String)</td></tr>
+        <tr><td align="left">status (String)</td></tr>
+        <tr><td align="left">frozen_at (DateTime)</td></tr>
+        <tr><td align="left">item_count (Integer)</td></tr>
+    </table>>];
+
+    DatasetItem [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+        <tr><td bgcolor="#B4C6E7"><b>data_dataset_item</b></td></tr>
+        <tr><td align="left"><u>id</u> (UUID)</td></tr>
+        <tr><td align="left"><i>dataset_id</i> (UUID)</td></tr>
+        <tr><td align="left"><i>normalized_message_id</i> (UUID)</td></tr>
+        <tr><td align="left">split_name (String)</td></tr>
+        <tr><td align="left">sample_weight (Float)</td></tr>
+        <tr><td align="left">row_order (Integer)</td></tr>
+    </table>>];
+
+    // Relationships: arrow indicates Crow (many), tail indicates Tee (one)
+    SourceSystem -> IngestionRun [dir=back, arrowtail=tee, arrowhead=crow];
+    IngestionRun -> RawObject [dir=back, arrowtail=tee, arrowhead=crow];
+    RawObject -> RawRecord [dir=back, arrowtail=tee, arrowhead=crow];
+    RawRecord -> NormalizedMessage [dir=back, arrowtail=tee, arrowhead=tee, label="0..1"];
+    ProcessingRun -> NormalizedMessage [dir=back, arrowtail=tee, arrowhead=crow];
+    NormalizedMessage -> Annotation [dir=back, arrowtail=tee, arrowhead=crow];
+    NormalizedMessage -> DatasetItem [dir=back, arrowtail=tee, arrowhead=crow];
+    Dataset -> DatasetItem [dir=back, arrowtail=tee, arrowhead=crow];
+}

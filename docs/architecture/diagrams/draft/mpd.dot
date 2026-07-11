@@ -1,0 +1,140 @@
+
+digraph MPD {
+    rankdir=LR;
+    node [shape=none, fontname="Helvetica,Arial,sans-serif", fontsize=10];
+    edge [fontname="Helvetica,Arial,sans-serif", fontsize=9, dir=both, arrowtail=crow, arrowhead=tee];
+
+    SourceSystem [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+        <tr><td bgcolor="#A9DFBF"><b>data_source_system</b></td></tr>
+        <tr><td align="left"><u>id</u> (uuid) PK [gen_random_uuid()]</td></tr>
+        <tr><td align="left">name (text) NOT NULL UNIQUE</td></tr>
+        <tr><td align="left">source_type (text) NOT NULL CHECK(...)</td></tr>
+        <tr><td align="left">owner_name (text)</td></tr>
+        <tr><td align="left">legal_basis (text)</td></tr>
+        <tr><td align="left">contains_personal_data (boolean) NOT NULL [false]</td></tr>
+        <tr><td align="left">retention_days (integer)</td></tr>
+        <tr><td align="left">is_active (boolean) NOT NULL [true]</td></tr>
+        <tr><td align="left">created_at (timestamptz) NOT NULL [now()]</td></tr>
+        <tr><td align="left">updated_at (timestamptz)</td></tr>
+    </table>>];
+
+    IngestionRun [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+        <tr><td bgcolor="#A9DFBF"><b>data_ingestion_run</b></td></tr>
+        <tr><td align="left"><u>id</u> (uuid) PK</td></tr>
+        <tr><td align="left"><i>source_system_id</i> (uuid) NOT NULL FK RESTRICT</td></tr>
+        <tr><td align="left">started_at (timestamptz) NOT NULL</td></tr>
+        <tr><td align="left">finished_at (timestamptz)</td></tr>
+        <tr><td align="left">status (text) NOT NULL CHECK(...)</td></tr>
+        <tr><td align="left">trigger_mode (text) NOT NULL</td></tr>
+        <tr><td align="left">raw_object_count (integer) NOT NULL [0]</td></tr>
+        <tr><td align="left">raw_record_count (integer) NOT NULL [0]</td></tr>
+        <tr><td align="left">log_message (text)</td></tr>
+        <tr><td align="left">created_at (timestamptz) NOT NULL [now()]</td></tr>
+    </table>>];
+
+    RawObject [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+        <tr><td bgcolor="#A9DFBF"><b>data_raw_object</b></td></tr>
+        <tr><td align="left"><u>id</u> (uuid) PK</td></tr>
+        <tr><td align="left"><i>ingestion_run_id</i> (uuid) NOT NULL FK CASCADE</td></tr>
+        <tr><td align="left">external_ref (text)</td></tr>
+        <tr><td align="left">object_type (text) NOT NULL CHECK(...)</td></tr>
+        <tr><td align="left">storage_uri (text)</td></tr>
+        <tr><td align="left">source_format (text)</td></tr>
+        <tr><td align="left">content_hash (text) NOT NULL</td></tr>
+        <tr><td align="left">size_bytes (bigint)</td></tr>
+        <tr><td align="left">source_metadata (jsonb) NOT NULL ['{}']</td></tr>
+        <tr><td align="left">collected_at (timestamptz) NOT NULL</td></tr>
+        <tr><td align="left">retention_until (timestamptz)</td></tr>
+        <tr><td align="left">created_at (timestamptz) NOT NULL [now()]</td></tr>
+    </table>>];
+
+    RawRecord [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+        <tr><td bgcolor="#A9DFBF"><b>data_raw_record</b></td></tr>
+        <tr><td align="left"><u>id</u> (uuid) PK</td></tr>
+        <tr><td align="left"><i>raw_object_id</i> (uuid) NOT NULL FK CASCADE</td></tr>
+        <tr><td align="left">record_key (text) NOT NULL</td></tr>
+        <tr><td align="left">raw_content (text) NOT NULL</td></tr>
+        <tr><td align="left">detected_language (text)</td></tr>
+        <tr><td align="left">is_usable (boolean) NOT NULL [true]</td></tr>
+        <tr><td align="left">rejection_reason (text)</td></tr>
+        <tr><td align="left">extracted_at (timestamptz) NOT NULL</td></tr>
+        <tr><td align="left">created_at (timestamptz) NOT NULL [now()]</td></tr>
+    </table>>];
+
+    ProcessingRun [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+        <tr><td bgcolor="#A9DFBF"><b>data_processing_run</b></td></tr>
+        <tr><td align="left"><u>id</u> (uuid) PK</td></tr>
+        <tr><td align="left">pipeline_version (text) NOT NULL</td></tr>
+        <tr><td align="left">started_at (timestamptz) NOT NULL</td></tr>
+        <tr><td align="left">finished_at (timestamptz)</td></tr>
+        <tr><td align="left">status (text) NOT NULL CHECK(...)</td></tr>
+        <tr><td align="left">normalized_count (integer) NOT NULL [0]</td></tr>
+        <tr><td align="left">rejected_count (integer) NOT NULL [0]</td></tr>
+        <tr><td align="left">report_uri (text)</td></tr>
+        <tr><td align="left">created_at (timestamptz) NOT NULL [now()]</td></tr>
+    </table>>];
+
+    NormalizedMessage [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+        <tr><td bgcolor="#A9DFBF"><b>data_normalized_message</b></td></tr>
+        <tr><td align="left"><u>id</u> (uuid) PK</td></tr>
+        <tr><td align="left"><i>raw_record_id</i> (uuid) NOT NULL FK RESTRICT</td></tr>
+        <tr><td align="left"><i>processing_run_id</i> (uuid) NOT NULL FK RESTRICT</td></tr>
+        <tr><td align="left">normalized_text (text) NOT NULL</td></tr>
+        <tr><td align="left">text_sha256 (text) NOT NULL UNIQUE</td></tr>
+        <tr><td align="left">language (text) NOT NULL</td></tr>
+        <tr><td align="left">current_label (text) NOT NULL CHECK(...)</td></tr>
+        <tr><td align="left">quality_score (real)</td></tr>
+        <tr><td align="left">contains_pii (boolean) NOT NULL [false]</td></tr>
+        <tr><td align="left">redaction_status (text) NOT NULL [not_required] CHECK(...)</td></tr>
+        <tr><td align="left">text_length (integer) NOT NULL</td></tr>
+        <tr><td align="left">normalized_at (timestamptz) NOT NULL</td></tr>
+        <tr><td align="left">created_at (timestamptz) NOT NULL [now()]</td></tr>
+        <tr><td align="left">updated_at (timestamptz)</td></tr>
+    </table>>];
+
+    Annotation [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+        <tr><td bgcolor="#A9DFBF"><b>data_annotation</b></td></tr>
+        <tr><td align="left"><u>id</u> (uuid) PK</td></tr>
+        <tr><td align="left"><i>normalized_message_id</i> (uuid) NOT NULL FK CASCADE</td></tr>
+        <tr><td align="left">label (text) NOT NULL CHECK(...)</td></tr>
+        <tr><td align="left">label_source (text) NOT NULL</td></tr>
+        <tr><td align="left">confidence (real) CHECK(...)</td></tr>
+        <tr><td align="left">comment (text)</td></tr>
+        <tr><td align="left">is_validated (boolean) NOT NULL [false]</td></tr>
+        <tr><td align="left">annotated_at (timestamptz) NOT NULL</td></tr>
+        <tr><td align="left">created_at (timestamptz) NOT NULL [now()]</td></tr>
+    </table>>];
+
+    Dataset [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+        <tr><td bgcolor="#A9DFBF"><b>data_dataset</b></td></tr>
+        <tr><td align="left"><u>id</u> (uuid) PK</td></tr>
+        <tr><td align="left">name (text) NOT NULL</td></tr>
+        <tr><td align="left">version_tag (text) NOT NULL UNIQUE</td></tr>
+        <tr><td align="left">target_usage (text) NOT NULL</td></tr>
+        <tr><td align="left">status (text) NOT NULL CHECK(...)</td></tr>
+        <tr><td align="left">frozen_at (timestamptz)</td></tr>
+        <tr><td align="left">item_count (integer) NOT NULL [0]</td></tr>
+        <tr><td align="left">created_at (timestamptz) NOT NULL [now()]</td></tr>
+    </table>>];
+
+    DatasetItem [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+        <tr><td bgcolor="#A9DFBF"><b>data_dataset_item</b></td></tr>
+        <tr><td align="left"><u>id</u> (uuid) PK</td></tr>
+        <tr><td align="left"><i>dataset_id</i> (uuid) NOT NULL FK CASCADE</td></tr>
+        <tr><td align="left"><i>normalized_message_id</i> (uuid) NOT NULL FK RESTRICT</td></tr>
+        <tr><td align="left">split_name (text) NOT NULL CHECK(...)</td></tr>
+        <tr><td align="left">sample_weight (real) NOT NULL [1.0]</td></tr>
+        <tr><td align="left">row_order (integer)</td></tr>
+        <tr><td align="left">created_at (timestamptz) NOT NULL [now()]</td></tr>
+    </table>>];
+
+    // Relationships: arrow indicates Crow (many), tail indicates Tee (one)
+    SourceSystem -> IngestionRun [dir=back, arrowtail=tee, arrowhead=crow];
+    IngestionRun -> RawObject [dir=back, arrowtail=tee, arrowhead=crow];
+    RawObject -> RawRecord [dir=back, arrowtail=tee, arrowhead=crow];
+    RawRecord -> NormalizedMessage [dir=back, arrowtail=tee, arrowhead=tee, label="0..1"];
+    ProcessingRun -> NormalizedMessage [dir=back, arrowtail=tee, arrowhead=crow];
+    NormalizedMessage -> Annotation [dir=back, arrowtail=tee, arrowhead=crow];
+    NormalizedMessage -> DatasetItem [dir=back, arrowtail=tee, arrowhead=crow];
+    Dataset -> DatasetItem [dir=back, arrowtail=tee, arrowhead=crow];
+}

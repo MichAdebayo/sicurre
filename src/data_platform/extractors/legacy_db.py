@@ -1,0 +1,555 @@
+"""Extractor service that connects to an external monolithic database to fetch threats."""
+
+from __future__ import annotations
+
+import json
+import logging
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from sqlalchemy import select, text
+from sqlalchemy.engine import make_url
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+
+from core.config import ROOT_DIR
+from core.trace_logger import SemanticTraceLogger
+from data_platform.services.database.source_naming import build_database_source_path
+from db.models import (
+    DataIngestionRun,
+    DataRawObject,
+    DataRawRecord,
+    DataSourceSystem,
+    IngestionStatus,
+    ObjectType,
+    SourceType,
+)
+from db.queries import SourceSystemQueries
+from data_platform.api.schemas import (
+    DataSourceCreate,
+    IngestionRunCreate,
+)
+from db.services.lineage import (
+    IngestionRunService,
+    SourceSystemService,
+)
+from data_platform.services.shared.snapshot_storage import (
+    SnapshotStore,
+    SnapshotWriteResult,
+    build_snapshot_store,
+)
+
+logger = logging.getLogger(__name__)
+
+REPO_ROOT = ROOT_DIR
+DEFAULT_LEGACY_DB_PATH = REPO_ROOT / "data" / "raw" / "db" / "external_threats.db"
+DEFAULT_LEGACY_DB_URL = f"sqlite+aiosqlite:///{DEFAULT_LEGACY_DB_PATH}"
+
+DEFAULT_LEGACY_SOURCE_NAME = "database-historical"
+DEFAULT_LEGACY_SNAPSHOT_DIR = REPO_ROOT / "data" / "raw" / "db_historical"
+DEFAULT_LEGACY_SNAPSHOT_PREFIX = "db_historical"
+
+
+@dataclass(slots=True)
+class LegacyDbIngestionResult:
+    ingestion_run_id: str
+    source_system_id: str
+    snapshot_path: Path | None
+    snapshot_storage_uri: str
+    raw_object_count: int
+    raw_record_count: int
+    skipped_count: int
+    total_extracted_count: int
+    log_message: str
+
+
+class LegacyDbConnector:
+    """Client to query the external historical legacy database."""
+
+    def __init__(self, db_url: str = DEFAULT_LEGACY_DB_URL) -> None:
+        self.db_url = db_url
+
+    def _resolved_db_path(self) -> Path | None:
+        url = make_url(self.db_url)
+        if not url.drivername.startswith("sqlite"):
+            return None
+
+        database = str(url.database or "").strip()
+        if not database or database == ":memory:":
+            return None
+
+        return Path(database)
+
+    async def fetch_threats(self, since_date: str | None = None) -> list[dict[str, Any]]:
+        """Extract threat logs from the monolithic legacy database."""
+        db_path = self._resolved_db_path()
+        if db_path is not None and not db_path.exists():
+            raise FileNotFoundError(
+                f"External DB not found at {db_path}. " "Run `make db-seed` first!"
+            )
+
+        engine = create_async_engine(self.db_url, echo=False)
+
+        try:
+            async with engine.connect() as conn:
+                query_str = """
+                    SELECT 
+                        t.id as threat_id,
+                        t.message_id,
+                        t.subject,
+                        t.body_preview,
+                        t.verdict,
+                        t.confidence,
+                        t.signals,
+                        t.archetype,
+                        t.source_dataset,
+                        t.received_at,
+                        t.created_at,
+                        u.email as user_email
+                    FROM threat_log t
+                    JOIN users u ON t.user_id = u.id
+                """
+                if since_date:
+                    query_str += f" WHERE t.created_at > '{since_date}' ORDER BY t.created_at ASC"
+                    
+                query = text(query_str)
+                result = await conn.execute(query)
+                # Convert rows to dict mappings
+                rows = result.mappings().fetchall()
+                return [dict(row) for row in rows]
+        finally:
+            await engine.dispose()
+
+
+class LegacyDbIngestionService:
+    def __init__(
+        self,
+        *,
+        connector: LegacyDbConnector | None = None,
+        snapshot_dir: Path = DEFAULT_LEGACY_SNAPSHOT_DIR,
+        snapshot_store: SnapshotStore | None = None,
+        snapshot_prefix: str = DEFAULT_LEGACY_SNAPSHOT_PREFIX,
+        source_name: str = DEFAULT_LEGACY_SOURCE_NAME,
+    ) -> None:
+        self.connector = connector or LegacyDbConnector()
+        self.snapshot_dir = snapshot_dir
+        self.snapshot_prefix = snapshot_prefix
+
+        local_snapshot_root = (
+            snapshot_dir.parent
+            if snapshot_dir.name == snapshot_prefix
+            else snapshot_dir
+        )
+        self.snapshot_store = snapshot_store or build_snapshot_store(
+            local_root_dir=local_snapshot_root,
+            repo_root=REPO_ROOT,
+            source_key="database_historical",
+        )
+
+        self.source_name = source_name
+        self.source_service = SourceSystemService()
+        self.ingestion_service = IngestionRunService()
+        self.source_repository = SourceSystemQueries()
+        self.trace = SemanticTraceLogger(
+            parent_type="Database",
+            child_target="Historical DB",
+            domain="data_platform",
+        )
+
+    @staticmethod
+    def _resolved_child_source_name(entry: dict[str, Any]) -> str:
+        return build_database_source_path(str(entry.get("source_dataset") or ""))
+
+    async def _existing_record_keys(self, session: AsyncSession) -> set[str]:
+        stmt = (
+            select(DataRawRecord.record_key)
+            .join(DataRawObject)
+            .join(DataIngestionRun)
+            .join(DataSourceSystem)
+            .where(DataSourceSystem.name == self.source_name)
+        )
+        rows = await session.scalars(stmt)
+        return set(rows)
+
+    async def run(
+        self,
+        session: AsyncSession,
+        *,
+        trigger_mode: str = "manual",
+        started_at: datetime | None = None,
+        since_date: str | None = None,
+    ) -> LegacyDbIngestionResult:
+        run_started_at = started_at or datetime.now(timezone.utc)
+        self.trace.trace(
+            stage="orchestration",
+            status="start",
+            message="Historical DB extraction starting",
+        )
+        source_system = await self._get_or_create_source_system(session)
+        ingestion_run = await self.ingestion_service.create(
+            session,
+            IngestionRunCreate(
+                source_system_id=source_system.id,
+                started_at=run_started_at,
+                status=IngestionStatus.RUNNING,
+                trigger_mode=trigger_mode,
+                log_message="Database historical extraction started",
+            ),
+        )
+        self.trace.set_trace_id(str(ingestion_run.id))
+
+        try:
+            self.trace.trace(
+                stage="extraction",
+                status="start",
+                message=f"Connecting to external legacy DB (since {since_date or 'beginning'})",
+            )
+            entries = await self.connector.fetch_threats(since_date=since_date)
+            total_extracted_count = len(entries)
+            self.trace.trace(
+                stage="extraction",
+                status="success",
+                message=f"Extracted {total_extracted_count} entries from legacy DB",
+                metrics={"total_extracted": total_extracted_count},
+            )
+
+            if not entries:
+                ingestion_run.finished_at = datetime.now(timezone.utc)
+                ingestion_run.status = IngestionStatus.COMPLETED
+                ingestion_run.log_message = "DB extraction returned 0 entries"
+                self.trace.trace(
+                    stage="orchestration",
+                    status="success",
+                    message="Historical DB run complete — nothing to ingest",
+                )
+                await session.commit()
+                return self._empty_result(ingestion_run, source_system)
+
+            existing_keys = await self._existing_record_keys(session)
+            new_entries = [
+                e for e in entries if self._entry_key(e) not in existing_keys
+            ]
+            skipped_count = len(entries) - len(new_entries)
+
+            if not new_entries:
+                ingestion_run.finished_at = datetime.now(timezone.utc)
+                ingestion_run.status = IngestionStatus.COMPLETED
+                ingestion_run.log_message = (
+                    f"No new entries — all {skipped_count} already ingested"
+                )
+                self.trace.trace(
+                    stage="orchestration",
+                    status="success",
+                    message="Historical DB run complete — nothing new to ingest",
+                    metrics={"skipped": skipped_count},
+                )
+                await session.commit()
+                return self._empty_result(
+                    ingestion_run,
+                    source_system,
+                    skipped_count=skipped_count,
+                    total_extracted_count=total_extracted_count,
+                )
+
+            self.trace.trace(
+                stage="ingestion",
+                status="start",
+                message=f"Writing {len(new_entries)} entries to Sicurre DB ({skipped_count} skipped)",
+            )
+
+            # Write trace to Snapshot Store
+            snapshot_payload = {
+                "source": "External Legacy Database",
+                "extracted_at": run_started_at.isoformat(),
+                "records": [],
+            }
+            # Need to format date strings for JSON serialization
+            for entry in new_entries:
+                entry_copy = dict(entry)
+                if hasattr(entry_copy.get("received_at"), "isoformat"):
+                    entry_copy["received_at"] = entry_copy["received_at"].isoformat()
+                snapshot_payload["records"].append(entry_copy)
+
+            snapshot_result = await self._write_snapshot(
+                ingestion_run=ingestion_run,
+                payload=snapshot_payload,
+            )
+            self.trace.trace(
+                stage="snapshot",
+                status="success",
+                message=f"Snapshot written: {snapshot_result.storage_uri}",
+            )
+
+            raw_object = self._build_raw_object(
+                ingestion_run=ingestion_run,
+                source_system=source_system,
+                snapshot_result=snapshot_result,
+                collected_at=run_started_at,
+                entries=new_entries,
+            )
+            session.add(raw_object)
+            await session.flush()
+
+            source_systems_by_name = await self._get_or_create_child_source_systems(
+                session,
+                source_names={
+                    self._resolved_child_source_name(entry) for entry in new_entries
+                },
+            )
+
+            raw_records = self._build_raw_records(
+                raw_object=raw_object,
+                entries=new_entries,
+                source_systems_by_name=source_systems_by_name,
+            )
+            session.add_all(raw_records)
+
+            log_message = (
+                f"Historical DB extraction completed: "
+                f"{len(raw_records)} entries extracted."
+            )
+            ingestion_run.finished_at = datetime.now(timezone.utc)
+            ingestion_run.status = IngestionStatus.COMPLETED
+            ingestion_run.raw_object_count = 1
+            ingestion_run.raw_record_count = len(raw_records)
+            ingestion_run.log_message = log_message
+            self.trace.trace(
+                stage="ingestion",
+                status="success",
+                message=f"Historical DB ingestion completed: {len(raw_records)} records",
+                metrics={
+                    "new_records": len(raw_records),
+                    "skipped": skipped_count,
+                    "total_extracted": total_extracted_count,
+                },
+            )
+            self.trace.trace(
+                stage="orchestration",
+                status="success",
+                message="Historical DB run complete",
+            )
+            await session.commit()
+
+            return LegacyDbIngestionResult(
+                ingestion_run_id=str(ingestion_run.id),
+                source_system_id=str(source_system.id),
+                snapshot_path=snapshot_result.local_path,
+                snapshot_storage_uri=snapshot_result.storage_uri,
+                raw_object_count=1,
+                raw_record_count=len(raw_records),
+                skipped_count=skipped_count,
+                total_extracted_count=total_extracted_count,
+                log_message=log_message,
+            )
+
+        except Exception as exc:
+            ingestion_run.finished_at = datetime.now(timezone.utc)
+            ingestion_run.status = IngestionStatus.FAILED
+            ingestion_run.log_message = f"Historical DB ingestion failed: {exc}"
+            self.trace.trace(
+                stage="orchestration",
+                status="failed",
+                message=f"Historical DB ingestion failed: {exc}",
+            )
+            await session.commit()
+            raise
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _empty_result(
+        self,
+        run: DataIngestionRun,
+        source: DataSourceSystem,
+        *,
+        skipped_count: int = 0,
+        total_extracted_count: int = 0,
+    ) -> LegacyDbIngestionResult:
+        return LegacyDbIngestionResult(
+            ingestion_run_id=str(run.id),
+            source_system_id=str(source.id),
+            snapshot_path=None,
+            snapshot_storage_uri="",
+            raw_object_count=0,
+            raw_record_count=0,
+            skipped_count=skipped_count,
+            total_extracted_count=total_extracted_count,
+            log_message=run.log_message or "",
+        )
+
+    @staticmethod
+    def _entry_key(entry: dict[str, Any]) -> str:
+        eid = entry.get("message_id") or entry.get("threat_id")
+        return str(eid).strip()
+
+    async def _get_or_create_source_system(
+        self, session: AsyncSession
+    ) -> DataSourceSystem:
+        source_system = await self.source_repository.get_by_name(
+            session, self.source_name
+        )
+        if source_system is not None:
+            return source_system
+
+        return await self.source_service.create(
+            session,
+            DataSourceCreate(
+                name=self.source_name,
+                source_type=SourceType.SQL,
+                description="Historical extraction from the external monolithic threat database",
+                owner_name="Internal SecOps DB",
+                legal_basis="historical_threat_intel",
+                contains_personal_data=False,
+                retention_days=365,
+            ),
+        )
+
+    async def _get_or_create_child_source_systems(
+        self,
+        session: AsyncSession,
+        *,
+        source_names: set[str],
+    ) -> dict[str, DataSourceSystem]:
+        source_systems: dict[str, DataSourceSystem] = {}
+        for source_name in sorted(source_names):
+            source_system = await self.source_repository.get_by_name(
+                session, source_name
+            )
+            if source_system is None:
+                source_system = await self.source_service.create(
+                    session,
+                    DataSourceCreate(
+                        name=source_name,
+                        source_type=SourceType.SQL,
+                        description=(
+                            "Historical extraction child source derived from the external "
+                            "database source_dataset lineage"
+                        ),
+                        owner_name="Internal SecOps DB",
+                        legal_basis="historical_threat_intel",
+                        contains_personal_data=False,
+                        retention_days=365,
+                    ),
+                )
+            source_systems[source_name] = source_system
+        return source_systems
+
+    async def _write_snapshot(
+        self,
+        *,
+        ingestion_run: DataIngestionRun,
+        payload: dict[str, Any],
+    ) -> SnapshotWriteResult:
+        snapshot_bytes = json.dumps(
+            payload,
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        ).encode("utf-8")
+        date_str = ingestion_run.started_at.strftime("%Y%m%d")
+        filename = f"db_historical_{date_str}_{ingestion_run.id}.json"
+
+        object_key = self.snapshot_store.build_object_key(
+            source_prefix=self.snapshot_prefix,
+            filename=filename,
+        )
+        return await self.snapshot_store.write_snapshot(
+            object_key=object_key,
+            payload=snapshot_bytes,
+            content_type="application/json",
+        )
+
+    def _build_raw_object(
+        self,
+        *,
+        ingestion_run: DataIngestionRun,
+        source_system: DataSourceSystem,
+        snapshot_result: SnapshotWriteResult,
+        collected_at: datetime,
+        entries: list[dict[str, Any]],
+    ) -> DataRawObject:
+        child_source_counts = {
+            source_name: sum(
+                1
+                for entry in entries
+                if self._resolved_child_source_name(entry) == source_name
+            )
+            for source_name in sorted(
+                {self._resolved_child_source_name(entry) for entry in entries}
+            )
+        }
+        return DataRawObject(
+            ingestion_run_id=ingestion_run.id,
+            external_ref=f"sqlite://external_threats.db#run:{ingestion_run.id}",
+            object_type=ObjectType.SQL_EXPORT,
+            storage_uri=snapshot_result.storage_uri,
+            source_format="json",
+            content_hash=snapshot_result.content_hash,
+            size_bytes=snapshot_result.size_bytes,
+            source_metadata={
+                "source_name": source_system.name,
+                "entry_count": len(entries),
+                "child_source_counts": child_source_counts,
+            },
+            collected_at=collected_at,
+        )
+
+    def _build_raw_records(
+        self,
+        *,
+        raw_object: DataRawObject,
+        entries: list[dict[str, Any]],
+        source_systems_by_name: dict[str, DataSourceSystem],
+    ) -> list[DataRawRecord]:
+        extracted_at = datetime.now(timezone.utc)
+        raw_records: list[DataRawRecord] = []
+
+        for index, entry in enumerate(entries, start=1):
+            record_key = self._entry_key(entry)
+            child_source_name = self._resolved_child_source_name(entry)
+            child_source_system = source_systems_by_name[child_source_name]
+
+            # Map external schema to sicurre standard raw text
+            subject = entry.get("subject", "")
+            body = entry.get("body_preview", "")
+            full_text = f"{subject}\n\n{body}" if subject else body
+
+            verdict = str(entry.get("verdict") or "").strip().lower()
+            label = verdict or None
+
+            enriched = {
+                "subject": subject,
+                "body": body,
+                "text": full_text,
+                "label": label,
+                "confidence": entry.get("confidence"),
+                "source": child_source_name,
+                "archetype": entry.get("archetype"),
+                "signals": entry.get("signals"),
+                "created_at": str(entry.get("created_at")) if entry.get("created_at") else None,
+            }
+
+            raw_content = json.dumps(
+                enriched,
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+            is_usable = bool(full_text)
+            rejection_reason = None if is_usable else "missing_body"
+
+            raw_records.append(
+                DataRawRecord(
+                    raw_object_id=raw_object.id,
+                    source_system_id=child_source_system.id,
+                    record_key=record_key,
+                    raw_content=raw_content,
+                    detected_language="fr",
+                    is_usable=is_usable,
+                    rejection_reason=rejection_reason,
+                    extracted_at=extracted_at,
+                )
+            )
+
+        return raw_records

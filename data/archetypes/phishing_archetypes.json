@@ -1,0 +1,437 @@
+{
+  "meta": {
+    "class_label": 0,
+    "class_name": "phishing",
+    "description": "French phishing email archetypes for synthetic generation",
+    "tier_distribution": {"simple": 0.30, "medium": 0.40, "hard": 0.30}
+  },
+  "archetypes": [
+    {
+      "id": "p_simple_loterie",
+      "tier": "simple",
+      "name": "Loterie / concours gagnant",
+      "weight": 1.0,
+      "description": "Classic lottery win notification asking for personal details",
+      "templates": [
+        "Objet : Félicitations {prenom} ! Vous avez gagné {prix} !\n\nCher(e) {prenom} {nom},\n\nNous avons le plaisir de vous informer que votre adresse email a été sélectionnée comme gagnante de notre tirage {organisme}.\n\nVotre gain : {prix}\nRéférence du tirage : {ref}\n\nPour réclamer votre prix, veuillez nous envoyer les informations suivantes dans un délai de {delai} jours :\n- Nom complet\n- Adresse postale\n- Numéro de téléphone\n- Copie de votre pièce d'identité\n\nAttention : tout retard entraînera l'annulation de votre gain.\n\nCordialement,\n{agent}\nService des Réclamations\n{organisme}",
+        "Objet : {prenom}, vous avez remporté un {cadeau} Parkside !\n\nChère participante, Cher participant,\n\nSuite à notre campagne promotionnelle, votre email ({email}) a été tiré au sort !\n\nVotre lot : {cadeau}\nNuméro de participation : #{ref}\n\nRécupérez votre cadeau en confirmant vos coordonnées : [URL]\n\nCette offre expire dans {delai} heures.\n\n{organisme} - Service Clients",
+        "Objet : URGENT - Gain de {montant} EUR en attente !\n\nBonjour,\n\nVous êtes l'heureux gagnant d'un prix de {montant} EUR organisé par {organisme}.\n\nPour valider votre gain, envoyez-nous :\n1. Votre nom complet\n2. Votre adresse\n3. Votre numéro de téléphone\n4. Votre RIB\n\nContactez notre agent : {agent} via {email_agent}\n\nNe tardez pas, l'offre expire le {date_expiry}.\n\nBien à vous,\nDépartement des prix\n{organisme}"
+      ],
+      "variables": {
+        "prix": ["100 000 EUR", "50 000 EUR", "25 000 EUR", "un voyage aux Maldives", "une voiture Renault Clio", "un chèque de 75 000 EUR"],
+        "organisme": ["EuroMillions International", "Loterie Nationale Européenne", "Fondation des Gagnants Internationaux", "Tirage Microsoft-Google", "Programme de Fidélité Orange"],
+        "cadeau": ["ensemble 3 pièces Parkside", "coffret Thermomix", "iPhone 16 Pro", "TV Samsung 55 pouces", "robot Dyson V15"],
+        "delai": ["48", "72", "24", "96", "5"],
+        "montant": ["50 000", "100 000", "250 000", "15 000", "500 000"]
+      }
+    },
+    {
+      "id": "p_simple_heritage",
+      "tier": "simple",
+      "name": "Faux héritage / avance de fonds",
+      "weight": 0.8,
+      "description": "Advance-fee fraud claiming inheritance or unclaimed funds",
+      "templates": [
+        "Objet : Notification concernant vos {montant} USD non réclamés\n\nCher(e) Bénéficiaire,\n\nJe suis {agent}, {titre} auprès de {organisme}. Notre comité a récemment identifié que votre paiement de {montant} USD n'a jamais été versé en raison de négligences administratives.\n\nVos fonds sont actuellement bloqués dans notre centre de paiement offshore lié à {banque}.\n\nPour débloquer le transfert sous 24 heures, un frais de traitement de {frais} EUR est requis.\n\nMerci de confirmer :\n1. Nom complet\n2. Adresse\n3. Téléphone\n4. Profession\n\nContact : {agent}\nEmail : {email_agent}\nTéléphone : {phone}\n\nCode de vérification : {code}\n\nCordialement,\n{agent}\n{organisme}",
+        "Objet : Votre dossier d'héritage concernant feu M. {nom_defunt}\n\nMadame, Monsieur,\n\nJe suis Maître {agent}, notaire à {ville}. Suite au décès de M. {nom_defunt}, ressortissant français décédé sans héritier direct, une somme de {montant} EUR a été identifiée sur un compte dormant.\n\nVotre nom a été sélectionné comme bénéficiaire potentiel. Pour initier la procédure de transfert, merci de nous fournir :\n- Copie de votre pièce d'identité\n- Justificatif de domicile\n- Coordonnées bancaires (RIB)\n\nLes frais de notariat ({frais} EUR) seront déduits du montant total.\n\nMerci de votre diligence.\n\nMaître {agent}\nÉtude Notariale de {ville}"
+      ],
+      "variables": {
+        "montant": ["2 500 000", "4 800 000", "1 200 000", "30 500 000", "950 000"],
+        "organisme": ["Commission Internationale des Finances", "Banque Mondiale - Comité de la Dette", "Fonds Monétaire de Développement", "Trésor Public International"],
+        "banque": ["HSBC International", "Crédit Suisse", "Barclays Offshore", "BNP Paribas International"],
+        "titre": ["Directeur du Comité de Paiement", "Avocat Principal", "Secrétaire Général", "Commissaire aux Comptes"],
+        "frais": ["485", "350", "275", "590", "750"],
+        "nom_defunt": ["Jean-Pierre Dumont", "Henri Lavoisier", "Marcel Beaumont", "François Delacroix", "Robert Martineau"],
+        "code": ["AG/H4400501FR", "REF/2026/FR-001", "BNF-7742-EU", "TX-8891-FR"]
+      }
+    },
+    {
+      "id": "p_simple_whatsapp",
+      "tier": "simple",
+      "name": "Fausse notification WhatsApp/SMS",
+      "weight": 0.6,
+      "description": "Fake messaging app notification to lure clicks",
+      "templates": [
+        "Objet : {prenom}, vous avez un nouveau message sur WhatsApp\n\nWhatsApp\n\n+33 *** *** **{suffix}\nVous avez reçu une demande de correspondance.\n\nOuvrir le message : [URL]\n\nVous recevez cette notification car une demande vous a été envoyée.\nSi vous ne souhaitez plus recevoir ces emails : [URL]",
+        "Objet : Nouveau message vocal en attente\n\n{app} - Notification\n\nBonjour {prenom},\n\nVous avez {nb_messages} nouveau(x) message(s) vocal(aux) non écouté(s).\n\nÉcoutez vos messages : [URL]\n\nCe lien expire dans {delai} heures.\n\n© {app} {annee}"
+      ],
+      "variables": {
+        "app": ["WhatsApp", "Telegram", "Signal", "Viber"],
+        "suffix": ["05", "12", "87", "31", "44"],
+        "nb_messages": ["1", "3", "2", "5"],
+        "delai": ["24", "48", "12", "6"]
+      }
+    },
+    {
+      "id": "p_medium_investissement",
+      "tier": "medium",
+      "name": "Investissement frauduleux (Dassault-style)",
+      "weight": 1.2,
+      "description": "Fake investment opportunity impersonating French blue-chip companies. Based on real 2026 Dassault Aviation phishing campaign.",
+      "templates": [
+        "Objet : Dernière chance : investissez dans {entreprise} maintenant !\n\nLancez-vous dans l'aventure avec {entreprise}\n\n{entreprise}, {description_entreprise}, affiche une croissance remarquable. Profitez d'un gain de +{pourcentage} % en seulement quelques mois en investissant dans un groupe solide, innovant et faiblement endetté.\n\nBénéficiez de jusqu'à {nb_actions} actions gratuites pour chaque nouvel investissement !\n\n→ Je m'envole vers mes gains : [URL]\n\nNe manquez pas cette opportunité unique de rejoindre les investisseurs qui profitent déjà de la hausse.\n\nSE DÉSABONNER : [URL]",
+        "Objet : DERNIÈRE CHANCE : +{pourcentage}% + {nb_actions} ACTIONS GRATUITES AVANT CE SOIR !\n\n{entreprise} - Opportunité Exclusive\n\nCher investisseur,\n\nLe cours de l'action {entreprise} a progressé de +{pourcentage}% sur les {duree} derniers mois.\n\nÀ l'occasion du lancement de {produit}, nous offrons {nb_actions} actions gratuites à tout nouvel investisseur.\n\nCette offre est limitée et expire ce soir à minuit.\n\n→ Investir maintenant : [URL]\n\n{entreprise} - {description_courte}\nCapitalisation : {capitalisation}\n\nSi vous ne souhaitez plus recevoir nos communications : [URL]",
+        "Objet : {prenom}, profitez de la hausse de {entreprise} ({pourcentage}% de rendement)\n\nBonjour {prenom},\n\nDepuis le début de l'année, l'action {entreprise} a surperformé le CAC 40 avec un rendement exceptionnel de +{pourcentage}%.\n\nNos analystes prévoient une hausse supplémentaire de {prev_hausse}% d'ici {horizon}, portée par :\n• {raison_1}\n• {raison_2}\n• {raison_3}\n\nOuvrez votre position dès maintenant avec un bonus de {nb_actions} actions offertes.\n\n→ Accéder à la plateforme d'investissement : [URL]\n\nAvertissement : les performances passées ne préjugent pas des performances futures.\n\n© {annee} - Service Investisseurs"
+      ],
+      "variables": {
+        "entreprise": ["Dassault Aviation", "TotalEnergies", "LVMH", "Airbus", "Hermès International", "Safran", "Schneider Electric", "BNP Paribas"],
+        "description_entreprise": ["leader mondial de l'aéronautique militaire et civil", "géant français de l'énergie", "numéro un mondial du luxe", "constructeur aéronautique européen", "maison de luxe française emblématique"],
+        "description_courte": ["Aéronautique & Défense", "Énergie renouvelable", "Luxe & Mode", "Aéronautique", "Luxe"],
+        "pourcentage": ["52,72", "47,31", "38,95", "61,20", "33,88", "42,15"],
+        "nb_actions": ["20", "15", "10", "25", "30", "50"],
+        "duree": ["6", "3", "9", "12"],
+        "capitalisation": ["32 milliards EUR", "150 milliards EUR", "420 milliards EUR", "85 milliards EUR"],
+        "produit": ["notre nouveau Rafale F5", "notre plan stratégique 2030", "notre programme d'actionnariat salarié", "notre partenariat avec l'ESA"],
+        "prev_hausse": ["15", "22", "18", "30", "25"],
+        "horizon": ["fin 2026", "T3 2026", "décembre", "6 mois"],
+        "raison_1": ["Commandes record pour l'export militaire", "Transition énergétique accélérée", "Croissance en Asie-Pacifique", "Carnet de commandes historique"],
+        "raison_2": ["Marge opérationnelle en hausse", "Dividende exceptionnel prévu", "Résultats T1 au-dessus des attentes", "Partenariat stratégique"],
+        "raison_3": ["Faible endettement", "Position de trésorerie solide", "Innovation technologique de rupture", "Expansion sur de nouveaux marchés"]
+      }
+    },
+    {
+      "id": "p_medium_icloud",
+      "tier": "medium",
+      "name": "Faux verrouillage de compte Cloud/iCloud",
+      "weight": 1.0,
+      "description": "Cloud account locked scam impersonating Apple/Google. Based on real cloud phishing from 2026 inbox.",
+      "templates": [
+        "Objet : {prenom}, votre compte {service} a été verrouillé le {date}. Vos photos et vidéos seront supprimées !\n\nProblème de paiement - {service}\n\nCher utilisateur,\n\nNous avons rencontré un problème lors du renouvellement de votre abonnement {service}.\n\nMalheureusement, votre moyen de paiement a expiré. Pour garantir la continuité de votre {service}, veuillez mettre à jour vos informations de paiement.\n\nID d'abonnement : {sub_id}\nProduit : {service}\nDate d'expiration : {date}\n\nSi vous ne mettez pas à jour vos informations de paiement, vous risquez de perdre l'accès à votre {service}, ce qui pourrait empêcher la sauvegarde et la synchronisation de vos données telles que photos, vidéos et documents.\n\n→ Mettre à jour mes informations de paiement : [URL]\n\nMerci de votre confiance.\nCordialement,\nÉquipe du Service Client {service}",
+        "Objet : Action requise concernant l'expiration de votre espace {service}\n\n{service} - Service de Facturation\n\nBonjour,\n\nNous n'avons pas pu traiter le renouvellement automatique de votre abonnement {service} (réf. {sub_id}).\n\nSans action de votre part avant le {date}, votre espace de stockage sera désactivé et vos fichiers pourraient être supprimés de manière permanente.\n\nEspace utilisé : {espace} sur {espace_total}\nFichiers concernés : {nb_fichiers} documents, photos et vidéos\n\nMettre à jour mon moyen de paiement : [URL]\n\nPour votre sécurité :\n• Accédez toujours à votre compte via notre site officiel\n• Ne partagez jamais votre mot de passe\n• Assurez-vous que vos coordonnées sont à jour\n\nCordialement,\nÉquipe {service}"
+      ],
+      "variables": {
+        "service": ["Cloud", "iCloud", "Google One", "Cloud Storage Premium", "OneDrive"],
+        "sub_id": ["9647937", "8485026", "5573821", "7712094", "3398615"],
+        "espace": ["48,7 Go", "12,3 Go", "127,5 Go", "5,2 Go"],
+        "espace_total": ["50 Go", "15 Go", "200 Go", "50 Go"],
+        "nb_fichiers": ["2 347", "856", "4 129", "1 503"]
+      }
+    },
+    {
+      "id": "p_medium_ameli",
+      "tier": "medium",
+      "name": "Ameli / Carte Vitale remboursement",
+      "weight": 1.0,
+      "description": "Impersonating French health insurance for refund or card renewal",
+      "templates": [
+        "Objet : Renouvellement obligatoire de votre Carte Vitale\n\nAssurance Maladie - ameli.fr\n\nMadame, Monsieur {nom},\n\nSuite à la mise à jour de notre système d'information, votre Carte Vitale nécessite un renouvellement obligatoire.\n\nSans cette démarche, vos remboursements de soins seront suspendus à compter du {date}.\n\nVous devrez fournir :\n- Votre numéro de sécurité sociale\n- Votre RIB\n- Une pièce d'identité en cours de validité\n\n→ Renouveler ma Carte Vitale : [URL]\n\nCette procédure est gratuite et ne prend que quelques minutes.\n\nCordialement,\nService en ligne de l'Assurance Maladie\nameli.fr",
+        "Objet : Votre remboursement Ameli de {montant} EUR est en attente\n\nBonjour {prenom} {nom},\n\nVotre remboursement de {montant} EUR (réf. {ref}) est en attente de validation de vos coordonnées bancaires.\n\nPour recevoir ce virement sous {delai} jours ouvrés, veuillez confirmer votre RIB sur votre espace personnel :\n\n→ Confirmer mes coordonnées bancaires : [URL]\n\nSans confirmation avant le {date}, le remboursement sera annulé.\n\nVotre numéro de dossier : {ref}\n\nBien cordialement,\nAssurance Maladie - Service des Remboursements"
+      ],
+      "variables": {
+        "montant": ["247,86", "89,50", "312,45", "156,30", "478,92"],
+        "ref": ["AME-2026-7841", "RBT-9982-FR", "AME-2026-3315", "VIR-2026-0156"],
+        "delai": ["3", "5", "7", "2"]
+      }
+    },
+    {
+      "id": "p_medium_impots",
+      "tier": "medium",
+      "name": "DGFiP / impots.gouv trop-perçu",
+      "weight": 1.0,
+      "description": "Tax authority impersonation claiming overpayment refund",
+      "templates": [
+        "Objet : Votre convocation de contrôle fiscal (Réf. {ref})\n\nDirection Générale des Finances Publiques\n\nMadame, Monsieur,\n\nSuite à l'examen de votre dossier fiscal (référence {ref}), un trop-perçu de {montant} EUR a été identifié en votre faveur.\n\nPour bénéficier de ce remboursement, veuillez mettre à jour vos coordonnées bancaires sur votre espace personnel :\n\n→ Accéder à mon espace impots.gouv : [URL]\n\nDocuments requis :\n- Dernier avis d'imposition\n- RIB au format IBAN\n\nAttention : cette procédure doit être effectuée avant le {date} sous peine de forclusion.\n\nCordialement,\nService de gestion fiscale\nDGFiP - impots.gouv.fr",
+        "Objet : Avis de remboursement pour un trop-perçu de {montant} EUR\n\nBonjour {prenom} {nom},\n\nÀ la suite du recalcul de votre impôt sur le revenu {annee}, nous avons constaté un trop-perçu de {montant} EUR.\n\nCe montant vous sera remboursé sous {delai} jours ouvrés après confirmation de vos coordonnées.\n\nRéférence : {ref}\n\nValider mon remboursement : [URL]\n\nLe Service des Impôts des Particuliers\n{centre}"
+      ],
+      "variables": {
+        "montant": ["387,42", "1 254,80", "528,15", "743,60", "219,30"],
+        "ref": ["1043-3218-19", "2026-FR-47291", "DGFIP-8834-2026", "SIP-5521-B"],
+        "annee": ["2025", "2024"],
+        "centre": ["Centre des Finances Publiques de Paris 15e", "SIP de Lyon 3e", "Centre de Bordeaux Sud", "SIP de Marseille Nord"]
+      }
+    },
+    {
+      "id": "p_medium_laposte",
+      "tier": "medium",
+      "name": "La Poste / Colissimo colis bloqué",
+      "weight": 1.0,
+      "description": "Package delivery scam impersonating La Poste",
+      "templates": [
+        "Objet : Nouvelle tentative de livraison pour votre colis Colissimo\n\nLa Poste - Colissimo\n\nBonjour {prenom},\n\nVotre colis n°{tracking} n'a pas pu être livré ce jour ({date}).\n\nMotif : {motif}\n\nChoisissez un créneau de livraison et confirmez votre adresse :\n→ Reprogrammer ma livraison : [URL]\n\nFrais de réexpédition : {frais} EUR\n\nSans action de votre part sous {delai} jours, votre colis sera retourné à l'expéditeur.\n\nCordialement,\nService Client Colissimo\nLa Poste - laposte.fr",
+        "Objet : [La Poste] Une action est requise pour votre colis en attente\n\nBonjour,\n\nNous vous informons que votre colis (réf. {tracking}) est actuellement bloqué dans notre centre de tri de {ville}.\n\nRaison : {motif}\n\nPour débloquer la livraison, un complément d'affranchissement de {frais} EUR est nécessaire.\n\n→ Payer les frais et reprogrammer : [URL]\n\nDate limite : {date}\n\nLa Poste - Service Colissimo"
+      ],
+      "variables": {
+        "tracking": ["8R12345678901", "CC098765432FR", "6A88412390127", "9V55123876401"],
+        "motif": ["Adresse incomplète", "Destinataire absent", "Affranchissement insuffisant", "Taxes douanières impayées"],
+        "frais": ["1,95", "2,99", "4,50", "3,45"],
+        "ville": ["Roissy-Charles de Gaulle", "Lyon-Satolas", "Bordeaux-Mérignac", "Lille-Lesquin"]
+      }
+    },
+    {
+      "id": "p_medium_edf",
+      "tier": "medium",
+      "name": "EDF / Engie facture impayée",
+      "weight": 0.8,
+      "description": "Energy provider impersonation for unpaid bill",
+      "templates": [
+        "Objet : Avis de coupure concernant votre facture impayée (Réf {ref})\n\n{fournisseur} - Service Facturation\n\nMadame, Monsieur {nom},\n\nMalgré nos précédentes relances, nous constatons que votre facture du {date_facture} d'un montant de {montant} EUR reste impayée.\n\nSans régularisation avant le {date}, nous serons dans l'obligation de procéder à la coupure de votre alimentation en {service}.\n\nRéglez votre facture en ligne :\n→ Payer ma facture : [URL]\n\nRéférence client : {ref}\nMontant dû : {montant} EUR\nDate limite : {date}\n\nService recouvrement\n{fournisseur}",
+        "Objet : Remboursement de {montant} EUR suite à un double prélèvement {fournisseur}\n\nBonjour {prenom},\n\nSuite à une erreur technique, un double prélèvement de {montant} EUR a été effectué sur votre compte le {date_facture}.\n\nPour recevoir votre remboursement, veuillez confirmer vos coordonnées bancaires :\n→ Confirmer mon RIB : [URL]\n\nLe remboursement sera effectué sous {delai} jours ouvrés.\n\nNous vous prions de nous excuser pour ce désagrément.\n\n{fournisseur} - Service Client"
+      ],
+      "variables": {
+        "fournisseur": ["EDF", "Engie", "TotalEnergies", "Eni"],
+        "service": ["électricité", "gaz", "énergie"],
+        "montant": ["387,42", "156,80", "245,30", "512,15", "89,90"],
+        "ref": ["EDF-2026-887421", "FAC-553219", "CLI-774102", "ENI-2026-0341"],
+        "date_facture": ["15 janvier 2026", "28 février 2026", "3 février 2026"]
+      }
+    },
+    {
+      "id": "p_medium_caf",
+      "tier": "medium",
+      "name": "CAF allocation suspendue",
+      "weight": 0.8,
+      "description": "Family welfare impersonation threatening benefit suspension",
+      "templates": [
+        "Objet : Action requise pour éviter la suspension de vos allocations\n\nCaisse d'Allocations Familiales\n\nMadame, Monsieur {nom},\n\nNous vous informons que le versement de vos allocations a été temporairement suspendu suite à un défaut de mise à jour de votre dossier.\n\nAllocations concernées : {allocation}\nMontant mensuel : {montant} EUR\n\nPour rétablir vos droits, veuillez mettre à jour votre situation dans un délai de {delai} jours :\n→ Mettre à jour mon dossier : [URL]\n\nSans réponse de votre part, la suspension sera maintenue.\n\nService des prestations\nCAF - caf.fr"
+      ],
+      "variables": {
+        "allocation": ["APL (Aide Personnalisée au Logement)", "RSA (Revenu de Solidarité Active)", "Allocation de rentrée scolaire", "Prime d'activité", "AAH (Allocation aux Adultes Handicapés)"],
+        "montant": ["485,00", "607,75", "312,45", "156,90", "971,37"]
+      }
+    },
+    {
+      "id": "p_medium_banque",
+      "tier": "medium",
+      "name": "Banque - mise à jour DSP2 obligatoire",
+      "weight": 0.8,
+      "description": "Bank impersonation requiring DSP2 compliance update",
+      "templates": [
+        "Objet : Mise à jour obligatoire suite à la nouvelle réglementation DSP2\n\n{banque}\n\nCher(e) client(e),\n\nConformément à la directive européenne DSP2 sur les services de paiement, une mise à jour de vos informations d'authentification est requise.\n\nSans cette mise à jour avant le {date} :\n- Vos paiements par carte seront refusés\n- L'accès à votre espace en ligne sera restreint\n- Vos virements automatiques seront suspendus\n\n→ Mettre à jour mes informations : [URL]\n\nCette procédure prend moins de 3 minutes et garantit la sécurité de vos opérations.\n\nService Sécurité\n{banque}",
+        "Objet : Activité suspecte détectée sur votre compte {banque}\n\nBonjour {prenom},\n\nNotre système de surveillance a détecté une activité inhabituelle sur votre compte se terminant par ****{digits}.\n\nDétails de la transaction suspecte :\n- Montant : {montant} EUR\n- {lieu}\n- Date : {date}\n\nSi vous n'êtes pas à l'origine de cette opération, veuillez sécuriser immédiatement votre compte :\n→ Bloquer ma carte et vérifier : [URL]\n\nSi cette transaction est légitime, vous pouvez ignorer ce message.\n\nService Fraude\n{banque}"
+      ],
+      "variables": {
+        "banque": ["BNP Paribas", "Crédit Agricole", "Société Générale", "Caisse d'Épargne", "LCL", "Banque Populaire", "CIC", "La Banque Postale", "Boursorama"],
+        "digits": ["4821", "7793", "3156", "9408", "6247"],
+        "lieu": ["Achat en ligne - Amazon.co.uk", "Retrait DAB - Abidjan, Côte d'Ivoire", "Virement SEPA - Bucarest, Roumanie", "Paiement TPE - Istanbul, Turquie"],
+        "montant": ["849,90", "1 247,00", "432,50", "2 100,00", "599,99"]
+      }
+    },
+    {
+      "id": "p_medium_vinci",
+      "tier": "medium",
+      "name": "Vinci Autoroutes / transport surprise",
+      "weight": 0.6,
+      "description": "French infrastructure brand impersonation with fake reward",
+      "templates": [
+        "Objet : Nous avons une surprise de {entreprise}\n\n{entreprise}\n\nChère cliente, Cher client,\n\nPour vous remercier de votre fidélité, {entreprise} vous offre un cadeau exclusif !\n\nVotre récompense : {cadeau}\n\nPour réclamer votre cadeau, confirmez vos coordonnées avant le {date} :\n→ Réclamer mon cadeau : [URL]\n\nOffre limitée aux {nb} premiers participants.\n\n{entreprise} - Service Fidélité",
+        "Objet : Votre remboursement de péage {entreprise} de {montant} EUR\n\nBonjour {prenom},\n\nSuite à une erreur de facturation sur l'autoroute {autoroute} le {date}, un trop-perçu de {montant} EUR a été identifié.\n\nPour recevoir votre remboursement :\n→ Valider mes coordonnées bancaires : [URL]\n\nNuméro de dossier : {ref}\n\nCordialement,\n{entreprise} - Service Client"
+      ],
+      "variables": {
+        "entreprise": ["Vinci Autoroutes", "APRR", "Sanef", "ASF Autoroutes", "SNCF"],
+        "cadeau": ["un badge Télépéage offert pendant 1 an", "un coffret voyage d'une valeur de 200 EUR", "100 EUR de carburant", "un abonnement autoroute illimité 3 mois"],
+        "autoroute": ["A6", "A1", "A7", "A10", "A13"],
+        "montant": ["23,50", "47,80", "15,90", "82,30"]
+      }
+    },
+    {
+      "id": "p_hard_onedrive",
+      "tier": "hard",
+      "name": "Partage fichier OneDrive / Google Drive collègue",
+      "weight": 1.0,
+      "description": "File sharing phishing mimicking legitimate workplace collaboration. Very hard to distinguish from real shares.",
+      "templates": [
+        "Objet : {expediteur} a partagé \"{nom_fichier}\" avec vous\n\n{expediteur} vous a invité(e) à accéder à un fichier.\n\nVoici le document que {expediteur} a partagé avec vous :\n\n📄 {nom_fichier}\n🔗 Ce lien fonctionne pour tout le monde.\n\n→ Ouvrir : [URL]\n\nMicrosoft respecte votre vie privée. Déclaration de confidentialité : [URL]",
+        "Objet : {expediteur} vous a partagé le document {nom_fichier}\n\nGoogle Drive\n\n{expediteur} ({email_exp}) a partagé un élément avec vous.\n\n{nom_fichier}\n\nOuvrir dans Drive : [URL]\n\nSi vous ne souhaitez plus recevoir d'emails quand quelqu'un partage des éléments avec vous, vous pouvez vous désabonner.\n\nGoogle LLC, 1600 Amphitheatre Parkway, Mountain View, CA 94043"
+      ],
+      "variables": {
+        "expediteur": ["Marie Dupont", "Jean-Luc Martin", "Felicia Jaquet", "Pierre Lefebvre", "Sophie Bernard", "Directeur RH"],
+        "nom_fichier": ["Rapport Q1 2026.pdf", "Contrat de prestation.docx", "Facture février 2026.xlsx", "Planning réunions mars.pdf", "Intrigant 05", "Note de frais validée.pdf", "Devis_projet_2026.pdf"]
+      }
+    },
+    {
+      "id": "p_hard_urssaf",
+      "tier": "hard",
+      "name": "URSSAF relance cotisations micro-entrepreneur",
+      "weight": 1.0,
+      "description": "Very realistic URSSAF notice targeting auto-entrepreneurs - core Sicurre audience",
+      "templates": [
+        "Objet : Régularisation de vos cotisations URSSAF (T{trimestre} {annee})\n\nURSSAF - Espace Auto-Entrepreneur\n\nMadame, Monsieur {nom},\n\nNous avons constaté un écart entre vos déclarations de chiffre d'affaires et les cotisations versées pour le trimestre T{trimestre} {annee}.\n\nMontant à régulariser : {montant} EUR\nÉchéance : {date}\nRéférence : {ref}\n\nSans régularisation dans les {delai} jours, des majorations de retard de {taux}% seront appliquées.\n\nAccédez à votre espace pour régulariser :\n→ Mon espace URSSAF : [URL]\n\nSi vous pensez qu'il s'agit d'une erreur, contactez-nous via votre messagerie sécurisée.\n\nService de gestion des cotisations\nURSSAF Île-de-France",
+        "Objet : Mise en demeure pour vos cotisations impayées (Réf {ref})\n\nURSSAF\n\nMadame, Monsieur {nom},\n\nMalgré nos précédentes relances, nous constatons que vos cotisations sociales restent impayées.\n\nDétail :\n- Période : T{trimestre} {annee}\n- Montant principal : {montant} EUR\n- Majorations : {majorations} EUR\n- Total dû : {total} EUR\n\nÀ défaut de paiement sous {delai} jours, nous engagerons une procédure de recouvrement forcé auprès du tribunal compétent.\n\nRégularisez votre situation en ligne :\n→ [URL]\n\nURSSAF - Service du Recouvrement"
+      ],
+      "variables": {
+        "trimestre": ["1", "2", "3", "4"],
+        "annee": ["2025", "2026"],
+        "montant": ["1 247,00", "834,50", "2 156,80", "567,30"],
+        "majorations": ["124,70", "83,45", "215,68", "56,73"],
+        "total": ["1 371,70", "917,95", "2 372,48", "624,03"],
+        "taux": ["10", "5", "15"],
+        "ref": ["URSSAF-2026-MED-4471", "COT-2026-IDF-8821", "REC-2025-T4-3319"]
+      }
+    },
+    {
+      "id": "p_hard_bec",
+      "tier": "hard",
+      "name": "BEC - usurpation patron/DRH",
+      "weight": 0.8,
+      "description": "Business Email Compromise - impersonating CEO or HR director",
+      "templates": [
+        "Objet : Virement urgent à traiter dans les plus brefs délais\n\nBonjour {prenom},\n\nJe suis actuellement en déplacement et je ne peux pas passer par le circuit habituel. J'ai besoin que tu effectues un virement de {montant} EUR vers le compte suivant :\n\nBénéficiaire : {beneficiaire}\nIBAN : {iban}\nMotif : {motif}\n\nC'est confidentiel, n'en parle à personne pour le moment. Je t'expliquerai à mon retour.\n\nMerci,\n{patron}\n{titre}",
+        "Objet : Demande de service rapide\n\nSalut {prenom},\n\nEs-tu disponible ? J'ai besoin d'un service rapide et discret.\n\nJ'ai un fournisseur à payer en urgence ({montant} EUR) mais je n'ai pas accès au système depuis mon téléphone. Peux-tu lancer le virement avec les coordonnées ci-dessous ?\n\nJe te les envoie ici pour gagner du temps :\n{beneficiaire}\n{iban}\n\nMerci de ne pas en parler à {collegue} avant que ce soit réglé.\n\nÀ très vite,\n{patron}",
+        "Objet : Mise à jour de votre RIB pour le prochain virement de salaire\n\nBonjour {prenom},\n\nSuite à un changement de notre prestataire de paie, nous vous demandons de bien vouloir mettre à jour vos coordonnées bancaires avant le {date}.\n\nCela permettra d'éviter tout retard dans le versement de votre salaire du mois de {mois}.\n\n→ Mettre à jour mon RIB : [URL]\n\nMerci de votre diligence.\n\n{patron}\nDirection des Ressources Humaines"
+      ],
+      "variables": {
+        "patron": ["Marc Lefèvre", "Isabelle Moreau", "Philippe Durand", "Catherine Blanc"],
+        "titre": ["Directeur Général", "PDG", "Gérant", "Directrice Administrative"],
+        "beneficiaire": ["SCI Horizon Conseil", "TechParts International SARL", "Cabinet Juridique Mercier & Associés"],
+        "iban": ["FR76 3000 4000 0300 0012 3456 789", "FR76 1820 6000 1112 3456 7890 142", "FR76 3000 3041 0000 0500 0010 023"],
+        "motif": ["Prestation conseil Q1 2026", "Acompte dossier confidentiel", "Frais juridiques urgents"],
+        "collegue": ["Sophie", "Laurent", "Nathalie", "Julien"],
+        "mois": ["mars", "avril", "février", "mai"]
+      }
+    },
+    {
+      "id": "p_hard_stripe_paypal",
+      "tier": "hard",
+      "name": "Stripe / PayPal paiement échoué",
+      "weight": 0.8,
+      "description": "Payment processor impersonation - very realistic for auto-entrepreneurs",
+      "templates": [
+        "Objet : Action requise : échec de paiement sur votre compte {plateforme}\n\n{plateforme}\n\nBonjour {prenom},\n\nNous n'avons pas pu traiter un paiement de {montant} EUR depuis votre compte {plateforme} ({email}).\n\nMotif : {motif}\n\nSi cette situation persiste, votre compte pourrait être limité et vous ne pourrez plus recevoir de paiements de vos clients.\n\nMettez à jour votre moyen de paiement :\n→ [URL]\n\nTransaction concernée : {ref}\nDate : {date}\n\nL'équipe {plateforme}",
+        "Objet : Vérification d'identité requise pour votre compte {plateforme}\n\nBonjour {prenom},\n\nConformément aux obligations réglementaires (KYC), nous devons vérifier votre identité pour maintenir votre compte {plateforme} actif.\n\nSans vérification avant le {date}, votre compte sera suspendu et les fonds en attente ({montant} EUR) seront gelés.\n\nDocuments requis :\n- Pièce d'identité recto/verso\n- Justificatif de domicile de moins de 3 mois\n- RIB professionnel\n\n→ Commencer la vérification : [URL]\n\nÉquipe Conformité\n{plateforme}"
+      ],
+      "variables": {
+        "plateforme": ["Stripe", "PayPal", "Wise", "Revolut Business", "SumUp"],
+        "motif": ["Carte expirée", "Fonds insuffisants", "Refus de la banque émettrice", "Vérification d'identité requise"],
+        "montant": ["149,99", "2 340,00", "87,50", "1 150,00", "450,00"],
+        "ref": ["TXN-20260304-8821", "PAY-FR-55123", "WIS-2026-09941", "INV-2026-03-0047"]
+      }
+    },
+    {
+      "id": "p_hard_franceconnect",
+      "tier": "hard",
+      "name": "FranceConnect - vérification identité",
+      "weight": 0.6,
+      "description": "French digital identity platform impersonation",
+      "templates": [
+        "Objet : Une vérification de votre identité numérique FranceConnect est requise\n\nFranceConnect\n\nBonjour {prenom} {nom},\n\nSuite aux nouvelles exigences de sécurité du {organisme}, votre identité numérique FranceConnect doit être revérifiée.\n\nSans cette vérification avant le {date} :\n- Votre accès aux services publics en ligne sera suspendu\n- Vos démarches en cours seront interrompues\n- Vous devrez vous présenter physiquement en mairie\n\n→ Vérifier mon identité : [URL]\n\nCette procédure prend moins de 5 minutes.\n\nService FranceConnect\nDirection interministérielle du numérique"
+      ],
+      "variables": {
+        "organisme": ["Ministère de l'Intérieur", "ANTS (Agence Nationale des Titres Sécurisés)", "Direction interministérielle du numérique"]
+      }
+    },
+    {
+      "id": "p_medium_faux_colis_generique",
+      "tier": "medium",
+      "name": "Faux colis en attente (générique)",
+      "weight": 1.2,
+      "description": "Generic delivery notification scam. Impersonates various carriers with fake tracking and small payment required. Based on real Spam_3.txt patterns (Suivre-votre-colis, DHL, Chronopost).",
+      "templates": [
+        "Objet : {prenom}, nous avons essayé de vous joindre\n\nSuivre-votre-colis\n\nBonjour,\n\nNous vous informons qu'un colis à votre nom est en attente dans notre centre de distribution de {ville}.\n\nNuméro de suivi : {tracking}\nTransporteur : {transporteur}\nStatut : En attente - action requise\n\nUne tentative de livraison a échoué le {date_facture}. Pour reprogrammer la livraison, des frais de réexpédition de {frais} EUR sont nécessaires.\n\n→ Confirmer la livraison : [URL]\n\nDate limite avant retour à l'expéditeur : {date}\n\nService client - Suivi de colis\nCet email est envoyé automatiquement - merci de ne pas répondre.",
+        "Objet : Votre colis n°{tracking} est bloqué en centre de tri\n\n{transporteur}\n\nCher(e) client(e),\n\nVotre colis est actuellement retenu dans notre centre de tri de {ville} en raison de {motif}.\n\nDétails de l'envoi :\n- Numéro de suivi : {tracking}\n- Poids : {poids} kg\n- Expéditeur : {expediteur}\n- Date d'envoi : {date_facture}\n\nPour débloquer votre colis, veuillez vous acquitter des frais de {frais} EUR :\n→ Payer et reprogrammer : [URL]\n\nSans action sous {delai} jours ouvrés, le colis sera retourné à l'expéditeur.\n\nCordialement,\n{transporteur} - Service Livraison",
+        "Objet : [NOTIFICATION] Livraison en attente pour le colis {tracking}\n\nBonjour {prenom},\n\nUn colis expédié par {expediteur} est en attente de livraison à votre adresse.\n\nLe livreur n'a pas pu vous remettre le colis : {motif}.\n\nVeuillez choisir un nouveau créneau de livraison et régler les frais de {frais} EUR pour la réexpédition.\n\n→ Reprogrammer ma livraison : [URL]\n\nCe lien est valable {delai} jours.\n\nMerci,\nÉquipe Livraison - {transporteur}"
+      ],
+      "variables": {
+        "transporteur": ["Chronopost", "DHL Express", "GLS France", "UPS", "Mondial Relay", "Relais Colis", "Colissimo"],
+        "motif": ["Adresse incomplète", "Destinataire absent lors du passage du livreur", "Frais de douane impayés", "Affranchissement insuffisant", "Colis surdimensionné - supplément requis"],
+        "frais": ["1,95", "2,49", "3,99", "4,50", "1,49", "2,99"],
+        "poids": ["0,8", "2,3", "1,5", "4,7", "0,3"],
+        "expediteur": ["Amazon Marketplace", "Temu France", "Shein", "AliExpress", "Wish", "un vendeur Vinted"],
+        "delai": ["3", "5", "7", "2"]
+      }
+    },
+    {
+      "id": "p_medium_faux_lidl",
+      "tier": "medium",
+      "name": "Faux sondage LIDL / coffret cadeau",
+      "weight": 1.0,
+      "description": "Fake LIDL loyalty survey promising a free tool kit, kitchen set, or garden gadget. Based on real Spam_3.txt patterns (Coffret Outils Lidl, Makita).",
+      "templates": [
+        "Objet : {prenom}, Votre {cadeau} Vous Attend\n\nLidl - Programme de fidélité\n\nFélicitations !\n\nNous souhaitons vous offrir une opportunité unique de recevoir un {cadeau} ! Pour le réclamer, il vous suffit de répondre à ce court sondage sur votre expérience avec Lidl.\n\nConfirmez votre place maintenant - les quantités sont limitées.\n\n→ Répondre au sondage : [URL]\n\nTemps requis : ~{duree} minutes\nVotre coût : GRATUIT\n\nSi vous ne souhaitez plus recevoir ces e-mails, vous pouvez vous désabonner.\n\n© {annee} Lidl France",
+        "Objet : Derniers jours pour remporter un {cadeau} avec Lidl !\n\nCher(e) client(e) Lidl,\n\nDans le cadre de notre enquête de satisfaction, Lidl offre la possibilité de remporter un {cadeau} d'une valeur de {valeur} EUR.\n\nVotre avis compte ! Participez en répondant à {nb_questions} questions rapides concernant votre expérience avec Lidl.\n\n→ Commencer l'enquête : [URL]\n\nAttention : cette offre est limitée aux {nb_gagnants} premiers participants et expire le {date}.\n\nÉquipe Fidélité Lidl",
+        "Objet : {prenom}, félicitations ! Vous avez été sélectionné(e)\n\nLidl Récompenses\n\nBonjour {prenom},\n\nEn tant que client fidèle, vous faites partie des {nb_gagnants} personnes sélectionnées pour recevoir un {cadeau}.\n\nPour confirmer votre participation :\n1. Répondez à notre court sondage ({duree} min)\n2. Confirmez votre adresse de livraison\n3. Recevez votre cadeau sous {delai_livraison} jours\n\n→ Participer maintenant : [URL]\n\nOffre valable jusqu'au {date}.\n\n© {annee} Lidl France - Tous droits réservés"
+      ],
+      "variables": {
+        "cadeau": ["Coffret d'outils Makita", "Coffret Outils Lidl", "Set de couteaux Silvercrest", "Robot cuiseur Monsieur Cuisine", "Perceuse-visseuse Parkside", "Nettoyeur haute pression Parkside", "Barbecue à gaz Grillmeister", "Aspirateur cyclonique Silvercrest"],
+        "valeur": ["199", "149", "89", "299", "249", "179"],
+        "nb_questions": ["5", "7", "4", "8", "6"],
+        "nb_gagnants": ["500", "250", "100", "1 000", "750"],
+        "duree": ["2", "3", "1"],
+        "delai_livraison": ["5 à 7", "7 à 10", "3 à 5", "10 à 14"]
+      }
+    },
+    {
+      "id": "p_medium_faux_vinci",
+      "tier": "medium",
+      "name": "Vinci Autoroutes - faux kit sécurité",
+      "weight": 0.8,
+      "description": "Fake Vinci Autoroutes safety survey offering free emergency car kit. Based on real Spam_3.txt patterns (Winter Safety Kit, Kit d'urgence).",
+      "templates": [
+        "Objet : {prenom}, votre {cadeau} est disponible\n\nVinci Autoroutes - Exclusivité Client\n\nCher(e) client(e) Vinci Autoroutes,\n\nVous avez la chance de gagner un {cadeau} ! Pour le réclamer, répondez simplement à cette courte étude sur votre expérience avec Vinci Autoroutes.\n\nTemps requis : ~{duree} minutes\nVotre coût : GRATUIT\n\n→ Commencer : [URL]\n\nLes quantités sont limitées à {nb_kits} unités. Cette offre expire le {date}.\n\nSi vous ne souhaitez plus recevoir ces e-mails, désabonnez-vous ici : [URL]\n\n© {annee} Vinci Autoroutes",
+        "Objet : AVERTISSEMENT : Vinci Autoroutes vous offre un kit de sécurité\n\nVinci Autoroutes - Alerte Officielle\n\nSécurité routière : chaque année, des milliers d'automobilistes se retrouvent piégés après un choc. Vinci Autoroutes alerte : portes coincées et issues bloquées sont un danger réel.\n\nPour votre sécurité, recevez gratuitement notre {cadeau} ({nb_outils} outils essentiels) en répondant à un bref questionnaire.\n\n→ Réclamer mon kit : [URL]\n\nContenu du kit :\n- {outil_1}\n- {outil_2}\n- {outil_3}\n- {outil_4}\n\nOffre limitée aux {nb_kits} premiers clients.\n\nVinci Autoroutes - La route en toute sécurité",
+        "Objet : Participez à notre enquête Vinci Autoroutes et gagnez un {cadeau}\n\nBonjour {prenom},\n\nNous souhaitons améliorer nos services et votre avis est essentiel.\n\nEn guise de remerciement, nous offrons un {cadeau} aux {nb_kits} premiers répondants.\n\nLe questionnaire ne prend que {duree} minutes :\n→ Participer : [URL]\n\nDate limite : {date}\n\nMerci de votre confiance,\nVinci Autoroutes - Service Qualité"
+      ],
+      "variables": {
+        "cadeau": ["Kit d'urgence pour voiture", "Kit de sécurité routière Winter", "Coffret brise-vitre et coupe-ceinture", "Kit d'urgence hiver", "Trousse de premiers secours auto"],
+        "nb_kits": ["500", "300", "1 000", "750", "200"],
+        "nb_outils": ["6", "8", "5", "10"],
+        "duree": ["2", "3", "1"],
+        "outil_1": ["Brise-vitre en acier trempé", "Lampe torche LED rechargeable", "Triangle de signalisation homologué"],
+        "outil_2": ["Coupe-ceinture de sécurité", "Gilet réfléchissant haute visibilité", "Câbles de démarrage 500A"],
+        "outil_3": ["Couverture de survie", "Paire de gants de protection", "Extincteur poudre ABC 1 kg"],
+        "outil_4": ["Lampe de détresse magnétique", "Trousse de premiers secours", "Câble de remorquage 5 tonnes"]
+      }
+    },
+    {
+      "id": "p_hard_faux_fedex_dpd",
+      "tier": "hard",
+      "name": "Faux FedEx / DPD - livraison échouée",
+      "weight": 1.0,
+      "description": "Very realistic FedEx or DPD delivery failure notification. Professional layout, spoofed sender, legitimate-looking tracking number. Based on real Spam_3.txt patterns.",
+      "templates": [
+        "Objet : ⭐ Mise à jour concernant la livraison de votre colis\n\nFedEx® - Mise à jour de livraison\n\nUne action est requise pour finaliser la livraison de votre colis.\n\nMise à jour concernant votre livraison :\nUne tentative de livraison n'a pas pu être finalisée. Merci de confirmer vos préférences afin de poursuivre l'acheminement.\n\nColis en attente : {nb_colis}\nNuméro de suivi : {tracking}\n\n→ Suivre\n→ Planifier la livraison : [URL]\n\nImportant : Merci d'effectuer cette action avant le {date}.\n\nAssistance :\nEmail : support@fedex.com\nTéléphone : +33 1 48 62 50 73\n\nMessage automatique - merci de ne pas répondre.\n\n© {annee} FedEx® - Tous droits réservés",
+        "Objet : Votre colis DPD est en cours de livraison\n\nDPD France\n\nBonjour {prenom},\n\nVotre colis référencé {tracking} est arrivé dans notre dépôt de {ville} mais n'a pas pu être livré.\n\nMotif : {motif}\n\nPour reprogrammer la livraison :\n1. Choisissez un créneau horaire\n2. Confirmez votre adresse\n3. Réglez les frais de réacheminement ({frais} EUR)\n\n→ Reprogrammer : [URL]\n\nSans action avant le {date}, le colis sera retourné à l'expéditeur.\n\nDPD France - Service Client\nTél. : +33 9 70 80 85 66",
+        "Objet : {prenom}, une action est requise pour votre expédition FedEx®\n\nFedEx®\n\nInformation importante sur votre envoi\n\nNous avons tenté de livrer votre colis le {date_facture} à l'adresse indiquée, mais la livraison n'a pas abouti.\n\nRéférence envoi : {tracking}\nDestination : {ville}, France\nExpéditeur : {expediteur}\nPoids : {poids} kg\n\nAction requise : veuillez confirmer votre disponibilité et mettre à jour vos préférences de livraison.\n\n→ Gérer ma livraison : [URL]\n\nSi vous ne prenez aucune mesure avant le {date}, le colis sera mis en attente pendant {delai} jours puis retourné.\n\nCordialement,\nFedEx® - Service Expéditions France\n\n© {annee} FedEx. Tous droits réservés."
+      ],
+      "variables": {
+        "nb_colis": ["1", "2"],
+        "motif": ["Destinataire absent", "Boîte aux lettres pleine", "Adresse vérifiée - accès refusé par interphone", "Complément d'adresse manquant"],
+        "frais": ["2,49", "3,99", "1,95"],
+        "poids": ["1,2", "0,5", "3,8", "2,1", "0,9"],
+        "expediteur": ["Amazon.fr", "Zalando", "Fnac", "Cdiscount", "Nike Europe"],
+        "delai": ["5", "7", "10"]
+      }
+    },
+    {
+      "id": "p_medium_faux_supermarche",
+      "tier": "medium",
+      "name": "Faux cadeau supermarché / bricolage",
+      "weight": 1.0,
+      "description": "Fake prize from Carrefour, Leroy Merlin, ManoMano, or Decathlon. Survey-gated gift scam. Based on real Spam_3.txt patterns.",
+      "templates": [
+        "Objet : {prenom}, Recevez votre {cadeau} GRATUITEMENT !\n\n{enseigne}\n\nBonne nouvelle !\n\nNous sommes ravis d'annoncer un tirage au sort mettant en avant le {cadeau}, proposé à une offre spéciale en raison d'un léger défaut d'emballage.\n\nCela ne prendra qu'une minute de votre temps et vous pourrez recevoir un superbe cadeau.\n\n→ Répondre et gagner : [URL]\n\nOffre limitée - Seuls les {nb_gagnants} premiers participants pourront en bénéficier.\n\n© {annee} {enseigne}",
+        "Objet : Enquête de satisfaction {enseigne} pour gagner un {cadeau}\n\n{enseigne}\n\nCher(e) membre,\n\nEn tant que client(e) fidèle de {enseigne}, vous êtes invité(e) à participer à notre enquête de satisfaction.\n\nEn remerciement, vous pouvez remporter un {cadeau} d'une valeur de {valeur} EUR.\n\nTemps requis : ~{duree} minutes\nVotre coût : GRATUIT\n\n→ Commencer l'enquête : [URL]\n\nDate limite de participation : {date}\n\nMerci de votre fidélité,\n{enseigne} - Programme Fidélité",
+        "Objet : Gagnez un {cadeau} grâce à cette offre exclusive {enseigne}\n\nBonjour {prenom},\n\nFélicitations ! Vous avez été sélectionné(e) pour participer à notre programme de récompenses.\n\nRépondez à {nb_questions} questions rapides et tentez de remporter :\n🎁 {cadeau} (valeur {valeur} EUR)\n\nÉtapes :\n1. Répondez à notre sondage ({duree} min)\n2. Renseignez votre adresse de livraison\n3. Recevez votre cadeau sous {delai_livraison} jours\n\n→ Participer : [URL]\n\nLes quantités sont limitées à {nb_gagnants} lots.\n\n{enseigne} - Service Client"
+      ],
+      "variables": {
+        "enseigne": ["Carrefour", "Leroy Merlin", "ManoMano", "Decathlon", "Boulanger", "Castorama", "Action"],
+        "cadeau": ["Rasoir électrique Braun Series 9", "Pack RYOBI Perceuse + Visseuse sans fil", "Kit d'outils Makita 18V", "Tente de camping Quechua 4 places", "Perceuse à colonne Bosch Professional", "Machine à café De'Longhi Magnifica", "Robot tondeuse Gardena Sileno", "Barbecue Weber Spirit II"],
+        "valeur": ["189", "249", "149", "299", "99", "349", "199"],
+        "nb_questions": ["5", "7", "4", "8", "3"],
+        "nb_gagnants": ["500", "250", "100", "1 000", "750"],
+        "duree": ["2", "3", "1"],
+        "delai_livraison": ["5 à 7", "7 à 10", "3 à 5", "10 à 14"]
+      }
+    },
+    {
+      "id": "p_hard_faux_tech_prize",
+      "tier": "hard",
+      "name": "Faux cadeau tech (MacBook / iPhone)",
+      "weight": 0.8,
+      "description": "Fake tech prize claiming user won a MacBook Pro or iPhone. Very polished layout mimicking Free Mobile or telecom promotions. Based on real Spam_3.txt patterns.",
+      "templates": [
+        "Objet : 🔥 Confirmation requise : votre {produit} vous attend ID#{ref}\n\n{marque_telecom}\n\nVOUS AVEZ ÉTÉ SÉLECTIONNÉ !\n\n{produit}\n\nPour en faire la demande, il suffit de remplir ce bref questionnaire sur votre expérience avec {marque_telecom}.\n\n→ Demandez votre cadeau : [URL]\n\n{annee}\n\nSi vous ne souhaitez plus recevoir ces e-mails, vous pouvez vous désabonner.",
+        "Objet : {prenom}, Préparation de Votre {produit} !\n\n{marque_telecom} - Récompense Client\n\nFélicitations {prenom} !\n\nVotre fidélité nous est précieuse. Pour vous remercier, {marque_telecom} vous offre la possibilité de recevoir un {produit} d'une valeur de {valeur} EUR.\n\nPour valider votre récompense :\n1. Répondez à un court sondage ({duree} min)\n2. Confirmez votre adresse de livraison\n3. Recevez votre {produit} sous {delai_livraison} jours\n\n→ Valider ma récompense : [URL]\n\nAttention : offre limitée aux {nb_gagnants} premiers clients.\n\n© {annee} {marque_telecom}",
+        "Objet : Votre {produit} est prêt à être expédié\n\n{marque_telecom}\n\nBonjour {prenom},\n\nSuite au tirage au sort de notre programme fidélité, votre {produit} a été sélectionné pour expédition.\n\nDétails :\n- Produit : {produit}\n- Valeur : {valeur} EUR\n- Référence : {ref}\n- Statut : En attente de confirmation\n\nConfirmez et réclamez votre {produit} :\n→ [URL]\n\nVous avez {delai} heures pour finaliser cette demande.\n\nService Client\n{marque_telecom}\n\n© {annee} - Tous droits réservés"
+      ],
+      "variables": {
+        "produit": ["MacBook Pro", "MacBook Air M4", "iPhone 17 Pro Max", "iPhone 16 Pro", "Samsung Galaxy S25 Ultra", "iPad Pro 13 pouces", "Apple Watch Ultra 3"],
+        "marque_telecom": ["Free Mobile", "SFR", "Orange", "Bouygues Telecom", "Sosh", "RED by SFR", "B&You"],
+        "valeur": ["1 499", "2 199", "1 299", "1 999", "899", "1 799"],
+        "nb_gagnants": ["100", "250", "50", "500"],
+        "duree": ["2", "3", "1"],
+        "delai_livraison": ["5 à 7", "7 à 10", "3 à 5"],
+        "delai": ["24", "48", "72", "12"]
+      }
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "label": "legitimate",
+  "confidence": 0.91,
+  "signals": ["DMARC pass", "Known sender pattern"],
+  "model_version": "sicurre/camembertav2-phishing-fr@v0.1.0"
+}

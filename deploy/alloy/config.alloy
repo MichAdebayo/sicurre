@@ -1,0 +1,114 @@
+discovery.docker "containers" {
+	host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "sicurre" {
+	targets = discovery.docker.containers.targets
+
+	rule {
+		source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+		regex         = "sicurre-prod"
+		action        = "keep"
+	}
+
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		regex         = "/(.*)"
+		target_label  = "container"
+	}
+
+	rule {
+		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+		target_label  = "service"
+	}
+
+	rule {
+		target_label = "job"
+		replacement  = "sicurre"
+	}
+}
+
+prometheus.scrape "app_gateway" {
+	targets         = [{"__address__" = "sicurre-app:5173"}]
+	metrics_path    = "/metrics"
+	scrape_interval = "60s"
+	forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.remote_write "grafana_cloud" {
+	endpoint {
+		url = sys.env("GRAFANA_PROMETHEUS_REMOTE_WRITE_URL")
+
+		basic_auth {
+			username = sys.env("GRAFANA_PROMETHEUS_METRICS_USERNAME")
+			password = sys.env("GRAFANA_PROMETHEUS_METRICS_API_TOKEN")
+		}
+	}
+}
+
+loki.source.docker "sicurre" {
+	host       = "unix:///var/run/docker.sock"
+	targets    = discovery.relabel.sicurre.output
+	forward_to = [loki.process.sicurre.receiver]
+}
+
+loki.process "sicurre" {
+	forward_to = [loki.write.grafana_cloud.receiver]
+
+	stage.drop {
+		expression = "GET /__app/health"
+	}
+
+	stage.drop {
+		expression = "GET /health"
+	}
+
+	stage.drop {
+		expression = "GET /metrics"
+	}
+}
+
+loki.write "grafana_cloud" {
+	endpoint {
+		url = sys.env("GRAFANA_LOKI_URL")
+
+		basic_auth {
+			username = sys.env("GRAFANA_LOKI_USER")
+			password = sys.env("GRAFANA_LOKI_API_TOKEN")
+		}
+	}
+
+	external_labels = {
+		env    = "production",
+		stack  = "sicurre",
+		server = "hetzner-cx33",
+	}
+}
+
+// The receiver is ready for application traces once the API/auth services are
+// instrumented. Prometheus and Docker/Loki continue to cover host operations.
+otelcol.auth.basic "grafana_cloud" {
+	username = sys.env("GRAFANA_OPEN_TELEMETRY_INSTANCE_ID")
+	password = sys.env("GRAFANA_OPEN_TELEMETRY_API_TOKEN")
+}
+
+otelcol.exporter.otlphttp "grafana_cloud" {
+	client {
+		endpoint = sys.env("GRAFANA_OPEN_TELEMETRY_OTLP_ENDPOINT")
+		auth     = otelcol.auth.basic.grafana_cloud.handler
+	}
+}
+
+otelcol.receiver.otlp "sicurre" {
+	grpc {
+		endpoint = "0.0.0.0:4317"
+	}
+
+	http {
+		endpoint = "0.0.0.0:4318"
+	}
+
+	output {
+		traces  = [otelcol.exporter.otlphttp.grafana_cloud.input]
+	}
+}

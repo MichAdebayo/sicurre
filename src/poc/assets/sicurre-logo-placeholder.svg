@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="240" viewBox="0 0 720 240" role="img" aria-labelledby="title desc">
+  <title id="title">Sicurre Placeholder Logo</title>
+  <desc id="desc">Placeholder logo for Sicurre cybersecurity product identity.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f766e"/>
+      <stop offset="100%" stop-color="#115e59"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="24" width="192" height="192" rx="40" fill="url(#bg)"/>
+  <path d="M112 52l58 25v43c0 39-22 64-58 79-36-15-58-40-58-79V77l58-25z" fill="#ffffff" opacity="0.95"/>
+  <path d="M82 116l18 18 42-42" fill="none" stroke="#0f766e" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="242" y="120" font-size="74" font-family="Montserrat, Poppins, Arial, sans-serif" font-weight="700" fill="#0f172a">Sicurre</text>
+  <text x="245" y="163" font-size="26" font-family="Montserrat, Poppins, Arial, sans-serif" font-weight="500" fill="#334155">Email Security Platform</text>
+</svg>

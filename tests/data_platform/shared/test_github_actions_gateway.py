@@ -1,0 +1,101 @@
+"""Unit tests for GitHubActionsGateway."""
+
+from __future__ import annotations
+
+import pytest
+import pytest_asyncio
+import respx
+import httpx
+
+from data_platform.services.shared.github_actions_gateway import (
+    GitHubActionsGateway,
+    GitHubDispatchError,
+)
+
+_DISPATCH_URL = (
+    "https://api.github.com/repos/owner-test/sicurre-ml"
+    "/actions/workflows/train.yml/dispatches"
+)
+
+
+@pytest.fixture
+def gateway() -> GitHubActionsGateway:
+    return GitHubActionsGateway(
+        token="test-token",
+        owner="owner-test",
+        repo="sicurre-ml",
+    )
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_dispatch_training_success(gateway: GitHubActionsGateway) -> None:
+    """204 response completes without error."""
+    respx.post(_DISPATCH_URL).mock(return_value=httpx.Response(204))
+
+    await gateway.dispatch_training(kaggle_slug="user/sicurre-data")
+
+    assert respx.calls.call_count == 1
+    request = respx.calls.last.request
+    import json
+
+    body = json.loads(request.content)
+    assert body["ref"] == "mlops"
+    assert body["inputs"]["training_dataset"] == "user/sicurre-data"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_dispatch_training_sends_bearer_token(
+    gateway: GitHubActionsGateway,
+) -> None:
+    respx.post(_DISPATCH_URL).mock(return_value=httpx.Response(204))
+
+    await gateway.dispatch_training(kaggle_slug="user/sicurre-data")
+
+    auth_header = respx.calls.last.request.headers.get("Authorization", "")
+    assert auth_header == "Bearer test-token"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_dispatch_training_raises_on_non_204(
+    gateway: GitHubActionsGateway,
+) -> None:
+    """Any non-204 status raises GitHubDispatchError."""
+    for status_code in (403, 404, 422, 500):
+        respx.post(_DISPATCH_URL).mock(
+            return_value=httpx.Response(status_code, json={"message": "err"})
+        )
+
+        with pytest.raises(GitHubDispatchError):
+            await gateway.dispatch_training(kaggle_slug="user/sicurre-data")
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_dispatch_training_custom_ref(gateway: GitHubActionsGateway) -> None:
+    """Custom ref is forwarded in the request body."""
+    respx.post(_DISPATCH_URL).mock(return_value=httpx.Response(204))
+
+    await gateway.dispatch_training(kaggle_slug="user/sicurre-data", ref="main")
+
+    import json
+
+    body = json.loads(respx.calls.last.request.content)
+    assert body["ref"] == "main"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_dispatch_training_custom_workflow() -> None:
+    custom_url = (
+        "https://api.github.com/repos/owner-test/sicurre-ml"
+        "/actions/workflows/retrain.yml/dispatches"
+    )
+    respx.post(custom_url).mock(return_value=httpx.Response(204))
+
+    gw = GitHubActionsGateway(token="tok", owner="owner-test", repo="sicurre-ml")
+    await gw.dispatch_training(kaggle_slug="slug", workflow="retrain.yml")
+
+    assert respx.calls.call_count == 1

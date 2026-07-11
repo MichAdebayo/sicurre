@@ -1,0 +1,6 @@
+{
+  "label": "phishing",
+  "confidence": 0.97,
+  "signals": ["French admin impersonation", "Suspicious URL", "DMARC fail"],
+  "model_version": "sicurre/camembertav2-phishing-fr@v0.1.0"
+}

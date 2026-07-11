@@ -1,0 +1,181 @@
+import { createReadStream } from "node:fs";
+import { access, stat } from "node:fs/promises";
+import http from "node:http";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const distDir = process.env.APP_DIST_DIR || path.resolve(__dirname, "../../dist");
+const port = Number(process.env.PORT || 5173);
+const apiServiceUrl = (process.env.API_SERVICE_URL || "http://127.0.0.1:8001").replace(/\/$/, "");
+const authServiceUrl = (process.env.AUTH_SERVICE_URL || "http://127.0.0.1:3005").replace(/\/$/, "");
+const startedAt = Date.now();
+let requestTotal = 0;
+let proxyErrorsTotal = 0;
+const routeCounters = new Map();
+
+const mimeTypes = new Map([
+  [".css", "text/css; charset=utf-8"],
+  [".html", "text/html; charset=utf-8"],
+  [".ico", "image/x-icon"],
+  [".js", "text/javascript; charset=utf-8"],
+  [".json", "application/json; charset=utf-8"],
+  [".png", "image/png"],
+  [".svg", "image/svg+xml"],
+  [".webp", "image/webp"],
+  [".woff", "font/woff"],
+  [".woff2", "font/woff2"],
+]);
+
+function shouldProxy(pathname) {
+  if (pathname.startsWith("/api/auth")) return authServiceUrl;
+  if (
+    pathname === "/health" ||
+    pathname === "/openapi.json" ||
+    pathname.startsWith("/v1") ||
+    pathname.startsWith("/auth")
+  ) {
+    return apiServiceUrl;
+  }
+  return null;
+}
+
+function metricRoute(pathname) {
+  if (pathname === "/__app/health") return "health";
+  if (pathname === "/metrics") return "metrics";
+  if (pathname.startsWith("/api/auth")) return "auth";
+  if (pathname === "/health" || pathname === "/openapi.json" || pathname.startsWith("/v1") || pathname.startsWith("/auth")) {
+    return "api";
+  }
+  if (pathname.startsWith("/assets")) return "assets";
+  return "app";
+}
+
+function incrementRoute(pathname) {
+  const route = metricRoute(pathname);
+  routeCounters.set(route, (routeCounters.get(route) || 0) + 1);
+}
+
+function renderMetrics() {
+  const lines = [
+    "# HELP sicurre_app_gateway_uptime_seconds Seconds since the app gateway started.",
+    "# TYPE sicurre_app_gateway_uptime_seconds gauge",
+    `sicurre_app_gateway_uptime_seconds ${Math.round((Date.now() - startedAt) / 1000)}`,
+    "# HELP sicurre_app_gateway_requests_total Total HTTP requests served by the app gateway.",
+    "# TYPE sicurre_app_gateway_requests_total counter",
+  ];
+  for (const [route, count] of routeCounters.entries()) {
+    lines.push(`sicurre_app_gateway_requests_total{route="${route}"} ${count}`);
+  }
+  lines.push(
+    "# HELP sicurre_app_gateway_proxy_errors_total Total upstream proxy failures.",
+    "# TYPE sicurre_app_gateway_proxy_errors_total counter",
+    `sicurre_app_gateway_proxy_errors_total ${proxyErrorsTotal}`,
+    "",
+  );
+  return lines.join("\n");
+}
+
+function readRequestBody(request) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    request.on("data", (chunk) => chunks.push(chunk));
+    request.on("end", () => resolve(Buffer.concat(chunks)));
+    request.on("error", reject);
+  });
+}
+
+async function proxyRequest(request, response, targetBase) {
+  const target = new URL(request.url || "/", targetBase);
+  const headers = { ...request.headers };
+  delete headers.host;
+  delete headers.connection;
+  delete headers["content-length"];
+
+  const method = request.method || "GET";
+  const body = method === "GET" || method === "HEAD" ? undefined : await readRequestBody(request);
+  const upstream = await fetch(target, { method, headers, body });
+  const responseHeaders = {};
+  upstream.headers.forEach((value, key) => {
+    if (!["connection", "content-encoding", "content-length", "transfer-encoding"].includes(key)) {
+      responseHeaders[key] = value;
+    }
+  });
+  response.writeHead(upstream.status, responseHeaders);
+  if (method === "HEAD") {
+    response.end();
+    return;
+  }
+  response.end(Buffer.from(await upstream.arrayBuffer()));
+}
+
+function safeFilePath(pathname) {
+  const decoded = decodeURIComponent(pathname);
+  const relative = decoded === "/" ? "index.html" : decoded.replace(/^\/+/, "");
+  const candidate = path.resolve(distDir, relative);
+  if (!candidate.startsWith(path.resolve(distDir))) {
+    return null;
+  }
+  return candidate;
+}
+
+async function serveStatic(request, response, pathname) {
+  const requested = safeFilePath(pathname);
+  const indexFile = path.join(distDir, "index.html");
+  let filePath = requested;
+  if (!filePath) {
+    response.writeHead(400);
+    response.end("Bad request");
+    return;
+  }
+
+  try {
+    const fileStat = await stat(filePath);
+    if (fileStat.isDirectory()) {
+      filePath = path.join(filePath, "index.html");
+    }
+    await access(filePath);
+  } catch {
+    filePath = indexFile;
+  }
+
+  const ext = path.extname(filePath).toLowerCase();
+  response.writeHead(200, {
+    "Cache-Control": filePath === indexFile ? "no-store" : "public, max-age=31536000, immutable",
+    "Content-Type": mimeTypes.get(ext) || "application/octet-stream",
+  });
+  createReadStream(filePath).pipe(response);
+}
+
+const server = http.createServer(async (request, response) => {
+  try {
+    const url = new URL(request.url || "/", "http://localhost");
+    requestTotal += 1;
+    incrementRoute(url.pathname);
+    if (url.pathname === "/__app/health") {
+      response.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ status: "ok", service: "sicurre-app" }));
+      return;
+    }
+    if (url.pathname === "/metrics") {
+      response.writeHead(200, { "Content-Type": "text/plain; version=0.0.4; charset=utf-8" });
+      response.end(renderMetrics());
+      return;
+    }
+    const proxyBase = shouldProxy(url.pathname);
+    if (proxyBase) {
+      await proxyRequest(request, response, proxyBase);
+      return;
+    }
+    await serveStatic(request, response, url.pathname);
+  } catch (error) {
+    proxyErrorsTotal += 1;
+    console.error("container_server error", error);
+    response.writeHead(502, { "Content-Type": "application/json; charset=utf-8" });
+    response.end(JSON.stringify({ detail: "App gateway request failed" }));
+  }
+});
+
+server.listen(port, "0.0.0.0", () => {
+  console.log(`Sicurre app server listening on http://0.0.0.0:${port}`);
+});
