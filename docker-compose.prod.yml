@@ -17,17 +17,21 @@ services:
       SICURRE_ENVIRONMENT: production
       SICURRE_AUTH_ENABLED: "true"
       SICURRE_BETTER_AUTH_BASE_URL: http://auth-service:3005
+      SICURRE_TELEMETRY_TRACES_ENABLED: "true"
+      SICURRE_TELEMETRY_OTLP_ENDPOINT: http://alloy:4318/v1/traces
+      SICURRE_TELEMETRY_TRACE_SAMPLE_RATIO: ${SICURRE_TELEMETRY_TRACE_SAMPLE_RATIO:-1.0}
     expose:
       - "8001"
     command:
       - sh
       - -c
-      - uv run alembic upgrade head && uv run uvicorn data_platform.api.main:app --host 0.0.0.0 --port 8001
+      - uv run --no-sync alembic upgrade head && uv run --no-sync alembic -c alembic.app.ini upgrade head && uv run --no-sync uvicorn data_platform.api.main:app --host 0.0.0.0 --port 8001 --no-access-log
     healthcheck:
       test:
         - CMD
         - uv
         - run
+        - --no-sync
         - python
         - -c
         - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=5).read()
@@ -49,11 +53,8 @@ services:
       SICURRE_BETTER_AUTH_URL: ${SICURRE_PUBLIC_APP_URL:-https://sicurre.com}
       BETTER_AUTH_URL: ${SICURRE_PUBLIC_APP_URL:-https://sicurre.com}
       SICURRE_FRONTEND_ORIGIN: ${SICURRE_PUBLIC_APP_URL:-https://sicurre.com}
-      SICURRE_BETTER_AUTH_DB_PATH: /app/data/local/better-auth.db
     expose:
       - "3005"
-    volumes:
-      - better_auth_data:/app/data/local
     healthcheck:
       test:
         - CMD
@@ -97,7 +98,6 @@ services:
     <<: *default-logging
 
   alloy:
-    profiles: ["observability"]
     image: grafana/alloy:latest
     restart: unless-stopped
     env_file:
@@ -107,9 +107,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
     command: ["run", "/etc/alloy/config.alloy"]
-    depends_on:
-      sicurre-app:
-        condition: service_healthy
     expose:
       - "4317"
       - "4318"
@@ -120,6 +117,3 @@ services:
 networks:
   sicurre-internal:
     driver: bridge
-
-volumes:
-  better_auth_data:

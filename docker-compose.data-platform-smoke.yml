@@ -14,7 +14,7 @@ services:
     command:
       - sh
       - -c
-      - uv run alembic upgrade head && uv run uvicorn data_platform.api.main:app --host 0.0.0.0 --port 8001
+      - uv run --no-sync alembic upgrade head && uv run --no-sync uvicorn data_platform.api.main:app --host 0.0.0.0 --port 8001
     ports:
       - "8001:8001"
     healthcheck:
@@ -22,6 +22,7 @@ services:
         - CMD
         - uv
         - run
+        - --no-sync
         - python
         - -c
         - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=5).read()"
