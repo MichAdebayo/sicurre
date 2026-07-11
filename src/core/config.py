@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlparse
@@ -41,6 +42,7 @@ class Settings(BaseSettings):
     better_auth_session_path: str = "/api/auth/get-session"
     better_auth_timeout_seconds: float = 5.0
     better_auth_cookie_name: str = "better-auth.session_token"
+    better_auth_schema: str = "auth"
     platform_admin_emails: str = "admin@sicurre.fr"
     raw_snapshot_storage_backend: str = "local"
     raw_snapshot_local_dir: Path = ROOT_DIR / "data" / "raw" / "api"
@@ -163,6 +165,9 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("PUBLIC_API_URL", "SICURRE_PUBLIC_API_URL"),
     )
     scheduler_enabled: bool = False
+    telemetry_traces_enabled: bool = False
+    telemetry_otlp_endpoint: str = "http://alloy:4318/v1/traces"
+    telemetry_trace_sample_ratio: float = Field(default=1.0, ge=0, le=1)
     scheduler_interval_seconds: int = Field(
         default=604800,
         validation_alias="SICURRE_SCHEDULER_INTERVAL_SECONDS",
@@ -249,6 +254,15 @@ class Settings(BaseSettings):
             raise ValueError(
                 "public_api_url must be the public Sicurre app API base URL, not a /v1 endpoint"
             )
+        return normalized
+
+    @field_validator("better_auth_schema")
+    @classmethod
+    def _validate_better_auth_schema(cls, value: str) -> str:
+        """Allow only an unambiguous PostgreSQL schema identifier."""
+        normalized = value.strip().lower()
+        if re.fullmatch(r"[a-z_][a-z0-9_]*", normalized) is None:
+            raise ValueError("better_auth_schema must be a safe PostgreSQL identifier")
         return normalized
 
     @property

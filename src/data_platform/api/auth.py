@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import re
 import sqlite3
 import uuid
@@ -12,6 +11,7 @@ from fastapi import Depends, HTTPException, Request, status
 
 from core.config import get_settings
 from core.security import AuthenticatedPrincipal, require_authenticated_principal
+from db.runtime import execute_runtime_query, ensure_local_runtime_tables
 
 PLATFORM_ADMIN_ROLE = "admin"
 WORKSPACE_OWNER_ROLE = "owner"
@@ -40,7 +40,7 @@ def _table_columns(conn: sqlite3.Connection, table_name: str) -> set[str]:
     return {str(row[1]) for row in rows}
 
 
-def ensure_runtime_tables() -> None:
+def _ensure_legacy_sqlite_tables() -> None:
     conn = sqlite3.connect(_db_path())
     try:
         conn.execute("""
@@ -263,7 +263,7 @@ def ensure_runtime_tables() -> None:
 
 
 def _query(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
-    ensure_runtime_tables()
+    _ensure_legacy_sqlite_tables()
     conn = sqlite3.connect(_db_path())
     conn.row_factory = sqlite3.Row
     try:
@@ -275,7 +275,12 @@ def _query(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
 
 
 async def async_query(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
-    return await asyncio.to_thread(_query, sql, params)
+    return await execute_runtime_query(sql, params)
+
+
+def ensure_runtime_tables() -> None:
+    """Create app runtime tables only for local SQLite development."""
+    ensure_local_runtime_tables()
 
 
 def _slugify_workspace_name(display_name: str, email: str, auth_user_id: str) -> str:

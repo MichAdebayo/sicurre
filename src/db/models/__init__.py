@@ -26,7 +26,6 @@ from db.models.lineage import (
     SplitName,
     UserRole,
 )
-
 __all__ = [
     "AnnotationLabel",
     "AnnotationLabelSource",

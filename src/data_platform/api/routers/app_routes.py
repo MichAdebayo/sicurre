@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.config import get_settings
 from core.database import get_async_session
 from data_platform.api.auth import AuthUser, async_query as auth_query, get_current_user
+from db.runtime import execute_runtime_query
 
 router = APIRouter(tags=["app-ui-flows"])
 CF_BASE = "https://api.cloudflare.com/client/v4"
@@ -182,7 +183,7 @@ def query_auth_db(query: str, params: tuple = ()) -> list[dict]:
 
 
 async def async_query_auth_db(query: str, params: tuple = ()) -> list[dict]:
-    return await asyncio.to_thread(query_auth_db, query, params)
+    return await execute_runtime_query(query, params)
 
 
 @router.get("/v1/auth/session")
@@ -197,7 +198,7 @@ async def patch_profile(
 ) -> dict:
     now = datetime.utcnow().isoformat() + "Z"
     await auth_query(
-        'UPDATE "user" SET name = ?, updatedAt = ? WHERE id = ?',
+        'UPDATE "user" SET name = ?, "updatedAt" = ? WHERE id = ?',
         (payload.display_name.strip(), now, current_user.id),
     )
     await auth_query(
@@ -1126,9 +1127,15 @@ async def get_alert_preferences(current_user: AuthUser = Depends(get_current_use
 async def update_alert_preferences(payload: AlertPreferenceUpdate, current_user: AuthUser = Depends(get_current_user)):
     await async_query_auth_db(
         """
-        INSERT OR REPLACE INTO app_alert_preference 
+        INSERT INTO app_alert_preference
         (workspace_id, notify_phishing, notify_spam, quiet_hours_enabled, quiet_hours_start, quiet_hours_end)
         VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(workspace_id) DO UPDATE SET
+            notify_phishing=excluded.notify_phishing,
+            notify_spam=excluded.notify_spam,
+            quiet_hours_enabled=excluded.quiet_hours_enabled,
+            quiet_hours_start=excluded.quiet_hours_start,
+            quiet_hours_end=excluded.quiet_hours_end
         """,
         (
             current_user.workspace_id,
@@ -1560,11 +1567,19 @@ async def check_domain_shield_status(
     # Insert or replace latest status cache
     await async_query_auth_db(
         """
-        INSERT OR REPLACE INTO app_domain_shield_status (
+        INSERT INTO app_domain_shield_status (
             domain, workspace_id, spf_valid, spf_record, dkim_valid, dkim_record,
             dmarc_valid, dmarc_record, dmarc_policy, ssl_valid, ssl_days_remaining,
             reputation_score, score_grade, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(domain) DO UPDATE SET
+            workspace_id=excluded.workspace_id, spf_valid=excluded.spf_valid,
+            spf_record=excluded.spf_record, dkim_valid=excluded.dkim_valid,
+            dkim_record=excluded.dkim_record, dmarc_valid=excluded.dmarc_valid,
+            dmarc_record=excluded.dmarc_record, dmarc_policy=excluded.dmarc_policy,
+            ssl_valid=excluded.ssl_valid, ssl_days_remaining=excluded.ssl_days_remaining,
+            reputation_score=excluded.reputation_score, score_grade=excluded.score_grade,
+            updated_at=excluded.updated_at
         """,
         (
             domain,

@@ -45,6 +45,7 @@ from pydantic import BaseModel, Field
 from core.config import get_settings
 from core.loops import send_loops_transactional
 from data_platform.api.auth import AuthUser, ensure_runtime_tables, get_current_user
+from db.runtime import execute_runtime_query
 from data_platform.services.cloudflare_provisioner import (
     CloudflareAPIError,
     CloudflareProvisioner,
@@ -199,11 +200,19 @@ async def _sync_domain_shield_dns(
     ts = datetime.now(timezone.utc).isoformat()
     await _async_query(
         """
-        INSERT OR REPLACE INTO app_domain_shield_status (
+        INSERT INTO app_domain_shield_status (
             domain, workspace_id, spf_valid, spf_record, dkim_valid, dkim_record,
             dmarc_valid, dmarc_record, dmarc_policy, ssl_valid, ssl_days_remaining,
             reputation_score, score_grade, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 365, ?, ?, ?)
+        ON CONFLICT(domain) DO UPDATE SET
+            workspace_id=excluded.workspace_id, spf_valid=excluded.spf_valid,
+            spf_record=excluded.spf_record, dkim_valid=excluded.dkim_valid,
+            dkim_record=excluded.dkim_record, dmarc_valid=excluded.dmarc_valid,
+            dmarc_record=excluded.dmarc_record, dmarc_policy=excluded.dmarc_policy,
+            ssl_valid=excluded.ssl_valid, ssl_days_remaining=excluded.ssl_days_remaining,
+            reputation_score=excluded.reputation_score, score_grade=excluded.score_grade,
+            updated_at=excluded.updated_at
         """,
         (
             zone_name,
@@ -257,31 +266,12 @@ def _query(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
 
 
 async def _async_query(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
-    return await asyncio.to_thread(_query, sql, params)
+    return await execute_runtime_query(sql, params)
 
 
 def _ensure_tables() -> None:
-    """Create the cloudflare_integration table if it does not exist yet."""
+    """Create application tables for local development only."""
     ensure_runtime_tables()
-    _query("""
-        CREATE TABLE IF NOT EXISTS cloudflare_integration (
-            id                  TEXT PRIMARY KEY,
-            user_email          TEXT NOT NULL,
-            workspace_id        TEXT NULL,
-            workspace_member_user_id TEXT NULL,
-            zone_id             TEXT NOT NULL,
-            zone_name           TEXT NOT NULL,
-            account_id          TEXT NOT NULL,
-            worker_name         TEXT NOT NULL,
-            rule_id             TEXT NOT NULL DEFAULT 'unknown',
-            destination_email   TEXT NOT NULL,
-            shared_secret_hash  TEXT NOT NULL,
-            status              TEXT NOT NULL DEFAULT 'pending_verification',
-            error_message       TEXT,
-            created_at          TEXT NOT NULL,
-            updated_at          TEXT NOT NULL
-        )
-    """)
 
 
 # ---------------------------------------------------------------------------
@@ -701,8 +691,10 @@ async def setup_cloudflare(
         )
         await _async_query(
             """
-            INSERT OR REPLACE INTO app_cloudflare_config (workspace_id, api_token, created_at, updated_at)
+            INSERT INTO app_cloudflare_config (workspace_id, api_token, created_at, updated_at)
             VALUES (?, ?, ?, ?)
+            ON CONFLICT(workspace_id) DO UPDATE SET
+                api_token=excluded.api_token, updated_at=excluded.updated_at
             """,
             (current_user.workspace_id, payload.cf_api_token, now, now),
         )
@@ -763,8 +755,10 @@ async def setup_cloudflare(
     if payload.cf_api_token:
         await _async_query(
             """
-            INSERT OR REPLACE INTO app_cloudflare_config (workspace_id, api_token, created_at, updated_at)
+            INSERT INTO app_cloudflare_config (workspace_id, api_token, created_at, updated_at)
             VALUES (?, ?, ?, ?)
+            ON CONFLICT(workspace_id) DO UPDATE SET
+                api_token=excluded.api_token, updated_at=excluded.updated_at
             """,
             (current_user.workspace_id, payload.cf_api_token, now, now),
         )
@@ -907,11 +901,19 @@ async def setup_cloudflare(
 
                 await _async_query(
                     """
-                    INSERT OR REPLACE INTO app_domain_shield_status (
+                    INSERT INTO app_domain_shield_status (
                         domain, workspace_id, spf_valid, spf_record, dkim_valid, dkim_record,
                         dmarc_valid, dmarc_record, dmarc_policy, ssl_valid, ssl_days_remaining,
                         reputation_score, score_grade, updated_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 365, ?, ?, ?)
+                    ON CONFLICT(domain) DO UPDATE SET
+                        workspace_id=excluded.workspace_id, spf_valid=excluded.spf_valid,
+                        spf_record=excluded.spf_record, dkim_valid=excluded.dkim_valid,
+                        dkim_record=excluded.dkim_record, dmarc_valid=excluded.dmarc_valid,
+                        dmarc_record=excluded.dmarc_record, dmarc_policy=excluded.dmarc_policy,
+                        ssl_valid=excluded.ssl_valid, ssl_days_remaining=excluded.ssl_days_remaining,
+                        reputation_score=excluded.reputation_score, score_grade=excluded.score_grade,
+                        updated_at=excluded.updated_at
                     """,
                     (
                         payload.zone_name,
@@ -1159,8 +1161,10 @@ async def save_workspace_cloudflare_token(
     ts = datetime.now(timezone.utc).isoformat()
     await _async_query(
         """
-        INSERT OR REPLACE INTO app_cloudflare_config (workspace_id, api_token, created_at, updated_at)
+        INSERT INTO app_cloudflare_config (workspace_id, api_token, created_at, updated_at)
         VALUES (?, ?, ?, ?)
+        ON CONFLICT(workspace_id) DO UPDATE SET
+            api_token=excluded.api_token, updated_at=excluded.updated_at
         """,
         (current_user.workspace_id, payload.cf_api_token, ts, ts),
     )
