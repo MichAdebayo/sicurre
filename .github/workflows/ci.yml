@@ -69,9 +69,17 @@ jobs:
       - name: Install Python dependencies
         run: uv sync --frozen --group backend --group dev --group storage
 
+      - name: Audit production Python dependency set
+        run: |
+          uv export --frozen --only-group runtime --no-hashes -o /tmp/runtime-requirements.txt
+          uv run --no-sync pip-audit --no-deps --disable-pip \
+            --ignore-vuln PYSEC-2026-161 --ignore-vuln PYSEC-2026-249 \
+            --ignore-vuln PYSEC-2026-248 --ignore-vuln CVE-2026-48818 \
+            --ignore-vuln CVE-2026-48817 -r /tmp/runtime-requirements.txt
+
       - name: Lint deployment-critical Python
         run: |
-          uv run --no-sync ruff check src/core/config.py src/data_platform/extractors/incremental_cc_extractor.py src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py tests/data_platform/common_crawl/test_incremental_cc_checkpoint.py tests/data_platform/common_crawl/test_cc_runtime_config.py
+          uv run --no-sync ruff check src/core/config.py src/db/runtime.py src/db/models/app_runtime.py src/db/migrations_app src/data_platform/extractors/incremental_cc_extractor.py src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py tests/data_platform/common_crawl/test_incremental_cc_checkpoint.py tests/data_platform/common_crawl/test_cc_runtime_config.py
           uv run --no-sync ruff format --check src/core/config.py src/data_platform/extractors/incremental_cc_extractor.py src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py tests/data_platform/common_crawl/test_incremental_cc_checkpoint.py tests/data_platform/common_crawl/test_cc_runtime_config.py
 
       - name: Typecheck deployment-critical Python
