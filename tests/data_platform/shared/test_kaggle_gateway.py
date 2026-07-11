@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import csv
 import os
-import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -92,8 +91,8 @@ def test_push_sync_success(gateway: KaggleGateway, tmp_path: Path, monkeypatch) 
     mock_api = MagicMock()
     mock_api.dataset_create_version.return_value = MagicMock(versionNumber=7)
 
-    with patch("kaggle.KaggleApi", return_value=mock_api):
-        version = gateway._push_sync("user/sicurre-data", tmp_path, "Test message")
+    gateway._api_factory = lambda: mock_api
+    version = gateway._push_sync("user/sicurre-data", tmp_path, "Test message")
 
     assert version == 7
     mock_api.authenticate.assert_called_once()
@@ -108,23 +107,17 @@ def test_push_sync_success(gateway: KaggleGateway, tmp_path: Path, monkeypatch) 
     )
 
 
-def test_push_sync_raises_on_failure(
-    gateway: KaggleGateway, tmp_path: Path
-) -> None:
+def test_push_sync_raises_on_failure(gateway: KaggleGateway, tmp_path: Path) -> None:
     mock_api = MagicMock()
     mock_api.dataset_create_version.side_effect = Exception("API error")
 
-    with patch("kaggle.KaggleApi", return_value=mock_api):
-        with pytest.raises(KagglePushError, match="Kaggle push failed"):
-            gateway._push_sync("user/sicurre-data", tmp_path, "msg")
-
-
+    gateway._api_factory = lambda: mock_api
+    with pytest.raises(KagglePushError, match="Kaggle push failed"):
+        gateway._push_sync("user/sicurre-data", tmp_path, "msg")
 
 
 @pytest.mark.asyncio
-async def test_push_version_calls_push_sync(
-    gateway: KaggleGateway, tmp_path: Path
-) -> None:
+async def test_push_version_calls_push_sync(gateway: KaggleGateway, tmp_path: Path) -> None:
     """push_version runs _push_sync in an executor and returns its result."""
     with patch.object(gateway, "_push_sync", return_value=42) as mock_sync:
         result = await gateway.push_version(

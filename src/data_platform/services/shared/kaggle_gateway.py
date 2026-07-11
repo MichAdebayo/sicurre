@@ -2,19 +2,19 @@ from __future__ import annotations
 
 import asyncio
 import csv
+import json
+import logging
 import os
-import subprocess
-import tempfile
+import socket
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class KagglePushError(Exception):
     """Raised when the kaggle datasets version call fails."""
-
-
-import logging
-
-logger = logging.getLogger(__name__)
 
 
 class KaggleGateway:
@@ -24,9 +24,30 @@ class KaggleGateway:
     Injectable — swap for a stub in tests.
     """
 
-    def __init__(self, username: str, key: str) -> None:
+    def __init__(
+        self,
+        username: str,
+        key: str,
+        api_factory: Callable[[], Any] | None = None,
+    ) -> None:
         self._username = username
         self._key = key
+        self._api_factory = api_factory or self._create_api
+
+    @staticmethod
+    def _create_api() -> Any:
+        """Create the Kaggle client after credentials are present in the environment."""
+        from kaggle import KaggleApi
+
+        return KaggleApi()
+
+    def _configure_credentials(self) -> None:
+        """Expose the modern access token contract expected by Kaggle 2.x."""
+        if self._key:
+            os.environ["KAGGLE_API_TOKEN"] = self._key
+            os.environ.pop("KAGGLE_KEY", None)
+        if self._username:
+            os.environ["KAGGLE_USERNAME"] = self._username
 
     async def push_version(
         self,
@@ -49,12 +70,11 @@ class KaggleGateway:
         )
 
     def _push_sync(self, slug: str, export_dir: Path, message: str) -> int:
-        import socket
-        import json
-
         # 1. Apply IPv4 monkeypatch to prevent IPv6 connection hang
         orig_getaddrinfo = socket.getaddrinfo
-        socket.getaddrinfo = lambda h, p, *a, **kw: orig_getaddrinfo(h, p, socket.AF_INET, *a[1:] if a else 0, **kw)
+        socket.getaddrinfo = lambda h, p, *a, **kw: orig_getaddrinfo(
+            h, p, socket.AF_INET, *a[1:] if a else 0, **kw
+        )
 
         try:
             # Write dataset-metadata.json into the export directory if missing
@@ -69,16 +89,10 @@ class KaggleGateway:
                 with open(metadata_file, "w") as f:
                     json.dump({"id": slug, "title": title, "resources": resources}, f)
 
-            from kaggle import KaggleApi
-            api = KaggleApi()
-
             # Try authenticating using settings credentials first
             try:
-                if self._key:
-                    os.environ["KAGGLE_API_TOKEN"] = self._key
-                    os.environ.pop("KAGGLE_KEY", None)
-                elif self._username:
-                    os.environ["KAGGLE_USERNAME"] = self._username
+                self._configure_credentials()
+                api = self._api_factory()
                 api.authenticate()
                 # Test credentials by checking status of target dataset
                 api.dataset_status(slug)
@@ -90,7 +104,7 @@ class KaggleGateway:
                 os.environ.pop("KAGGLE_USERNAME", None)
                 os.environ.pop("KAGGLE_KEY", None)
                 os.environ.pop("KAGGLE_API_TOKEN", None)
-                api = KaggleApi()
+                api = self._api_factory()
                 api.authenticate()
 
             logger.info(f"Uploading new dataset version to Kaggle: slug={slug}...")
@@ -101,7 +115,7 @@ class KaggleGateway:
                 convert_to_csv=False,
                 dir_mode="tar",
             )
-            
+
             # Extract version number if available in the response object
             version_num = getattr(response, "versionNumber", 0)
             if not version_num:
@@ -122,7 +136,6 @@ class KaggleGateway:
             raise KagglePushError(detail) from exc
         finally:
             socket.getaddrinfo = orig_getaddrinfo
-
 
     @staticmethod
     def _parse_version_number(stdout: str) -> int:
