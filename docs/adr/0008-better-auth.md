@@ -14,7 +14,16 @@ After dropping Supabase as the database platform (ADR-0004), Supabase Auth no lo
 4. Demonstrates Simplon competency: "Sécuriser l'accès à la solution IA" (Bloc 3 C20).
 
 ## Decision
-Use **Better Auth** — a TypeScript/framework-agnostic auth library that runs as middleware alongside our FastAPI backend (via its REST API adapter or as a sidecar service).
+Use **Better Auth** — a TypeScript/framework-agnostic auth library that runs as
+a sidecar service beside the FastAPI backend. Keep that boundary rather than
+switching the public app to Neon Auth during the current deployment pass.
+
+The current local/container smoke runtime uses a SQLite-backed Better Auth
+database volume. Before public multi-host production, migrate Better Auth to
+the existing Neon PostgreSQL instance using a dedicated `auth` schema and
+Better Auth's PostgreSQL adapter. The public `/api/auth/*` boundary remains
+unchanged, so this is a persistence migration rather than an auth-provider
+rewrite.
 
 ## Alternatives considered
 
@@ -25,11 +34,12 @@ Use **Better Auth** — a TypeScript/framework-agnostic auth library that runs a
 | **Keycloak** | Enterprise-grade, full OIDC | Very heavy for solo-dev MVP; Java runtime; complex ops |
 | **Firebase Auth** | Free tier, Google-native | External runtime dependency; limited customization |
 | **Custom JWT implementation** | Full control | Reinventing the wheel; high risk of security mistakes |
+| **Neon Auth** | Managed auth endpoint; auth data branches with Neon | Newer Neon-specific runtime/API dependency; not a drop-in replacement for the current Better Auth client/sidecar contract |
 
 ## Why Better Auth
 
 - **Sidecar boundary:** Runs as `auth-service`, a Node.js sidecar exposing `/api/auth/*` while FastAPI owns product APIs.
-- **Session control:** Better Auth manages users, accounts, sessions, and verification rows in the shared app database.
+- **Session control:** Better Auth manages users, accounts, sessions, and verification rows in an auth-owned schema. SQLite is retained only for local/POC and container smoke use; Neon PostgreSQL is the production persistence target.
 - **Framework-agnostic:** Exposes a REST API — our FastAPI backend calls it or proxies its endpoints. Works with any frontend (Streamlit POC, React prod).
 - **Self-hosted:** Runs on the same application host as a sidecar — no external auth SaaS at runtime.
 - **Session management:** Built-in session table, CSRF protection, and cookie/bearer token modes.
@@ -41,9 +51,16 @@ Use **Better Auth** — a TypeScript/framework-agnostic auth library that runs a
 2. FastAPI validates sessions by calling Better Auth's session verification endpoint (or by verifying JWT tokens Better Auth issues).
 3. FastAPI maps the authenticated Better Auth user to `app_workspace` and `workspace_member`.
 4. Better Auth manages auth tables; Sicurre API manages Cloudflare integration tokens separately.
+5. The Better Auth PostgreSQL migration runs before enabling public production
+   accounts. It uses a dedicated `auth` schema so library-owned tables cannot
+   collide with Sicurre domain tables.
 
 ## Consequences
 
 - **Added complexity:** One more service (Node.js sidecar) or need to bridge TS↔Python. Mitigated by Better Auth's REST API — FastAPI just makes HTTP calls.
 - **Security ownership:** We own the auth stack — must handle CSRF, session expiry, token rotation ourselves. Better Auth provides primitives, but we configure them.
 - **Simplon alignment:** Demonstrates full understanding of auth architecture, OAuth flows, and token security — stronger than just using a managed auth service.
+- **Operational trade-off:** The sidecar remains one small Node.js service, but
+  avoids hard-coupling customer identity to a Neon-specific external auth
+  endpoint. Neon remains the production database provider, not the auth
+  provider contract.
