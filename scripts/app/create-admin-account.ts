@@ -2,10 +2,14 @@ import fs from "node:fs";
 import path from "node:path";
 
 import Database from "better-sqlite3";
-import { getMigrations } from "better-auth/db";
 import { config as loadEnv } from "dotenv";
 
-import { auth } from "../../auth-service/auth.js";
+import {
+  auth,
+  authDatabase,
+  authDatabaseDialect,
+  prepareAuthDatabase,
+} from "../../auth-service/auth.js";
 
 type Args = {
   email: string;
@@ -42,12 +46,6 @@ function parseArgs(): Args {
   return { email: email.trim().toLowerCase(), password, name: name.trim() };
 }
 
-function authDbPath(): string {
-  return process.env.SICURRE_BETTER_AUTH_DB_PATH
-    ? path.resolve(rootDir, process.env.SICURRE_BETTER_AUTH_DB_PATH)
-    : path.join(rootDir, "data/local/sicurre.db");
-}
-
 function ensureAdminEmailInEnv(email: string): boolean {
   const existing = fs.existsSync(envPath) ? fs.readFileSync(envPath, "utf8") : "";
   const key = "SICURRE_PLATFORM_ADMIN_EMAILS";
@@ -78,12 +76,15 @@ function ensureAdminEmailInEnv(email: string): boolean {
 async function main(): Promise<void> {
   const { email, password, name } = parseArgs();
 
-  const { runMigrations } = await getMigrations(auth.options);
-  await runMigrations();
-
-  const dbPath = authDbPath();
-  const db = new Database(dbPath);
-  const existingUser = db
+  if (process.env.SICURRE_ENVIRONMENT?.trim().toLowerCase() === "production") {
+    throw new Error("This local utility cannot edit production administrators.");
+  }
+  await prepareAuthDatabase();
+  if (authDatabaseDialect !== "sqlite" || !("prepare" in authDatabase)) {
+    throw new Error("The local admin utility requires the SQLite auth adapter.");
+  }
+  const localAuthDatabase = authDatabase as Database.Database;
+  const existingUser = localAuthDatabase
     .prepare('SELECT id, email FROM "user" WHERE lower(email) = ? LIMIT 1')
     .get(email) as { id: string; email: string } | undefined;
 
@@ -92,19 +93,17 @@ async function main(): Promise<void> {
       body: { email, password, name },
     });
   } else {
-    db.prepare('UPDATE "user" SET name = ?, "updatedAt" = ? WHERE id = ?').run(
+    localAuthDatabase.prepare('UPDATE "user" SET name = ?, "updatedAt" = ? WHERE id = ?').run(
       name,
       new Date(),
       existingUser.id,
     );
   }
 
-  db.prepare('UPDATE "user" SET "emailVerified" = 1, "updatedAt" = ? WHERE lower(email) = ?').run(
+  localAuthDatabase.prepare('UPDATE "user" SET "emailVerified" = 1, "updatedAt" = ? WHERE lower(email) = ?').run(
     new Date(),
     email,
   );
-  db.close();
-
   const envChanged = ensureAdminEmailInEnv(email);
 
   console.log(existingUser ? "Admin Better Auth user already existed; name/email verification updated." : "Admin Better Auth user created.");

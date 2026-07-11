@@ -4,6 +4,8 @@ import Database from "better-sqlite3";
 import { config as loadEnv } from "dotenv";
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
+import { getMigrations } from "better-auth/db/migration";
+import { Pool } from "pg";
 
 loadEnv({ path: path.resolve(process.cwd(), ".env") });
 
@@ -17,10 +19,71 @@ const authSecret =
   process.env.SICURRE_BETTER_AUTH_SECRET ??
   "dev-only-better-auth-secret-change-me-please-1234567890";
 
-const sqlitePath =
-  process.env.SICURRE_BETTER_AUTH_DB_PATH ??
-  path.resolve(process.cwd(), "data/local/sicurre.db");
-export const authDatabase = new Database(sqlitePath);
+const environment = (process.env.SICURRE_ENVIRONMENT ?? "development").trim().toLowerCase();
+const isProduction = environment === "production";
+const localDatabasePath = process.env.SICURRE_LOCAL_BETTER_AUTH_DB_PATH?.trim();
+const productionDatabaseUrl = process.env.SICURRE_BETTER_AUTH_DATABASE_URL?.trim();
+const authSchema = (process.env.SICURRE_BETTER_AUTH_SCHEMA ?? "auth").trim();
+
+if (!/^[a-z_][a-z0-9_]*$/.test(authSchema)) {
+  throw new Error("SICURRE_BETTER_AUTH_SCHEMA must be a safe PostgreSQL identifier.");
+}
+if (isProduction && !productionDatabaseUrl) {
+  throw new Error("Production Better Auth requires SICURRE_BETTER_AUTH_DATABASE_URL.");
+}
+if (isProduction && localDatabasePath) {
+  throw new Error("Production Better Auth must not define SICURRE_LOCAL_BETTER_AUTH_DB_PATH.");
+}
+if (!isProduction && productionDatabaseUrl) {
+  throw new Error("Local Better Auth must not define SICURRE_BETTER_AUTH_DATABASE_URL.");
+}
+
+export const authDatabaseDialect = isProduction ? "postgresql" : "sqlite";
+const productionPool = isProduction
+  ? new Pool({
+      connectionString: productionDatabaseUrl,
+      options: `-c search_path=${authSchema},public`,
+      max: 10,
+      idleTimeoutMillis: 30_000,
+      connectionTimeoutMillis: 10_000,
+    })
+  : null;
+
+const localDatabase = isProduction
+  ? null
+  : new Database(localDatabasePath ?? path.resolve(process.cwd(), "data/local/better-auth.db"));
+
+export const authDatabase = productionPool ?? localDatabase!;
+
+export async function prepareAuthDatabase(): Promise<void> {
+  if (productionPool) {
+    await productionPool.query(`CREATE SCHEMA IF NOT EXISTS "${authSchema}"`);
+  }
+  const { runMigrations } = await getMigrations(auth.options);
+  await runMigrations();
+}
+
+export async function closeAuthDatabase(): Promise<void> {
+  if (productionPool) {
+    await productionPool.end();
+    return;
+  }
+  localDatabase?.close();
+}
+
+export async function authEmailExists(email: string): Promise<boolean> {
+  if (productionPool) {
+    const result = await productionPool.query(
+      `SELECT 1 AS found FROM "${authSchema}"."user" WHERE lower(email) = $1 LIMIT 1`,
+      [email],
+    );
+    return result.rowCount === 1;
+  }
+  const row = localDatabase!
+    .prepare('SELECT 1 AS found FROM "user" WHERE lower(email) = ? LIMIT 1')
+    .get(email) as { found?: number } | undefined;
+  return Boolean(row?.found);
+}
 
 type TurnstileVerification = {
   success: boolean;

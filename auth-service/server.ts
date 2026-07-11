@@ -5,7 +5,7 @@ import { config as loadEnv } from "dotenv";
 import express, { type Request, type Response } from "express";
 import { fromNodeHeaders, toNodeHandler } from "better-auth/node";
 
-import { auth, authDatabase } from "./auth.js";
+import { auth, authDatabaseDialect, authEmailExists, prepareAuthDatabase } from "./auth.js";
 
 loadEnv({ path: path.resolve(process.cwd(), ".env") });
 
@@ -25,7 +25,7 @@ app.use(
 );
 
 app.get("/api/auth/health", (_req: Request, res: Response) => {
-  res.json({ status: "ok", service: "better-auth" });
+  res.json({ status: "ok", service: "better-auth", database: authDatabaseDialect });
 });
 
 app.get("/api/auth/config", (_req: Request, res: Response) => {
@@ -34,7 +34,7 @@ app.get("/api/auth/config", (_req: Request, res: Response) => {
   res.json({ turnstile: { enabled, siteKey: enabled ? siteKey : null } });
 });
 
-app.post("/api/auth/check-email", express.json(), (req: Request, res: Response) => {
+app.post("/api/auth/check-email", express.json(), async (req: Request, res: Response) => {
   const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
   if (!email || !email.includes("@")) {
     res.status(400).json({ exists: false });
@@ -42,12 +42,9 @@ app.post("/api/auth/check-email", express.json(), (req: Request, res: Response) 
   }
 
   try {
-    const row = authDatabase
-      .prepare('select 1 as found from "user" where lower(email) = ? limit 1')
-      .get(email) as { found?: number } | undefined;
-    res.json({ exists: Boolean(row?.found) });
+    res.json({ exists: await authEmailExists(email) });
   } catch {
-    res.json({ exists: false });
+    res.status(503).json({ exists: false, error: "auth_database_unavailable" });
   }
 });
 
@@ -62,6 +59,14 @@ app.all("/api/auth/*", toNodeHandler(auth));
 
 app.use(express.json());
 
-app.listen(port, () => {
-  console.log(`Better Auth server listening on http://127.0.0.1:${port}`);
+async function start(): Promise<void> {
+  await prepareAuthDatabase();
+  app.listen(port, () => {
+    console.log(`Better Auth server listening on http://127.0.0.1:${port}`);
+  });
+}
+
+start().catch((error) => {
+  console.error("Better Auth database initialization failed", error);
+  process.exit(1);
 });
