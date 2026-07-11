@@ -13,7 +13,6 @@ from typing import Any
 import boto3
 import hashlib
 import pandas as pd
-from google.cloud import bigquery
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -294,7 +293,10 @@ class CommonCrawlBigQueryClient:
         self,
         settings: CommonCrawlIngestionSettings | None = None,
     ) -> None:
+        from google.cloud import bigquery
+
         self.settings = settings or CommonCrawlIngestionSettings.from_app_settings()
+        self._bigquery = bigquery
         self.bq_client = bigquery.Client()
         self.project_id = self.settings.gcp_project
         self.dataset_id = self.settings.dataset_id
@@ -349,15 +351,15 @@ class CommonCrawlBigQueryClient:
     def execute_bigquery_pipeline(self, df: pd.DataFrame) -> list[dict[str, Any]]:
         """Loads data to BigQuery, deduplicates using FARM_FINGERPRINT, and extracts the results."""
         logger.info(f"Ensuring internal dataset {self.dataset_id} exists...")
-        dataset_ref = bigquery.Dataset(f"{self.project_id}.{self.dataset_id}")
+        dataset_ref = self._bigquery.Dataset(f"{self.project_id}.{self.dataset_id}")
         dataset_ref.location = self.settings.gcp_region
         self.bq_client.create_dataset(dataset_ref, exists_ok=True)
 
         logger.info(
             f"Pushing {len(df)} rows to BigQuery native table: {self.full_table_id}"
         )
-        job_config = bigquery.LoadJobConfig(
-            write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE
+        job_config = self._bigquery.LoadJobConfig(
+            write_disposition=self._bigquery.WriteDisposition.WRITE_TRUNCATE
         )
         load_job = self.bq_client.load_table_from_dataframe(
             dataframe=df,
