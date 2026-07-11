@@ -158,6 +158,8 @@ jobs:
               echo "GHCR_OWNER=${{ needs.build-push.outputs.owner }}" >> .env
             fi
 
+            echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io \
+              --username '${{ github.actor }}' --password-stdin
             docker compose -f docker-compose.prod.yml pull sicurre-app sicurre-api auth-service
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
