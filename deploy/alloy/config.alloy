@@ -109,8 +109,6 @@ otelcol.receiver.otlp "sicurre" {
 	}
 
 	output {
-		metrics = [otelcol.exporter.otlphttp.grafana_cloud.input]
-		logs    = [otelcol.exporter.otlphttp.grafana_cloud.input]
 		traces  = [otelcol.exporter.otlphttp.grafana_cloud.input]
 	}
 }
