@@ -5,6 +5,7 @@
   "description": "Real-time phishing detection and inbox remediation for French auto-entrepreneurs and TPEs.",
   "scripts": {
     "auth:dev": "tsx auth-service/server.ts",
+    "auth:migrate": "tsx scripts/app/migrate-better-auth.ts",
     "auth:typecheck": "tsc -p auth-service/tsconfig.json --noEmit",
     "dev": "vite",
     "build": "tsc && vite build",
@@ -27,6 +28,7 @@
     "framer-motion": "11.18.2",
     "i18next": "23.16.5",
     "lucide-react": "0.511.0",
+    "pg": "^8.22.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-hook-form": "7.56.4",
@@ -41,6 +43,7 @@
     "@types/cors": "2.8.18",
     "@types/express": "5.0.3",
     "@types/node": "20.19.1",
+    "@types/pg": "^8.20.0",
     "@types/react": "19.1.6",
     "@types/react-dom": "19.1.5",
     "@vitejs/plugin-react": "^6.0.2",
