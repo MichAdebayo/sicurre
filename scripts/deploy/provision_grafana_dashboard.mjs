@@ -54,20 +54,48 @@ async function ensureFolder() {
   return folderUid;
 }
 
-async function requireDatasources() {
+const datasourceNames = {
+  prometheus: "grafanacloud-sicurre-prom",
+  loki: "grafanacloud-sicurre-logs",
+  tempo: "grafanacloud-sicurre-traces",
+};
+
+async function resolveDatasources() {
   const { body } = await grafanaFetch("/api/datasources");
-  const availableTypes = new Set(body.map((datasource) => datasource.type));
-  const requiredTypes = ["prometheus", "loki", "tempo"];
-  const missingTypes = requiredTypes.filter((type) => !availableTypes.has(type));
-  if (missingTypes.length > 0) {
-    throw new Error(`Grafana is missing required datasources: ${missingTypes.join(", ")}`);
+  const resolved = Object.fromEntries(
+    Object.entries(datasourceNames).map(([variable, name]) => [
+      variable,
+      body.find((datasource) => datasource.name === name),
+    ]),
+  );
+  const missing = Object.entries(resolved)
+    .filter(([, datasource]) => !datasource)
+    .map(([variable]) => datasourceNames[variable]);
+  if (missing.length > 0) {
+    throw new Error(`Grafana is missing required datasources: ${missing.join(", ")}`);
+  }
+  return resolved;
+}
+
+function bindDatasources(dashboard, datasources) {
+  const variables = dashboard.templating?.list || [];
+  for (const [name, datasource] of Object.entries(datasources)) {
+    const variable = variables.find((item) => item.name === name);
+    if (!variable) throw new Error(`Dashboard datasource variable '${name}' is missing.`);
+    variable.current = {
+      selected: true,
+      text: datasource.name,
+      value: datasource.uid,
+    };
+    variable.regex = `/^${datasource.name}$/`;
   }
 }
 
 const dashboard = JSON.parse(await readFile(dashboardPath, "utf8"));
 dashboard.id = null;
 
-await requireDatasources();
+const datasources = await resolveDatasources();
+bindDatasources(dashboard, datasources);
 await ensureFolder();
 const provisioned = await grafanaFetch("/api/dashboards/db", {
   method: "POST",
@@ -81,6 +109,14 @@ const provisioned = await grafanaFetch("/api/dashboards/db", {
 const verified = await grafanaFetch(`/api/dashboards/uid/${dashboard.uid}`);
 if (verified.body.dashboard?.uid !== dashboard.uid) {
   throw new Error(`Grafana dashboard verification failed for UID ${dashboard.uid}.`);
+}
+for (const [name, datasource] of Object.entries(datasources)) {
+  const savedVariable = verified.body.dashboard.templating.list.find(
+    (variable) => variable.name === name,
+  );
+  if (savedVariable?.current?.value !== datasource.uid) {
+    throw new Error(`Grafana datasource binding verification failed for '${name}'.`);
+  }
 }
 
 console.log(
