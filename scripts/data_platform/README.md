@@ -2,7 +2,10 @@
 
 This folder is organized by source and by pipeline phase so source-specific recovery workflows do not get mixed with shared tooling.
 
-`scripts/` is no longer the canonical launcher surface for Make or day-to-day operational commands. Those entrypoints now live under `src/data_platform/cli/`. This tree is reserved for investigation, manual recovery, one-off backfills, audits, and no-write probes.
+Most canonical data commands live under `src/data_platform/cli/`. This tree is
+reserved for thin deployment/release entrypoints, investigation, manual
+recovery, one-off backfills, audits, and no-write probes. Production business
+logic still belongs under `src/`.
 
 ## Layout
 
@@ -40,7 +43,9 @@ This folder is organized by source and by pipeline phase so source-specific reco
 - Keep source-specific manual recovery workflows under the relevant source folder.
 - Put reusable cross-source builders in `stage_two/`, not under `common_crawl/` or `certfr/`.
 - Automated steady-state runners should stay distinct from one-time manual recovery scripts.
-- Make should call `src/data_platform/cli/` only. `scripts/` should not be a Make entrypoint surface.
+- Make may call a thin script for repository-level release or recovery
+  orchestration. Ordinary data-domain commands should call
+  `src/data_platform/cli/`.
 
 ## Naming split
 

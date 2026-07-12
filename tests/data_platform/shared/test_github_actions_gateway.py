@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
-import pytest_asyncio
-import respx
 import httpx
+import pytest
+import respx
 
 from data_platform.services.shared.github_actions_gateway import (
     GitHubActionsGateway,
@@ -13,9 +12,9 @@ from data_platform.services.shared.github_actions_gateway import (
 )
 
 _DISPATCH_URL = (
-    "https://api.github.com/repos/owner-test/sicurre-ml"
-    "/actions/workflows/train.yml/dispatches"
+    "https://api.github.com/repos/owner-test/sicurre-ml/actions/workflows/train.yml/dispatches"
 )
+_WORKFLOW_URL = "https://api.github.com/repos/owner-test/sicurre-ml/actions/workflows/train.yml"
 
 
 @pytest.fixture
@@ -99,3 +98,30 @@ async def test_dispatch_training_custom_workflow() -> None:
     await gw.dispatch_training(kaggle_slug="slug", workflow="retrain.yml")
 
     assert respx.calls.call_count == 1
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_validate_training_receiver_accepts_active_workflow(
+    gateway: GitHubActionsGateway,
+) -> None:
+    """An accessible active workflow passes release preflight validation."""
+    respx.get(_WORKFLOW_URL).mock(return_value=httpx.Response(200, json={"state": "active"}))
+
+    await gateway.validate_training_receiver()
+
+
+@pytest.mark.asyncio
+@respx.mock
+@pytest.mark.parametrize("status_code", [403, 404, 500])
+async def test_validate_training_receiver_rejects_inaccessible_workflow(
+    gateway: GitHubActionsGateway,
+    status_code: int,
+) -> None:
+    """An inaccessible workflow stops release before dataset publication."""
+    respx.get(_WORKFLOW_URL).mock(
+        return_value=httpx.Response(status_code, json={"message": "unavailable"})
+    )
+
+    with pytest.raises(GitHubDispatchError):
+        await gateway.validate_training_receiver()
