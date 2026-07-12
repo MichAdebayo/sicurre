@@ -9,7 +9,8 @@
     "auth:typecheck": "tsc -p auth-service/tsconfig.json --noEmit",
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "grafana:provision": "node scripts/deploy/provision_grafana_dashboard.mjs"
   },
   "repository": {
     "type": "git",

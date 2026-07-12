@@ -5,7 +5,13 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "../..");
 
-const grafanaUrl = process.env.GRAFANA_URL?.replace(/\/$/, "");
+function normalizeGrafanaUrl(value) {
+  if (!value) return undefined;
+  const withScheme = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+  return withScheme.replace(/\/$/, "");
+}
+
+const grafanaUrl = normalizeGrafanaUrl(process.env.GRAFANA_URL);
 const token = process.env.GRAFANA_SERVICE_ACCOUNT_TOKEN || process.env.GRAFANA_API_TOKEN;
 const folderUid = process.env.GRAFANA_SICURRE_FOLDER_UID || "sicurre";
 const folderTitle = process.env.GRAFANA_SICURRE_FOLDER_TITLE || "Sicurre";
@@ -48,11 +54,22 @@ async function ensureFolder() {
   return folderUid;
 }
 
+async function requireDatasources() {
+  const { body } = await grafanaFetch("/api/datasources");
+  const availableTypes = new Set(body.map((datasource) => datasource.type));
+  const requiredTypes = ["prometheus", "loki", "tempo"];
+  const missingTypes = requiredTypes.filter((type) => !availableTypes.has(type));
+  if (missingTypes.length > 0) {
+    throw new Error(`Grafana is missing required datasources: ${missingTypes.join(", ")}`);
+  }
+}
+
 const dashboard = JSON.parse(await readFile(dashboardPath, "utf8"));
 dashboard.id = null;
 
+await requireDatasources();
 await ensureFolder();
-await grafanaFetch("/api/dashboards/db", {
+const provisioned = await grafanaFetch("/api/dashboards/db", {
   method: "POST",
   body: JSON.stringify({
     dashboard,
@@ -61,5 +78,12 @@ await grafanaFetch("/api/dashboards/db", {
     message: "Provision Sicurre runtime dashboard from repository",
   }),
 });
+const verified = await grafanaFetch(`/api/dashboards/uid/${dashboard.uid}`);
+if (verified.body.dashboard?.uid !== dashboard.uid) {
+  throw new Error(`Grafana dashboard verification failed for UID ${dashboard.uid}.`);
+}
 
-console.log(`Provisioned Grafana dashboard '${dashboard.title}' in folder '${folderTitle}'.`);
+console.log(
+  `Provisioned Grafana dashboard '${dashboard.title}' in folder '${folderTitle}': ` +
+  `${grafanaUrl}${provisioned.body.url}`,
+);
