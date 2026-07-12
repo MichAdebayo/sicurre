@@ -12,14 +12,17 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 SRC_ROOT = ROOT_DIR / "src"
 sys.path.insert(0, str(SRC_ROOT))
 
-from core.config import get_settings  # noqa: E402
+from core.config import Settings, get_settings  # noqa: E402
 from core.database import AsyncSessionFactory  # noqa: E402
+from data_platform.services.shared.github_actions_gateway import (  # noqa: E402
+    GitHubActionsGateway,
+)
 from db.models import DataAnnotation, DataDataset, DataNormalizedMessage  # noqa: E402
 
 NO_CHANGES_EXIT_CODE = 3
 
 
-def _require_release_configuration() -> None:
+def _require_release_configuration() -> Settings:
     settings = get_settings()
     required = {
         "KAGGLE_USERNAME": settings.kaggle_username,
@@ -31,11 +34,12 @@ def _require_release_configuration() -> None:
     missing = [name for name, value in required.items() if not value]
     if missing:
         raise RuntimeError(f"Missing monthly release settings: {', '.join(missing)}")
+    return settings
 
 
 async def main() -> None:
     """Exit with code three when the latest frozen dataset already covers all records."""
-    _require_release_configuration()
+    settings = _require_release_configuration()
     async with AsyncSessionFactory() as session:
         eligible_count = int(
             (
@@ -63,6 +67,14 @@ async def main() -> None:
     print({"eligible_count": eligible_count, "latest_frozen_count": latest_item_count})
     if eligible_count <= latest_item_count:
         raise SystemExit(NO_CHANGES_EXIT_CODE)
+
+    receiver = GitHubActionsGateway(
+        token=str(settings.github_ml_dispatch_token),
+        owner=str(settings.github_ml_repo_owner),
+        repo=settings.github_ml_repo_name,
+    )
+    await receiver.validate_training_receiver()
+    print({"github_training_receiver": "active"})
 
 
 if __name__ == "__main__":
