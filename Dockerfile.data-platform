@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.11-slim AS base
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app/src \
@@ -9,14 +9,27 @@ WORKDIR /app
 RUN pip install --no-cache-dir uv
 
 COPY pyproject.toml uv.lock ./
+
+FROM base AS runtime
 RUN uv sync --frozen --only-group runtime
 
 COPY alembic.ini alembic.app.ini ./
 COPY src ./src
 COPY scripts ./scripts
+COPY Makefile ./
 
 RUN mkdir -p data/local data/raw
 
 EXPOSE 8001
 
 CMD ["uv", "run", "--no-sync", "uvicorn", "data_platform.api.main:app", "--host", "0.0.0.0", "--port", "8001"]
+
+FROM runtime AS release
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends make \
+    && rm -rf /var/lib/apt/lists/* \
+    && uv sync --frozen --no-default-groups --group runtime --group release
+
+CMD ["make", "monthly-release"]
+
+FROM runtime AS production

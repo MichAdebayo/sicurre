@@ -101,6 +101,19 @@ jobs:
           cache-from: type=gha,scope=sicurre-api
           cache-to: type=gha,mode=max,scope=sicurre-api
 
+      - name: Build and push dataset release runner
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.data-platform
+          target: release
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.image.outputs.owner }}/sicurre-data-release:${{ steps.tag.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ steps.image.outputs.owner }}/sicurre-data-release:latest
+          cache-from: type=gha,scope=sicurre-data-release
+          cache-to: type=gha,mode=max,scope=sicurre-data-release
+
   deploy:
     name: Deploy to Hetzner
     runs-on: ubuntu-latest
@@ -161,6 +174,7 @@ jobs:
             echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io \
               --username '${{ github.actor }}' --password-stdin
             docker compose -f docker-compose.prod.yml pull sicurre-app sicurre-api auth-service
+            docker compose --profile release -f docker-compose.prod.yml pull sicurre-data-release
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
             docker run --rm \
