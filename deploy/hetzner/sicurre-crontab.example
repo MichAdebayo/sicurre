@@ -16,5 +16,6 @@ COMPOSE="docker compose -f /home/sicurre-prod/sicurre/docker-compose.prod.yml"
 10 4 1 * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/database/run_sql_ingestion.py >> /home/sicurre-prod/sicurre/cron-database.log 2>&1
 10 5 2 * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py >> /home/sicurre-prod/sicurre/cron-common-crawl.log 2>&1
 
-# Enable only after release gates are enforced in code and manually proven.
-# 30 6 3 * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api sh -lc 'uv run python src/data_platform/cli/normalize/messages.py --all-pending && uv run python src/data_platform/cli/maintenance/annotation_backfill.py --write && ...' >> /home/sicurre-prod/sicurre/cron-dataset-release.log 2>&1
+# Monthly release runs after the monthly DB and Common Crawl jobs. The preflight
+# exits cleanly without publishing when no new eligible records are available.
+30 6 3 * * cd /home/sicurre-prod/sicurre && $COMPOSE --profile release run --rm --no-deps sicurre-data-release >> /home/sicurre-prod/sicurre/cron-dataset-release.log 2>&1

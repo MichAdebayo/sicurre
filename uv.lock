@@ -4880,6 +4880,9 @@ dev = [
     { name = "sqlalchemy" },
     { name = "warcio" },
 ]
+release = [
+    { name = "kaggle" },
+]
 runtime = [
     { name = "aiosqlite" },
     { name = "alembic" },
@@ -4999,6 +5002,7 @@ dev = [
     { name = "sqlalchemy", specifier = ">=2.0.47" },
     { name = "warcio", specifier = ">=1.7.5" },
 ]
+release = [{ name = "kaggle", specifier = ">=2.2.3" }]
 runtime = [
     { name = "aiosqlite", specifier = ">=0.22.1" },
     { name = "alembic", specifier = ">=1.18.4" },

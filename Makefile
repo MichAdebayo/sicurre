@@ -238,7 +238,7 @@ ingest-all-cron: run-scheduler
 
 normalize:
 	@echo "Normalizing all raw records in the configured data-platform DB..."
-	uv run python src/data_platform/cli/normalize/messages.py --all-pending $(NORMALIZE_ARGS)
+	uv run --no-sync python src/data_platform/cli/normalize/messages.py --all-pending $(NORMALIZE_ARGS)
 
 normalize-dry:
 	@echo "Previewing normalization (no DB writes)..."
@@ -248,7 +248,7 @@ normalize-dry:
 
 annotate:
 	@echo "Persisting missing annotations on normalized messages..."
-	uv run python src/data_platform/cli/maintenance/annotation_backfill.py --write
+	uv run --no-sync python src/data_platform/cli/maintenance/annotation_backfill.py --write
 
 # ── Dataset ───────────────────────────────────────────────────────────────────
 
@@ -258,7 +258,7 @@ generate-data:
 
 dataset-build:
 	@echo "Building DB-backed dataset from annotated normalized messages..."
-	uv run python src/data_platform/cli/datasets/build.py \
+	uv run --no-sync python src/data_platform/cli/datasets/build.py \
 		--name "$(DATASET_NAME)" \
 		--version-tag "$(DATASET_VERSION_TAG)" \
 		--target-usage "$(DATASET_TARGET_USAGE)" \
@@ -268,13 +268,13 @@ dataset-build:
 
 dataset-export:
 	@echo "Serializing frozen dataset to CSV/JSONL for PyTorch..."
-	uv run python src/data_platform/cli/datasets/export.py \
+	uv run --no-sync python src/data_platform/cli/datasets/export.py \
 		--version-tag "$(DATASET_VERSION_TAG)" \
 		$(EXPORT_ARGS)
 
 publish-latest:
 	@echo "Publishing latest frozen dataset to Kaggle and dispatching ML training..."
-	uv run python scripts/data_platform/publish_latest.py
+	uv run --no-sync python scripts/data_platform/publish_latest.py
 
 seed-frozen-dataset:
 	@echo "Seeding current_frozen provenance into data_dataset + data_dataset_item..."
@@ -304,7 +304,11 @@ pipeline-push: normalize annotate dataset-build dataset-export
 dataset-release: normalize annotate dataset-build dataset-export publish-latest
 	@echo "Monthly dataset release completed."
 
-monthly-release: dataset-release
+monthly-release: normalize annotate
+	@set +e; uv run --no-sync python scripts/data_platform/release_preflight.py; code=$$?; set -e; \
+	if [ $$code -eq 3 ]; then echo "Monthly release skipped: no new eligible records."; exit 0; fi; \
+	if [ $$code -ne 0 ]; then exit $$code; fi; \
+	$(MAKE) dataset-build dataset-export publish-latest
 
 run-pipeline: run-scheduler
 	$(MAKE) dataset-release DATASET_TAG_PREFIX=cron

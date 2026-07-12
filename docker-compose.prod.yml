@@ -43,6 +43,18 @@ services:
       - sicurre-internal
     <<: *default-logging
 
+  sicurre-data-release:
+    profiles: ["release"]
+    image: ghcr.io/${GHCR_OWNER:-michaeladebayo99}/sicurre-data-release:${IMAGE_TAG:-latest}
+    env_file:
+      - ${SICURRE_API_ENV_FILE:-./deploy/env.api}
+    environment:
+      SICURRE_ENVIRONMENT: production
+    command: ["make", "monthly-release"]
+    networks:
+      - sicurre-internal
+    <<: *default-logging
+
   auth-service:
     image: ghcr.io/${GHCR_OWNER:-michaeladebayo99}/sicurre-auth:${IMAGE_TAG:-latest}
     restart: unless-stopped
