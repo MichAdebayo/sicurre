@@ -127,6 +127,38 @@ services:
       - sicurre-internal
     <<: *default-logging
 
+  node-exporter:
+    image: prom/node-exporter:v1.9.1
+    restart: unless-stopped
+    command:
+      - --path.rootfs=/host
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+)($|/)
+    volumes:
+      - /:/host:ro,rslave
+    expose:
+      - "9100"
+    networks:
+      - sicurre-internal
+    <<: *default-logging
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.52.1
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    expose:
+      - "8080"
+    networks:
+      - sicurre-internal
+    <<: *default-logging
+
 networks:
   sicurre-internal:
     driver: bridge

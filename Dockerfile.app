@@ -41,4 +41,4 @@ COPY auth-service ./auth-service
 
 EXPOSE 3005
 
-CMD ["npm", "run", "auth:dev"]
+CMD ["./node_modules/.bin/tsx", "auth-service/server.ts"]
