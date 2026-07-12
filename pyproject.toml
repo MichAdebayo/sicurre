@@ -80,6 +80,9 @@ runtime = [
     "urllib3>=2.7.0",
     "warcio>=1.7.5",
 ]
+release = [
+    "kaggle>=2.2.3",
+]
 backend = [
     "aiosqlite>=0.21.0",
     "alembic>=1.14.1",
