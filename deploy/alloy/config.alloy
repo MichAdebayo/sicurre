@@ -35,6 +35,24 @@ prometheus.scrape "app_gateway" {
 	forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
 }
 
+prometheus.scrape "host" {
+	targets         = [{"__address__" = "node-exporter:9100"}]
+	scrape_interval = "60s"
+	forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.scrape "containers" {
+	targets         = [{"__address__" = "cadvisor:8080"}]
+	scrape_interval = "60s"
+	forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.scrape "alloy" {
+	targets         = [{"__address__" = "127.0.0.1:12345"}]
+	scrape_interval = "60s"
+	forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
 prometheus.remote_write "grafana_cloud" {
 	endpoint {
 		url = sys.env("GRAFANA_PROMETHEUS_REMOTE_WRITE_URL")
@@ -109,6 +127,6 @@ otelcol.receiver.otlp "sicurre" {
 	}
 
 	output {
-		traces  = [otelcol.exporter.otlphttp.grafana_cloud.input]
+		traces = [otelcol.exporter.otlphttp.grafana_cloud.input]
 	}
 }

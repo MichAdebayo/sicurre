@@ -13,6 +13,9 @@ const startedAt = Date.now();
 let requestTotal = 0;
 let proxyErrorsTotal = 0;
 const routeCounters = new Map();
+const statusCounters = new Map();
+const durationBuckets = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10];
+const routeDurations = new Map();
 
 const mimeTypes = new Map([
   [".css", "text/css; charset=utf-8"],
@@ -56,6 +59,24 @@ function incrementRoute(pathname) {
   routeCounters.set(route, (routeCounters.get(route) || 0) + 1);
 }
 
+function observeRequest(route, statusCode, durationSeconds) {
+  const statusKey = `${route}:${statusCode}`;
+  statusCounters.set(statusKey, (statusCounters.get(statusKey) || 0) + 1);
+  const observation = routeDurations.get(route) || {
+    count: 0,
+    sum: 0,
+    buckets: new Map(durationBuckets.map((bucket) => [bucket, 0])),
+  };
+  observation.count += 1;
+  observation.sum += durationSeconds;
+  for (const bucket of durationBuckets) {
+    if (durationSeconds <= bucket) {
+      observation.buckets.set(bucket, observation.buckets.get(bucket) + 1);
+    }
+  }
+  routeDurations.set(route, observation);
+}
+
 function renderMetrics() {
   const lines = [
     "# HELP sicurre_app_gateway_uptime_seconds Seconds since the app gateway started.",
@@ -66,6 +87,30 @@ function renderMetrics() {
   ];
   for (const [route, count] of routeCounters.entries()) {
     lines.push(`sicurre_app_gateway_requests_total{route="${route}"} ${count}`);
+  }
+  lines.push(
+    "# HELP sicurre_app_gateway_responses_total HTTP responses grouped by route and status.",
+    "# TYPE sicurre_app_gateway_responses_total counter",
+  );
+  for (const [key, count] of statusCounters.entries()) {
+    const [route, status] = key.split(":");
+    lines.push(`sicurre_app_gateway_responses_total{route="${route}",status="${status}"} ${count}`);
+  }
+  lines.push(
+    "# HELP sicurre_app_gateway_request_duration_seconds End-to-end gateway request duration.",
+    "# TYPE sicurre_app_gateway_request_duration_seconds histogram",
+  );
+  for (const [route, observation] of routeDurations.entries()) {
+    for (const bucket of durationBuckets) {
+      lines.push(
+        `sicurre_app_gateway_request_duration_seconds_bucket{route="${route}",le="${bucket}"} ${observation.buckets.get(bucket)}`,
+      );
+    }
+    lines.push(
+      `sicurre_app_gateway_request_duration_seconds_bucket{route="${route}",le="+Inf"} ${observation.count}`,
+      `sicurre_app_gateway_request_duration_seconds_sum{route="${route}"} ${observation.sum}`,
+      `sicurre_app_gateway_request_duration_seconds_count{route="${route}"} ${observation.count}`,
+    );
   }
   lines.push(
     "# HELP sicurre_app_gateway_proxy_errors_total Total upstream proxy failures.",
@@ -148,8 +193,15 @@ async function serveStatic(request, response, pathname) {
 }
 
 const server = http.createServer(async (request, response) => {
+  const requestStartedAt = process.hrtime.bigint();
+  const requestUrl = new URL(request.url || "/", "http://localhost");
+  const route = metricRoute(requestUrl.pathname);
+  response.once("finish", () => {
+    const elapsed = Number(process.hrtime.bigint() - requestStartedAt) / 1e9;
+    observeRequest(route, response.statusCode, elapsed);
+  });
   try {
-    const url = new URL(request.url || "/", "http://localhost");
+    const url = requestUrl;
     requestTotal += 1;
     incrementRoute(url.pathname);
     if (url.pathname === "/__app/health") {
