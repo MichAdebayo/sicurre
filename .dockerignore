@@ -8,6 +8,7 @@ node_modules
 dist
 data
 scratch
+tests
 notebooks
 *.ipynb
 vite-dev.log

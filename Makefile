@@ -87,8 +87,13 @@ help:
 install:
 	uv sync
 
-test:
-	uv run pytest tests/
+test: test-unit test-integration
+
+test-unit:
+	uv run pytest tests/unit
+
+test-integration:
+	uv run pytest tests/integration
 
 dev-api:
 	PYTHONPATH=src uv run uvicorn data_platform.api.main:app --reload --port 8001
@@ -109,14 +114,14 @@ grafana-provision:
 	node scripts/deploy/provision_grafana_dashboard.mjs
 
 ci-data-quality:
-	uv run --group backend --group dev --group storage ruff check src/core/config.py src/data_platform/extractors/incremental_cc_extractor.py src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py tests/data_platform/common_crawl/test_incremental_cc_checkpoint.py tests/data_platform/common_crawl/test_cc_runtime_config.py
-	uv run --group backend --group dev --group storage ruff format --check src/core/config.py src/data_platform/extractors/incremental_cc_extractor.py src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py tests/data_platform/common_crawl/test_incremental_cc_checkpoint.py tests/data_platform/common_crawl/test_cc_runtime_config.py
+	uv run --group backend --group dev --group storage ruff check src/core/config.py src/data_platform/extractors/incremental_cc_extractor.py src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py tests/integration/data_platform/common_crawl/test_incremental_cc_checkpoint.py tests/unit/data_platform/common_crawl/test_cc_runtime_config.py
+	uv run --group backend --group dev --group storage ruff format --check src/core/config.py src/data_platform/extractors/incremental_cc_extractor.py src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py tests/integration/data_platform/common_crawl/test_incremental_cc_checkpoint.py tests/unit/data_platform/common_crawl/test_cc_runtime_config.py
 	uv run --group backend --group dev --group storage mypy --config-file mypy.ini --follow-imports=skip
 	uv run --group backend --group dev --group storage interrogate -f 90 src/core/config.py src/data_platform/extractors/incremental_cc_extractor.py src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py
-	uv run --group backend --group dev --group storage pytest tests/data_platform --cov=src --cov-report=term-missing --cov-fail-under=50
+	uv run --group backend --group dev --group storage pytest tests/unit tests/integration --cov=src --cov-report=term-missing --cov-fail-under=50
 
 test-inference:
-	uv run scripts/app/test_inference_api.py
+	uv run tests/e2e/app/smoke_inference_api.py
 
 # ── Base Ingestion ─────────────────────────────────────────────────────────────
 
