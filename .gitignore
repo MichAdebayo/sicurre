@@ -56,7 +56,12 @@ Thumbs.db
 .uv/
 
 
+# Local databases and SQLite runtime sidecars
 *.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
 
 # Data files (CSVs, JSONs, model weights — too large / PII-sensitive for git)
 data/raw/**/*.csv
@@ -81,6 +86,10 @@ data/models/**/*.safetensors
 data/raw/
 data/cron/
 data/local/
+data/exports/
+data/final/
+data/processed/
+data/models/
 
 # Private-by-default documentation (internal only)
 docs/ops/
@@ -116,9 +125,10 @@ sicurre-*.ipynb
 sicurre-ml-bootstrap.md
 
 relay.md
-data/exports/
 simplon-coverage-checklist.md
-*.png
+# Local screenshots and visual review output. Project-owned images may be tracked.
+/Screenshot *.png
+scratch/screenshots/
 .streamlit/
 node_modules/
 assets/
@@ -126,6 +136,8 @@ ui-ideas/
 # Frontend source assets must be committed so clean CI builds match local builds.
 !src/app/assets/
 !src/app/assets/*.svg
+# Unreferenced local image-generation outputs; promote intentionally if adopted.
+src/app/assets/*.png
 
 src/app/task.md
 src/app/walkthrough.md

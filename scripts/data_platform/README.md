@@ -13,6 +13,7 @@ logic still belongs under `src/`.
   - `extraction/`: Common Crawl snapshot collection, R2 upload, and R2 inventory helpers.
   - `ingestion/`: DB ingestion entrypoints plus one-time reset and manual merge helpers.
   - `evaluation/`: no-write Common Crawl review, promotion, and evaluation scripts.
+  - `investigation/`: probes, state inspection, and live/raw source evaluation.
 - `certfr/`
   - `generation/`: CERT-FR signal summarization, synthesis input building, draft generation, and generation quality analysis.
   - `review/`: CERT-FR review staging helpers.
@@ -59,7 +60,7 @@ logic still belongs under `src/`.
 - `common_crawl/extraction/extract_common_crawl_snapshots.py`: legacy/manual upstream Common Crawl extraction into R2.
 - `common_crawl/ingestion/ingest_latest_common_crawl_snapshot.py`: legacy/manual latest-parquet ingestion.
 - `common_crawl/ingestion/ingest_merged_common_crawl_snapshots.py`: one-time manual merged ingestion of the latest two `fr_usable` parquets.
-- `common_crawl/evaluation/evaluate_common_crawl_live_source.py`: exhaustive no-write three-class evaluation over live DB raw records.
+- `common_crawl/investigation/evaluate_common_crawl_live_source.py`: exhaustive no-write three-class evaluation over live DB raw records.
 
 Implementation note:
 - `src/data_platform/extractors/common_crawl_archive.py` owns upstream archive collection and snapshot building.
