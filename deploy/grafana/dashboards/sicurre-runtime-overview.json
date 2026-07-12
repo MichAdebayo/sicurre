@@ -139,7 +139,7 @@
       },
       "targets": [
         {
-          "expr": "{stack=\"sicurre\"} |= \"error\"",
+          "expr": "{stack=\"sicurre\", service=~\"$service\"} |~ \"(?i)error|exception|failed\"",
           "refId": "A"
         }
       ],
@@ -170,12 +170,34 @@
       },
       "targets": [
         {
-          "expr": "{stack=\"sicurre\"}",
+          "expr": "{stack=\"sicurre\", service=~\"$service\"}",
           "refId": "A"
         }
       ],
       "title": "Service Logs",
       "type": "logs"
+    },
+    {
+      "datasource": {
+        "type": "tempo",
+        "uid": "${tempo}"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "id": 6,
+      "targets": [
+        {
+          "query": "{ resource.service.name =~ `sicurre.*` }",
+          "queryType": "traceql",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent Application Traces",
+      "type": "traces"
     }
   ],
   "refresh": "1m",
@@ -184,34 +206,59 @@
   "templating": {
     "list": [
       {
-        "current": {
-          "selected": false,
-          "text": "Prometheus",
-          "value": "prometheus"
-        },
+        "current": {},
         "hide": 0,
         "includeAll": false,
-        "label": "Prometheus datasource UID",
+        "label": "Prometheus",
         "name": "prometheus",
         "options": [],
         "query": "prometheus",
         "skipUrlSync": false,
-        "type": "textbox"
+        "type": "datasource"
       },
       {
-        "current": {
-          "selected": false,
-          "text": "Loki",
-          "value": "loki"
-        },
+        "current": {},
         "hide": 0,
         "includeAll": false,
-        "label": "Loki datasource UID",
+        "label": "Loki",
         "name": "loki",
         "options": [],
         "query": "loki",
         "skipUrlSync": false,
-        "type": "textbox"
+        "type": "datasource"
+      },
+      {
+        "current": {},
+        "hide": 0,
+        "includeAll": false,
+        "label": "Tempo",
+        "name": "tempo",
+        "options": [],
+        "query": "tempo",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "loki",
+          "uid": "${loki}"
+        },
+        "definition": "label_values({stack=\"sicurre\"}, service)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Service",
+        "name": "service",
+        "options": [],
+        "query": "label_values({stack=\"sicurre\"}, service)",
+        "refresh": 1,
+        "skipUrlSync": false,
+        "type": "query"
       }
     ]
   },
@@ -220,7 +267,7 @@
     "to": "now"
   },
   "timezone": "browser",
-  "title": "Sicurre / App Runtime",
+  "title": "Sicurre / Runtime Overview",
   "uid": "sicurre-app-runtime",
   "version": 1,
   "weekStart": ""
