@@ -81,8 +81,8 @@ jobs:
 
       - name: Lint deployment-critical Python
         run: |
-          uv run --no-sync ruff check src/core/config.py src/db/runtime.py src/db/models/app_runtime.py src/db/migrations_app src/data_platform/extractors/incremental_cc_extractor.py src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py tests/data_platform/common_crawl/test_incremental_cc_checkpoint.py tests/data_platform/common_crawl/test_cc_runtime_config.py
-          uv run --no-sync ruff format --check src/core/config.py src/data_platform/extractors/incremental_cc_extractor.py src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py tests/data_platform/common_crawl/test_incremental_cc_checkpoint.py tests/data_platform/common_crawl/test_cc_runtime_config.py
+          uv run --no-sync ruff check src/core/config.py src/db/runtime.py src/db/models/app_runtime.py src/db/migrations_app src/data_platform/extractors/incremental_cc_extractor.py src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py tests/integration/data_platform/common_crawl/test_incremental_cc_checkpoint.py tests/unit/data_platform/common_crawl/test_cc_runtime_config.py
+          uv run --no-sync ruff format --check src/core/config.py src/data_platform/extractors/incremental_cc_extractor.py src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py tests/integration/data_platform/common_crawl/test_incremental_cc_checkpoint.py tests/unit/data_platform/common_crawl/test_cc_runtime_config.py
 
       - name: Typecheck deployment-critical Python
         run: uv run --no-sync mypy --config-file mypy.ini --follow-imports=skip
@@ -91,7 +91,7 @@ jobs:
         run: uv run --no-sync interrogate -f 90 src/core/config.py src/data_platform/extractors/incremental_cc_extractor.py src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py
 
       - name: Run data-platform tests with coverage
-        run: uv run --no-sync pytest tests/data_platform --cov=src --cov-report=term-missing --cov-fail-under=50
+        run: uv run --no-sync pytest tests/unit tests/integration --cov=src --cov-report=term-missing --cov-fail-under=50
 
   docker-smoke:
     name: Docker app-stack smoke

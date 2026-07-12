@@ -6,6 +6,7 @@ import os
 sys.path.insert(0, str(Path("src").resolve()))
 from data_platform.extractors.incremental_cc_extractor import DURATION_MAP
 
+@pytest.mark.e2e
 @pytest.mark.skip(reason="Requires external network and takes time")
 @pytest.mark.asyncio
 async def test_cc_cron():
