@@ -5,11 +5,11 @@ This script preserves table schemas, indices, and database migrations while dele
 all row records and resetting auto-increment sequences, allowing clean end-to-end 
 user testing from scratch.
 
-Location: scripts/app/empty_db.py
+Location: scripts/app/maintenance/reset_local_database.py
 
 Usage:
-    python scripts/app/empty_db.py
-    uv run python scripts/app/empty_db.py
+    python scripts/app/maintenance/reset_local_database.py
+    uv run python scripts/app/maintenance/reset_local_database.py
 """
 
 import argparse
@@ -27,7 +27,7 @@ logging.basicConfig(
 logger = logging.getLogger("empty_db")
 
 # Repository root directory
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DB_PATH = REPO_ROOT / "data" / "local" / "sicurre.db"
 
 
