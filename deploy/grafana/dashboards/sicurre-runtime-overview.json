@@ -1,274 +1,103 @@
 {
-  "annotations": {
-    "list": []
-  },
+  "annotations": {"list": []},
   "editable": true,
-  "fiscalYearStartMonth": 0,
-  "graphTooltip": 0,
+  "graphTooltip": 1,
   "links": [],
   "panels": [
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${prometheus}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 0
-      },
       "id": 1,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "expr": "sum by (route) (rate(sicurre_app_gateway_requests_total[5m]))",
-          "legendFormat": "{{route}}",
-          "refId": "A"
-        }
-      ],
-      "title": "App Gateway Requests",
-      "type": "timeseries"
+      "type": "stat",
+      "title": "Application Available",
+      "description": "Latest successful Prometheus scrape of the Sicurre gateway.",
+      "datasource": {"type": "prometheus", "uid": "${prometheus}"},
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
+      "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "HEALTHY", "color": "green"}}}], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "none", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "targets": [{"expr": "up{job=\"prometheus.scrape.app_gateway\"}", "refId": "A"}]
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${prometheus}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 12,
-        "y": 0
-      },
       "id": 2,
-      "options": {
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        }
-      },
-      "targets": [
-        {
-          "expr": "sicurre_app_gateway_uptime_seconds",
-          "legendFormat": "uptime",
-          "refId": "A"
-        }
-      ],
-      "title": "Gateway Uptime",
-      "type": "stat"
+      "type": "stat",
+      "title": "Live Request Rate",
+      "datasource": {"type": "prometheus", "uid": "${prometheus}"},
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0},
+      "fieldConfig": {"defaults": {"unit": "reqps", "decimals": 2, "color": {"mode": "thresholds"}}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "targets": [{"expr": "sum(rate(sicurre_app_gateway_requests_total{route=~\"app|api|auth\"}[5m]))", "refId": "A"}]
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${prometheus}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 18,
-        "y": 0
-      },
       "id": 3,
-      "options": {
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        }
-      },
-      "targets": [
-        {
-          "expr": "sicurre_app_gateway_proxy_errors_total",
-          "legendFormat": "proxy errors",
-          "refId": "A"
-        }
-      ],
-      "title": "Proxy Errors",
-      "type": "stat"
+      "type": "stat",
+      "title": "p95 User Latency",
+      "description": "95th percentile end-to-end latency through the app gateway.",
+      "datasource": {"type": "prometheus", "uid": "${prometheus}"},
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 0},
+      "fieldConfig": {"defaults": {"unit": "s", "decimals": 3, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 2}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(sicurre_app_gateway_request_duration_seconds_bucket{route=~\"app|api|auth\"}[5m])))", "refId": "A"}]
     },
     {
-      "datasource": {
-        "type": "loki",
-        "uid": "${loki}"
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 24,
-        "x": 0,
-        "y": 8
-      },
       "id": 4,
-      "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
-        "showCommonLabels": false,
-        "showLabels": true,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
-      },
-      "targets": [
-        {
-          "expr": "{stack=\"sicurre\", service=~\"$service\"} |~ \"(?i)error|exception|failed\"",
-          "refId": "A"
-        }
-      ],
-      "title": "Recent Sicurre Errors",
-      "type": "logs"
+      "type": "stat",
+      "title": "5xx Error Rate",
+      "datasource": {"type": "prometheus", "uid": "${prometheus}"},
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "decimals": 2, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 0.01}, {"color": "red", "value": 0.05}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "targets": [{"expr": "sum(rate(sicurre_app_gateway_responses_total{status=~\"5..\"}[5m])) / clamp_min(sum(rate(sicurre_app_gateway_responses_total[5m])), 0.000001)", "refId": "A"}]
     },
     {
-      "datasource": {
-        "type": "loki",
-        "uid": "${loki}"
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 24,
-        "x": 0,
-        "y": 18
-      },
       "id": 5,
-      "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
-        "showCommonLabels": false,
-        "showLabels": true,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
-      },
-      "targets": [
-        {
-          "expr": "{stack=\"sicurre\", service=~\"$service\"}",
-          "refId": "A"
-        }
-      ],
-      "title": "Service Logs",
-      "type": "logs"
+      "type": "timeseries",
+      "title": "Traffic by Product Surface",
+      "datasource": {"type": "prometheus", "uid": "${prometheus}"},
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 5},
+      "fieldConfig": {"defaults": {"unit": "reqps"}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum by (route) (rate(sicurre_app_gateway_requests_total{route!~\"health|metrics|assets\"}[5m]))", "legendFormat": "{{route}}", "refId": "A"}]
     },
     {
-      "datasource": {
-        "type": "tempo",
-        "uid": "${tempo}"
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 24,
-        "x": 0,
-        "y": 28
-      },
       "id": 6,
+      "type": "timeseries",
+      "title": "Latency Percentiles",
+      "datasource": {"type": "prometheus", "uid": "${prometheus}"},
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 5},
+      "fieldConfig": {"defaults": {"unit": "s", "decimals": 3}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
       "targets": [
-        {
-          "query": "{ resource.service.name =~ `sicurre.*` }",
-          "queryType": "traceql",
-          "refId": "A"
-        }
-      ],
-      "title": "Recent Application Traces",
-      "type": "traces"
+        {"expr": "histogram_quantile(0.50, sum by (le) (rate(sicurre_app_gateway_request_duration_seconds_bucket{route=~\"app|api|auth\"}[5m])))", "legendFormat": "p50", "refId": "A"},
+        {"expr": "histogram_quantile(0.95, sum by (le) (rate(sicurre_app_gateway_request_duration_seconds_bucket{route=~\"app|api|auth\"}[5m])))", "legendFormat": "p95", "refId": "B"},
+        {"expr": "histogram_quantile(0.99, sum by (le) (rate(sicurre_app_gateway_request_duration_seconds_bucket{route=~\"app|api|auth\"}[5m])))", "legendFormat": "p99", "refId": "C"}
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "HTTP Outcomes",
+      "datasource": {"type": "prometheus", "uid": "${prometheus}"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14},
+      "fieldConfig": {"defaults": {"unit": "reqps"}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["sum"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum by (status) (rate(sicurre_app_gateway_responses_total{route!~\"health|metrics|assets\"}[5m]))", "legendFormat": "HTTP {{status}}", "refId": "A"}]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Upstream Proxy Failures",
+      "datasource": {"type": "prometheus", "uid": "${prometheus}"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14},
+      "fieldConfig": {"defaults": {"unit": "short", "min": 0}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single", "sort": "none"}},
+      "targets": [{"expr": "increase(sicurre_app_gateway_proxy_errors_total[15m])", "legendFormat": "proxy failures / 15m", "refId": "A"}]
     }
   ],
   "refresh": "1m",
   "schemaVersion": 39,
-  "tags": ["sicurre", "runtime", "production"],
-  "templating": {
-    "list": [
-      {
-        "current": {},
-        "hide": 0,
-        "includeAll": false,
-        "label": "Prometheus",
-        "name": "prometheus",
-        "options": [],
-        "query": "prometheus",
-        "skipUrlSync": false,
-        "type": "datasource"
-      },
-      {
-        "current": {},
-        "hide": 0,
-        "includeAll": false,
-        "label": "Loki",
-        "name": "loki",
-        "options": [],
-        "query": "loki",
-        "skipUrlSync": false,
-        "type": "datasource"
-      },
-      {
-        "current": {},
-        "hide": 0,
-        "includeAll": false,
-        "label": "Tempo",
-        "name": "tempo",
-        "options": [],
-        "query": "tempo",
-        "skipUrlSync": false,
-        "type": "datasource"
-      },
-      {
-        "allValue": ".*",
-        "current": {
-          "selected": true,
-          "text": "All",
-          "value": "$__all"
-        },
-        "datasource": {
-          "type": "loki",
-          "uid": "${loki}"
-        },
-        "definition": "label_values({stack=\"sicurre\"}, service)",
-        "hide": 0,
-        "includeAll": true,
-        "label": "Service",
-        "name": "service",
-        "options": [],
-        "query": "label_values({stack=\"sicurre\"}, service)",
-        "refresh": 1,
-        "skipUrlSync": false,
-        "type": "query"
-      }
-    ]
-  },
-  "time": {
-    "from": "now-6h",
-    "to": "now"
-  },
+  "tags": ["sicurre", "application", "production"],
+  "templating": {"list": [{"current": {}, "hide": 2, "includeAll": false, "name": "prometheus", "options": [], "query": "prometheus", "skipUrlSync": true, "type": "datasource"}]},
+  "time": {"from": "now-6h", "to": "now"},
   "timezone": "browser",
-  "title": "Sicurre / Runtime Overview",
+  "title": "Sicurre / Application Health",
   "uid": "sicurre-app-runtime",
-  "version": 1,
-  "weekStart": ""
+  "version": 1
 }
