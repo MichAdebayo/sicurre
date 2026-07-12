@@ -15,8 +15,13 @@ const grafanaUrl = normalizeGrafanaUrl(process.env.GRAFANA_URL);
 const token = process.env.GRAFANA_SERVICE_ACCOUNT_TOKEN || process.env.GRAFANA_API_TOKEN;
 const folderUid = process.env.GRAFANA_SICURRE_FOLDER_UID || "sicurre";
 const folderTitle = process.env.GRAFANA_SICURRE_FOLDER_TITLE || "Sicurre";
-const dashboardPath = process.env.GRAFANA_DASHBOARD_PATH ||
-  path.join(rootDir, "deploy/grafana/dashboards/sicurre-runtime-overview.json");
+const dashboardPaths = process.env.GRAFANA_DASHBOARD_PATH
+  ? [process.env.GRAFANA_DASHBOARD_PATH]
+  : [
+      "sicurre-runtime-overview.json",
+      "sicurre-infrastructure.json",
+      "sicurre-telemetry-pipeline.json",
+    ].map((name) => path.join(rootDir, "deploy/grafana/dashboards", name));
 
 if (!grafanaUrl || !token) {
   console.error("GRAFANA_URL and GRAFANA_SERVICE_ACCOUNT_TOKEN are required.");
@@ -79,9 +84,9 @@ async function resolveDatasources() {
 
 function bindDatasources(dashboard, datasources) {
   const variables = dashboard.templating?.list || [];
-  for (const [name, datasource] of Object.entries(datasources)) {
-    const variable = variables.find((item) => item.name === name);
-    if (!variable) throw new Error(`Dashboard datasource variable '${name}' is missing.`);
+  for (const variable of variables) {
+    const datasource = datasources[variable.name];
+    if (!datasource) continue;
     variable.current = {
       selected: true,
       text: datasource.name,
@@ -91,35 +96,42 @@ function bindDatasources(dashboard, datasources) {
   }
 }
 
-const dashboard = JSON.parse(await readFile(dashboardPath, "utf8"));
-dashboard.id = null;
-
 const datasources = await resolveDatasources();
-bindDatasources(dashboard, datasources);
 await ensureFolder();
-const provisioned = await grafanaFetch("/api/dashboards/db", {
-  method: "POST",
-  body: JSON.stringify({
-    dashboard,
-    folderUid,
-    overwrite: true,
-    message: "Provision Sicurre runtime dashboard from repository",
-  }),
-});
-const verified = await grafanaFetch(`/api/dashboards/uid/${dashboard.uid}`);
-if (verified.body.dashboard?.uid !== dashboard.uid) {
-  throw new Error(`Grafana dashboard verification failed for UID ${dashboard.uid}.`);
-}
-for (const [name, datasource] of Object.entries(datasources)) {
-  const savedVariable = verified.body.dashboard.templating.list.find(
-    (variable) => variable.name === name,
-  );
-  if (savedVariable?.current?.value !== datasource.uid) {
-    throw new Error(`Grafana datasource binding verification failed for '${name}'.`);
-  }
-}
 
-console.log(
-  `Provisioned Grafana dashboard '${dashboard.title}' in folder '${folderTitle}': ` +
-  `${grafanaUrl}${provisioned.body.url}`,
-);
+for (const dashboardPath of dashboardPaths) {
+  const dashboard = JSON.parse(await readFile(dashboardPath, "utf8"));
+  dashboard.id = null;
+  bindDatasources(dashboard, datasources);
+
+  const provisioned = await grafanaFetch("/api/dashboards/db", {
+    method: "POST",
+    body: JSON.stringify({
+      dashboard,
+      folderUid,
+      overwrite: true,
+      message: "Provision Sicurre observability dashboards from repository",
+    }),
+  });
+  const verified = await grafanaFetch(`/api/dashboards/uid/${dashboard.uid}`);
+  if (verified.body.dashboard?.uid !== dashboard.uid) {
+    throw new Error(`Grafana dashboard verification failed for UID ${dashboard.uid}.`);
+  }
+  for (const variable of dashboard.templating?.list || []) {
+    const datasource = datasources[variable.name];
+    if (!datasource) continue;
+    const savedVariable = verified.body.dashboard.templating.list.find(
+      (candidate) => candidate.name === variable.name,
+    );
+    if (savedVariable?.current?.value !== datasource.uid) {
+      throw new Error(
+        `Grafana datasource binding verification failed for '${variable.name}'.`,
+      );
+    }
+  }
+
+  console.log(
+    `Provisioned Grafana dashboard '${dashboard.title}' in folder '${folderTitle}': ` +
+    `${grafanaUrl}${provisioned.body.url}`,
+  );
+}

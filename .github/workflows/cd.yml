@@ -173,7 +173,7 @@ jobs:
           host: ${{ secrets.HETZNER_HOST }}
           username: ${{ secrets.HETZNER_USER }}
           key: ${{ secrets.HETZNER_SSH_KEY }}
-          source: "docker-compose.prod.yml,deploy/alloy/config.alloy,deploy/nginx/conf.d/sicurre.com.conf,deploy/hetzner/sicurre-crontab.example,deploy/env.compose.example,deploy/env.api.example,deploy/env.auth.example,deploy/env.alloy.example,deploy/grafana/dashboards/sicurre-runtime-overview.json,scripts/deploy/provision_grafana_dashboard.mjs"
+          source: "docker-compose.prod.yml,deploy/alloy/config.alloy,deploy/nginx/conf.d/sicurre.com.conf,deploy/hetzner/sicurre-crontab.example,deploy/env.compose.example,deploy/env.api.example,deploy/env.auth.example,deploy/env.alloy.example,deploy/grafana/dashboards/sicurre-runtime-overview.json,deploy/grafana/dashboards/sicurre-infrastructure.json,deploy/grafana/dashboards/sicurre-telemetry-pipeline.json,scripts/deploy/provision_grafana_dashboard.mjs"
           target: ${{ secrets.DEPLOY_PATH }}
 
       - name: Pull images and restart app stack
