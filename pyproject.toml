@@ -134,4 +134,7 @@ storage = [
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
-testpaths = ["tests"]
+testpaths = ["tests/unit", "tests/integration"]
+markers = [
+    "e2e: live or containerized end-to-end checks that require explicit execution",
+]

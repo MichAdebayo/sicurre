@@ -17,7 +17,7 @@ locally via transformers.pipeline (Python 3.12 required; torch not yet released
 for Python 3.14).
 
 Usage:
-    uv run --python 3.12 scripts/app/test_hf_inference.py
+    uv run --python 3.12 tests/e2e/app/smoke_hf_inference.py
 
 Exit 0  → all probes classified without error.
 Exit 1  → at least one probe failed.
@@ -32,7 +32,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # ── Load token ────────────────────────────────────────────────────────────────
-load_dotenv(Path(__file__).parents[2] / ".env")
+load_dotenv(Path(__file__).parents[3] / ".env")
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 if not HF_TOKEN:

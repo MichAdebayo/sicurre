@@ -94,6 +94,8 @@ services:
         condition: service_healthy
     environment:
       SICURRE_APP_SMOKE_URL: http://sicurre-app:5173
+    volumes:
+      - ./tests/e2e/app/app_stack_smoke.mjs:/app/tests/e2e/app/app_stack_smoke.mjs:ro
     command:
       - node
-      - scripts/app/app_stack_smoke.mjs
+      - tests/e2e/app/app_stack_smoke.mjs

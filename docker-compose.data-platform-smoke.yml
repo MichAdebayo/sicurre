@@ -41,8 +41,11 @@ services:
     environment:
       SICURRE_STAGING_API_URL: http://data-platform-api:8001
       SICURRE_STAGING_SMOKE_TOKEN: dev-token
+    volumes:
+      - ./tests/e2e/data_platform/staging_smoke.py:/app/tests/e2e/data_platform/staging_smoke.py:ro
     command:
       - uv
       - run
+      - --no-sync
       - python
-      - scripts/data_platform/staging_smoke.py
+      - tests/e2e/data_platform/staging_smoke.py

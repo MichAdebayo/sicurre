@@ -34,7 +34,7 @@ Classify response body
 
 Usage
 ─────
-  uv run scripts/app/test_inference_api.py
+  uv run tests/e2e/app/smoke_inference_api.py
 
 Exit codes
 ──────────
@@ -51,7 +51,7 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).parents[2] / ".env", override=True)
+load_dotenv(Path(__file__).parents[3] / ".env", override=True)
 
 BASE_URL = (
     os.getenv("SICURRE_INFERENCE_API_URL")
