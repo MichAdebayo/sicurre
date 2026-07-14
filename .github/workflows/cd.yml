@@ -215,6 +215,17 @@ jobs:
               --username '${{ github.actor }}' --password-stdin
             docker compose -f docker-compose.prod.yml pull sicurre-app sicurre-api auth-service
             docker compose --profile release -f docker-compose.prod.yml pull sicurre-data-release
+
+            # The authenticated GHCR session is scoped to this repository and can
+            # reject unrelated public packages. Prefetch cAdvisor anonymously
+            # without changing the server's persistent Docker credentials.
+            cadvisor_image="ghcr.io/google/cadvisor:v0.57.0@sha256:e75bdb03b74b0b6995f208f166fead2e6e555dde73e44200113bb26f41b1981d"
+            if ! docker image inspect "$cadvisor_image" >/dev/null 2>&1; then
+              anonymous_docker_config=$(mktemp -d)
+              docker --config "$anonymous_docker_config" pull "$cadvisor_image"
+              rm -rf "$anonymous_docker_config"
+            fi
+
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
             # Bind-mounted Alloy configuration changes do not alter Compose's service hash.
             docker compose -f docker-compose.prod.yml up -d --force-recreate alloy
