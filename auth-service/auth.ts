@@ -2,13 +2,12 @@ import path from "node:path";
 import { mkdirSync } from "node:fs";
 
 import Database from "better-sqlite3";
-import { config as loadEnv } from "dotenv";
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { getMigrations } from "better-auth/db/migration";
 import { Pool } from "pg";
 
-loadEnv({ path: path.resolve(process.cwd(), ".env") });
+import "./env.js";
 
 const authBaseUrl =
   process.env.BETTER_AUTH_URL ??
