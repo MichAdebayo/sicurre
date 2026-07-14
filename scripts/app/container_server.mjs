@@ -2,7 +2,7 @@ import { createReadStream } from "node:fs";
 import { access, stat } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDir = process.env.APP_DIST_DIR || path.resolve(__dirname, "../../dist");
@@ -30,7 +30,7 @@ const mimeTypes = new Map([
   [".woff2", "font/woff2"],
 ]);
 
-function shouldProxy(pathname) {
+export function shouldProxy(pathname) {
   if (pathname.startsWith("/api/auth")) return authServiceUrl;
   if (
     pathname === "/health" ||
@@ -43,7 +43,7 @@ function shouldProxy(pathname) {
   return null;
 }
 
-function metricRoute(pathname) {
+export function metricRoute(pathname) {
   if (pathname === "/__app/health") return "health";
   if (pathname === "/metrics") return "metrics";
   if (pathname.startsWith("/api/auth")) return "auth";
@@ -59,7 +59,7 @@ function incrementRoute(pathname) {
   routeCounters.set(route, (routeCounters.get(route) || 0) + 1);
 }
 
-function observeRequest(route, statusCode, durationSeconds) {
+export function observeRequest(route, statusCode, durationSeconds) {
   const statusKey = `${route}:${statusCode}`;
   statusCounters.set(statusKey, (statusCounters.get(statusKey) || 0) + 1);
   const observation = routeDurations.get(route) || {
@@ -77,7 +77,7 @@ function observeRequest(route, statusCode, durationSeconds) {
   routeDurations.set(route, observation);
 }
 
-function renderMetrics() {
+export function renderMetrics() {
   const lines = [
     "# HELP sicurre_app_gateway_uptime_seconds Seconds since the app gateway started.",
     "# TYPE sicurre_app_gateway_uptime_seconds gauge",
@@ -154,7 +154,7 @@ async function proxyRequest(request, response, targetBase) {
   response.end(Buffer.from(await upstream.arrayBuffer()));
 }
 
-function safeFilePath(pathname) {
+export function safeFilePath(pathname) {
   const decoded = decodeURIComponent(pathname);
   const relative = decoded === "/" ? "index.html" : decoded.replace(/^\/+/, "");
   const candidate = path.resolve(distDir, relative);
@@ -192,7 +192,7 @@ async function serveStatic(request, response, pathname) {
   createReadStream(filePath).pipe(response);
 }
 
-const server = http.createServer(async (request, response) => {
+export const server = http.createServer(async (request, response) => {
   const requestStartedAt = process.hrtime.bigint();
   const requestUrl = new URL(request.url || "/", "http://localhost");
   const route = metricRoute(requestUrl.pathname);
@@ -228,6 +228,11 @@ const server = http.createServer(async (request, response) => {
   }
 });
 
-server.listen(port, "0.0.0.0", () => {
-  console.log(`Sicurre app server listening on http://0.0.0.0:${port}`);
-});
+export function startServer() {
+  return server.listen(port, "0.0.0.0", () => {
+    console.log(`Sicurre app server listening on http://0.0.0.0:${port}`);
+  });
+}
+
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isMain) startServer();
