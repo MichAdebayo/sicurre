@@ -25,12 +25,6 @@ from poc.inference import (
     PocInferenceClient,
     PocInferenceError,
 )
-from poc.inference import (
-    normalize_inference_result as normalize_model_result,
-)
-from poc.inference import (
-    simulated_result as simulate_model_result,
-)
 from poc.local_runtime import POC_AUTH_DB_PATH, POC_DATA_DB_PATH, ensure_local_auth_db
 from poc.pipeline import stream_operation
 
@@ -1400,16 +1394,6 @@ def authenticate_user(email: str, password: str) -> dict[str, Any] | None:
 
 def inference_status() -> tuple[bool, str]:
     return INFERENCE_CLIENT.health()
-
-
-def normalize_inference_result(raw: dict[str, Any]) -> dict[str, Any]:
-    return normalize_model_result(raw)
-
-
-def simulated_result(subject: str, sender: str, text_value: str) -> dict[str, Any]:
-    return simulate_model_result(
-        ClassificationRequest(subject=subject, sender=sender, text=text_value)
-    )
 
 
 def classify_email(
