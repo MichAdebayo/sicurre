@@ -1,30 +1,22 @@
 import cors from "cors";
 import express, { type Request, type Response } from "express";
-import { fromNodeHeaders, toNodeHandler } from "better-auth/node";
+import { fromNodeHeaders } from "better-auth/node";
 
-import { auth, authDatabaseDialect, authEmailExists } from "./auth.js";
 const trustedOrigins = [
   process.env.SICURRE_FRONTEND_ORIGIN,
   "http://127.0.0.1:5173",
   "http://localhost:5173",
 ].filter(Boolean) as string[];
 
-type AuthServerDependencies = {
+export type AuthServerDependencies = {
   databaseDialect: string;
   emailExists: (email: string) => Promise<boolean>;
   getSession: (headers: Headers) => Promise<unknown>;
   authHandler: express.RequestHandler;
 };
 
-const defaultDependencies: AuthServerDependencies = {
-  databaseDialect: authDatabaseDialect,
-  emailExists: authEmailExists,
-  getSession: (headers) => auth.api.getSession({ headers }),
-  authHandler: toNodeHandler(auth),
-};
-
 export function createAuthApp(
-  dependencies: AuthServerDependencies = defaultDependencies,
+  dependencies: AuthServerDependencies,
 ): express.Express {
   const app = express();
   app.use(cors({ origin: trustedOrigins, credentials: true }));

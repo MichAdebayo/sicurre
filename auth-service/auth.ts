@@ -1,4 +1,5 @@
 import path from "node:path";
+import { mkdirSync } from "node:fs";
 
 import Database from "better-sqlite3";
 import { config as loadEnv } from "dotenv";
@@ -52,9 +53,12 @@ const productionPool = isProduction
     })
   : null;
 
-const localDatabase = isProduction
-  ? null
-  : new Database(localDatabasePath ?? path.resolve(process.cwd(), "data/local/better-auth.db"));
+const resolvedLocalDatabasePath = localDatabasePath
+  ?? path.resolve(process.cwd(), "data/local/better-auth.db");
+if (!isProduction) {
+  mkdirSync(path.dirname(resolvedLocalDatabasePath), { recursive: true });
+}
+const localDatabase = isProduction ? null : new Database(resolvedLocalDatabasePath);
 
 export const authDatabase = productionPool ?? localDatabase!;
 
