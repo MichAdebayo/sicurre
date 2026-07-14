@@ -1,9 +1,6 @@
-import path from "node:path";
-
 import { toNodeHandler } from "better-auth/node";
-import { config as loadEnv } from "dotenv";
 
-loadEnv({ path: path.resolve(process.cwd(), ".env") });
+import "./env.js";
 
 const [{ auth, authDatabaseDialect, authEmailExists, prepareAuthDatabase }, { createAuthApp }] = await Promise.all([
   import("./auth.js"),
@@ -19,9 +16,20 @@ try {
     getSession: (headers) => auth.api.getSession({ headers }),
     authHandler: toNodeHandler(auth),
   }).listen(port, () => {
-    console.log(`Better Auth server listening on http://127.0.0.1:${port}`);
+    console.log(JSON.stringify({
+      level: "info",
+      service: "auth-service",
+      event: "server_started",
+      address: "127.0.0.1",
+      port,
+    }));
   });
 } catch (error) {
-  console.error("Better Auth database initialization failed", error);
+  console.error(JSON.stringify({
+    level: "error",
+    service: "auth-service",
+    event: "database_initialization_failed",
+    error: error instanceof Error ? error.message : "unknown_error",
+  }));
   process.exit(1);
 }
