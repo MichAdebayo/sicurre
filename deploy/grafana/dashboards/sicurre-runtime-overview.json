@@ -28,8 +28,8 @@
     {
       "id": 3,
       "type": "stat",
-      "title": "p95 User Latency",
-      "description": "95th percentile end-to-end latency through the app gateway.",
+      "title": "p95 Gateway Latency (All User Traffic)",
+      "description": "Combined end-to-end gateway latency for frontend pages, Sicurre API calls, and Better Auth calls.",
       "datasource": {"type": "prometheus", "uid": "${prometheus}"},
       "gridPos": {"h": 5, "w": 6, "x": 12, "y": 0},
       "fieldConfig": {"defaults": {"unit": "s", "decimals": 3, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 2}]}}, "overrides": []},
@@ -59,16 +59,13 @@
     {
       "id": 6,
       "type": "timeseries",
-      "title": "Latency Percentiles",
+      "title": "p95 Latency by Surface",
+      "description": "End-to-end gateway latency separated into frontend pages (app), Sicurre API calls (api), and Better Auth calls (auth).",
       "datasource": {"type": "prometheus", "uid": "${prometheus}"},
       "gridPos": {"h": 9, "w": 12, "x": 12, "y": 5},
       "fieldConfig": {"defaults": {"unit": "s", "decimals": 3}, "overrides": []},
       "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
-      "targets": [
-        {"expr": "histogram_quantile(0.50, sum by (le) (rate(sicurre_app_gateway_request_duration_seconds_bucket{route=~\"app|api|auth\"}[5m])))", "legendFormat": "p50", "refId": "A"},
-        {"expr": "histogram_quantile(0.95, sum by (le) (rate(sicurre_app_gateway_request_duration_seconds_bucket{route=~\"app|api|auth\"}[5m])))", "legendFormat": "p95", "refId": "B"},
-        {"expr": "histogram_quantile(0.99, sum by (le) (rate(sicurre_app_gateway_request_duration_seconds_bucket{route=~\"app|api|auth\"}[5m])))", "legendFormat": "p99", "refId": "C"}
-      ]
+      "targets": [{"expr": "histogram_quantile(0.95, sum by (le, route) (rate(sicurre_app_gateway_request_duration_seconds_bucket{route=~\"app|api|auth\"}[5m])))", "legendFormat": "{{route}}", "refId": "A"}]
     },
     {
       "id": 7,

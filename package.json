@@ -4,11 +4,13 @@
   "type": "module",
   "description": "Real-time phishing detection and inbox remediation for French auto-entrepreneurs and TPEs.",
   "scripts": {
-    "auth:dev": "tsx auth-service/server.ts",
+    "auth:dev": "tsx auth-service/main.ts",
     "auth:migrate": "tsx scripts/app/migrate-better-auth.ts",
     "auth:typecheck": "tsc -p auth-service/tsconfig.json --noEmit",
     "dev": "vite",
     "build": "tsc && vite build",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "preview": "vite preview",
     "grafana:provision": "node scripts/deploy/provision_grafana_dashboard.mjs"
   },
@@ -47,10 +49,14 @@
     "@types/pg": "^8.20.0",
     "@types/react": "19.1.6",
     "@types/react-dom": "19.1.5",
+    "@types/supertest": "^6.0.3",
     "@vitejs/plugin-react": "^6.0.2",
+    "@vitest/coverage-v8": "^4.1.10",
+    "supertest": "^7.2.2",
     "tailwindcss": "4.3.1",
     "tsx": "4.20.3",
     "typescript": "5.8.3",
-    "vite": "8.0.16"
+    "vite": "8.0.16",
+    "vitest": "^4.1.10"
   }
 }
