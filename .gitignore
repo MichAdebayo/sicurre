@@ -94,6 +94,7 @@ data/models/
 
 # Private-by-default documentation (internal only)
 docs/ops/
+docs/certification/
 docs/architecture/notebook-*.md
 docs/architecture/threat-model.md
 docs/architecture/privacy-rgpd.md
