@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from local_runtime import POC_AUTH_DB_PATH, demo_accounts, ensure_local_auth_db
+from poc.local_runtime import POC_AUTH_DB_PATH, demo_accounts, ensure_local_auth_db
 
 
 def main() -> None:
