@@ -54,3 +54,9 @@ def test_missing_passwords_fail_before_database_creation(
     else:
         raise AssertionError("Missing POC passwords must stop database seeding.")
     assert not database_path.exists()
+
+
+def test_demo_accounts_do_not_expose_passwords() -> None:
+    accounts = local_runtime.demo_accounts()
+    assert {account["role"] for account in accounts} == {"Administrateur", "Observateur"}
+    assert all("password" not in account for account in accounts)

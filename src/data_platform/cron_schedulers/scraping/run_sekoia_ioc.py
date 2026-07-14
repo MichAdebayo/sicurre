@@ -11,6 +11,7 @@ import asyncio
 import logging
 import os
 import sys
+from collections.abc import MutableMapping
 from pathlib import Path
 
 # Reserved-slot routing must happen before settings are loaded.
@@ -18,26 +19,31 @@ _parser = _argparse.ArgumentParser(add_help=False)
 _parser.add_argument("--reserved", action="store_true", default=False)
 _reserved_args, _ = _parser.parse_known_args()
 
-_poc_mode = os.getenv("SICURRE_POC_MODE", "false").lower() == "true"
-if _poc_mode and os.getenv("SICURRE_POC_ALLOW_EXTERNAL_WRITES", "false").lower() != "true":
-    raise RuntimeError("POC SEKOIA cron requires explicit sandbox external-write approval.")
 
-os.environ["SICURRE_SEKOIA_SNAPSHOT_STORAGE_BACKEND"] = "prod"
-if _poc_mode:
-    _poc_prefix = os.environ.get("SICURRE_POC_R2_PREFIX", "demonstrations/poc")
-    os.environ["SICURRE_SEKOIA_SNAPSHOT_PREFIX"] = f"{_poc_prefix}/scraping/sekoia_ioc"
-else:
-    os.environ["SICURRE_SEKOIA_SNAPSHOT_PREFIX"] = (
-        "cron/reserved/scraping/sekoia_ioc"
-        if _reserved_args.reserved
-        else "cron/scraping/sekoia_ioc"
+def configure_snapshot_environment(environ: MutableMapping[str, str], *, reserved: bool) -> None:
+    """Route scheduled snapshots to production or an approved POC namespace."""
+    poc_mode = environ.get("SICURRE_POC_MODE", "false").lower() == "true"
+    external_writes = environ.get("SICURRE_POC_ALLOW_EXTERNAL_WRITES", "false").lower() == "true"
+    if poc_mode and not external_writes:
+        raise RuntimeError("POC SEKOIA cron requires explicit sandbox external-write approval.")
+
+    environ["SICURRE_SEKOIA_SNAPSHOT_STORAGE_BACKEND"] = "prod"
+    if poc_mode:
+        poc_prefix = environ.get("SICURRE_POC_R2_PREFIX", "demonstrations/poc")
+        environ["SICURRE_SEKOIA_SNAPSHOT_PREFIX"] = f"{poc_prefix}/scraping/sekoia_ioc"
+        return
+    environ["SICURRE_SEKOIA_SNAPSHOT_PREFIX"] = (
+        "cron/reserved/scraping/sekoia_ioc" if reserved else "cron/scraping/sekoia_ioc"
     )
+
+
+configure_snapshot_environment(os.environ, reserved=_reserved_args.reserved)
 
 ROOT_DIR = Path(__file__).resolve().parents[4]
 SRC_ROOT = ROOT_DIR / "src"
 
-if str(SRC_ROOT) not in sys.path:
-    sys.path.insert(0, str(SRC_ROOT))
+if str(SRC_ROOT) not in sys.path:  # pragma: no cover - direct-script compatibility
+    sys.path.insert(0, str(SRC_ROOT))  # pragma: no cover
 
 from sqlalchemy.ext.asyncio import (  # noqa: E402
     AsyncSession,
