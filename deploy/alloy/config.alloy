@@ -73,6 +73,20 @@ loki.source.docker "sicurre" {
 loki.process "sicurre" {
 	forward_to = [loki.write.grafana_cloud.receiver]
 
+	stage.json {
+		expressions = {
+			level   = "level",
+			service = "service",
+		}
+	}
+
+	stage.labels {
+		values = {
+			level   = "",
+			service = "",
+		}
+	}
+
 	stage.drop {
 		expression = "GET /__app/health"
 	}
