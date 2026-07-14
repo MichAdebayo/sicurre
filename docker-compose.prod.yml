@@ -145,6 +145,9 @@ services:
     image: gcr.io/cadvisor/cadvisor:v0.52.1
     restart: unless-stopped
     privileged: true
+    command:
+      # Docker 29's containerd image store has no legacy layerdb metadata.
+      - --disable_metrics=disk
     devices:
       - /dev/kmsg:/dev/kmsg
     volumes:
