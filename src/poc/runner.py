@@ -8,9 +8,8 @@ from __future__ import annotations
 
 import json
 import subprocess
-import sys
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 
