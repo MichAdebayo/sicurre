@@ -111,7 +111,7 @@ services:
     <<: *default-logging
 
   alloy:
-    image: grafana/alloy:latest
+    image: grafana/alloy:v1.16.1@sha256:51aeb9d829239345070619dad3edd6873186f913c84f45b365b74574fcb38ec0
     restart: unless-stopped
     env_file:
       - ${SICURRE_ALLOY_ENV_FILE:-./deploy/env.alloy}
@@ -142,7 +142,7 @@ services:
     <<: *default-logging
 
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.52.1
+    image: ghcr.io/google/cadvisor:v0.57.0@sha256:e75bdb03b74b0b6995f208f166fead2e6e555dde73e44200113bb26f41b1981d
     restart: unless-stopped
     privileged: true
     command:
