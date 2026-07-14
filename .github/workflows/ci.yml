@@ -17,6 +17,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Run actionlint
         run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color
 
@@ -51,6 +53,16 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
+      - name: Run app and auth tests with coverage
+        run: npm run test:coverage
+
+      - name: Upload JavaScript coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: javascript-coverage
+          path: coverage/javascript
+          if-no-files-found: error
+
       - name: Audit production Node dependencies
         run: npm audit --omit=dev --audit-level=high
 
@@ -66,6 +78,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: astral-sh/setup-uv@v5
         with:
@@ -94,8 +108,31 @@ jobs:
       - name: Enforce critical docstring coverage
         run: uv run --no-sync interrogate -f 90 src/core/config.py src/data_platform/extractors/incremental_cc_extractor.py src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py
 
-      - name: Run data-platform tests with coverage
-        run: uv run --no-sync pytest tests/unit tests/integration --cov=src --cov-report=term-missing --cov-fail-under=50
+      - name: Run Python tests with repository coverage ratchet
+        run: |
+          mkdir -p coverage/python
+          uv run --no-sync pytest tests/unit tests/integration \
+            --cov=src --cov-branch --cov-report=term-missing \
+            --cov-report=xml:coverage/python/coverage.xml --cov-fail-under=50
+
+      - name: Enforce 90% core and database coverage
+        run: |
+          uv run --no-sync pytest tests/unit tests/integration \
+            --cov=src/core --cov=src/db --cov-branch \
+            --cov-report=term-missing --cov-fail-under=90
+
+      - name: Enforce 90% coverage on changed Python lines
+        if: github.event_name == 'pull_request'
+        run: |
+          uv run --no-sync diff-cover coverage/python/coverage.xml \
+            --compare-branch=origin/${{ github.base_ref }} --fail-under=90
+
+      - name: Upload Python coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-coverage
+          path: coverage/python
+          if-no-files-found: error
 
   docker-smoke:
     name: Docker app-stack smoke
@@ -117,3 +154,6 @@ jobs:
 
       - name: Run app stack smoke
         run: make app-stack-smoke
+
+      - name: Build monthly dataset release image
+        run: docker build --target release -f Dockerfile.data-platform .
