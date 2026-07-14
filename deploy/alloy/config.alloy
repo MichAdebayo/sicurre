@@ -84,6 +84,12 @@ loki.process "sicurre" {
 	stage.drop {
 		expression = "GET /metrics"
 	}
+
+	// cAdvisor cannot read process smaps through Docker's containerd image store.
+	// Its Prometheus metrics remain available; this repeated warning has no action.
+	stage.drop {
+		expression = "Cannot read smaps files for any PID from CONTAINER"
+	}
 }
 
 loki.write "grafana_cloud" {
