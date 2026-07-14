@@ -1,13 +1,5 @@
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-# Add project root to sys.path to resolve src.poc imports
-ROOT_DIR = Path(__file__).resolve().parents[2]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
-
 import base64
 import hashlib
 import json
@@ -15,54 +7,38 @@ import os
 import re
 import secrets
 import sqlite3
-import subprocess
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 import bcrypt
-import httpx
 import streamlit as st
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import OperationalError
 
-try:
-    from poc.local_runtime import (
-        POC_AUTH_DB_PATH,
-        POC_DATA_DB_PATH,
-        build_poc_command_env,
-        ensure_local_auth_db,
-    )
-except ModuleNotFoundError:
-    try:
-        from src.poc.local_runtime import (
-            POC_AUTH_DB_PATH,
-            POC_DATA_DB_PATH,
-            build_poc_command_env,
-            ensure_local_auth_db,
-        )
-    except ModuleNotFoundError:
-        from local_runtime import (  # type: ignore
-            POC_AUTH_DB_PATH,
-            POC_DATA_DB_PATH,
-            build_poc_command_env,
-            ensure_local_auth_db,
-        )
-
+from poc.config import get_poc_settings
+from poc.inference import (
+    ClassificationRequest,
+    InferenceMode,
+    PocInferenceClient,
+    PocInferenceError,
+)
+from poc.local_runtime import POC_AUTH_DB_PATH, POC_DATA_DB_PATH, ensure_local_auth_db
+from poc.pipeline import stream_operation
 
 ensure_local_auth_db()
+POC_SETTINGS = get_poc_settings()
+POC_SETTINGS.require_demo_credentials()
+INFERENCE_CLIENT = PocInferenceClient(POC_SETTINGS)
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 I18N_PATH = ROOT_DIR / "src" / "poc" / "i18n.json"
 LOGO_PATH = ROOT_DIR / "src" / "app" / "assets" / "sicurre.svg"
 
-INFERENCE_URL = os.environ.get(
-    "SICURRE_POC_INFERENCE_API_URL", "http://127.0.0.1:8000/v1/classify"
-)
-INFERENCE_API_KEY = os.environ.get(
-    "SICURRE_POC_INFERENCE_API_KEY", os.environ.get("INFERENCE_API_KEY", "")
-)
+INFERENCE_URL = POC_SETTINGS.inference_api_url
+INFERENCE_API_KEY = POC_SETTINGS.inference_api_key
 
 # ── Dynamic Theme Mode Override ──────────────────────────────────────────────
 if "theme_mode" not in st.session_state:
@@ -73,19 +49,19 @@ force_theme_css = ""
 if theme_mode == "Light":
     force_theme_css = """
   :root {
-    --bg: #F1F5F9 !important;
+    --bg: #F8FAFC !important;
     --surface: #FFFFFF !important;
-    --border: #CBD5E1 !important;
-    --border-line: #CBD5E1 !important;
-    --text: #0F2E7A !important;
-    --text-2: #334155 !important;
+    --border: #E2E8F0 !important;
+    --border-line: #E2E8F0 !important;
+    --text: #0F172A !important;
+    --text-2: #475569 !important;
     --text-muted: #64748B !important;
-    --cta-text: #102A43 !important;
-    --empty-text: #334155 !important;
-    --primary: #1B4FCC !important;
-    --primary-dark: #1239A6 !important;
-    --primary-light: #EEF3FF !important;
-    --primary-border: #CBD5E1 !important;
+    --cta-text: #FFFFFF !important;
+    --empty-text: #475569 !important;
+    --primary: #4A90D9 !important;
+    --primary-dark: #2E6BB5 !important;
+    --primary-light: #EAF4FF !important;
+    --primary-border: #C7E2FF !important;
     --accent: #F59E0B !important;
     --accent-dark: #B45309 !important;
     --danger: #D97706 !important;
@@ -93,25 +69,25 @@ if theme_mode == "Light":
     --danger-border: #FDE68A !important;
     --nav-hover: #EEF3FF !important;
     --danger-semantic: #EF4444 !important;
-    --safe-semantic: #10B981 !important;
+    --safe-semantic: #047857 !important;
   }
   """
 elif theme_mode == "Dark":
     force_theme_css = """
   :root {
-    --bg: #1E293B !important;
-    --surface: #334155 !important;
-    --border: #475569 !important;
+    --bg: #07111F !important;
+    --surface: #0B1626 !important;
+    --border: #26364F !important;
     --border-line: rgba(255, 255, 255, 0.25) !important;
-    --text: #F1F5F9 !important;
-    --text-2: #CBD5E1 !important;
-    --text-muted: #94A3B8 !important;
-    --cta-text: #111827 !important;
+    --text: #F8FAFC !important;
+    --text-2: #B7C4D7 !important;
+    --text-muted: #8090A6 !important;
+    --cta-text: #06111F !important;
     --empty-text: #F8FAFC !important;
-    --primary: #60A5FA !important;
-    --primary-dark: #3B82F6 !important;
-    --primary-light: #1E3A5F !important;
-    --primary-border: #475569 !important;
+    --primary: #4A90D9 !important;
+    --primary-dark: #86C3F3 !important;
+    --primary-light: #153F73 !important;
+    --primary-border: #33445F !important;
     --accent: #F59E0B !important;
     --accent-dark: #B45309 !important;
     --danger: #F59E0B !important;
@@ -172,7 +148,7 @@ elif theme_mode == "Dark":
   .stButton > button[kind="primary"]:active *,
   div[data-testid="stFormSubmitButton"] button:hover *,
   div[data-testid="stFormSubmitButton"] button:focus *,
-  div[data-testid="stFormSubmitButton"] button:active * { color: #FFFFFF !important; }
+  div[data-testid="stFormSubmitButton"] button:active * { color: var(--cta-text) !important; }
 
   /* Forced dark: login helper text must stay readable */
   [data-testid="InputInstructions"],
@@ -255,25 +231,25 @@ st.markdown(
 {force_theme_css}
 /* ── Light mode tokens ────────────────────────────────── */
 :root {{
-  --bg: #F1F5F9;
+  --bg: #F8FAFC;
   --surface: #FFFFFF;
-  --border: #CBD5E1;
-  --border-line: #CBD5E1;
-  --text: #0F2E7A;
-  --text-2: #334155;
+  --border: #E2E8F0;
+  --border-line: #E2E8F0;
+  --text: #0F172A;
+  --text-2: #475569;
   --text-muted: #64748B;
-  --cta-text: #102A43;
-  --empty-text: #334155;
-  --primary: #1B4FCC;
-  --primary-dark: #1239A6;
-  --primary-light: #EEF3FF;
-  --primary-border: #CBD5E1;
+  --cta-text: #FFFFFF;
+  --empty-text: #475569;
+  --primary: #4A90D9;
+  --primary-dark: #2E6BB5;
+  --primary-light: #EAF4FF;
+  --primary-border: #C7E2FF;
   --accent: #F59E0B;
   --accent-dark: #B45309;
   --danger: #D97706;
   --danger-bg: #FFFBEB;
   --danger-border: #FDE68A;
-  --safe: #10B981;
+  --safe: #047857;
   --safe-bg: #ECFDF5;
   --safe-border: #A7F3D0;
   --warning: #F59E0B;
@@ -282,25 +258,25 @@ st.markdown(
   --nav-hover: #EEF3FF;
   --shadow: 0 1px 3px rgba(0,0,0,0.08);
   --danger-semantic: #EF4444;
-  --safe-semantic: #10B981;
+  --safe-semantic: #047857;
 }}
 
 /* ── Dark mode tokens (OS preference) ────────────────── */
 @media (prefers-color-scheme: dark) {{
   :root {{
-    --bg: #1E293B;
-    --surface: #334155;
-    --border: #475569;
+    --bg: #07111F;
+    --surface: #0B1626;
+    --border: #26364F;
     --border-line: rgba(255, 255, 255, 0.25);
-    --text: #F1F5F9;
-    --text-2: #CBD5E1;
-    --text-muted: #94A3B8;
-    --cta-text: #111827;
+    --text: #F8FAFC;
+    --text-2: #B7C4D7;
+    --text-muted: #8090A6;
+    --cta-text: #06111F;
     --empty-text: #F8FAFC;
-    --primary: #60A5FA;
-    --primary-dark: #3B82F6;
-    --primary-light: #1E3A5F;
-    --primary-border: #475569;
+    --primary: #4A90D9;
+    --primary-dark: #86C3F3;
+    --primary-light: #153F73;
+    --primary-border: #33445F;
     --accent: #F59E0B;
     --accent-dark: #B45309;
     --danger: #F59E0B;
@@ -321,12 +297,12 @@ st.markdown(
 
 /* ── Streamlit dark theme ──────────────────────────────── */
 [data-theme="dark"] {{
-  --bg: #1E293B; --surface: #334155; --border: #475569;
+  --bg: #07111F; --surface: #0B1626; --border: #26364F;
   --border-line: rgba(255, 255, 255, 0.25);
-  --text: #F1F5F9; --text-2: #CBD5E1; --text-muted: #94A3B8;
-  --cta-text: #111827; --empty-text: #F8FAFC;
-  --primary: #60A5FA; --primary-dark: #3B82F6;
-  --primary-light: #1E3A5F; --primary-border: #475569;
+  --text: #F8FAFC; --text-2: #B7C4D7; --text-muted: #8090A6;
+  --cta-text: #06111F; --empty-text: #F8FAFC;
+  --primary: #4A90D9; --primary-dark: #86C3F3;
+  --primary-light: #153F73; --primary-border: #33445F;
   --accent: #F59E0B; --accent-dark: #B45309;
   --danger: #F59E0B; --danger-bg: #451A03; --danger-border: #78350F;
   --safe: #34D399; --safe-bg: #022C22; --safe-border: #064E3B;
@@ -336,6 +312,9 @@ st.markdown(
 }}
 
 /* ── App shell ─────────────────────────────────────────── */
+html, body, [data-testid="stAppViewContainer"] {{
+  background: var(--bg) !important;
+}}
 .stApp {{ background: var(--bg) !important; color: var(--text) !important; }}
 
 [data-testid="stHeader"] {{
@@ -352,6 +331,8 @@ st.markdown(
 #MainMenu {{ visibility: hidden; }}
 footer {{ visibility: hidden; }}
 [data-testid="stDeployButton"] {{ display: none; }}
+button[kind="header"],
+button[data-testid="stMainMenuButton"] {{ display: none !important; }}
 
 /* ── Logo background fix for dark mode clash ──────────── */
 .logo-container {{
@@ -366,9 +347,9 @@ button[kind="primaryFormSubmit"],
 button[data-testid="stBaseButton-primaryFormSubmit"],
 .stButton > button[kind="primary"],
 div[data-testid="stFormSubmitButton"] button {{
-  background: var(--accent) !important;
+  background: var(--primary) !important;
   color: var(--cta-text) !important;
-  border: 1px solid var(--accent) !important;
+  border: 1px solid var(--primary-dark) !important;
   border-radius: 8px !important;
   font-weight: 600 !important;
   transition: all 0.15s ease !important;
@@ -433,9 +414,9 @@ div[data-testid="stFormSubmitButton"] button:active,
 div[data-testid="stFormSubmitButton"] button:hover *,
 div[data-testid="stFormSubmitButton"] button:focus *,
 div[data-testid="stFormSubmitButton"] button:active * {{
-  background: var(--accent-dark) !important;
-  border-color: var(--accent-dark) !important;
-  color: #FFFFFF !important;
+  background: var(--primary-dark) !important;
+  border-color: var(--primary-dark) !important;
+  color: var(--cta-text) !important;
 }}
 
 /* Sidebar nav focus/hover must stay on the readable text token, not the dark CTA token */
@@ -468,7 +449,7 @@ button[kind="primaryFormSubmit"]:active *,
 div[data-testid="stFormSubmitButton"] button:hover *,
 div[data-testid="stFormSubmitButton"] button:focus *,
 div[data-testid="stFormSubmitButton"] button:active * {{
-  color: #FFFFFF !important;
+  color: var(--cta-text) !important;
 }}
 
 /* ── Secondary buttons ────────────────────────────────── */
@@ -885,21 +866,26 @@ div[data-testid="stMarkdownContainer"] h6 {{
 
 /* ── Inference status inline ──────────────────────────── */
 .inference-status {{
+  display: grid;
+  gap: 0.3rem;
+  padding: 0 0.75rem;
+  font-size: 0.84rem;
+  color: var(--text-2);
+  margin-bottom: 1.5rem !important;
+}}
+.inference-status .status-heading {{
   display: flex;
   align-items: center;
-  padding: 0 0.75rem;
-  font-size: 0.82rem;
-  color: var(--text-2);
-  gap: 0;
-  margin-bottom: 1.5rem !important;
 }}
 .inference-status .status-label {{
   font-weight: 600;
-  margin-right: 0.35rem;
 }}
 .inference-status .status-value {{
   color: var(--text-muted);
   font-weight: 400;
+  line-height: 1.45;
+  padding-left: 14px;
+  overflow-wrap: anywhere;
 }}
 
 /* ── Password eye icon & form hints ───────────────────── */
@@ -1116,6 +1102,26 @@ div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid=
     background-color: transparent !important;
 }}
 
+/* Final primary-state contract shared by light and dark themes. */
+[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"],
+[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] * {{
+    background: var(--primary) !important;
+    color: var(--cta-text) !important;
+}}
+[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:hover,
+[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:focus,
+[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:hover *,
+[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:focus * {{
+    background: var(--primary-dark) !important;
+    color: var(--cta-text) !important;
+}}
+input:focus,
+textarea:focus,
+[data-baseweb="select"]:focus-within > div {{
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 1px var(--primary) !important;
+}}
+
 </style>
 """,
     unsafe_allow_html=True,
@@ -1285,7 +1291,7 @@ def _fmt_num(value: int | float) -> str:
 
 def _safe_text(value: str, max_len: int = 200) -> str:
     clean = " ".join((value or "").split())
-    return clean if len(clean) <= max_len else f"{clean[:max_len - 1]}..."
+    return clean if len(clean) <= max_len else f"{clean[: max_len - 1]}..."
 
 
 def _hash_token(token: str) -> str:
@@ -1319,7 +1325,7 @@ def _set_user_session(user: dict[str, Any]) -> None:
 
 def _persist_session(user_id: str) -> str:
     sid = secrets.token_urlsafe(32)
-    expires_at = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+    expires_at = (datetime.now(UTC) + timedelta(days=7)).isoformat()
     _auth_exec(
         "UPDATE poc_user SET session_token_hash = ?, session_expires_at = ? WHERE id = ?",
         (_hash_token(sid), expires_at, user_id),
@@ -1346,7 +1352,7 @@ def _restore_session_from_query() -> None:
           AND session_expires_at > ?
         LIMIT 1
         """,
-        (_hash_token(str(sid)), datetime.now(timezone.utc).isoformat()),
+        (_hash_token(str(sid)), datetime.now(UTC).isoformat()),
     ):
         _set_user_session(dict(rows[0]))
 
@@ -1372,9 +1378,7 @@ def _clear_session() -> None:
 
 def check_password(plain_password: str, hashed_password: str) -> bool:
     try:
-        return bcrypt.checkpw(
-            plain_password.encode("utf-8"), hashed_password.encode("utf-8")
-        )
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
     except Exception:
         return False
 
@@ -1389,100 +1393,7 @@ def authenticate_user(email: str, password: str) -> dict[str, Any] | None:
 
 
 def inference_status() -> tuple[bool, str]:
-    if not INFERENCE_API_KEY:
-        return False, "INFERENCE_API_KEY missing"
-
-    try:
-        with httpx.Client(timeout=5.0) as client:
-            response = client.get(
-                INFERENCE_URL.replace("/v1/classify", "/health"),
-                headers={"Authorization": f"Bearer {INFERENCE_API_KEY}"},
-            )
-        if response.status_code == 200:
-            return True, tr("inference_up")
-        return False, f"HTTP {response.status_code}"
-    except Exception as exc:
-        return False, f"{tr('inference_down')}: {exc}"
-
-
-def normalize_inference_result(raw: dict[str, Any]) -> dict[str, Any]:
-    verdict = str(raw.get("verdict") or "safe").lower()
-    is_phishing = bool(raw.get("is_phishing", verdict == "phishing"))
-    label_verdict = raw.get("label_verdict") or (raw.get("stage_labels") or {}).get(
-        "onnx"
-    )
-    label_verdict = str(
-        label_verdict or ("phishing" if is_phishing else "legitimate")
-    ).lower()
-
-    return {
-        "safety_verdict": "phishing" if is_phishing else "safe",
-        "label_verdict": label_verdict,
-        "is_phishing": is_phishing,
-        "composite_score": float(raw.get("composite_score") or 0.0),
-        "llm_provider": str(raw.get("llm_provider") or "n/a"),
-        "explanation": str(raw.get("explanation") or tr("no_explanation")),
-        "stage_scores": raw.get("stage_scores") or {},
-        "stage_labels": raw.get("stage_labels") or {},
-        "label_distribution": raw.get("label_distribution") or {},
-        "stage_breakdown": raw.get("stage_breakdown") or {},
-        "raw": raw,
-    }
-
-
-def simulated_result(subject: str, sender: str, text_value: str) -> dict[str, Any]:
-    full = f"{subject} {sender} {text_value}".lower()
-    phishing_terms = [
-        "urgent",
-        "mot de passe",
-        "rib",
-        "suspendu",
-        "verifier",
-        "confirmez",
-    ]
-    spam_terms = ["promo", "offre", "gratuit", "bonus", "remise", "leads"]
-
-    phishing_hits = sum(term in full for term in phishing_terms)
-    spam_hits = sum(term in full for term in spam_terms)
-
-    if phishing_hits >= 2:
-        raw = {
-            "verdict": "phishing",
-            "label_verdict": "phishing",
-            "is_phishing": True,
-            "composite_score": 0.78,
-            "stage_scores": {"onnx": 0.71, "llm": 0.82},
-            "stage_labels": {"onnx": "phishing", "llm": "phishing"},
-            "label_distribution": {"legitimate": 0.04, "spam": 0.18, "phishing": 0.78},
-            "explanation": "Simulation locale : tentative de phishing probable.",
-            "llm_provider": "simulation",
-        }
-    elif spam_hits >= 2:
-        raw = {
-            "verdict": "safe",
-            "label_verdict": "spam",
-            "is_phishing": False,
-            "composite_score": 0.28,
-            "stage_scores": {"onnx": 0.19, "llm": 0.33},
-            "stage_labels": {"onnx": "spam", "llm": "spam"},
-            "label_distribution": {"legitimate": 0.18, "spam": 0.72, "phishing": 0.10},
-            "explanation": "Simulation locale : contenu promotionnel détecté.",
-            "llm_provider": "simulation",
-        }
-    else:
-        raw = {
-            "verdict": "safe",
-            "label_verdict": "legitimate",
-            "is_phishing": False,
-            "composite_score": 0.08,
-            "stage_scores": {"onnx": 0.06, "llm": 0.09},
-            "stage_labels": {"onnx": "legitimate", "llm": "legitimate"},
-            "label_distribution": {"legitimate": 0.86, "spam": 0.09, "phishing": 0.05},
-            "explanation": "Simulation locale : e-mail légitime.",
-            "llm_provider": "simulation",
-        }
-
-    return normalize_inference_result(raw)
+    return INFERENCE_CLIENT.health()
 
 
 def classify_email(
@@ -1492,33 +1403,33 @@ def classify_email(
     use_llm: bool = True,
     use_virustotal: bool = True,
 ) -> dict[str, Any]:
-    payload = {
-        "subject": subject,
-        "sender": sender,
-        "text": text_value,
-        "use_llm": use_llm,
-        "use_virustotal": use_virustotal,
-    }
-    started = time.perf_counter()
+    mode = InferenceMode(st.session_state.get("inference_mode", InferenceMode.LIVE.value))
+    return INFERENCE_CLIENT.classify(
+        ClassificationRequest(
+            subject=subject,
+            sender=sender,
+            text=text_value,
+            use_llm=use_llm,
+            use_virustotal=use_virustotal,
+        ),
+        mode=mode,
+    )
 
+
+def classify_email_for_ui(
+    subject: str,
+    sender: str,
+    text_value: str,
+    use_llm: bool = True,
+    use_virustotal: bool = True,
+) -> dict[str, Any] | None:
+    """Run classification and present a controlled, actionable failure."""
     try:
-        with httpx.Client(timeout=35.0) as client:
-            response = client.post(
-                INFERENCE_URL,
-                json=payload,
-                headers={"Authorization": f"Bearer {INFERENCE_API_KEY}"},
-            )
-        response.raise_for_status()
-        normalized = normalize_inference_result(response.json())
-        normalized["source"] = "api"
-    except Exception as exc:
-        st.warning(f"{tr('api_fallback')}: {exc}")
-        normalized = simulated_result(subject, sender, text_value)
-        normalized["source"] = "simulation"
-
-    normalized["params"] = {"use_llm": use_llm, "use_virustotal": use_virustotal}
-    normalized["latency_ms"] = round((time.perf_counter() - started) * 1000.0, 2)
-    return normalized
+        return classify_email(subject, sender, text_value, use_llm, use_virustotal)
+    except PocInferenceError as exc:
+        st.session_state["last_inference_error"] = str(exc)
+        st.error(f"{tr('inference_request_failed')} {exc}")
+        return None
 
 
 def log_inference_event(
@@ -1562,7 +1473,7 @@ def log_inference_event(
         """,
         (
             str(uuid4()),
-            datetime.now(timezone.utc).isoformat(),
+            datetime.now(UTC).isoformat(),
             user_email,
             context,
             subject,
@@ -1591,7 +1502,7 @@ def reclassify_event(event_id: str, new_verdict: str, by_user: str) -> None:
     """Override the safety verdict for a single event."""
     _auth_exec(
         "UPDATE app_inference_event SET override_verdict = ?, override_by = ?, overridden_at = ? WHERE id = ?",
-        (new_verdict, by_user, datetime.now(timezone.utc).isoformat(), event_id),
+        (new_verdict, by_user, datetime.now(UTC).isoformat(), event_id),
     )
 
 
@@ -1645,40 +1556,34 @@ def get_events(limit: int = 500) -> list[dict[str, Any]]:
     return out
 
 
-def run_and_stream(command: str) -> tuple[bool, str]:
-    process = subprocess.Popen(
-        ["bash", "-lc", command],
-        cwd=ROOT_DIR,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        env=build_poc_command_env(),
-    )
-
+def run_and_stream(operation_key: str) -> tuple[bool, str]:
     output_lines: list[str] = []
     with st.status(tr("pipeline_running"), expanded=True) as status:
         placeholder = st.empty()
-        while process.poll() is None:
-            line = process.stdout.readline() if process.stdout else ""
-            if line:
-                output_lines.append(line)
+        try:
+            for line in stream_operation(operation_key, POC_SETTINGS):
+                output_lines.append(f"{line}\n")
                 placeholder.code("".join(output_lines[-40:]), language="bash")
-        tail = process.stdout.read() if process.stdout else ""
-        if tail:
-            output_lines.append(tail)
-            placeholder.code("".join(output_lines[-40:]), language="bash")
-
-        code = process.returncode
-        full_output = "".join(output_lines)
-        placeholder.code(full_output, language="bash")
-        if code == 0:
+        except (KeyError, PermissionError, RuntimeError) as exc:
+            output_lines.append(f"ERREUR: {exc}\n")
+            full_output = "".join(output_lines)
+            placeholder.code(full_output, language="bash")
+            status.update(label=tr("pipeline_failed"), state="error")
+            return False, full_output
+        except Exception as exc:
+            output_lines.append(f"ERREUR: opération interrompue ({type(exc).__name__}).\n")
+            full_output = "".join(output_lines)
+            placeholder.code(full_output, language="bash")
+            status.update(label=tr("pipeline_failed"), state="error")
+            return False, full_output
+        else:
+            full_output = "".join(output_lines)
+            placeholder.code(full_output, language="bash")
             status.update(label=tr("pipeline_done"), state="complete")
             return True, full_output
-        status.update(label=f"{tr('pipeline_failed')} ({code})", state="error")
-        return False, full_output
 
 
-def run_pipeline_action(title: str, command: str) -> None:
+def run_pipeline_action(title: str, operation_key: str) -> None:
     if st.session_state.get("pipeline_busy", False):
         st.warning(tr("pipeline_busy"))
         return
@@ -1686,7 +1591,7 @@ def run_pipeline_action(title: str, command: str) -> None:
     st.session_state["pipeline_busy"] = True
     try:
         with st.spinner(f"{title}..."):
-            ok, output = run_and_stream(command)
+            ok, output = run_and_stream(operation_key)
         st.session_state["last_pipeline_output"] = output
         st.session_state["last_pipeline_success"] = ok
     finally:
@@ -1712,15 +1617,12 @@ def render_logo_html(width: int = 160, center: bool = False) -> None:
             )
     else:
         st.markdown(
-            "<span style='font-size:1.4rem;font-weight:900;letter-spacing:-1px;'"
-            ">SICURRE</span>",
+            "<span style='font-size:1.4rem;font-weight:900;letter-spacing:-1px;'>SICURRE</span>",
             unsafe_allow_html=True,
         )
 
 
-def render_bar_chart(
-    rows: list[dict[str, Any]], x_field: str, y_field: str, title: str
-) -> None:
+def render_bar_chart(rows: list[dict[str, Any]], x_field: str, y_field: str, title: str) -> None:
     if not rows:
         st.info(tr("no_data"))
         return
@@ -1729,7 +1631,7 @@ def render_bar_chart(
         "encoding": {
             "x": {"field": x_field, "type": "nominal", "axis": {"labelAngle": 0}},
             "y": {"field": y_field, "type": "quantitative"},
-            "color": {"value": "#1B4FCC"},
+            "color": {"value": "#4A90D9"},
         },
         "config": {"background": "transparent", "view": {"stroke": "transparent"}},
     }
@@ -1749,11 +1651,7 @@ def render_class_dist_chart(events: list[dict[str, Any]]) -> None:
         lv = _eff_label(e) if _eff_verdict(e) != "phishing" else "phishing"
         if lv in counts:
             counts[lv] += 1
-    rows = [
-        {"classe": fr_labels[k], "count": v, "_key": k}
-        for k, v in counts.items()
-        if v > 0
-    ]
+    rows = [{"classe": fr_labels[k], "count": v, "_key": k} for k, v in counts.items() if v > 0]
     if not rows:
         st.info(tr("no_data"))
         return
@@ -1850,10 +1748,10 @@ def render_result_card(result: dict[str, Any]) -> None:
     <span style='font-size:0.8rem;color:var(--text-muted);'>Score {score_pct:.1f} % | {lat:.0f} ms</span>
   </div>
   <div style='margin-bottom:12px;'>
-    <div style='font-size:0.78rem;color:var(--text-2);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;'>{tr('explanation')}</div>
+    <div style='font-size:0.78rem;color:var(--text-2);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;'>{tr("explanation")}</div>
     <p style='font-size:0.9rem;color:var(--text);margin:0;'>{explanation}</p>
   </div>
-  <div style='font-size:0.78rem;color:var(--text-2);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;'>{tr('class_distribution')}</div>
+  <div style='font-size:0.78rem;color:var(--text-2);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;'>{tr("class_distribution")}</div>
   {bars_html}
 </div>
 """,
@@ -1879,10 +1777,9 @@ _restore_session_from_query()
 
 # ── Login page ─────────────────────────────────────────────────────────────
 if not st.session_state["authenticated"]:
-
     c1, c2, c3 = st.columns([1, 1.2, 1])
     with c2:
-        st.markdown("<div style='margin-top: 2.5rem;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top: 0.75rem;'></div>", unsafe_allow_html=True)
         # Force logo centering with explicit CSS class wrapper
         if LOGO_PATH.exists():
             b64 = base64.b64encode(LOGO_PATH.read_bytes()).decode()
@@ -1920,7 +1817,7 @@ if not st.session_state["authenticated"]:
                 _set_user_session(auth_result)
                 _auth_exec(
                     "UPDATE poc_user SET last_login_at = ? WHERE id = ?",
-                    (datetime.now(timezone.utc).isoformat(), auth_result["id"]),
+                    (datetime.now(UTC).isoformat(), auth_result["id"]),
                 )
                 if remember:
                     sid = _persist_session(auth_result["id"])
@@ -1942,7 +1839,9 @@ with st.sidebar:
         b64 = base64.b64encode(LOGO_PATH.read_bytes()).decode()
         logo_html = f'<img src="data:image/svg+xml;base64,{b64}" width="100" style="max-width: 100% !important; margin: 0 !important; display: block;" />'
     else:
-        logo_html = '<span style="font-size:1.4rem;font-weight:900;letter-spacing:-1px;">SICURRE</span>'
+        logo_html = (
+            '<span style="font-size:1.4rem;font-weight:900;letter-spacing:-1px;">SICURRE</span>'
+        )
 
     st.markdown(
         f"<div style='margin-top: -1.5rem; margin-bottom: 1.2rem;'>"
@@ -1998,8 +1897,8 @@ with st.sidebar:
     dot_cls = "dot-green" if ok else "dot-red"
     st.markdown(
         f"<div class='inference-status'>"
-        f"<span class='status-dot {dot_cls}'></span>"
-        f"<span class='status-label'>{tr('inference_status')} :</span>"
+        f"<div class='status-heading'><span class='status-dot {dot_cls}'></span>"
+        f"<span class='status-label'>{tr('inference_status')}</span></div>"
         f"<span class='status-value'>{status_text}</span>"
         f"</div>",
         unsafe_allow_html=True,
@@ -2026,9 +1925,7 @@ if page == "nav_home":
     total = len(events)
     blocked = sum(_eff_verdict(e) == "phishing" for e in events)
     delivered = sum(_eff_verdict(e) == "safe" for e in events)
-    spam_safe = sum(
-        _eff_verdict(e) == "safe" and _eff_label(e) == "spam" for e in events
-    )
+    spam_safe = sum(_eff_verdict(e) == "safe" and _eff_label(e) == "spam" for e in events)
 
     if eval_events := [e for e in events if e.get("expected_label")]:
         fp_block = sum(
@@ -2050,13 +1947,9 @@ if page == "nav_home":
         label_acc = 0.0
 
     latencies = [
-        float(e.get("latency_ms") or 0.0)
-        for e in events
-        if float(e.get("latency_ms") or 0.0) > 0
+        float(e.get("latency_ms") or 0.0) for e in events if float(e.get("latency_ms") or 0.0) > 0
     ]
-    p95 = (
-        sorted(latencies)[max(int(len(latencies) * 0.95) - 1, 0)] if latencies else 0.0
-    )
+    p95 = sorted(latencies)[max(int(len(latencies) * 0.95) - 1, 0)] if latencies else 0.0
 
     r1, r2, r3, r4 = st.columns(4)
     r1.markdown(
@@ -2113,15 +2006,11 @@ if page == "nav_home":
             ev = _eff_verdict(event)
             el = _eff_label(event)
             if ev == "phishing":
-                badge = (
-                    f"<span class='badge badge-phishing'>{tr('class_phishing')}</span>"
-                )
+                badge = f"<span class='badge badge-phishing'>{tr('class_phishing')}</span>"
             elif el == "spam":
                 badge = f"<span class='badge badge-spam'>{tr('class_spam')}</span>"
             else:
-                badge = (
-                    f"<span class='badge badge-safe'>{tr('class_legitimate')}</span>"
-                )
+                badge = f"<span class='badge badge-safe'>{tr('class_legitimate')}</span>"
             ts = event["created_at"].replace("T", " ")[:16]
             st.markdown(
                 f"<div class='card' style='padding:10px 12px;margin-bottom:5px;'>"
@@ -2142,8 +2031,7 @@ elif page == "nav_smail":
     safe_events = [
         e
         for e in events
-        if _eff_verdict(e) == "safe"
-        and e.get("context") in ("playground", "manual", "smail")
+        if _eff_verdict(e) == "safe" and e.get("context") in ("playground", "manual", "smail")
     ]
     legit_events = [e for e in safe_events if _eff_label(e) == "legitimate"]
     spam_events = [e for e in safe_events if _eff_label(e) == "spam"]
@@ -2207,11 +2095,9 @@ elif page == "nav_threat_log":
     c1, c2, c3 = st.columns([1, 2, 2])
     with c1:
         period_opts = [tr("period_all"), tr("period_today"), tr("period_week")]
-        period_sel = st.selectbox(
-            tr("filter_period"), period_opts, label_visibility="collapsed"
-        )
+        period_sel = st.selectbox(tr("filter_period"), period_opts, label_visibility="collapsed")
 
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     phishing_events = [e for e in events if _eff_verdict(e) == "phishing"]
 
     if period_sel == tr("period_today"):
@@ -2229,7 +2115,9 @@ elif page == "nav_threat_log":
             score_pct = float(event.get("composite_score") or 0.0) * 100.0
             corr_note = ""
             if event.get("override_verdict") == "phishing":
-                corr_note = f" &nbsp;<span class='badge badge-phishing'>{tr('corrected_label')}</span>"
+                corr_note = (
+                    f" &nbsp;<span class='badge badge-phishing'>{tr('corrected_label')}</span>"
+                )
             elif event.get("override_verdict"):
                 corr_note = f" &nbsp;<span class='badge badge-safe'>{tr('corrected_label')}</span>"
             snip = _delink(_safe_text(event.get("snippet") or "", 200))
@@ -2259,6 +2147,24 @@ elif page == "nav_threat_log":
 elif page == "nav_playground":
     st.title(tr("playground_title"))
     st.caption(tr("playground_subtitle"))
+
+    mode_options = [InferenceMode.LIVE, InferenceMode.SIMULATION, InferenceMode.INCIDENT]
+    mode_labels = {
+        InferenceMode.LIVE: tr("inference_mode_live"),
+        InferenceMode.SIMULATION: tr("inference_mode_simulation"),
+        InferenceMode.INCIDENT: tr("inference_mode_incident"),
+    }
+    current_mode = InferenceMode(st.session_state.get("inference_mode", InferenceMode.LIVE.value))
+    selected_mode = st.segmented_control(
+        tr("inference_mode"),
+        options=mode_options,
+        default=current_mode,
+        format_func=lambda option: mode_labels[option],
+        selection_mode="single",
+    )
+    selected_mode = selected_mode or current_mode
+    st.session_state["inference_mode"] = selected_mode.value
+    st.caption(tr(f"inference_mode_{selected_mode.value}_help"))
 
     # Config options at the top of the page (spanning full width)
     st.markdown("<div style='margin-bottom:8px;'></div>", unsafe_allow_html=True)
@@ -2297,21 +2203,23 @@ elif page == "nav_playground":
             key="pg_analyze_preset",
         ):
             with st.spinner(tr("analyzing")):
-                result = classify_email(
+                result = classify_email_for_ui(
                     sample["subject"], sample["sender"], sample["text"], use_llm, use_vt
                 )
-            st.session_state["last_result"] = result
-            log_inference_event(
-                user_email=user["email"],
-                context="playground",
-                subject=sample["subject"],
-                sender=sample["sender"],
-                text_value=sample["text"],
-                result=result,
-                delivered_in_smail=result["safety_verdict"] == "safe",
-                expected_label=sample["expected_label"],
-            )
-            st.rerun()
+            if result is not None:
+                st.session_state["last_result"] = result
+                st.session_state.pop("last_inference_error", None)
+                log_inference_event(
+                    user_email=user["email"],
+                    context="playground",
+                    subject=sample["subject"],
+                    sender=sample["sender"],
+                    text_value=sample["text"],
+                    result=result,
+                    delivered_in_smail=result["safety_verdict"] == "safe",
+                    expected_label=sample["expected_label"],
+                )
+                st.rerun()
 
         st.markdown("---")
         st.markdown(f"#### {tr('manual_test')}")
@@ -2327,19 +2235,21 @@ elif page == "nav_playground":
 
         if submit_manual:
             with st.spinner(tr("analyzing")):
-                result = classify_email(m_subject, m_sender, m_body, use_llm, use_vt)
-            st.session_state["last_result"] = result
-            log_inference_event(
-                user_email=user["email"],
-                context="manual",
-                subject=m_subject,
-                sender=m_sender,
-                text_value=m_body,
-                result=result,
-                delivered_in_smail=result["safety_verdict"] == "safe",
-                expected_label=None,
-            )
-            st.rerun()
+                result = classify_email_for_ui(m_subject, m_sender, m_body, use_llm, use_vt)
+            if result is not None:
+                st.session_state["last_result"] = result
+                st.session_state.pop("last_inference_error", None)
+                log_inference_event(
+                    user_email=user["email"],
+                    context="manual",
+                    subject=m_subject,
+                    sender=m_sender,
+                    text_value=m_body,
+                    result=result,
+                    delivered_in_smail=result["safety_verdict"] == "safe",
+                    expected_label=None,
+                )
+                st.rerun()
 
     with right:
         st.markdown(f"#### {tr('inference_result')}")
@@ -2364,28 +2274,22 @@ elif page == "nav_pipeline":
 
     b1, b2, b3 = st.columns(3)
     with b1:
-        if st.button(
-            tr("pipeline_base"), disabled=busy, use_container_width=True, type="primary"
-        ):
+        if st.button(tr("pipeline_base"), disabled=busy, use_container_width=True, type="primary"):
             st.session_state["_pipeline_pending"] = (
                 tr("pipeline_base"),
-                "make poc-replay-frozen",
+                "base_replay",
             )
     with b2:
-        if st.button(
-            tr("pipeline_cron"), disabled=busy, use_container_width=True, type="primary"
-        ):
+        if st.button(tr("pipeline_cron"), disabled=busy, use_container_width=True, type="primary"):
             st.session_state["_pipeline_pending"] = (
                 tr("pipeline_cron"),
-                "make run-pipeline",
+                "incremental_demo",
             )
     with b3:
-        if st.button(
-            tr("pipeline_push"), disabled=busy, use_container_width=True, type="primary"
-        ):
+        if st.button(tr("pipeline_push"), disabled=busy, use_container_width=True, type="primary"):
             st.session_state["_pipeline_pending"] = (
                 tr("pipeline_push"),
-                "make pipeline-push",
+                "release_preview",
             )
 
     # Run OUTSIDE the columns so the terminal spans full width
@@ -2438,9 +2342,7 @@ elif page == "nav_datasets":
     st.markdown("<div style='margin-bottom:16px;'></div>", unsafe_allow_html=True)
 
     # Source breakdown chart
-    if _data_table_exists("data_source_system") and _data_table_exists(
-        "data_ingestion_run"
-    ):
+    if _data_table_exists("data_source_system") and _data_table_exists("data_ingestion_run"):
         src_rows = _data_q("""
             SELECT
                 ss.name,
@@ -2456,7 +2358,7 @@ elif page == "nav_datasets":
         if src_rows:
             st.markdown(f"#### {tr('source_breakdown')}")
             type_colors = {
-                "api": "#1B4FCC",
+                "api": "#4A90D9",
                 "file": "#F59E0B",
                 "scraping": "#EC4899",
                 "sql": "#10B981",
@@ -2528,15 +2430,15 @@ elif page == "nav_datasets":
                     "done",
                 )
                 badge = (
-                    f"<span class='badge badge-ok'>{r.get('status','')}</span>"
+                    f"<span class='badge badge-ok'>{r.get('status', '')}</span>"
                     if ok
-                    else f"<span class='badge badge-danger'>{r.get('status','')}</span>"
+                    else f"<span class='badge badge-danger'>{r.get('status', '')}</span>"
                 )
                 st.markdown(
                     f"<div class='card' style='padding:9px 12px;margin-bottom:4px;'>"
                     f"<div style='display:flex;justify-content:space-between;align-items:center;'>"
                     f"<span style='font-size:0.9rem;font-weight:600;color:var(--text);'>"
-                    f"{r.get('name','')}</span>{badge}</div>"
+                    f"{r.get('name', '')}</span>{badge}</div>"
                     f"<div style='font-size:0.78rem;color:var(--text-muted);'>"
                     f"{_fmt_num(cnt)} {tr('records')} &middot; {fin}</div>"
                     f"</div>",
@@ -2564,9 +2466,9 @@ elif page == "nav_datasets":
                 ic = int(row.get("item_count") or 0)
                 st.markdown(
                     f"<div class='card'>"
-                    f"<strong>{row.get('version_tag','—')}</strong>"
+                    f"<strong>{row.get('version_tag', '—')}</strong>"
                     f"<span style='margin-left:12px;font-size:0.82rem;color:var(--text-2);'>"
-                    f"{_fmt_num(ic)} {tr('rows')} &middot; {ts} &middot; {row.get('status','')}"
+                    f"{_fmt_num(ic)} {tr('rows')} &middot; {ts} &middot; {row.get('status', '')}"
                     f"</span></div>",
                     unsafe_allow_html=True,
                 )
@@ -2577,7 +2479,7 @@ elif page == "nav_settings":
     st.caption(tr("settings_subtitle"))
 
     st.write(
-        f"**Informations du profil**"
+        "**Informations du profil**"
         if st.session_state.get("lang", "fr") == "fr"
         else "**Profile Information**"
     )
@@ -2590,9 +2492,7 @@ elif page == "nav_settings":
             value=user["role"].capitalize(),
             disabled=True,
         )
-        saved = st.form_submit_button(
-            tr("save_settings"), type="primary", use_container_width=True
-        )
+        saved = st.form_submit_button(tr("save_settings"), type="primary", use_container_width=True)
 
     if saved:
         name_trimmed = (new_name or "").strip()
@@ -2658,7 +2558,7 @@ elif page == "nav_settings":
         ]
         cur_theme = st.session_state.get("theme_mode", "System")
         theme_idx = 0
-        for idx, (val, name) in enumerate(theme_opts):
+        for idx, (val, _name) in enumerate(theme_opts):
             if val == cur_theme:
                 theme_idx = idx
                 break

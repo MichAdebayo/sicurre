@@ -18,6 +18,7 @@
         generate-data dataset-build dataset-export publish-latest dataset-release monthly-release \
         seed-frozen-dataset \
 		poc-replay-frozen \
+		poc-cron-demo poc-release-preview poc-staging-publish \
         pipeline-push run-pipeline demo-v1 demo-v2 \
         poc db-seed r2-freeze-proof dev-app dev
 
@@ -77,6 +78,9 @@ help:
 	@echo "  make dataset-export            - Serialize frozen dataset to CSV/JSONL for PyTorch"
 	@echo "  make seed-frozen-dataset       - Seed current_frozen provenance into data_dataset + data_dataset_item"
 	@echo "  make poc-replay-frozen         - Idempotent replay of frozen production dataset lineage for POC"
+	@echo "  make poc-cron-demo             - Run the isolated SEKOIA scheduled ingestion demonstration"
+	@echo "  make poc-release-preview       - Build and export a local POC dataset without publication"
+	@echo "  make poc-staging-publish       - Publish only to the explicit POC staging Kaggle slug"
 	@echo ""
 	@echo "  POC"
 	@echo "  make poc                       - Launch Streamlit POC dashboard"
@@ -303,6 +307,24 @@ poc-replay-frozen:
 	$(MAKE) seed-frozen-dataset SEED_ARGS="--materialize-missing --sync-existing-version"
 	@echo "POC frozen replay completed: deterministic parity synced to current_frozen."
 
+poc-cron-demo:
+	@test "$${SICURRE_POC_MODE}" = "true" || (echo "Refusing cron demo outside SICURRE_POC_MODE."; exit 1)
+	@test "$${SICURRE_POC_ALLOW_EXTERNAL_WRITES}" = "true" || (echo "Set SICURRE_POC_ALLOW_EXTERNAL_WRITES=true for the sandbox feed snapshot."; exit 1)
+	@echo "Running isolated SEKOIA cron under $${SICURRE_POC_R2_PREFIX}/scraping/sekoia_ioc..."
+	PYTHONPATH=src uv run python src/data_platform/cron_schedulers/scraping/run_sekoia_ioc.py
+
+poc-release-preview:
+	@test "$${SICURRE_POC_MODE}" = "true" || (echo "Refusing POC release preview outside SICURRE_POC_MODE."; exit 1)
+	$(MAKE) pipeline-push DATASET_TAG_PREFIX=poc-preview
+	@echo "POC release preview completed locally. No Kaggle publication or ML dispatch occurred."
+
+poc-staging-publish:
+	@test "$${SICURRE_POC_MODE}" = "true" || (echo "Refusing staging publication outside SICURRE_POC_MODE."; exit 1)
+	@test "$${SICURRE_POC_ALLOW_EXTERNAL_WRITES}" = "true" || (echo "Set SICURRE_POC_ALLOW_EXTERNAL_WRITES=true for staging publication."; exit 1)
+	@test -n "$${SICURRE_POC_KAGGLE_DATASET_SLUG}" || (echo "SICURRE_POC_KAGGLE_DATASET_SLUG is required."; exit 1)
+	@test "$${SICURRE_POC_ALLOW_ML_DISPATCH}" != "true" || (echo "ML dispatch is forbidden from the POC staging publisher."; exit 1)
+	KAGGLE_DATASET_SLUG="$${SICURRE_POC_KAGGLE_DATASET_SLUG}" uv run --no-sync python scripts/data_platform/publish_latest.py --skip-github-dispatch
+
 # ── Pipeline & Demos ──────────────────────────────────────────────────────────
 
 pipeline-push: normalize annotate dataset-build dataset-export
@@ -337,11 +359,11 @@ demo-v2:
 
 poc-seed:
 	@echo "Seeding POC users (admin + demo)..."
-	uv run python src/poc/seed_users.py
+	PYTHONPATH=src uv run python -m poc.seed_users
 
 poc: poc-seed
 	@echo "Starting Sicurre POC Streamlit Dashboard..."
-	uv run streamlit run src/poc/app.py --server.port 8501
+	PYTHONPATH=src uv run streamlit run src/poc/app.py --server.port 8501
 
 # ── Dev ───────────────────────────────────────────────────────────────────────
 

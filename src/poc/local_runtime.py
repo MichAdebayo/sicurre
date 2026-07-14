@@ -1,57 +1,30 @@
 from __future__ import annotations
 
-import os
 import sqlite3
 import uuid
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import UTC, datetime
 
 import bcrypt
-from dotenv import load_dotenv
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-LOCAL_DATA_DIR = ROOT_DIR / "data" / "local"
+from poc.config import get_poc_settings
+from poc.pipeline import build_poc_process_env
 
-POC_AUTH_DB_PATH = LOCAL_DATA_DIR / "sicurre.db"
-
-
-def _resolve_poc_data_db_path() -> Path:
-    if configured := os.environ.get("SICURRE_POC_DATA_DB_PATH"):
-        return Path(configured).expanduser().resolve()
-
-    canonical = LOCAL_DATA_DIR / "sicurre_dataplatform.db"
-    legacy_typo = LOCAL_DATA_DIR / "sicurre_datapatform.db"
-    if not canonical.exists() and legacy_typo.exists():
-        legacy_typo.rename(canonical)
-    return canonical
-
-
-POC_DATA_DB_PATH = _resolve_poc_data_db_path()
-
-POC_AUTH_DB_ASYNC_URL = f"sqlite+aiosqlite:///{POC_AUTH_DB_PATH.as_posix()}"
-POC_DATA_DB_ASYNC_URL = f"sqlite+aiosqlite:///{POC_DATA_DB_PATH.as_posix()}"
-POC_DATA_DB_SYNC_URL = f"sqlite:///{POC_DATA_DB_PATH.as_posix()}"
-
-load_dotenv(ROOT_DIR / ".env", override=False)
-
-DEFAULT_ADMIN_EMAIL = (
-    os.environ.get("SICURRE_POC_ADMIN_EMAIL") or "admin.local@sicurre.test"
+SETTINGS = get_poc_settings()
+POC_AUTH_DB_PATH = SETTINGS.auth_database_path
+POC_DATA_DB_PATH = SETTINGS.data_platform_database_path
+POC_AUTH_DB_ASYNC_URL = SETTINGS.database_url
+POC_DATA_DB_ASYNC_URL = SETTINGS.data_platform_database_url
+POC_DATA_DB_SYNC_URL = SETTINGS.data_platform_database_url.replace(
+    "sqlite+aiosqlite://", "sqlite://", 1
 )
-DEFAULT_ADMIN_PASSWORD = os.environ.get("SICURRE_POC_ADMIN_PASSWORD") or ""
-DEFAULT_ADMIN_NAME = os.environ.get("SICURRE_POC_ADMIN_NAME", "Administrateur Sicurre")
-
-DEFAULT_VIEWER_EMAIL = (
-    os.environ.get("SICURRE_POC_VIEWER_EMAIL") or "viewer.local@sicurre.test"
-)
-DEFAULT_VIEWER_PASSWORD = os.environ.get("SICURRE_POC_VIEWER_PASSWORD") or ""
-DEFAULT_VIEWER_NAME = os.environ.get("SICURRE_POC_VIEWER_NAME", "Utilisateur Démo")
-
-POC_LOCAL_INFERENCE_API_URL = os.environ.get(
-    "SICURRE_POC_INFERENCE_API_URL", "http://127.0.0.1:8000/v1/classify"
-)
-POC_LOCAL_INFERENCE_API_KEY = os.environ.get(
-    "SICURRE_POC_INFERENCE_API_KEY", os.environ.get("INFERENCE_API_KEY", "")
-)
+DEFAULT_ADMIN_EMAIL = SETTINGS.admin_email
+DEFAULT_ADMIN_PASSWORD = SETTINGS.admin_password
+DEFAULT_ADMIN_NAME = SETTINGS.admin_name
+DEFAULT_VIEWER_EMAIL = SETTINGS.viewer_email
+DEFAULT_VIEWER_PASSWORD = SETTINGS.viewer_password
+DEFAULT_VIEWER_NAME = SETTINGS.viewer_name
+POC_LOCAL_INFERENCE_API_URL = SETTINGS.inference_api_url
+POC_LOCAL_INFERENCE_API_KEY = SETTINGS.inference_api_key
 
 
 def _hash_password(password: str) -> str:
@@ -101,7 +74,7 @@ def ensure_local_auth_db() -> None:
             "SICURRE_POC_ADMIN_PASSWORD et SICURRE_POC_VIEWER_PASSWORD doivent être définis dans .env."
         )
 
-    LOCAL_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    POC_AUTH_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(POC_AUTH_DB_PATH))
     try:
         legacy_event_exists = conn.execute(
@@ -111,9 +84,7 @@ def ensure_local_auth_db() -> None:
             "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'app_inference_event'"
         ).fetchone()
         if legacy_event_exists and not app_event_exists:
-            conn.execute(
-                "ALTER TABLE poc_inference_event RENAME TO app_inference_event"
-            )
+            conn.execute("ALTER TABLE poc_inference_event RENAME TO app_inference_event")
 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS poc_user (
@@ -180,17 +151,11 @@ def ensure_local_auth_db() -> None:
                 "ALTER TABLE app_inference_event ADD COLUMN inference_source TEXT NOT NULL DEFAULT 'api'"
             )
         if "override_verdict" not in event_columns:
-            conn.execute(
-                "ALTER TABLE app_inference_event ADD COLUMN override_verdict TEXT NULL"
-            )
+            conn.execute("ALTER TABLE app_inference_event ADD COLUMN override_verdict TEXT NULL")
         if "override_by" not in event_columns:
-            conn.execute(
-                "ALTER TABLE app_inference_event ADD COLUMN override_by TEXT NULL"
-            )
+            conn.execute("ALTER TABLE app_inference_event ADD COLUMN override_by TEXT NULL")
         if "overridden_at" not in event_columns:
-            conn.execute(
-                "ALTER TABLE app_inference_event ADD COLUMN overridden_at TEXT NULL"
-            )
+            conn.execute("ALTER TABLE app_inference_event ADD COLUMN overridden_at TEXT NULL")
         for account in _seed_accounts():
             row = conn.execute(
                 "SELECT id FROM poc_user WHERE email = ?",
@@ -225,7 +190,7 @@ def ensure_local_auth_db() -> None:
                     account["display_name"],
                     _hash_password(account["password"]),
                     "admin" if account["role"] == "Administrateur" else "viewer",
-                    datetime.now(timezone.utc).isoformat(),
+                    datetime.now(UTC).isoformat(),
                     None,
                 ),
             )
@@ -236,10 +201,5 @@ def ensure_local_auth_db() -> None:
 
 
 def build_poc_command_env() -> dict[str, str]:
-    env = dict(os.environ)
-    env["SICURRE_DATABASE_URL"] = POC_AUTH_DB_ASYNC_URL
-    env["SICURRE_DATA_PLATFORM_DATABASE_URL"] = POC_DATA_DB_ASYNC_URL
-    env["INFERENCE_API_URL"] = POC_LOCAL_INFERENCE_API_URL
-    if POC_LOCAL_INFERENCE_API_KEY:
-        env["INFERENCE_API_KEY"] = POC_LOCAL_INFERENCE_API_KEY
-    return env
+    """Return an isolated environment for local POC subprocesses."""
+    return build_poc_process_env(SETTINGS)
