@@ -118,7 +118,9 @@ ci-data-quality:
 	uv run --group backend --group dev --group storage ruff format --check src/core/config.py src/data_platform/extractors/incremental_cc_extractor.py src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py tests/integration/data_platform/common_crawl/test_incremental_cc_checkpoint.py tests/unit/data_platform/common_crawl/test_cc_runtime_config.py
 	uv run --group backend --group dev --group storage mypy --config-file mypy.ini --follow-imports=skip
 	uv run --group backend --group dev --group storage interrogate -f 90 src/core/config.py src/data_platform/extractors/incremental_cc_extractor.py src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py
-	uv run --group backend --group dev --group storage pytest tests/unit tests/integration --cov=src --cov-report=term-missing --cov-fail-under=50
+	uv run --group backend --group dev --group storage pytest tests/unit tests/integration --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=50
+	uv run --group backend --group dev --group storage pytest tests/unit tests/integration --cov=src/core --cov=src/db --cov-branch --cov-report=term-missing --cov-fail-under=90
+	npm run test:coverage
 
 test-inference:
 	uv run tests/e2e/app/smoke_inference_api.py
