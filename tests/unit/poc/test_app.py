@@ -1,5 +1,5 @@
-"""Streamlit interaction tests for the local certification POC."""
-
+import sqlite3
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -24,11 +24,72 @@ def open_page(app: AppTest, label: str, page_key: str) -> None:
     assert app.session_state["page"] == page_key
 
 
+def _seed_data_evidence(data_path: Path) -> None:
+    conn = sqlite3.connect(str(data_path))
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS data_source_system (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                source_type TEXT NOT NULL
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS data_ingestion_run (
+                id TEXT PRIMARY KEY,
+                source_system_id TEXT NOT NULL,
+                raw_record_count INTEGER NOT NULL,
+                finished_at TEXT NOT NULL,
+                status TEXT NOT NULL
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS data_dataset (
+                version_tag TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                item_count INTEGER NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+        conn.execute("CREATE TABLE IF NOT EXISTS data_raw_record (id TEXT PRIMARY KEY)")
+        conn.execute("CREATE TABLE IF NOT EXISTS data_normalized_message (id TEXT PRIMARY KEY)")
+        conn.execute("CREATE TABLE IF NOT EXISTS data_dataset_item (id TEXT PRIMARY KEY)")
+
+        # Seed data
+        conn.execute("INSERT INTO data_source_system (id, name, source_type) VALUES ('ss-1', 'PhishTank', 'api')")
+        conn.execute("INSERT INTO data_source_system (id, name, source_type) VALUES ('ss-2', 'CERT-FR', 'scraping')")
+        conn.execute("INSERT INTO data_ingestion_run (id, source_system_id, raw_record_count, finished_at, status) VALUES ('ir-1', 'ss-1', 100, '2026-07-15T12:00:00Z', 'success')")
+        conn.execute("INSERT INTO data_ingestion_run (id, source_system_id, raw_record_count, finished_at, status) VALUES ('ir-2', 'ss-2', 50, '2026-07-15T13:00:00Z', 'success')")
+        conn.execute("INSERT INTO data_dataset (version_tag, status, item_count, created_at) VALUES ('base-20260715', 'frozen', 120, '2026-07-15T14:00:00Z')")
+        conn.execute("INSERT INTO data_raw_record (id) VALUES ('1'), ('2')")
+        conn.execute("INSERT INTO data_normalized_message (id) VALUES ('1'), ('2')")
+        conn.execute("INSERT INTO data_dataset_item (id) VALUES ('1'), ('2')")
+        conn.commit()
+    finally:
+        conn.close()
+
+
 @pytest.fixture
 def poc_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AppTest:
     """Run the real POC script against isolated local configuration."""
     auth_path = tmp_path / "poc-auth.db"
     data_path = tmp_path / "poc-data.db"
+    _seed_data_evidence(data_path)
+
+    # Mock stream_operation to avoid running actual make commands during tests
+    def mock_stream_operation(operation_key: str, settings: object) -> Iterator[str]:
+        if st_session_state := getattr(pytest, "_pipeline_fail_type", None):
+            if st_session_state == "permission":
+                raise PermissionError("Access denied")
+            raise RuntimeError("Generic crash")
+        yield "Starting task...\n"
+        yield "Processing record 1...\n"
+        yield "API_KEY=mysecret\n"
+        yield "Done.\n"
+
+    from poc.presentation import pipeline_page
+    monkeypatch.setattr(pipeline_page, "stream_operation", mock_stream_operation)
+
     environment = {
         "SICURRE_POC_DATABASE_URL": f"sqlite+aiosqlite:///{auth_path}",
         "SICURRE_POC_DATA_PLATFORM_DATABASE_URL": f"sqlite+aiosqlite:///{data_path}",
@@ -153,3 +214,52 @@ def test_false_negative_report_moves_delivered_message_to_threat_log(poc_app: Ap
 
     open_page(poc_app, "Journal des menaces", "nav_threat_log")
     assert any("Validation facture mars" in markdown.value for markdown in poc_app.markdown)
+
+
+def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
+    """Test successful and failing pipeline runs, observer warning, and datasets display."""
+    login(poc_app)
+
+    # 1. Test Datasets Page (showing metrics and seeded database)
+    open_page(poc_app, "Jeux de données", "nav_datasets")
+    assert not poc_app.exception
+    # Verify seeded counts are shown
+    assert any("base-20260715" in md.value for md in poc_app.markdown)
+    assert any("PhishTank" in md.value for md in poc_app.markdown)
+
+    # 2. Test Pipeline Page - Admin Successful Run
+    open_page(poc_app, "Flux de données", "nav_pipeline")
+    cron_btn = next(btn for btn in poc_app.button if btn.label == "Cron incrémental")
+    cron_btn.click().run()
+    assert not poc_app.exception
+    assert any("Dernière opération terminée avec succès" in info.value for info in poc_app.info)
+
+    # 3. Test Pipeline Page - Permission Error Handler
+    pytest._pipeline_fail_type = "permission"  # type: ignore[attr-defined]
+    cron_btn.click().run()
+    assert not poc_app.exception
+    assert any("Dernière opération en erreur" in warning.value for warning in poc_app.warning)
+
+    # 4. Test Pipeline Page - General Error Handler
+    pytest._pipeline_fail_type = "runtime"  # type: ignore[attr-defined]
+    cron_btn.click().run()
+    assert not poc_app.exception
+    assert any("Dernière opération en erreur" in warning.value for warning in poc_app.warning)
+    pytest._pipeline_fail_type = None  # type: ignore[attr-defined]
+
+    # 5. Test Pipeline Page - Observer Restriction
+    # Logout and login as viewer/observer
+    open_page(poc_app, "Paramètres", "nav_settings")
+    logout_btn = next(btn for btn in poc_app.button if btn.label == "Déconnexion")
+    logout_btn.click().run()
+    assert poc_app.session_state["authenticated"] is False
+
+    poc_app.text_input[0].input("viewer@example.test")
+    poc_app.text_input[1].input("viewer-password")
+    poc_app.button[0].click().run()
+    assert poc_app.session_state["authenticated"] is True
+    assert poc_app.session_state["user"]["role"] == "viewer"
+
+    open_page(poc_app, "Flux de données", "nav_pipeline")
+    assert any("Accès réservé" in warning.value for warning in poc_app.warning)
+
