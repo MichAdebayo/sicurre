@@ -154,3 +154,7 @@ deploy/nginx/*.md
 
 DEPLOYMENT_BLOCKERS.md
 cert-readiness-audit.md
+
+
+scripts/README.md
+docs/architecture/issue-artifact.md
