@@ -38,8 +38,9 @@ _WORKER_JS = """\
  * Flow:
  *   1. Extract sender, subject and body from the inbound email
  *   2. POST to Sicurre scan endpoint (SICURRE_SCAN_URL)
- *   3. If verdict == "phishing"  → reject the message
- *   4. Otherwise                 → forward to FORWARD_TO with X-Sicurre trace headers
+ *   3. If quarantined, upload the original MIME for controlled release
+ *   4. If verdict == "phishing"  → reject the message
+ *   5. Otherwise                 → forward to FORWARD_TO with X-Sicurre trace headers
  *
  * Environment bindings (set via Cloudflare Workers secrets):
  *   SICURRE_SCAN_URL      – e.g. https://api.yourdomain.com/v1/email/scan
@@ -51,10 +52,12 @@ export default {
     const from    = message.from    || '';
     const subject = message.headers.get('subject') || message.headers.get('Subject') || '';
 
-    // Read raw email body; cap at 6 000 bytes for the scan API
+    // Read the original MIME once. Only a short text projection is classified.
+    let rawBytes = new ArrayBuffer(0);
     let bodyText = '';
     try {
-      const rawText = await new Response(message.raw).text();
+      rawBytes = await new Response(message.raw).arrayBuffer();
+      const rawText = new TextDecoder('utf-8', { fatal: false }).decode(rawBytes);
       // Strip MIME boundary/header noise so the model gets cleaner text
       bodyText = rawText
         .replace(/--[A-Za-z0-9_\\-\\.]+(?:--)?/g, '')
@@ -64,11 +67,20 @@ export default {
         .slice(0, 5_500);
     } catch (_) { /* fail-open body read */ }
 
+    const headerMessageId = message.headers.get('message-id') || message.headers.get('Message-ID') || '';
+    let messageId = headerMessageId.trim();
+    if (!messageId && rawBytes.byteLength) {
+      const digest = await crypto.subtle.digest('SHA-256', rawBytes);
+      messageId = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+    }
+
     // ── Call Sicurre scan endpoint ──────────────────────────────────────────
     let verdict = 'safe';
     let scanStatus = 'unavailable';
     let confidence = '';
     let scanHttpStatus = '';
+    let quarantineId = '';
+    let eventId = '';
     try {
       const resp = await fetch(env.SICURRE_SCAN_URL, {
         method : 'POST',
@@ -77,6 +89,7 @@ export default {
           'X-Sicurre-Secret' : env.SICURRE_SHARED_SECRET,
         },
         body  : JSON.stringify({
+          message_id     : messageId,
           subject,
           sender         : from,
           text           : bodyText,
@@ -90,13 +103,15 @@ export default {
         const data = await resp.json();
         verdict = (data.verdict || 'safe').toLowerCase();
         scanStatus = 'scanned';
-        confidence = data.confidence === undefined ? '' : String(data.confidence);
+        confidence = data.score === undefined ? '' : String(data.score);
+        quarantineId = data.quarantine_id ? String(data.quarantine_id) : '';
+        eventId = data.event_id ? String(data.event_id) : '';
       } else {
         scanStatus = 'api-error';
       }
-    } catch (error) {
+    } catch (_) {
       scanStatus = 'api-unreachable';
-      // Fail-open: scan unavailable → forward the message
+      // Preserve mail availability, but never claim the message was scanned.
     }
 
     if (verdict === 'phishing') {
@@ -105,7 +120,27 @@ export default {
     }
 
     if (verdict === 'quarantine') {
-      // Quarantined: drop silently (held in Sicurre DB for review)
+      if (!quarantineId || !rawBytes.byteLength) {
+        message.setReject('Sicurre quarantine storage unavailable; message was not discarded');
+        return;
+      }
+      const uploadUrl = env.SICURRE_SCAN_URL.replace(/\\/v1\\/email\\/scan\\/?$/, `/v1/email/quarantine/${quarantineId}/content`);
+      try {
+        const upload = await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'message/rfc822',
+            'X-Sicurre-Secret': env.SICURRE_SHARED_SECRET,
+          },
+          body: rawBytes,
+          signal: AbortSignal.timeout(15_000),
+        });
+        if (!upload.ok) {
+          message.setReject('Sicurre quarantine storage failed; message was not discarded');
+        }
+      } catch (_) {
+        message.setReject('Sicurre quarantine storage unreachable; message was not discarded');
+      }
       return;
     }
 
@@ -118,6 +153,7 @@ export default {
     traceHeaders.set('X-Sicurre-Verdict', verdict);
     traceHeaders.set('X-Sicurre-Scan-Http-Status', scanHttpStatus);
     traceHeaders.set('X-Sicurre-Confidence', confidence);
+    traceHeaders.set('X-Sicurre-Event-ID', eventId);
     await message.forward(env.FORWARD_TO, traceHeaders);
   },
 };

@@ -73,7 +73,6 @@ export default function AlertsRoute() {
 
   // Form states
   const [notifyPhishing, setNotifyPhishing] = useState(true);
-  const [notifySpam, setNotifySpam] = useState(false);
   const [quietEnabled, setQuietEnabled] = useState(false);
   const [quietStart, setQuietStart] = useState("22:00");
   const [quietEnd, setQuietEnd] = useState("07:00");
@@ -89,7 +88,6 @@ export default function AlertsRoute() {
   useEffect(() => {
     if (preferences) {
       setNotifyPhishing(preferences.notify_phishing);
-      setNotifySpam(preferences.notify_spam);
       setQuietEnabled(preferences.quiet_hours_enabled);
       setQuietStart(preferences.quiet_hours_start);
       setQuietEnd(preferences.quiet_hours_end);
@@ -103,13 +101,13 @@ export default function AlertsRoute() {
     try {
       await updatePrefsMutation.mutateAsync({
         notify_phishing: notifyPhishing,
-        notify_spam: notifySpam,
+        notify_spam: false,
         quiet_hours_enabled: quietEnabled,
         quiet_hours_start: quietStart,
         quiet_hours_end: quietEnd,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Paris",
       });
       setPrefsSuccess(true);
-      setTimeout(() => setPrefsSuccess(false), 3000);
     } catch (err) {
       setPrefsError(err instanceof Error ? err.message : "Failed to save preferences.");
     }
@@ -140,10 +138,11 @@ export default function AlertsRoute() {
   };
 
   const handleDismissAlert = async (id: string) => {
+    setRuleError("");
     try {
       await dismissAlertMutation.mutateAsync(id);
     } catch (err) {
-      console.error(err);
+      setRuleError(err instanceof Error ? err.message : "Impossible de masquer la notification.");
     }
   };
 
@@ -211,24 +210,9 @@ export default function AlertsRoute() {
                       {t("alerts.notify_phishing")}
                     </span>
                     <p className="text-xs text-on-surface-variant/70 mt-0.5">
-                      Sends immediate push alerts to your professional mail for high-risk flags.
-                    </p>
-                  </div>
-                </label>
-
-                <label className="flex items-start gap-3 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={notifySpam}
-                    onChange={(e) => setNotifySpam(e.target.checked)}
-                    className="w-4 h-4 mt-1 rounded text-primary border-border-subtle focus:ring-primary/20 accent-primary"
-                  />
-                  <div>
-                    <span className="text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">
-                      {t("alerts.notify_spam")}
-                    </span>
-                    <p className="text-xs text-on-surface-variant/70 mt-0.5">
-                      Daily summary digest for commercial advertiser spam.
+                      {i18n.language === "fr"
+                        ? "Envoie un e-mail lorsqu’une menace est placée en quarantaine."
+                        : "Sends an email when a threat is placed in quarantine."}
                     </p>
                   </div>
                 </label>
@@ -488,7 +472,7 @@ export default function AlertsRoute() {
                     await deleteRuleMutation.mutateAsync(id);
                     refetchRules();
                   } catch (err) {
-                    console.error(err);
+                    setRuleError(err instanceof Error ? err.message : "Impossible de supprimer la règle.");
                   }
                 }}
                 className="font-bold text-xs"

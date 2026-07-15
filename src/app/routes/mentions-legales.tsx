@@ -58,13 +58,11 @@ export default function MentionsLegalesRoute({ onBack }: MentionsLegalesProps) {
           <section className="space-y-3">
             <h2 className="font-display font-medium text-lg text-slate-200">1. Éditeur du site</h2>
             <p className="text-sm text-slate-400 leading-relaxed">
-              Le site <strong className="text-white">sicurre.io</strong> est édité par la société <strong className="text-white">Sicurre</strong>,
-              société par actions simplifiée au capital de 15 000 euros, immatriculée au Registre du Commerce
-              et des Sociétés de Paris sous le numéro 987 654 321, dont le siège social est situé à
-              Roubaix, France.
+              Le service expérimental <strong className="text-white">Sicurre</strong> est édité par Michael Adebayo
+              dans le cadre d'un projet de certification professionnelle. Il ne constitue pas encore une société commerciale immatriculée.
             </p>
             <p className="text-sm text-slate-400">
-              <strong className="text-white">Directeur de la publication :</strong> Michael Adebayo, en sa qualité de Président de Sicurre.
+              <strong className="text-white">Responsable de la publication :</strong> Michael Adebayo.
             </p>
           </section>
 
@@ -77,10 +75,8 @@ export default function MentionsLegalesRoute({ onBack }: MentionsLegalesProps) {
               <li>
                 <strong className="text-white">Neon Inc.</strong> (Base de données) : 2443 Fillmore St, San Francisco, CA 94115, États-Unis.
               </li>
-              <li>
-                <strong className="text-white">Google Cloud Platform</strong> (Infrastructures de calcul et stockage) : Google Ireland Limited,
-                Gordon House, Barrow Street, Dublin 4, Irlande. (Serveurs situés en Europe, région de Paris).
-              </li>
+              <li><strong className="text-white">Hetzner Online GmbH</strong> : hébergement des conteneurs applicatifs.</li>
+              <li><strong className="text-white">Cloudflare, Inc.</strong> : DNS, Email Routing et exécution du Worker de routage.</li>
             </ul>
           </section>
 
@@ -98,8 +94,8 @@ export default function MentionsLegalesRoute({ onBack }: MentionsLegalesProps) {
             <h2 className="font-display font-medium text-lg text-slate-200">4. Propriété intellectuelle</h2>
             <p className="text-sm text-slate-400 leading-relaxed">
               L'ensemble du contenu présent sur le site (textes, logos, animations 3D, chartes graphiques)
-              est la propriété exclusive de Sicurre. Toute reproduction, modification ou distribution
-              sans accord écrit préalable est strictly interdite.
+              appartient à son auteur ou à ses concédants respectifs. Toute reproduction, modification ou distribution
+              sans accord écrit préalable est strictement interdite.
             </p>
           </section>
         </MotionDiv>

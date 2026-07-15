@@ -118,3 +118,38 @@ def test_successful_simulation_populates_operational_pages(poc_app: AppTest) -> 
 
     open_page(poc_app, "Paramètres", "nav_settings")
     assert len(poc_app.selectbox) == 2
+
+
+def test_false_positive_correction_delivers_message_to_smail(poc_app: AppTest) -> None:
+    """A blocked message corrected as safe becomes visible in the local inbox."""
+    login(poc_app)
+    open_page(poc_app, "Espace d'essai", "nav_playground")
+    poc_app.button_group[0].set_value("simulation").run()
+    next(button for button in poc_app.button if button.label == "Analyser l'email").click().run()
+    poc_app.run()
+
+    open_page(poc_app, "Journal des menaces", "nav_threat_log")
+    mark_safe = next(button for button in poc_app.button if button.label == "Marquer faux positif")
+    mark_safe.click().run()
+    poc_app.run()
+
+    open_page(poc_app, "Smail", "nav_smail")
+    assert any("URGENT" in markdown.value for markdown in poc_app.markdown)
+
+
+def test_false_negative_report_moves_delivered_message_to_threat_log(poc_app: AppTest) -> None:
+    """A delivered message reported as phishing becomes visible in threat history."""
+    login(poc_app)
+    open_page(poc_app, "Espace d'essai", "nav_playground")
+    poc_app.button_group[0].set_value("simulation").run()
+    poc_app.selectbox[0].set_value("Client facture").run()
+    next(button for button in poc_app.button if button.label == "Analyser l'email").click().run()
+    poc_app.run()
+
+    open_page(poc_app, "Smail", "nav_smail")
+    report = next(button for button in poc_app.button if button.label == "Signaler comme phishing")
+    report.click().run()
+    poc_app.run()
+
+    open_page(poc_app, "Journal des menaces", "nav_threat_log")
+    assert any("Validation facture mars" in markdown.value for markdown in poc_app.markdown)

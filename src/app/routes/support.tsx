@@ -10,7 +10,8 @@ import {
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { AuthSession } from "../lib/api";
+import { AppToast } from "../components/common/app-toast";
+import { AuthSession, useCreateSupportRequest } from "../lib/api";
 
 const MotionDiv = motion.div as any;
 
@@ -27,27 +28,33 @@ export default function SupportRoute({ session }: SupportRouteProps) {
   const [email, setEmail] = useState(session?.email || "");
   const [category, setCategory] = useState("dns");
   const [message, setMessage] = useState("");
-  const [isPending, setIsPending] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [submittedTicket, setSubmittedTicket] = useState("");
+  const [submitError, setSubmitError] = useState("");
+  const createSupportRequest = useCreateSupportRequest();
 
-  const handleSendSupport = (e: React.FormEvent) => {
+  const handleSendSupport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim() || !message.trim()) return;
-
-    setIsPending(true);
-    // Simulate sending support request to support@sicurre.com
-    setTimeout(() => {
-      setIsPending(false);
-      setSubmitted(true);
+    setSubmitError("");
+    try {
+      const ticket = await createSupportRequest.mutateAsync({
+        requester_name: name.trim(),
+        requester_email: email.trim(),
+        category,
+        message: message.trim(),
+      });
+      setSubmittedTicket(ticket.id);
       setMessage("");
-    }, 1200);
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : isFR
+            ? "Impossible d’enregistrer la demande."
+            : "Could not record the request.",
+      );
+    }
   };
-
-  const systemNodes = [
-    { name: isFR ? "Pare-feu Global" : "Global Firewall", status: isFR ? "Opérationnel" : "Operational", metric: "Uptime", value: "99.99 %" },
-    { name: isFR ? "Modèle d'Analyse" : "Analysis Model", status: isFR ? "Opérationnel" : "Operational", metric: isFR ? "Latence" : "Latency", value: "82 ms" },
-    { name: isFR ? "Collecteur de Logs" : "Log Collector", status: isFR ? "Opérationnel" : "Operational", metric: isFR ? "Débit" : "Throughput", value: "14 req/s" },
-  ];
 
   return (
     <MotionDiv
@@ -57,6 +64,12 @@ export default function SupportRoute({ session }: SupportRouteProps) {
       transition={{ duration: 0.3 }}
       className="space-y-6 animate-in fade-in duration-200"
     >
+      <AppToast
+        tone="error"
+        message={submitError}
+        visible={Boolean(submitError)}
+        onClose={() => setSubmitError("")}
+      />
       {/* Header */}
       <div className="pb-6 border-b border-border-subtle">
         <h1 className="app-h1">
@@ -74,23 +87,23 @@ export default function SupportRoute({ session }: SupportRouteProps) {
         
         {/* Left: Contact Form Card (8 Columns) */}
         <div className="lg:col-span-8 bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm flex flex-col justify-between animate-in fade-in duration-300">
-          {submitted ? (
+          {submittedTicket ? (
             <div className="py-16 text-center space-y-4 max-w-md mx-auto animate-in fade-in duration-300">
               <div className="w-16 h-16 bg-safe/10 text-safe rounded-full flex items-center justify-center mx-auto shadow-inner">
                 <CheckCircle2 className="w-8 h-8" />
               </div>
               <div className="space-y-2">
                 <h3 className="app-h2">
-                  {isFR ? "Message Envoyé avec Succès !" : "Support Ticket Submitted!"}
+                  {isFR ? "Demande enregistrée" : "Support request recorded"}
                 </h3>
                 <p className="app-body-normal text-on-surface-variant/80 leading-relaxed font-medium">
                   {isFR
-                    ? "Votre message a été transmis avec succès à support@sicurre.com. Un technicien prendra contact avec vous sous un délai moyen de 2 heures."
-                    : "Your message was successfully transmitted to support@sicurre.com. An engineer will follow up with you within 2 hours."}
+                    ? `Ticket ${submittedTicket.slice(0, 8)}. Votre demande est visible par l’équipe Sicurre.`
+                    : `Ticket ${submittedTicket.slice(0, 8)}. Your request is now visible to the Sicurre team.`}
                 </p>
               </div>
               <Button
-                onClick={() => setSubmitted(false)}
+                onClick={() => setSubmittedTicket("")}
                 className="mt-6 px-5 py-2 font-bold text-xs bg-surface-low border border-border-subtle text-on-surface hover:bg-surface-container"
               >
                 {isFR ? "Envoyer un autre message" : "Send another message"}
@@ -185,10 +198,10 @@ export default function SupportRoute({ session }: SupportRouteProps) {
               <div className="pt-3 border-t border-border-subtle/50 flex justify-end">
                 <Button
                   type="submit"
-                  disabled={isPending}
+                  disabled={createSupportRequest.isPending}
                   className="flex items-center gap-2 cursor-pointer bg-[#2e6bb5] hover:bg-[#23589b] text-white border-none text-xs font-bold rounded-lg px-5 py-2 h-10 shadow-sm"
                 >
-                  {isPending ? (
+                  {createSupportRequest.isPending ? (
                     <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                   ) : (
                     <Send className="w-3.5 h-3.5" />

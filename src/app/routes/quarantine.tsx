@@ -44,18 +44,6 @@ export default function QuarantineRoute() {
   const [actionSuccess, setActionSuccess] = useState("");
   const [actionError, setActionError] = useState("");
 
-  useEffect(() => {
-    if (!actionSuccess) return;
-    const t = setTimeout(() => setActionSuccess(""), 4000);
-    return () => clearTimeout(t);
-  }, [actionSuccess]);
-
-  useEffect(() => {
-    if (!actionError) return;
-    const t = setTimeout(() => setActionError(""), 4000);
-    return () => clearTimeout(t);
-  }, [actionError]);
-
   const getRemainingTime = (expiresAtStr: string) => {
     if (!expiresAtStr) return "14 d";
     const expiry = new Date(expiresAtStr).getTime();
@@ -80,16 +68,14 @@ export default function QuarantineRoute() {
     setActionError("");
     setActionSuccess("");
     try {
-      const res = await releaseMutation.mutateAsync(id);
+      await releaseMutation.mutateAsync(id);
       setActionSuccess(
-        i18n.language === "fr"
-          ? `Email libéré avec succès (Transféré à ${res.forwarded_to})`
-          : `Email released successfully (Forwarded to ${res.forwarded_to})`
+        i18n.language === "fr" ? "Email délivré." : "Email delivered."
       );
       setSelectedItem(null);
       refetch();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to release email.");
+      setActionError(quarantineActionError(err, isFR));
     }
   };
 
@@ -101,16 +87,16 @@ export default function QuarantineRoute() {
     setActionError("");
     setActionSuccess("");
     try {
-      const res = await whitelistMutation.mutateAsync(id);
+      await whitelistMutation.mutateAsync(id);
       setActionSuccess(
         i18n.language === "fr"
-          ? `Email marqué comme sain et expéditeur (${res.whitelisted_pattern}) ajouté à la liste blanche.`
-          : `Email marked as safe and sender (${res.whitelisted_pattern}) added to whitelist.`
+          ? "Email délivré et expéditeur autorisé."
+          : "Email delivered and sender allowed."
       );
       setSelectedItem(null);
       refetch();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to whitelist.");
+      setActionError(quarantineActionError(err, isFR));
     }
   };
 
@@ -451,4 +437,26 @@ export default function QuarantineRoute() {
       </div>
     </MotionDiv>
   );
+}
+
+function quarantineActionError(error: unknown, isFrench: boolean): string {
+  const message = error instanceof Error ? error.message : "";
+  if (message.includes("Email Sending: Edit")) {
+    return isFrench
+      ? "Ajoutez l’autorisation Cloudflare « Email Sending: Edit » au token."
+      : "Add Cloudflare Email Sending: Edit permission to the token.";
+  }
+  if (message.includes("Original email content is unavailable")) {
+    return isFrench
+      ? "Ce message historique ne contient pas l’original nécessaire à la délivrance."
+      : "This historical item has no original email available for delivery.";
+  }
+  if (message.includes("Active Cloudflare integration required")) {
+    return isFrench
+      ? "Reconnectez Cloudflare avant de délivrer ce message."
+      : "Reconnect Cloudflare before delivering this message.";
+  }
+  return isFrench
+    ? "Délivrance impossible. L’email reste en quarantaine."
+    : "Delivery failed. The email remains quarantined.";
 }

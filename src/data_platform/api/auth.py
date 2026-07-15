@@ -177,13 +177,37 @@ def _ensure_legacy_sqlite_tables() -> None:
                 sender TEXT NOT NULL,
                 subject TEXT NOT NULL,
                 body_text TEXT NOT NULL,
+                raw_storage_uri TEXT,
+                raw_content_hash TEXT,
+                raw_size_bytes INTEGER,
                 safety_verdict TEXT NOT NULL,
                 composite_score REAL NOT NULL,
                 status TEXT NOT NULL DEFAULT 'held',
                 created_at TEXT NOT NULL,
-                expires_at TEXT NOT NULL
+                expires_at TEXT NOT NULL,
+                delivery_message_id TEXT,
+                delivered_at TEXT,
+                last_delivery_error TEXT,
+                UNIQUE(workspace_id, message_id)
             )
         """)
+        quarantine_columns = _table_columns(conn, "app_quarantine_item")
+        for column_name, column_type in {
+            "raw_storage_uri": "TEXT",
+            "raw_content_hash": "TEXT",
+            "raw_size_bytes": "INTEGER",
+            "delivery_message_id": "TEXT",
+            "delivered_at": "TEXT",
+            "last_delivery_error": "TEXT",
+        }.items():
+            if column_name not in quarantine_columns:
+                conn.execute(
+                    f"ALTER TABLE app_quarantine_item ADD COLUMN {column_name} {column_type} NULL"
+                )
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_app_quarantine_workspace_message "
+            "ON app_quarantine_item(workspace_id, message_id)"
+        )
         conn.execute("""
             CREATE TABLE IF NOT EXISTS app_domain_shield_status (
                 domain TEXT PRIMARY KEY,

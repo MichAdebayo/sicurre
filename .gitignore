@@ -153,3 +153,4 @@ deploy/grafana/*.md
 deploy/nginx/*.md
 
 DEPLOYMENT_BLOCKERS.md
+cert-readiness-audit.md
