@@ -239,11 +239,14 @@ class CloudflareProvisioner:
         except Exception:
             r.raise_for_status()
             return {}
+        if not isinstance(data, dict):
+            return {}
         if not data.get("success", True):
             errors = data.get("errors", [])
             msg = "; ".join(e.get("message", str(e)) for e in errors) or r.text
             raise CloudflareAPIError(f"{context}: {msg}", status_code=r.status_code)
-        return data
+        res: dict[str, Any] = data
+        return res
 
     # ── public API ──────────────────────────────────────────────────────────
 
@@ -257,7 +260,6 @@ class CloudflareProvisioner:
 
     async def get_zone(self, zone_name: str) -> tuple[str, str]:
         """Return (zone_id, account_id) for the given domain name."""
-        data = await self._get("/zones", params={"name": zone_name})  # type: ignore[arg-type]
         # Note: _get doesn't take params directly, pass via query string
         async with httpx.AsyncClient(timeout=20.0) as client:
             r = await client.get(
@@ -443,7 +445,8 @@ class CloudflareProvisioner:
     async def get_email_routing_status(self, zone_id: str) -> dict[str, Any]:
         """Return current Email Routing status for a zone."""
         data = await self._get(f"/zones/{zone_id}/email/routing")
-        return data.get("result", {})
+        res = data.get("result", {})
+        return res if isinstance(res, dict) else {}
 
     async def get_dns_records(self, zone_id: str) -> list[dict[str, Any]]:
         """Fetch all DNS records for a given zone."""
@@ -454,7 +457,8 @@ class CloudflareProvisioner:
                 params={"per_page": 100},
             )
         data = self._unwrap(r, context=f"GET /zones/{zone_id}/dns_records")
-        return data.get("result", [])
+        res = data.get("result", [])
+        return res if isinstance(res, list) else []
 
     # ── full provisioning flow ──────────────────────────────────────────────
 
