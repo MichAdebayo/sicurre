@@ -4,11 +4,21 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import re
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
 
 from core.config import Settings, get_settings
+
+QUARANTINE_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
+
+
+def _safe_identifier(value: str, *, field_name: str) -> str:
+    """Validate one opaque storage-key segment against traversal characters."""
+    if not QUARANTINE_ID_PATTERN.fullmatch(value):
+        raise ValueError(f"Invalid quarantine {field_name}")
+    return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,7 +49,12 @@ class LocalQuarantineStore:
         self.root_dir = root_dir.resolve()
 
     def _path(self, workspace_id: str, item_id: str) -> Path:
-        return self.root_dir / workspace_id / f"{item_id}.eml"
+        workspace = _safe_identifier(workspace_id, field_name="workspace_id")
+        item = _safe_identifier(item_id, field_name="item_id")
+        candidate = (self.root_dir / workspace / f"{item}.eml").resolve()
+        if not candidate.is_relative_to(self.root_dir):
+            raise ValueError("Quarantine object escapes the configured storage root")
+        return candidate
 
     def _resolve_uri(self, storage_uri: str) -> Path:
         if not storage_uri.startswith("file://"):
@@ -89,14 +104,18 @@ class R2QuarantineStore:
         self.client = _r2_client(settings)
 
     def _key(self, workspace_id: str, item_id: str) -> str:
-        return PurePosixPath(self.prefix, workspace_id, f"{item_id}.eml").as_posix()
+        workspace = _safe_identifier(workspace_id, field_name="workspace_id")
+        item = _safe_identifier(item_id, field_name="item_id")
+        return PurePosixPath(self.prefix, workspace, f"{item}.eml").as_posix()
 
     def _parse_uri(self, storage_uri: str) -> str:
         prefix = f"r2://{self.bucket}/"
         if not storage_uri.startswith(prefix):
             raise ValueError("Quarantine object belongs to another bucket")
         key = storage_uri.removeprefix(prefix)
-        if not key.startswith(f"{self.prefix}/"):
+        key_path = PurePosixPath(key)
+        prefix_path = PurePosixPath(self.prefix)
+        if ".." in key_path.parts or key_path.parts[: len(prefix_path.parts)] != prefix_path.parts:
             raise ValueError("Quarantine object escapes the configured prefix")
         return key
 

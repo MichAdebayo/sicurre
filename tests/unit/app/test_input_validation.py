@@ -7,6 +7,7 @@ downstream dependencies are unavailable.
 
 from __future__ import annotations
 
+import hashlib
 from typing import Any
 
 import pytest
@@ -24,7 +25,6 @@ from data_platform.api.routers.app_routes import (
     UpdateProfileRequest,
 )
 from data_platform.api.routers.integrations import EmailScanRequest
-
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -100,22 +100,21 @@ async def test_scan_email_returns_503_when_inference_unavailable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """POST /v1/email/scan returns 503 when the inference API is unreachable."""
-    import hashlib
-
     import httpx
 
     secret = "valid-secret"
-    secret_hash = hashlib.sha256(secret.encode()).hexdigest()
 
     monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
 
     call_count = 0
+    expected_hash = hashlib.sha256(secret.encode()).hexdigest()
 
     async def query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
         nonlocal call_count
         call_count += 1
         if call_count == 1:
-            # Return a matching integration
+            assert "shared_secret_hash = ?" in sql
+            assert params == (expected_hash,)
             return [
                 {
                     "id": "int-1",
@@ -136,7 +135,7 @@ async def test_scan_email_returns_503_when_inference_unavailable(
         def __init__(self, **kwargs: Any) -> None:
             pass
 
-        async def __aenter__(self) -> "FailingClient":
+        async def __aenter__(self) -> FailingClient:
             return self
 
         async def __aexit__(self, *_: Any) -> None:

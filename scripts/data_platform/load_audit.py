@@ -1,78 +1,79 @@
-"""Load and performance validation script for Sicurre API boundaries."""
+"""Run a bounded, thresholded load audit against one Sicurre HTTP endpoint."""
 
 from __future__ import annotations
 
+import argparse
 import asyncio
+import os
+import re
 import sys
-import time
 
-import httpx
+from data_platform.services.shared.load_audit import LoadAuditConfig, run_load_audit
+
+ENV_NAME_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 
-async def benchmark_endpoint(url: str, requests_count: int, concurrency: int) -> None:
-    print(f"Starting benchmark on URL: {url}")
-    print(f"Total Requests: {requests_count} | Concurrency Level: {concurrency}\n")
+def parse_args() -> argparse.Namespace:
+    """Parse bounded load parameters and explicit pass thresholds."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("url")
+    parser.add_argument("--requests", type=int, default=100)
+    parser.add_argument("--concurrency", type=int, default=10)
+    parser.add_argument("--timeout-seconds", type=float, default=10)
+    parser.add_argument("--expected-status", type=int, default=200)
+    parser.add_argument("--bearer-env")
+    parser.add_argument("--max-error-rate", type=float, default=0.01)
+    parser.add_argument("--max-p95-ms", type=float, required=True)
+    return parser.parse_args()
 
-    latencies: list[float] = []
-    errors_count = 0
-    success_count = 0
 
-    semaphore = asyncio.Semaphore(concurrency)
-    client = httpx.AsyncClient(timeout=10.0)
+def bearer_headers(environment_name: str | None) -> dict[str, str] | None:
+    """Resolve an optional bearer token without accepting or printing its value."""
+    if not environment_name:
+        return None
+    if not ENV_NAME_PATTERN.fullmatch(environment_name):
+        raise ValueError("--bearer-env must be an uppercase environment variable name.")
+    token = os.environ.get(environment_name)
+    if not token:
+        raise ValueError(f"Required bearer environment variable is absent: {environment_name}")
+    return {"Authorization": f"Bearer {token}"}
 
-    async def send_request() -> None:
-        nonlocal errors_count, success_count
-        async with semaphore:
-            start_time = time.monotonic()
-            try:
-                r = await client.get(url)
-                duration = time.monotonic() - start_time
-                if r.status_code == 200:
-                    success_count += 1
-                    latencies.append(duration * 1000.0)  # convert to ms
-                else:
-                    errors_count += 1
-            except Exception:
-                errors_count += 1
 
-    start_bench = time.monotonic()
-    tasks = [asyncio.create_task(send_request()) for _ in range(requests_count)]
-    await asyncio.gather(*tasks)
-    await client.aclose()
-
-    total_bench_duration = time.monotonic() - start_bench
-
-    if not latencies:
-        print("Error: All requests failed. No latency data gathered.")
-        sys.exit(1)
-
-    latencies.sort()
-    p50 = latencies[int(len(latencies) * 0.50)]
-    p95 = latencies[int(len(latencies) * 0.95)]
-    p99 = latencies[int(len(latencies) * 0.99)]
-    avg = sum(latencies) / len(latencies)
-
-    print("=== Load Audit Results ===")
-    print(f"Duration: {total_bench_duration:.2f} seconds")
-    print(f"Throughput: {requests_count / total_bench_duration:.2f} req/sec")
-    print(f"Successes: {success_count} | Errors: {errors_count}")
-    print(f"Average Latency: {avg:.2f} ms")
-    print(f"p50 (Median)   : {p50:.2f} ms")
-    print(f"p95 Latency    : {p95:.2f} ms")
-    print(f"p99 Latency    : {p99:.2f} ms")
-    print("==========================")
+async def run() -> int:
+    """Execute the audit, print aggregate evidence, and enforce its gates."""
+    args = parse_args()
+    config = LoadAuditConfig(
+        url=args.url,
+        request_count=args.requests,
+        concurrency=args.concurrency,
+        timeout_seconds=args.timeout_seconds,
+        expected_status=args.expected_status,
+    )
+    result = await run_load_audit(config, headers=bearer_headers(args.bearer_env))
+    print("=== Sicurre load audit ===")
+    print(f"Target: {config.url}")
+    print(f"Requests: {result.request_count}")
+    print(f"Concurrency: {config.concurrency}")
+    print(f"Duration: {result.duration_seconds:.3f}s")
+    print(f"Throughput: {result.throughput_per_second:.2f} req/s")
+    print(f"Successes: {result.success_count}; errors: {result.error_count}")
+    print(f"Status counts: {result.status_counts}")
+    if result.latencies_ms:
+        print(f"Average: {result.average_ms:.2f}ms")
+        print(f"p50: {result.percentile_ms(50):.2f}ms")
+        print(f"p95: {result.percentile_ms(95):.2f}ms")
+        print(f"p99: {result.percentile_ms(99):.2f}ms")
+    passed = result.meets(
+        max_error_rate=args.max_error_rate,
+        max_p95_ms=args.max_p95_ms,
+    )
+    print(f"Gate: {'PASS' if passed else 'FAIL'}")
+    return 0 if passed else 1
 
 
 if __name__ == "__main__":
-    url_target = "http://localhost:8000/health"
-    reqs = 100
-    conn = 10
-
-    if len(sys.argv) > 1:
-        url_target = sys.argv[1]
-    if len(sys.argv) > 2:
-        reqs = int(sys.argv[2])
-    if len(sys.argv) > 3:
-        conn = int(sys.argv[3])
-
-    asyncio.run(benchmark_endpoint(url_target, reqs, conn))
+    try:
+        raise SystemExit(asyncio.run(run()))
+    except ValueError as error:
+        print(f"Configuration error: {error}", file=sys.stderr)
+        raise SystemExit(2) from error

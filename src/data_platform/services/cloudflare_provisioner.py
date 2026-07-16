@@ -174,9 +174,7 @@ class ProvisioningResult:
     shared_secret_hash: str  # SHA-256 hex – store in DB
     shared_secret_plain: str = field(repr=False)  # used once then discarded
     destination_verified: bool = False
-    message: str = (
-        "Provisioning complete. Check inbox for Cloudflare verification email."
-    )
+    message: str = "Provisioning complete. Check inbox for Cloudflare verification email."
 
 
 # ---------------------------------------------------------------------------
@@ -212,13 +210,9 @@ class CloudflareProvisioner:
             r = await client.get(f"{CF_BASE}{path}", headers=self._headers, **kw)
         return self._unwrap(r, context=f"GET {path}")
 
-    async def _post(
-        self, path: str, body: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
+    async def _post(self, path: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=20.0) as client:
-            r = await client.post(
-                f"{CF_BASE}{path}", headers=self._headers, json=body or {}
-            )
+            r = await client.post(f"{CF_BASE}{path}", headers=self._headers, json=body or {})
         return self._unwrap(r, context=f"POST {path}")
 
     async def _post_multipart(self, path: str, files: dict) -> dict[str, Any]:
@@ -236,17 +230,27 @@ class CloudflareProvisioner:
     def _unwrap(r: httpx.Response, *, context: str = "Cloudflare API") -> dict[str, Any]:
         try:
             data = r.json()
-        except Exception:
-            r.raise_for_status()
-            return {}
+        except ValueError as error:
+            raise CloudflareAPIError(
+                f"{context}: invalid JSON response",
+                status_code=r.status_code,
+            ) from error
         if not isinstance(data, dict):
-            return {}
-        if not data.get("success", True):
+            raise CloudflareAPIError(
+                f"{context}: invalid response payload",
+                status_code=r.status_code,
+            )
+        if not r.is_success or data.get("success") is not True:
             errors = data.get("errors", [])
-            msg = "; ".join(e.get("message", str(e)) for e in errors) or r.text
+            if not isinstance(errors, list):
+                errors = [errors]
+            msg = "; ".join(
+                str(error.get("message") or error) if isinstance(error, dict) else str(error)
+                for error in errors
+            )
+            msg = msg or str(data.get("error") or data.get("message") or r.reason_phrase)
             raise CloudflareAPIError(f"{context}: {msg}", status_code=r.status_code)
-        res: dict[str, Any] = data
-        return res
+        return data
 
     # ── public API ──────────────────────────────────────────────────────────
 
@@ -286,15 +290,8 @@ class CloudflareProvisioner:
             await self._post(f"/zones/{zone_id}/email/routing/enable")
             logger.info("Email Routing enabled on zone %s", zone_id)
         except CloudflareAPIError as exc:
-            # CF returns an error if already enabled or if we lack permissions to modify it (but it might be already active); treat as success
-            if (
-                "already enabled" in str(exc).lower()
-                or "authentication error" in str(exc).lower()
-                or exc.status_code in {400, 403}
-            ):
-                logger.info(
-                    "Email Routing already enabled or permission restricted on zone %s (skipped)", zone_id
-                )
+            if "already enabled" in str(exc).lower():
+                logger.info("Email Routing already enabled on zone %s", zone_id)
             else:
                 raise
 
@@ -304,22 +301,20 @@ class CloudflareProvisioner:
         Cloudflare will send a verification email to that address.
         Returns the destination address `tag` for tracking.
         """
-        try:
-            # Check if already exists in registered list
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                r = await client.get(
-                    f"{CF_BASE}/accounts/{account_id}/email/routing/addresses",
-                    headers=self._headers,
-                )
-            addresses_data = self._unwrap(
-                r, context=f"GET /accounts/{account_id}/email/routing/addresses"
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            r = await client.get(
+                f"{CF_BASE}/accounts/{account_id}/email/routing/addresses",
+                headers=self._headers,
             )
-            for addr in addresses_data.get("result", []):
-                if str(addr.get("email")).lower() == email.lower():
-                    logger.info("Destination address %s already registered (tag=%s)", email, addr["tag"])
-                    return str(addr["tag"])
-        except Exception as exc:
-            logger.warning("Could not list destination addresses: %s", exc)
+        addresses_data = self._unwrap(
+            r, context=f"GET /accounts/{account_id}/email/routing/addresses"
+        )
+        for addr in addresses_data.get("result", []):
+            if str(addr.get("email")).lower() == email.lower():
+                logger.info(
+                    "Destination address %s already registered (tag=%s)", email, addr["tag"]
+                )
+                return str(addr["tag"])
 
         data = await self._post(
             f"/accounts/{account_id}/email/routing/addresses",
@@ -368,9 +363,7 @@ class CloudflareProvisioner:
                 headers=headers,
                 files=files,
             )
-        self._unwrap(
-            r, context=f"PUT /accounts/{account_id}/workers/scripts/{worker_name}"
-        )
+        self._unwrap(r, context=f"PUT /accounts/{account_id}/workers/scripts/{worker_name}")
         logger.info("Worker '%s' deployed to account %s", worker_name, account_id)
 
     async def create_email_routing_rule(
@@ -388,28 +381,25 @@ class CloudflareProvisioner:
             "Authorization": f"Bearer {self._token}",
             "Content-Type": "application/json",
         }
-        
-        # 1. Fetch and clean up conflicting rules matching target_email
-        try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                r = await client.get(
-                    f"{CF_BASE}/zones/{zone_id}/email/routing/rules",
-                    headers=headers,
-                )
-            rules_data = self._unwrap(
-                r, context=f"GET /zones/{zone_id}/email/routing/rules"
+
+        # 1. Fetch and clean up conflicting rules matching target_email. Failure
+        # must abort; creating another rule after an unreadable/undeletable
+        # conflict would violate provisioning idempotency.
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            r = await client.get(
+                f"{CF_BASE}/zones/{zone_id}/email/routing/rules",
+                headers=headers,
             )
-            for rule in rules_data.get("result", []):
-                matchers = rule.get("matchers", [])
-                for m in matchers:
-                    if (
-                        m.get("type") == "literal"
-                        and str(m.get("value")).lower() == target_email.lower()
-                    ):
-                        logger.info("Deleting conflicting rule %s for %s", rule["id"], target_email)
-                        await self.delete_email_rule(zone_id, rule["id"])
-        except Exception as exc:
-            logger.warning("Could not check/clean conflicting rules: %s", exc)
+        rules_data = self._unwrap(r, context=f"GET /zones/{zone_id}/email/routing/rules")
+        for rule in rules_data.get("result", []):
+            matchers = rule.get("matchers", [])
+            for matcher in matchers:
+                if (
+                    matcher.get("type") == "literal"
+                    and str(matcher.get("value")).lower() == target_email.lower()
+                ):
+                    logger.info("Deleting conflicting rule %s for %s", rule["id"], target_email)
+                    await self.delete_email_rule(zone_id, rule["id"])
 
         # 2. Create the new Worker-based routing rule
         body = {
@@ -420,11 +410,7 @@ class CloudflareProvisioner:
             "priority": 0,
         }
         data = await self._post(f"/zones/{zone_id}/email/routing/rules", body=body)
-        rule_id = (
-            data.get("result", {}).get("id")
-            or data.get("result", {}).get("tag")
-            or "unknown"
-        )
+        rule_id = data.get("result", {}).get("id") or data.get("result", {}).get("tag") or "unknown"
         logger.info("Email routing rule created (id=%s) for %s", rule_id, target_email)
         return str(rule_id)
 
@@ -495,9 +481,7 @@ class CloudflareProvisioner:
                     f"{CF_BASE}/zones/{zone_id}/email/routing/rules",
                     headers=self._headers,
                 )
-            rules_data = self._unwrap(
-                r, context=f"GET /zones/{zone_id}/email/routing/rules"
-            )
+            rules_data = self._unwrap(r, context=f"GET /zones/{zone_id}/email/routing/rules")
             for rule in rules_data.get("result", []):
                 matchers = rule.get("matchers", [])
                 for m in matchers:
@@ -511,7 +495,10 @@ class CloudflareProvisioner:
                                 val = a["value"]
                                 if isinstance(val, list) and val:
                                     actual_forward_to = str(val[0])
-                                    logger.info("Auto-resolved destination email from old rule: %s", actual_forward_to)
+                                    logger.info(
+                                        "Auto-resolved destination email from old rule: %s",
+                                        actual_forward_to,
+                                    )
                                     break
         except Exception as exc:
             logger.warning("Could not auto-resolve forwarding destination from rules: %s", exc)
@@ -530,7 +517,10 @@ class CloudflareProvisioner:
                 for addr in addresses_data.get("result", []):
                     if addr.get("status") == "verified":
                         actual_forward_to = str(addr["email"])
-                        logger.info("Auto-resolved destination email from verified list: %s", actual_forward_to)
+                        logger.info(
+                            "Auto-resolved destination email from verified list: %s",
+                            actual_forward_to,
+                        )
                         break
             except Exception as exc:
                 logger.warning("Could not auto-resolve from verified destination list: %s", exc)
@@ -601,7 +591,7 @@ class CloudflareProvisioner:
         # 1. Fetch existing records to check for duplicates
         records = await self.get_dns_records(zone_id)
         existing_id = None
-        
+
         # Cloudflare zone names are fully qualified in responses. Normalize both side-by-side comparison
         target_name_normalized = name.lower().rstrip(".")
         for rec in records:
@@ -611,24 +601,22 @@ class CloudflareProvisioner:
                     existing_id = rec["id"]
                     break
 
-        body = {
-            "type": rec_type,
-            "name": name,
-            "content": content_clean,
-            "ttl": 3600
-        }
+        body = {"type": rec_type, "name": name, "content": content_clean, "ttl": 3600}
 
         if existing_id:
-            logger.info("Updating existing DNS record %s (%s) with content: %s", existing_id, name, content_clean)
+            logger.info(
+                "Updating existing DNS record %s (%s) with content: %s",
+                existing_id,
+                name,
+                content_clean,
+            )
             async with httpx.AsyncClient(timeout=20.0) as client:
                 r = await client.put(
                     f"{CF_BASE}/zones/{zone_id}/dns_records/{existing_id}",
                     headers=self._headers,
                     json=body,
                 )
-            self._unwrap(
-                r, context=f"PUT /zones/{zone_id}/dns_records/{existing_id}"
-            )
+            self._unwrap(r, context=f"PUT /zones/{zone_id}/dns_records/{existing_id}")
         else:
             logger.info("Creating new DNS record (%s) with content: %s", name, content_clean)
             async with httpx.AsyncClient(timeout=20.0) as client:

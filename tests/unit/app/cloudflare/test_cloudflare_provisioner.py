@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import httpx
 import pytest
 import respx
@@ -10,6 +12,22 @@ from data_platform.services.cloudflare_provisioner import (
     CloudflareAPIError,
     CloudflareProvisioner,
 )
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        httpx.Response(500, json={"error": "upstream failure"}),
+        httpx.Response(403, json=[]),
+        httpx.Response(200, json=[]),
+        httpx.Response(200, content=b"not-json"),
+        httpx.Response(200, json={"result": {}}),
+    ],
+)
+def test_unwrap_rejects_http_and_contract_errors(response: httpx.Response) -> None:
+    """Cloudflare failures cannot become empty successful responses."""
+    with pytest.raises(CloudflareAPIError):
+        CloudflareProvisioner._unwrap(response, context="contract test")
 
 
 @pytest.mark.asyncio
@@ -85,9 +103,7 @@ async def test_enable_email_routing_success() -> None:
 @respx.mock
 async def test_enable_email_routing_already_enabled() -> None:
     provisioner = CloudflareProvisioner(api_token="token")
-    respx.post(
-        "https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/enable"
-    ).mock(
+    respx.post("https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/enable").mock(
         return_value=httpx.Response(
             400,
             json={"success": False, "errors": [{"message": "already enabled"}]},
@@ -95,6 +111,21 @@ async def test_enable_email_routing_already_enabled() -> None:
     )
     # Should not raise exception
     await provisioner.enable_email_routing("zone-123")
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_enable_email_routing_surfaces_permission_error() -> None:
+    """A generic 403 is actionable and cannot masquerade as idempotent success."""
+    provisioner = CloudflareProvisioner(api_token="token")
+    respx.post("https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/enable").mock(
+        return_value=httpx.Response(
+            403,
+            json={"success": False, "errors": [{"message": "permission denied"}]},
+        )
+    )
+    with pytest.raises(CloudflareAPIError, match="permission denied"):
+        await provisioner.enable_email_routing("zone-123")
 
 
 @pytest.mark.asyncio
@@ -112,9 +143,7 @@ async def test_create_destination_address_existing() -> None:
             },
         )
     )
-    tag = await provisioner.create_destination_address(
-        "account-123", "test@dest.com"
-    )
+    tag = await provisioner.create_destination_address("account-123", "test@dest.com")
     assert tag == "tag-123"
 
 
@@ -124,9 +153,7 @@ async def test_create_destination_address_new() -> None:
     provisioner = CloudflareProvisioner(api_token="token")
     respx.get(
         "https://api.cloudflare.com/client/v4/accounts/account-123/email/routing/addresses"
-    ).mock(
-        return_value=httpx.Response(200, json={"success": True, "result": []})
-    )
+    ).mock(return_value=httpx.Response(200, json={"success": True, "result": []}))
     respx.post(
         "https://api.cloudflare.com/client/v4/accounts/account-123/email/routing/addresses"
     ).mock(
@@ -135,9 +162,7 @@ async def test_create_destination_address_new() -> None:
             json={"success": True, "result": {"tag": "new-tag-123"}},
         )
     )
-    tag = await provisioner.create_destination_address(
-        "account-123", "new@dest.com"
-    )
+    tag = await provisioner.create_destination_address("account-123", "new@dest.com")
     assert tag == "new-tag-123"
 
 
@@ -156,15 +181,21 @@ async def test_deploy_email_worker() -> None:
         forward_to="forward@test.com",
     )
     assert route.called
+    request = route.calls.last.request
+    assert request.headers["Authorization"] == "Bearer token"
+    assert b'"name": "SICURRE_SCAN_URL"' in request.content
+    assert b'"text": "https://scan.test"' in request.content
+    assert b'"type": "secret_text"' in request.content
+    assert b'"text": "secret"' in request.content
+    assert b'"name": "FORWARD_TO"' in request.content
+    assert b'"text": "forward@test.com"' in request.content
 
 
 @pytest.mark.asyncio
 @respx.mock
 async def test_create_email_routing_rule() -> None:
     provisioner = CloudflareProvisioner(api_token="token")
-    respx.get(
-        "https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/rules"
-    ).mock(
+    respx.get("https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/rules").mock(
         return_value=httpx.Response(
             200,
             json={
@@ -172,9 +203,7 @@ async def test_create_email_routing_rule() -> None:
                 "result": [
                     {
                         "id": "old-rule-id",
-                        "matchers": [
-                            {"type": "literal", "value": "target@test.com"}
-                        ],
+                        "matchers": [{"type": "literal", "value": "target@test.com"}],
                     }
                 ],
             },
@@ -197,6 +226,53 @@ async def test_create_email_routing_rule() -> None:
     assert del_route.called
     assert create_route.called
     assert rule_id == "new-rule-id"
+    request = create_route.calls.last.request
+    assert request.headers["Authorization"] == "Bearer token"
+    payload = json.loads(request.content)
+    assert payload["matchers"] == [{"type": "literal", "field": "to", "value": "target@test.com"}]
+    assert payload["actions"] == [{"type": "worker", "value": ["my-worker"]}]
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_rule_creation_aborts_when_conflicts_cannot_be_read() -> None:
+    """Provisioning cannot create duplicate rules after a failed conflict check."""
+    provisioner = CloudflareProvisioner(api_token="token")
+    respx.get("https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/rules").mock(
+        return_value=httpx.Response(
+            403,
+            json={"success": False, "errors": [{"message": "missing rule read"}]},
+        )
+    )
+    create_route = respx.post(
+        "https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/rules"
+    ).mock(return_value=httpx.Response(200, json={"success": True, "result": {}}))
+
+    with pytest.raises(CloudflareAPIError, match="missing rule read"):
+        await provisioner.create_email_routing_rule("zone-123", "my-worker", "target@test.com")
+    assert not create_route.called
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_destination_creation_aborts_when_existing_addresses_cannot_be_read() -> None:
+    """Provisioning cannot duplicate a destination after an unreadable list."""
+    provisioner = CloudflareProvisioner(api_token="token")
+    respx.get(
+        "https://api.cloudflare.com/client/v4/accounts/account-123/email/routing/addresses"
+    ).mock(
+        return_value=httpx.Response(
+            403,
+            json={"success": False, "errors": [{"message": "missing address read"}]},
+        )
+    )
+    create_route = respx.post(
+        "https://api.cloudflare.com/client/v4/accounts/account-123/email/routing/addresses"
+    ).mock(return_value=httpx.Response(200, json={"success": True, "result": {}}))
+
+    with pytest.raises(CloudflareAPIError, match="missing address read"):
+        await provisioner.create_destination_address("account-123", "target@test.com")
+    assert not create_route.called
 
 
 @pytest.mark.asyncio
@@ -230,9 +306,7 @@ async def test_delete_worker_404_ignored() -> None:
 @respx.mock
 async def test_get_email_routing_status() -> None:
     provisioner = CloudflareProvisioner(api_token="token")
-    respx.get(
-        "https://api.cloudflare.com/client/v4/zones/zone-123/email/routing"
-    ).mock(
+    respx.get("https://api.cloudflare.com/client/v4/zones/zone-123/email/routing").mock(
         return_value=httpx.Response(
             200,
             json={"success": True, "result": {"status": "active"}},
@@ -246,9 +320,7 @@ async def test_get_email_routing_status() -> None:
 @respx.mock
 async def test_get_dns_records() -> None:
     provisioner = CloudflareProvisioner(api_token="token")
-    respx.get(
-        "https://api.cloudflare.com/client/v4/zones/zone-123/dns_records"
-    ).mock(
+    respx.get("https://api.cloudflare.com/client/v4/zones/zone-123/dns_records").mock(
         return_value=httpx.Response(
             200,
             json={
@@ -272,20 +344,16 @@ async def test_provision_flow() -> None:
             200,
             json={
                 "success": True,
-                "result": [
-                    {"id": "zone-123", "account": {"id": "account-456"}}
-                ],
+                "result": [{"id": "zone-123", "account": {"id": "account-456"}}],
             },
         )
     )
     # Mock enable routing
-    respx.post(
-        "https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/enable"
-    ).mock(return_value=httpx.Response(200, json={"success": True}))
+    respx.post("https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/enable").mock(
+        return_value=httpx.Response(200, json={"success": True})
+    )
     # Mock fetching existing routing rules (return a mock literal matcher to test auto-resolve from rule)
-    respx.get(
-        "https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/rules"
-    ).mock(
+    respx.get("https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/rules").mock(
         return_value=httpx.Response(
             200,
             json={
@@ -293,12 +361,8 @@ async def test_provision_flow() -> None:
                 "result": [
                     {
                         "id": "old-rule",
-                        "matchers": [
-                            {"type": "literal", "value": "test@domain.com"}
-                        ],
-                        "actions": [
-                            {"type": "forward", "value": ["forwarded@domain.com"]}
-                        ],
+                        "matchers": [{"type": "literal", "value": "test@domain.com"}],
+                        "actions": [{"type": "forward", "value": ["forwarded@domain.com"]}],
                     }
                 ],
             },
@@ -329,27 +393,17 @@ async def test_provision_flow() -> None:
     # Mock registering destination address
     respx.post(
         "https://api.cloudflare.com/client/v4/accounts/account-456/email/routing/addresses"
-    ).mock(
-        return_value=httpx.Response(
-            200, json={"success": True, "result": {"tag": "tag-1"}}
-        )
-    )
+    ).mock(return_value=httpx.Response(200, json={"success": True, "result": {"tag": "tag-1"}}))
     # Mock worker deploy
     respx.put(
         "https://api.cloudflare.com/client/v4/accounts/account-456/workers/scripts/sicurre-gw-zone-123"
     ).mock(return_value=httpx.Response(200, json={"success": True}))
     # Mock routing rule creation
-    respx.post(
-        "https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/rules"
-    ).mock(
-        return_value=httpx.Response(
-            200, json={"success": True, "result": {"id": "new-rule-id"}}
-        )
+    respx.post("https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/rules").mock(
+        return_value=httpx.Response(200, json={"success": True, "result": {"id": "new-rule-id"}})
     )
 
-    res = await provisioner.provision(
-        "domain.com", "test@domain.com", "https://api.test/v1/scan"
-    )
+    res = await provisioner.provision("domain.com", "test@domain.com", "https://api.test/v1/scan")
     assert res.zone_id == "zone-123"
     assert res.destination_email == "forwarded@domain.com"
     assert res.destination_verified is True
@@ -360,9 +414,7 @@ async def test_provision_flow() -> None:
 async def test_deploy_dns_record_create() -> None:
     provisioner = CloudflareProvisioner(api_token="token")
     # Mock existing DNS records
-    respx.get(
-        "https://api.cloudflare.com/client/v4/zones/zone-123/dns_records"
-    ).mock(
+    respx.get("https://api.cloudflare.com/client/v4/zones/zone-123/dns_records").mock(
         return_value=httpx.Response(
             200,
             json={
@@ -375,9 +427,7 @@ async def test_deploy_dns_record_create() -> None:
     create_route = respx.post(
         "https://api.cloudflare.com/client/v4/zones/zone-123/dns_records"
     ).mock(return_value=httpx.Response(200, json={"success": True}))
-    await provisioner.deploy_dns_record(
-        "zone-123", "TXT", "example.com", "test-content"
-    )
+    await provisioner.deploy_dns_record("zone-123", "TXT", "example.com", "test-content")
     assert create_route.called
 
 
@@ -386,16 +436,12 @@ async def test_deploy_dns_record_create() -> None:
 async def test_deploy_dns_record_update() -> None:
     provisioner = CloudflareProvisioner(api_token="token")
     # Mock existing DNS records
-    respx.get(
-        "https://api.cloudflare.com/client/v4/zones/zone-123/dns_records"
-    ).mock(
+    respx.get("https://api.cloudflare.com/client/v4/zones/zone-123/dns_records").mock(
         return_value=httpx.Response(
             200,
             json={
                 "success": True,
-                "result": [
-                    {"id": "dns-id", "type": "TXT", "name": "example.com"}
-                ],
+                "result": [{"id": "dns-id", "type": "TXT", "name": "example.com"}],
             },
         )
     )
@@ -403,9 +449,7 @@ async def test_deploy_dns_record_update() -> None:
     update_route = respx.put(
         "https://api.cloudflare.com/client/v4/zones/zone-123/dns_records/dns-id"
     ).mock(return_value=httpx.Response(200, json={"success": True}))
-    await provisioner.deploy_dns_record(
-        "zone-123", "TXT", "example.com", "test-content"
-    )
+    await provisioner.deploy_dns_record("zone-123", "TXT", "example.com", "test-content")
     assert update_route.called
 
 
@@ -421,8 +465,6 @@ async def test_teardown_flow() -> None:
     del_worker = respx.delete(
         "https://api.cloudflare.com/client/v4/accounts/account-456/workers/scripts/my-worker"
     ).mock(return_value=httpx.Response(200, json={"success": True}))
-    await provisioner.teardown(
-        "zone-123", "account-456", "my-worker", "rule-123"
-    )
+    await provisioner.teardown("zone-123", "account-456", "my-worker", "rule-123")
     assert del_rule.called
     assert del_worker.called

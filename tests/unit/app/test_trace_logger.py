@@ -5,10 +5,20 @@ from __future__ import annotations
 import json
 import logging
 
+import pytest
+
 from core.trace_logger import SemanticTraceLogger
 
 
-def test_trace_emits_valid_json_to_stdout(capsys: object) -> None:
+def _json_payload(captured_stdout: str) -> dict[str, object]:
+    """Return the single structured trace emitted alongside the human line."""
+    json_lines = [line for line in captured_stdout.splitlines() if line.startswith("{")]
+    assert len(json_lines) == 1
+    payload: dict[str, object] = json.loads(json_lines[0])
+    return payload
+
+
+def test_trace_emits_valid_json_to_stdout(capsys: pytest.CaptureFixture[str]) -> None:
     """Each trace call prints a valid JSON line containing the expected fields."""
     logger = SemanticTraceLogger(
         parent_type="test",
@@ -26,18 +36,13 @@ def test_trace_emits_valid_json_to_stdout(capsys: object) -> None:
         metrics={"inserted": 100, "skipped": 5},
     )
 
-    captured = capsys.readlines() if hasattr(capsys, "readlines") else None  # type: ignore[union-attr]
-    # capsys is a pytest fixture with readouterr
-    import sys
-
-    out = sys.stdout
-    # Re-capture via capsys
-    output = capsys.__class__.__name__  # type: ignore[union-attr]
-    # Use the proper pytest capsys
-    pass
+    payload = _json_payload(capsys.readouterr().out)
+    assert payload["entity_type"] == "source"
+    assert payload["entity_id"] == "phishtank-1"
+    assert payload["metrics"] == {"inserted": 100, "skipped": 5}
 
 
-def test_trace_json_contains_required_keys(capsys) -> None:  # type: ignore[no-untyped-def]
+def test_trace_json_contains_required_keys(capsys: pytest.CaptureFixture[str]) -> None:
     """The JSON trace line includes all mandatory structured fields."""
     logger = SemanticTraceLogger(
         parent_type="cron",
@@ -48,11 +53,7 @@ def test_trace_json_contains_required_keys(capsys) -> None:  # type: ignore[no-u
 
     logger.trace(stage="ingestion", status="start", message="Starting ingestion")
 
-    captured = capsys.readouterr()
-    lines = [line for line in captured.out.strip().split("\n") if line.startswith("{")]
-    assert len(lines) >= 1, "At least one JSON trace line expected"
-
-    payload = json.loads(lines[0])
+    payload = _json_payload(capsys.readouterr().out)
     assert payload["parent_type"] == "cron"
     assert payload["child_target"] == "PhishTank"
     assert payload["trace_id"] == "trace-002"
@@ -63,7 +64,9 @@ def test_trace_json_contains_required_keys(capsys) -> None:  # type: ignore[no-u
     assert "timestamp" in payload
 
 
-def test_trace_omits_optional_fields_when_not_provided(capsys) -> None:  # type: ignore[no-untyped-def]
+def test_trace_omits_optional_fields_when_not_provided(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """entity_type, entity_id, and metrics are only present when passed."""
     logger = SemanticTraceLogger(
         parent_type="test",
@@ -73,15 +76,13 @@ def test_trace_omits_optional_fields_when_not_provided(capsys) -> None:  # type:
 
     logger.trace(stage="snapshot", status="skipped", message="No new data")
 
-    captured = capsys.readouterr()
-    lines = [line for line in captured.out.strip().split("\n") if line.startswith("{")]
-    payload = json.loads(lines[0])
+    payload = _json_payload(capsys.readouterr().out)
     assert "entity_type" not in payload
     assert "entity_id" not in payload
     assert "metrics" not in payload
 
 
-def test_trace_includes_metrics_when_provided(capsys) -> None:  # type: ignore[no-untyped-def]
+def test_trace_includes_metrics_when_provided(capsys: pytest.CaptureFixture[str]) -> None:
     """Metrics dict is embedded in the JSON trace payload."""
     logger = SemanticTraceLogger(
         parent_type="test",
@@ -96,13 +97,11 @@ def test_trace_includes_metrics_when_provided(capsys) -> None:  # type: ignore[n
         metrics={"rows": 42, "duration_ms": 150},
     )
 
-    captured = capsys.readouterr()
-    lines = [line for line in captured.out.strip().split("\n") if line.startswith("{")]
-    payload = json.loads(lines[0])
+    payload = _json_payload(capsys.readouterr().out)
     assert payload["metrics"] == {"rows": 42, "duration_ms": 150}
 
 
-def test_failed_status_logs_at_error_level(caplog) -> None:  # type: ignore[no-untyped-def]
+def test_failed_status_logs_at_error_level(caplog: pytest.LogCaptureFixture) -> None:
     """A 'failed' status trace emits at ERROR level in the traditional logger."""
     logger = SemanticTraceLogger(
         parent_type="test",
@@ -118,7 +117,7 @@ def test_failed_status_logs_at_error_level(caplog) -> None:  # type: ignore[no-u
     assert "Connection refused" in error_records[0].message
 
 
-def test_success_status_logs_at_info_level(caplog) -> None:  # type: ignore[no-untyped-def]
+def test_success_status_logs_at_info_level(caplog: pytest.LogCaptureFixture) -> None:
     """A 'success' status trace emits at INFO level."""
     logger = SemanticTraceLogger(
         parent_type="test",
@@ -133,7 +132,7 @@ def test_success_status_logs_at_info_level(caplog) -> None:  # type: ignore[no-u
     assert len(info_records) >= 1
 
 
-def test_set_trace_id_updates_subsequent_traces(capsys) -> None:  # type: ignore[no-untyped-def]
+def test_set_trace_id_updates_subsequent_traces(capsys: pytest.CaptureFixture[str]) -> None:
     """set_trace_id binds a new trace ID for all subsequent emissions."""
     logger = SemanticTraceLogger(
         parent_type="test",
@@ -143,9 +142,7 @@ def test_set_trace_id_updates_subsequent_traces(capsys) -> None:  # type: ignore
     logger.set_trace_id("run-42")
     logger.trace(stage="classification", status="start", message="Begin")
 
-    captured = capsys.readouterr()
-    lines = [line for line in captured.out.strip().split("\n") if line.startswith("{")]
-    payload = json.loads(lines[0])
+    payload = _json_payload(capsys.readouterr().out)
     assert payload["trace_id"] == "run-42"
 
 
@@ -155,7 +152,9 @@ def test_default_trace_id_is_pending() -> None:
     assert logger._trace_id == "run-pending"
 
 
-def test_human_readable_line_includes_stage_and_status_icon(capsys) -> None:  # type: ignore[no-untyped-def]
+def test_human_readable_line_includes_stage_and_status_icon(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """The first printed line is a human-readable summary with status icon."""
     logger = SemanticTraceLogger(
         parent_type="test",

@@ -357,7 +357,7 @@ async def update_threat_status(
             (
                 is_del,
                 payload.status,
-                datetime.utcnow().isoformat() + "Z",
+                datetime.now(timezone.utc).isoformat(),
                 id,
                 current_user.workspace_id,
             ),

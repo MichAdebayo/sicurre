@@ -86,6 +86,24 @@ def _tracking_query(
     return captured, query
 
 
+def _foreign_resource_query(
+    foreign_row: dict[str, Any],
+) -> tuple[list[tuple[str, tuple[Any, ...]]], Any]:
+    """Model an existing foreign row that leaks whenever workspace scoping is absent."""
+    captured: list[tuple[str, tuple[Any, ...]]] = []
+
+    async def query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        captured.append((sql, params))
+        normalized = " ".join(sql.lower().split())
+        if "workspace_id" in normalized and USER_A.workspace_id in params:
+            return []
+        if normalized.startswith("select"):
+            return [foreign_row]
+        return []
+
+    return captured, query
+
+
 # ── Threats ──────────────────────────────────────────────────────────────────
 
 
@@ -124,7 +142,19 @@ async def test_threat_status_update_cannot_cross_workspaces(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """POST /v1/threats/{id}/status rejects when the threat belongs to workspace-2."""
-    captured, query = _tracking_query({})
+    captured, query = _foreign_resource_query(
+        {
+            "id": "threat-owned-by-b",
+            "message_id": "foreign-message",
+            "subject": "Foreign threat",
+            "sender": "foreign@example.test",
+            "body_preview": "Foreign body",
+            "verdict": "phishing",
+            "confidence": 0.99,
+            "received_at": "2026-07-15T00:00:00Z",
+            "status": "active",
+        }
+    )
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
 
     with pytest.raises(HTTPException) as exc_info:
@@ -143,7 +173,7 @@ async def test_feedback_with_foreign_event_returns_404(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """POST /v1/feedback referencing a workspace-2 event is rejected."""
-    captured, query = _tracking_query({})
+    captured, query = _foreign_resource_query({"id": "q-owned-by-b", "status": "held"})
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
 
     with pytest.raises(HTTPException) as exc_info:
@@ -157,6 +187,8 @@ async def test_feedback_with_foreign_event_returns_404(
         )
 
     assert exc_info.value.status_code == 404
+    assert all("workspace_id" in sql.lower() for sql, _ in captured)
+    assert all(USER_A.workspace_id in params for _, params in captured)
     assert any("workspace-1" in params for _, params in captured)
 
 
@@ -165,7 +197,7 @@ async def test_feedback_without_event_scopes_to_calling_workspace(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """POST /v1/feedback without event_id inserts into the caller's workspace."""
-    captured, query = _tracking_query({})
+    captured, query = _foreign_resource_query({"raw_storage_uri": "file:///foreign/quarantine.eml"})
 
     async def insert_query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
         captured.append((sql, params))
@@ -232,6 +264,8 @@ async def test_quarantine_release_rejects_foreign_item(
         await release_quarantine_item("q-owned-by-b", USER_A)
 
     assert exc_info.value.status_code == 404
+    assert all("workspace_id" in sql.lower() for sql, _ in captured)
+    assert all(USER_A.workspace_id in params for _, params in captured)
 
 
 @pytest.mark.asyncio
@@ -239,13 +273,17 @@ async def test_quarantine_delete_rejects_foreign_item(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """DELETE /v1/quarantine/{id} rejects when item belongs to another workspace."""
-    captured, query = _tracking_query({})
+    captured, query = _foreign_resource_query(
+        {"id": "q-owned-by-b", "status": "held", "sender": "foreign@example.test"}
+    )
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
 
     with pytest.raises(HTTPException) as exc_info:
         await delete_quarantine_item("q-owned-by-b", USER_A)
 
     assert exc_info.value.status_code == 404
+    assert all("workspace_id" in sql.lower() for sql, _ in captured)
+    assert all(USER_A.workspace_id in params for _, params in captured)
 
 
 @pytest.mark.asyncio
@@ -253,13 +291,15 @@ async def test_quarantine_whitelist_rejects_foreign_item(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """POST /v1/quarantine/{id}/whitelist rejects when item belongs to another workspace."""
-    captured, query = _tracking_query({})
+    captured, query = _foreign_resource_query({"id": "rule-owned-by-b"})
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
 
     with pytest.raises(HTTPException) as exc_info:
         await release_and_whitelist_item("q-owned-by-b", USER_A)
 
     assert exc_info.value.status_code == 404
+    assert all("workspace_id" in sql.lower() for sql, _ in captured)
+    assert all(USER_A.workspace_id in params for _, params in captured)
 
 
 # ── Alerts: Preferences ─────────────────────────────────────────────────────
@@ -342,7 +382,12 @@ async def test_security_rules_list_is_workspace_scoped(
     captured, query = _tracking_query(
         {
             "workspace-2": [
-                {"id": "rule-1", "rule_type": "blocklist", "pattern": "evil@test", "created_at": "now"}
+                {
+                    "id": "rule-1",
+                    "rule_type": "blocklist",
+                    "pattern": "evil@test",
+                    "created_at": "now",
+                }
             ],
         }
     )
@@ -381,13 +426,15 @@ async def test_security_rule_delete_rejects_foreign_rule(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """DELETE /v1/alerts/rules/{id} rejects when rule belongs to another workspace."""
-    captured, query = _tracking_query({})
+    captured, query = _foreign_resource_query({"id": "alert-owned-by-b"})
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
 
     with pytest.raises(HTTPException) as exc_info:
         await delete_security_rule("rule-owned-by-b", USER_A)
 
     assert exc_info.value.status_code == 404
+    assert all("workspace_id" in sql.lower() for sql, _ in captured)
+    assert all(USER_A.workspace_id in params for _, params in captured)
 
 
 # ── Alerts: History ──────────────────────────────────────────────────────────
@@ -525,12 +572,16 @@ async def test_admin_overview_rejects_customer() -> None:
 @pytest.mark.asyncio
 async def test_kpis_are_workspace_scoped(monkeypatch: pytest.MonkeyPatch) -> None:
     """GET /v1/stats/kpi scopes event query to workspace_id."""
-    captured, query = _tracking_query({
-        "workspace-2": [{"safety_verdict": "phishing", "cnt": 10}],
-    })
+    captured, query = _tracking_query(
+        {
+            "workspace-2": [{"safety_verdict": "phishing", "cnt": 10}],
+        }
+    )
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+
     async def mock_count(ws: str) -> int:
         return 5 if ws == "workspace-2" else 0
+
     monkeypatch.setattr(app_routes, "_workspace_threat_count", mock_count)
 
     session = MagicMock()
@@ -541,9 +592,12 @@ async def test_kpis_are_workspace_scoped(monkeypatch: pytest.MonkeyPatch) -> Non
 
 
 @pytest.mark.asyncio
-async def test_cloudflare_token_retrieval_is_workspace_scoped(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_cloudflare_token_retrieval_is_workspace_scoped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """GET /v1/integrations/cloudflare/token returns configured only for caller's workspace."""
     captured: list[tuple[str, tuple[Any, ...]]] = []
+
     async def mock_query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
         captured.append((sql, params))
         if "workspace-2" in params:
@@ -559,9 +613,12 @@ async def test_cloudflare_token_retrieval_is_workspace_scoped(monkeypatch: pytes
 
 
 @pytest.mark.asyncio
-async def test_cloudflare_token_deletion_is_workspace_scoped(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_cloudflare_token_deletion_is_workspace_scoped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """DELETE /v1/integrations/cloudflare/token scopes deletions to workspace_id."""
     captured: list[tuple[str, tuple[Any, ...]]] = []
+
     async def mock_query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
         captured.append((sql, params))
         return []

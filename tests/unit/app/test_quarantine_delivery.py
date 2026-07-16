@@ -65,7 +65,7 @@ async def test_cloudflare_raw_delivery_accepts_queued_recipient() -> None:
 
 
 @pytest.mark.asyncio
-async def test_resolve_sending_address_requires_enabled_domain() -> None:
+async def test_resolve_sending_address_rejects_disabled_domain() -> None:
     """Release envelopes use a domain Cloudflare reports as enabled."""
     transport = httpx.MockTransport(
         lambda _: httpx.Response(
@@ -99,3 +99,124 @@ async def test_cloudflare_permission_error_is_actionable() -> None:
             )
 
     assert exc_info.value.code == "email_sending_permission_required"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("operation", ["resolve", "send"])
+async def test_cloudflare_network_failure_is_stable(operation: str) -> None:
+    """Cloudflare connection failures map to one user-safe dependency error."""
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("offline", request=request)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(QuarantineDeliveryError) as exc_info:
+            if operation == "resolve":
+                await resolve_sending_address(api_token="token", zone_id="zone", client=client)
+            else:
+                await send_raw_email(
+                    api_token="token",
+                    account_id="account",
+                    envelope_from="quarantine@example.test",
+                    recipient="owner@example.test",
+                    raw_mime=b"MIME",
+                    client=client,
+                )
+
+    assert exc_info.value.code == "cloudflare_unreachable"
+
+
+@pytest.mark.asyncio
+async def test_resolve_sending_address_permission_error() -> None:
+    """Envelope discovery reports a missing Email Sending permission."""
+    transport = httpx.MockTransport(lambda _: httpx.Response(401, json={"success": False}))
+    async with httpx.AsyncClient(transport=transport) as client:
+        with pytest.raises(QuarantineDeliveryError) as exc_info:
+            await resolve_sending_address(api_token="token", zone_id="zone", client=client)
+
+    assert exc_info.value.code == "email_sending_permission_required"
+
+
+@pytest.mark.asyncio
+async def test_resolve_sending_address_requires_successful_response() -> None:
+    """Cloudflare API errors retain their bounded provider detail."""
+    transport = httpx.MockTransport(
+        lambda _: httpx.Response(
+            500,
+            json={"errors": [{"message": "Email Sending is unavailable"}]},
+        )
+    )
+    async with httpx.AsyncClient(transport=transport) as client:
+        with pytest.raises(QuarantineDeliveryError) as exc_info:
+            await resolve_sending_address(api_token="token", zone_id="zone", client=client)
+
+    assert exc_info.value.code == "cloudflare_delivery_failed"
+    assert str(exc_info.value) == "Email Sending is unavailable"
+
+
+@pytest.mark.asyncio
+async def test_resolve_sending_address_requires_enabled_domain() -> None:
+    """A successful response without an enabled domain cannot release mail."""
+    transport = httpx.MockTransport(
+        lambda _: httpx.Response(200, json={"success": True, "result": [{"name": "disabled.test"}]})
+    )
+    async with httpx.AsyncClient(transport=transport) as client:
+        with pytest.raises(QuarantineDeliveryError) as exc_info:
+            await resolve_sending_address(api_token="token", zone_id="zone", client=client)
+
+    assert exc_info.value.code == "email_sending_domain_required"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "response",
+    [
+        httpx.Response(500, content=b"not-json"),
+        httpx.Response(200, json={"success": False, "errors": []}),
+    ],
+)
+async def test_send_raw_email_rejects_failed_payload(response: httpx.Response) -> None:
+    """HTTP and payload-level failures never masquerade as accepted delivery."""
+    transport = httpx.MockTransport(lambda _: response)
+    async with httpx.AsyncClient(transport=transport) as client:
+        with pytest.raises(QuarantineDeliveryError) as exc_info:
+            await send_raw_email(
+                api_token="token",
+                account_id="account",
+                envelope_from="quarantine@example.test",
+                recipient="owner@example.test",
+                raw_mime=b"MIME",
+                client=client,
+            )
+
+    assert exc_info.value.code == "cloudflare_delivery_failed"
+
+
+@pytest.mark.asyncio
+async def test_send_raw_email_rejects_unaccepted_recipient() -> None:
+    """A 200 response is insufficient unless Cloudflare accepted the recipient."""
+    transport = httpx.MockTransport(
+        lambda _: httpx.Response(
+            200,
+            json={
+                "success": True,
+                "result": {
+                    "delivered": [],
+                    "queued": [],
+                    "message_id": "delivery-2",
+                },
+            },
+        )
+    )
+    async with httpx.AsyncClient(transport=transport) as client:
+        with pytest.raises(QuarantineDeliveryError) as exc_info:
+            await send_raw_email(
+                api_token="token",
+                account_id="account",
+                envelope_from="quarantine@example.test",
+                recipient="owner@example.test",
+                raw_mime=b"MIME",
+                client=client,
+            )
+
+    assert exc_info.value.code == "cloudflare_delivery_rejected"

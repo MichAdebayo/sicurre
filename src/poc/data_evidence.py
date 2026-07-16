@@ -9,6 +9,7 @@ from typing import Any
 
 from sqlalchemy import Engine, create_engine, inspect, text
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.pool import NullPool
 
 
 class PocDataEvidenceStore:
@@ -25,7 +26,11 @@ class PocDataEvidenceStore:
     def engine(self) -> Engine:
         """Create the SQLite engine only when evidence is requested."""
         if self._engine is None:
-            self._engine = create_engine(f"sqlite:///{self._database_path}", future=True)
+            self._engine = create_engine(
+                f"sqlite:///{self._database_path}",
+                future=True,
+                poolclass=NullPool,
+            )
         return self._engine
 
     def table_exists(self, table_name: str) -> bool:
