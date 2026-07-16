@@ -58,6 +58,16 @@ def test_rate_limit_falls_back_to_forwarded_client_ip() -> None:
     assert key == "ip:203.0.113.25"
 
 
+def test_rate_limit_uses_hashed_session_identity() -> None:
+    """Separate signed-in browser sessions without exposing cookie values."""
+    key = get_rate_limit_key(
+        _request(headers=[(b"cookie", b"better-auth.session_token=session-secret")])
+    )
+
+    assert key.startswith("session:")
+    assert "session-secret" not in key
+
+
 def test_default_limit_applies_to_undecorated_public_routes() -> None:
     """SlowAPI middleware enforces the configured fallback across the API."""
     client = TestClient(create_app())

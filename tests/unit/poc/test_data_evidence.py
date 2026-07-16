@@ -4,6 +4,7 @@ import sqlite3
 from pathlib import Path
 
 import pytest
+from sqlalchemy.exc import OperationalError
 
 from poc.data_evidence import PocDataEvidenceStore
 
@@ -33,3 +34,23 @@ def test_evidence_store_handles_absent_tables_and_rejects_identifiers(tmp_path: 
     assert store.count("missing") == 0
     with pytest.raises(ValueError, match="Invalid evidence table name"):
         store.count("data_raw_record; DROP TABLE data_raw_record")
+
+
+def test_evidence_store_retries_locked_database_then_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Retry transient SQLite locks but expose exhaustion to the operator."""
+    store = PocDataEvidenceStore(tmp_path / "locked.db", retries=2, retry_delay=0)
+
+    class LockedEngine:
+        def connect(self) -> None:
+            raise OperationalError("query", {}, Exception("database is locked"))
+
+    store._engine = LockedEngine()  # type: ignore[assignment]
+    sleeps: list[float] = []
+    monkeypatch.setattr("poc.data_evidence.time.sleep", sleeps.append)
+
+    with pytest.raises(OperationalError, match="database is locked"):
+        store.query("SELECT 1")
+
+    assert sleeps == [0]

@@ -50,6 +50,21 @@ def test_wrong_key_cannot_decrypt_ciphertext() -> None:
         decrypt_secret(encrypted, configured_key=wrong_key, environment="test")
 
 
+@pytest.mark.parametrize("invalid_key", ["not-ASCII-£", "dG9vLXNob3J0"])
+def test_invalid_configured_keys_are_rejected(invalid_key: str) -> None:
+    """Reject malformed or incorrectly sized production encryption keys."""
+    with pytest.raises(ValueError, match="SICURRE_SECRET_ENCRYPTION_KEY"):
+        encrypt_secret("token", configured_key=invalid_key, environment="production")
+
+
+def test_truncated_encrypted_payload_is_rejected() -> None:
+    """Reject ciphertext that cannot contain a nonce and authentication tag."""
+    truncated = "enc:v1:" + base64.urlsafe_b64encode(b"short").decode("ascii")
+
+    with pytest.raises(ValueError, match="payload is invalid"):
+        decrypt_secret(truncated, configured_key=TEST_KEY, environment="production")
+
+
 def test_production_settings_require_valid_secret_key() -> None:
     """Production cannot start with plaintext provider credential storage."""
     with pytest.raises(ValidationError):
