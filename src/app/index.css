@@ -265,8 +265,8 @@
 
   .app-label-tiny {
     font-family: var(--font-sans);
-    font-size: 12px;
-    line-height: 16px;
+    font-size: 13px;
+    line-height: 18px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -275,8 +275,8 @@
 
   .app-mono-data {
     font-family: var(--font-mono);
-    font-size: 12px;
-    line-height: 18px;
+    font-size: 13px;
+    line-height: 19px;
     font-weight: 500;
   }
 
@@ -288,8 +288,8 @@
   .app-readable .text-\[9px\],
   .app-readable .text-\[10px\],
   .app-readable .text-\[11px\] {
-    font-size: 12px;
-    line-height: 16px;
+    font-size: 13px;
+    line-height: 18px;
   }
 
   .app-readable .text-\[12px\] {

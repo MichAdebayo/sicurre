@@ -1,19 +1,5 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
-import LandingRoute from "./routes/landing";
-import LoginRoute from "./routes/login";
-import DashboardRoute from "./routes/dashboard";
-import ThreatsRoute from "./routes/threats";
-import LogsRoute from "./routes/logs";
-import SettingsRoute from "./routes/settings";
-import SupportRoute from "./routes/support";
-import QuarantineRoute from "./routes/quarantine";
-import AlertsRoute from "./routes/alerts";
-import DomainShieldRoute from "./routes/domain-shield";
-import MentionsLegalesRoute from "./routes/mentions-legales";
-import ConfidentialiteRoute from "./routes/confidentialite";
-import ContactRoute from "./routes/contact";
-import CGURoute from "./routes/cgu";
 import { AppShell } from "./components/common/app-shell";
 import { SidebarPage } from "./components/common/sidebar";
 import {
@@ -22,6 +8,21 @@ import {
   useCurrentSession,
   useLogout,
 } from "./lib/api";
+
+const LandingRoute = lazy(() => import("./routes/landing"));
+const LoginRoute = lazy(() => import("./routes/login"));
+const DashboardRoute = lazy(() => import("./routes/dashboard"));
+const ThreatsRoute = lazy(() => import("./routes/threats"));
+const LogsRoute = lazy(() => import("./routes/logs"));
+const SettingsRoute = lazy(() => import("./routes/settings"));
+const SupportRoute = lazy(() => import("./routes/support"));
+const QuarantineRoute = lazy(() => import("./routes/quarantine"));
+const AlertsRoute = lazy(() => import("./routes/alerts"));
+const DomainShieldRoute = lazy(() => import("./routes/domain-shield"));
+const MentionsLegalesRoute = lazy(() => import("./routes/mentions-legales"));
+const ConfidentialiteRoute = lazy(() => import("./routes/confidentialite"));
+const ContactRoute = lazy(() => import("./routes/contact"));
+const CGURoute = lazy(() => import("./routes/cgu"));
 
 type ViewState = "landing" | "login" | "signup" | "cgu" | "mentions-legales" | "confidentialite" | "contact";
 
@@ -75,8 +76,25 @@ const getInitialViewState = (): ViewState => {
   return "landing";
 };
 
+function RouteFallback() {
+  return (
+    <div className="min-h-screen w-screen flex items-center justify-center bg-surface-low text-on-surface">
+      <div className="text-sm font-semibold">Chargement…</div>
+    </div>
+  );
+}
+
 export default function App() {
+  return (
+    <Suspense fallback={<RouteFallback />}>
+      <AppContent />
+    </Suspense>
+  );
+}
+
+function AppContent() {
   const [hasStoredSession, setHasStoredSession] = useState(getInitialLoginState);
+  const [sessionLookupEnabled, setSessionLookupEnabled] = useState(true);
   const [viewState, setViewStateState] = useState<ViewState>(getInitialViewState);
 
   const setViewState = (view: ViewState) => {
@@ -89,7 +107,7 @@ export default function App() {
   };
   const [activePage, setActivePage] = useState<SidebarPage>("dashboard");
   const [settingsTab, setSettingsTab] = useState<string | undefined>();
-  const sessionQuery = useCurrentSession(true);
+  const sessionQuery = useCurrentSession(sessionLookupEnabled);
   const logoutMutation = useLogout();
   const session = sessionQuery.data;
 
@@ -113,6 +131,9 @@ export default function App() {
   useEffect(() => {
     if (session) {
       setHasStoredSession(true);
+      if (session.is_platform_admin) {
+        setActivePage("logs");
+      }
     }
   }, [session]);
 
@@ -142,19 +163,24 @@ export default function App() {
   }, [session, activePage]);
 
   const handleLoginSuccess = () => {
+    window.history.replaceState({}, document.title, "/");
+    sessionStorage.removeItem("sicurre_view_state");
+    setSessionLookupEnabled(true);
     setHasStoredSession(true);
     setActivePage("dashboard");
   };
 
   const handleLogout = async () => {
+    setSessionLookupEnabled(false);
+    setHasStoredSession(false);
+    clearStoredSession();
+    setViewState("landing");
+    setActivePage("dashboard");
     try {
       await logoutMutation.mutateAsync();
     } catch {
-      clearStoredSession();
+      // The local session remains closed even if remote revocation is unavailable.
     }
-    setHasStoredSession(false);
-    setViewState("landing");
-    setActivePage("dashboard");
   };
 
   if (sessionQuery.isLoading) {
@@ -210,6 +236,9 @@ export default function App() {
       currentPage={activePage}
       onPageChange={(page) => {
         if (page !== "settings") setSettingsTab(undefined);
+        if (session.is_platform_admin && page !== "logs" && page !== "settings" && page !== "support") {
+          return;
+        }
         setActivePage(page);
       }}
       onLogout={handleLogout}
@@ -219,11 +248,13 @@ export default function App() {
       onboardingRequired={session.onboarding_required}
     >
       <AnimatePresence mode="wait">
-        {activePage === "dashboard" && <DashboardRoute key="dashboard" session={session} onGoToSettings={handleGoToSettings} />}
-        {activePage === "threats" && <ThreatsRoute key="threats" session={session} />}
-        {activePage === "quarantine" && <QuarantineRoute key="quarantine" />}
-        {activePage === "alerts" && <AlertsRoute key="alerts" />}
-        {activePage === "domain-shield" && <DomainShieldRoute key="domain-shield" session={session} />}
+        {activePage === "dashboard" && !session.is_platform_admin && <DashboardRoute key="dashboard" session={session} onGoToSettings={handleGoToSettings} />}
+        {activePage === "threats" && !session.is_platform_admin && (
+          <ThreatsRoute key="threats" onOpenQuarantine={() => setActivePage("quarantine")} />
+        )}
+        {activePage === "quarantine" && !session.is_platform_admin && <QuarantineRoute key="quarantine" />}
+        {activePage === "alerts" && !session.is_platform_admin && <AlertsRoute key="alerts" />}
+        {activePage === "domain-shield" && !session.is_platform_admin && <DomainShieldRoute key="domain-shield" session={session} />}
         {activePage === "logs" && session.is_platform_admin && <LogsRoute key="logs" />}
         {activePage === "settings" && <SettingsRoute key="settings" session={session} initialTab={settingsTab} />}
         {activePage === "support" && <SupportRoute key="support" session={session} />}

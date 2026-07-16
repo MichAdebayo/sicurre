@@ -2,7 +2,7 @@ import { toNodeHandler } from "better-auth/node";
 
 import "./env.js";
 
-const [{ auth, authDatabaseDialect, authEmailExists, prepareAuthDatabase }, { createAuthApp }] = await Promise.all([
+const [{ auth, authDatabaseDialect, prepareAuthDatabase }, { createAuthApp }] = await Promise.all([
   import("./auth.js"),
   import("./server.js"),
 ]);
@@ -12,8 +12,6 @@ try {
   await prepareAuthDatabase();
   createAuthApp({
     databaseDialect: authDatabaseDialect,
-    emailExists: authEmailExists,
-    getSession: (headers) => auth.api.getSession({ headers }),
     authHandler: toNodeHandler(auth),
   }).listen(port, () => {
     console.log(JSON.stringify({

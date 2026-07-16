@@ -10,14 +10,14 @@ from starlette.requests import Request
 
 from core.config import Settings
 from core.security import (
-    _auth_cache,
     _principal_from_better_auth_payload,
-    _token_cache_key,
     _validate_with_better_auth,
     extract_bearer_token,
     require_authenticated_principal,
     require_internal_key,
 )
+
+TEST_SECRET_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
 
 def _request(*, cookie: str | None = None) -> Request:
@@ -58,28 +58,39 @@ def test_principal_rejects_payload_without_identity() -> None:
 
 
 @pytest.mark.asyncio
-async def test_better_auth_validation_uses_cached_principal(monkeypatch) -> None:
-    _auth_cache.clear()
-    cached = _principal_from_better_auth_payload({"user": {"id": "cached"}})
-    assert cached is not None
-    _auth_cache[_token_cache_key("token")] = cached
+async def test_better_auth_validation_never_caches_revocable_sessions(monkeypatch) -> None:
+    """A revoked cookie must be rejected on the request immediately after logout."""
+    responses = iter(
+        [
+            httpx.Response(
+                200,
+                json={"user": {"id": "active-user"}},
+                request=httpx.Request("GET", "http://auth/session"),
+            ),
+            httpx.Response(401),
+        ]
+    )
 
-    class UnexpectedClient:
-        def __init__(self, **_: Any) -> None:
-            raise AssertionError("HTTP client must not be created for a cached token")
+    class Client:
+        async def __aenter__(self) -> Client:
+            return self
 
-    monkeypatch.setattr("core.security.httpx.AsyncClient", UnexpectedClient)
+        async def __aexit__(self, *_: Any) -> None:
+            return None
 
-    principal = await _validate_with_better_auth("token", Settings(_env_file=None))
+        async def get(self, *_: Any, **__: Any) -> httpx.Response:
+            return next(responses)
 
-    assert principal == cached
+    monkeypatch.setattr("core.security.httpx.AsyncClient", lambda **_: Client())
+    settings = Settings(_env_file=None)
+
+    assert await _validate_with_better_auth(None, settings, "cookie") is not None
+    assert await _validate_with_better_auth(None, settings, "cookie") is None
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("status_code", [401, 403])
 async def test_better_auth_validation_rejects_denied_session(monkeypatch, status_code: int) -> None:
-    _auth_cache.clear()
-
     class Client:
         async def __aenter__(self) -> Client:
             return self
@@ -97,7 +108,6 @@ async def test_better_auth_validation_rejects_denied_session(monkeypatch, status
 
 @pytest.mark.asyncio
 async def test_better_auth_validation_sends_session_cookie(monkeypatch) -> None:
-    _auth_cache.clear()
     captured: dict[str, str] = {}
 
     class Client:
@@ -118,11 +128,19 @@ async def test_better_auth_validation_sends_session_cookie(monkeypatch) -> None:
     monkeypatch.setattr("core.security.httpx.AsyncClient", lambda **_: Client())
     settings = Settings(_env_file=None, better_auth_cookie_name="session")
 
-    principal = await _validate_with_better_auth(None, settings, "cookie-value")
+    principal = await _validate_with_better_auth(
+        None,
+        settings,
+        "cookie-value",
+        client_ip="203.0.113.10",
+    )
 
     assert principal is not None
     assert principal.subject == "cookie-user"
-    assert captured == {"Cookie": "session=cookie-value"}
+    assert captured == {
+        "Cookie": "session=cookie-value",
+        "x-real-ip": "203.0.113.10",
+    }
 
 
 @pytest.mark.asyncio
@@ -173,6 +191,7 @@ async def test_authentication_reports_missing_and_unavailable_services() -> None
         environment="production",
         auth_allow_dev_tokens=False,
         better_auth_base_url=None,
+        secret_encryption_key=TEST_SECRET_KEY,
     )
     credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="token")
     with pytest.raises(HTTPException) as unavailable:
