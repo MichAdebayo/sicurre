@@ -8,6 +8,8 @@ import pytest
 from core.config import Settings
 from db.runtime import _bind_qmark_parameters, _qualify_auth_tables, ensure_local_runtime_tables
 
+TEST_SECRET_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+
 
 def test_qmark_binding_creates_named_parameters() -> None:
     sql, bindings = _bind_qmark_parameters("SELECT ? AS one, ? AS two", [1, "two"])
@@ -24,7 +26,12 @@ def test_qmark_binding_rejects_parameter_mismatch() -> None:
 def test_auth_table_qualification_is_environment_specific(monkeypatch) -> None:
     monkeypatch.setattr(
         "db.runtime.get_settings",
-        lambda: Settings(_env_file=None, environment="production", better_auth_schema="identity"),
+        lambda: Settings(
+            _env_file=None,
+            environment="production",
+            better_auth_schema="identity",
+            secret_encryption_key=TEST_SECRET_KEY,
+        ),
     )
     assert _qualify_auth_tables('SELECT * FROM "user"') == 'SELECT * FROM identity."user"'
 
@@ -52,7 +59,12 @@ def test_local_runtime_table_creation_disposes_engine(monkeypatch) -> None:
 def test_production_does_not_create_runtime_tables(monkeypatch) -> None:
     create_engine = MagicMock()
     monkeypatch.setattr(
-        "db.runtime.get_settings", lambda: Settings(_env_file=None, environment="production")
+        "db.runtime.get_settings",
+        lambda: Settings(
+            _env_file=None,
+            environment="production",
+            secret_encryption_key=TEST_SECRET_KEY,
+        ),
     )
     monkeypatch.setattr("db.runtime.create_engine", create_engine)
 

@@ -1,6 +1,7 @@
 import { createReadStream } from "node:fs";
 import { access, stat } from "node:fs/promises";
 import http from "node:http";
+import net from "node:net";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -9,6 +10,7 @@ const distDir = process.env.APP_DIST_DIR || path.resolve(__dirname, "../../dist"
 const port = Number(process.env.PORT || 5173);
 const apiServiceUrl = (process.env.API_SERVICE_URL || "http://127.0.0.1:8001").replace(/\/$/, "");
 const authServiceUrl = (process.env.AUTH_SERVICE_URL || "http://127.0.0.1:3005").replace(/\/$/, "");
+const trustProxyHeaders = process.env.TRUST_PROXY_HEADERS?.trim().toLowerCase() === "true";
 const startedAt = Date.now();
 let requestTotal = 0;
 let proxyErrorsTotal = 0;
@@ -136,6 +138,12 @@ async function proxyRequest(request, response, targetBase) {
   delete headers.host;
   delete headers.connection;
   delete headers["content-length"];
+  const forwardedRealIp = headers["x-real-ip"];
+  const trustedRealIp = trustProxyHeaders && typeof forwardedRealIp === "string" && net.isIP(forwardedRealIp)
+    ? forwardedRealIp
+    : null;
+  headers["x-real-ip"] = trustedRealIp
+    ?? (request.socket.remoteAddress || "127.0.0.1").replace(/^::ffff:/, "");
 
   const method = request.method || "GET";
   const body = method === "GET" || method === "HEAD" ? undefined : await readRequestBody(request);

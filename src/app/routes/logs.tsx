@@ -6,6 +6,7 @@ import {
   Cloud,
   Flag,
   Inbox,
+  LifeBuoy,
   RefreshCw,
   Server,
   ShieldCheck,
@@ -198,11 +199,12 @@ export default function LogsRoute() {
         <>
           <RuntimeHealthPanel health={runtimeHealth.data} isLoading={runtimeHealth.isLoading} />
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <AdminMetric icon={<Users className="h-5 w-5" />} label="Workspaces" value={data.summary.workspaces_count} help="Espaces client connus par le runtime." />
             <AdminMetric icon={<Activity className="h-5 w-5" />} label="Événements" value={data.summary.threat_events_count} help="Verdicts enregistrés sans messages supprimés." />
             <AdminMetric icon={<Flag className="h-5 w-5" />} label="Feedbacks" value={data.summary.feedback_count} help={`${data.summary.false_negative_count} false negatives signalés.`} />
             <AdminMetric icon={<Cloud className="h-5 w-5" />} label="Domaines actifs" value={data.summary.cloudflare_active_count} help={`${data.summary.cloudflare_integrations_count} intégrations Cloudflare au total.`} />
+            <AdminMetric icon={<LifeBuoy className="h-5 w-5" />} label="Support ouvert" value={data.summary.support_open_count} help="Demandes client à prendre en charge." />
           </div>
 
           <div className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
@@ -300,6 +302,29 @@ export default function LogsRoute() {
               )}
             </section>
           </div>
+
+          <section className="rounded-lg border border-border-subtle bg-surface-lowest p-5 dark:bg-surface-low">
+            <div className="mb-5 flex items-center gap-3">
+              <LifeBuoy className="h-5 w-5 text-primary" />
+              <h2 className="app-h2">Demandes de support récentes</h2>
+            </div>
+            {data.recent_support.length === 0 ? (
+              <EmptyPanel title="Aucune demande" body="Les tickets envoyés depuis l’application apparaîtront ici." />
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {data.recent_support.map((item) => (
+                  <div key={item.id} className="rounded-lg border border-border-subtle bg-surface-low p-4 dark:bg-surface">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-bold text-on-surface">{item.category}</p>
+                      <span className="rounded-md bg-primary-fixed px-2 py-1 text-xs font-bold text-on-primary-container">{item.status}</span>
+                    </div>
+                    <p className="mt-2 break-all text-sm text-on-surface-variant">{item.requester_email}</p>
+                    <p className="mt-1 text-xs text-on-surface-variant">{formatDate(item.created_at)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </>
       )}
     </MotionDiv>

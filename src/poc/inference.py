@@ -112,22 +112,30 @@ class PocInferenceClient:
         self.timeout_seconds = timeout_seconds
 
     def health(self) -> tuple[bool, str]:
-        """Return local model API availability without exposing credentials."""
+        """Return local model API and bearer-contract availability."""
         if not self.settings.inference_api_key:
             return False, "Clé d'inférence POC absente"
         health_url = self.settings.inference_api_url.removesuffix("/v1/classify") + "/health"
         try:
-            response = httpx.get(
+            health_response = httpx.get(
                 health_url,
+                timeout=5.0,
+            )
+            if not health_response.is_success:
+                return False, f"HTTP {health_response.status_code}"
+            auth_response = httpx.post(
+                self.settings.inference_api_url,
+                json={},
                 headers=self._headers(),
                 timeout=5.0,
             )
         except httpx.HTTPError as exc:
             return False, f"Service local indisponible: {type(exc).__name__}"
-        return (
-            response.is_success,
-            "Service local disponible" if response.is_success else f"HTTP {response.status_code}",
-        )
+        if auth_response.status_code == 401:
+            return False, "Clé d'inférence locale refusée"
+        if auth_response.status_code == 422:
+            return True, "Service local disponible et authentifié"
+        return False, f"Contrat d'authentification inattendu (HTTP {auth_response.status_code})"
 
     def classify(
         self,

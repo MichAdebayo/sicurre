@@ -22,7 +22,7 @@ Use a self-hosted deployment shape:
 - Better Auth runs as a Node.js sidecar on `127.0.0.1:3005` and exposes `/api/auth/*`.
 - The frontend reaches Better Auth through the same origin proxy path `/api/auth`.
 - The public API host is the Hetzner server reachable over HTTPS.
-- Local development uses SQLite at `data/local/sicurre.db`; production remains aligned with Neon PostgreSQL as the relational target.
+- Local development uses separate SQLite files for Sicurre application data and Better Auth; production uses separate Sicurre and `auth` schemas in Neon PostgreSQL.
 
 ## Consequences
 

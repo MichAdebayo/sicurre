@@ -59,9 +59,9 @@ export default function ConfidentialiteRoute({ onBack }: ConfidentialiteProps) {
             <h2 className="font-display font-medium text-lg text-slate-200">1. Engagements RGPD et Souveraineté</h2>
             <p className="text-sm text-slate-400 leading-relaxed">
               Chez Sicurre, nous traitons la sécurité et la confidentialité de vos e-mails avec la plus grande rigueur.
-              En conformité totale avec le Règlement Général sur la Protection des Données (RGPD), toutes les analyses
-              d'inférence de phishing sont exécutées sur des infrastructures souveraines situées en France.
-              <strong className="text-white"> Aucun e-mail n'est partagé avec des tiers ou utilisé pour entraîner des modèles publics.</strong>
+              Les traitements sont conçus selon les principes de minimisation, de limitation de conservation et de contrôle d'accès du RGPD.
+              Cloudflare achemine les messages vers l'API Sicurre et les prestataires d'infrastructure nécessaires traitent les données
+              selon leur rôle technique. <strong className="text-white">Les messages clients ne servent pas à entraîner un modèle public.</strong>
             </p>
           </section>
 
@@ -86,10 +86,12 @@ export default function ConfidentialiteRoute({ onBack }: ConfidentialiteProps) {
           </section>
 
           <section className="space-y-3">
-            <h2 className="font-display font-medium text-lg text-slate-200">3. Politique stricte de Non-Stockage des E-mails</h2>
+            <h2 className="font-display font-medium text-lg text-slate-200">3. Stockage minimal et quarantaine temporaire</h2>
             <p className="text-sm text-slate-400 leading-relaxed">
-              Par défaut, <strong className="text-white">Sicurre ne stocke jamais le corps ou le contenu de vos e-mails</strong> dans ses bases de données.
-              Seules les métadonnées techniques indispensables à votre journal de sécurité sont enregistrées :
+              Les messages légitimes ou indésirables ne sont pas conservés en contenu brut. Pour permettre une restauration,
+              <strong className="text-white"> le MIME original d'un message classé comme phishing est placé dans une quarantaine privée pendant 14 jours au maximum</strong>,
+              puis supprimé lors de sa libération, de sa suppression ou de son expiration. La base applicative conserve uniquement les métadonnées
+              nécessaires et un aperçu dont les données personnelles détectables sont masquées :
             </p>
             <ul className="list-disc pl-5 text-sm text-slate-400 space-y-1.5">
               <li>Adresse de l'expéditeur et du destinataire</li>

@@ -4,7 +4,6 @@ import hashlib
 from typing import Any
 
 import httpx
-from cachetools import TTLCache
 from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
@@ -21,9 +20,8 @@ class AuthenticatedPrincipal(BaseModel):
 
 
 _bearer_scheme = HTTPBearer(auto_error=False)
-_auth_cache: TTLCache[str, AuthenticatedPrincipal] = TTLCache(maxsize=1_000, ttl=300)
-
-
+_credentials_dependency = Security(_bearer_scheme)
+_settings_dependency = Depends(get_settings)
 def extract_bearer_token(authorization_header: str | None) -> str | None:
     if authorization_header is None:
         return None
@@ -32,10 +30,6 @@ def extract_bearer_token(authorization_header: str | None) -> str | None:
     if scheme.lower() != "bearer" or not token:
         return None
     return token.strip()
-
-
-def _token_cache_key(token: str) -> str:
-    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def _unauthorized(detail: str = "Authentication required") -> HTTPException:
@@ -67,19 +61,16 @@ def _principal_from_better_auth_payload(
 
 
 async def _validate_with_better_auth(
-    token: str | None, settings: Settings, session_cookie: str | None = None
+    token: str | None,
+    settings: Settings,
+    session_cookie: str | None = None,
+    client_ip: str | None = None,
 ) -> AuthenticatedPrincipal | None:
     if not settings.better_auth_base_url:
         return None
 
-    cache_source = token or session_cookie
-    if cache_source is None:
+    if token is None and session_cookie is None:
         return None
-
-    cache_key = _token_cache_key(cache_source)
-    cached_principal = _auth_cache.get(cache_key)
-    if cached_principal is not None:
-        return cached_principal
 
     endpoint = (
         f"{settings.better_auth_base_url.rstrip('/')}"
@@ -93,6 +84,8 @@ async def _validate_with_better_auth(
             headers["Authorization"] = f"Bearer {token}"
         if session_cookie:
             headers["Cookie"] = f"{settings.better_auth_cookie_name}={session_cookie}"
+        if client_ip:
+            headers["x-real-ip"] = client_ip
         response = await client.get(
             endpoint,
             headers=headers,
@@ -109,10 +102,7 @@ async def _validate_with_better_auth(
     if not isinstance(payload, dict):
         return None
 
-    principal = _principal_from_better_auth_payload(payload)
-    if principal is not None:
-        _auth_cache[cache_key] = principal
-    return principal
+    return _principal_from_better_auth_payload(payload)
 
 
 def _validate_with_dev_token(
@@ -132,8 +122,8 @@ def _validate_with_dev_token(
 
 async def require_authenticated_principal(
     request: Request,
-    credentials: HTTPAuthorizationCredentials | None = Security(_bearer_scheme),
-    settings: Settings = Depends(get_settings),
+    credentials: HTTPAuthorizationCredentials | None = _credentials_dependency,
+    settings: Settings = _settings_dependency,
 ) -> AuthenticatedPrincipal:
     if not settings.auth_enabled:
         principal = AuthenticatedPrincipal(
@@ -160,6 +150,8 @@ async def require_authenticated_principal(
                 token,
                 settings,
                 session_cookie=session_cookie,
+                client_ip=request.headers.get("x-real-ip")
+                or (request.client.host if request.client else None),
             )
         except httpx.HTTPError as exc:
             raise HTTPException(
@@ -175,8 +167,8 @@ async def require_authenticated_principal(
 
 
 async def require_internal_key(
-    credentials: HTTPAuthorizationCredentials | None = Security(_bearer_scheme),
-    settings: Settings = Depends(get_settings),
+    credentials: HTTPAuthorizationCredentials | None = _credentials_dependency,
+    settings: Settings = _settings_dependency,
 ) -> None:
     """Validates the service-to-service bearer token for internal endpoints."""
     if not settings.internal_api_key:
