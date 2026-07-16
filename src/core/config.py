@@ -280,7 +280,7 @@ class Settings(BaseSettings):
         return normalized
 
     @model_validator(mode="after")
-    def _validate_production_secret_encryption(self) -> "Settings":
+    def _validate_production_secret_encryption(self) -> Settings:
         """Require a valid, dedicated encryption key for production secrets."""
         from core.secret_cipher import encrypt_secret
 
