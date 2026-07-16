@@ -10,12 +10,13 @@ the authenticated session, never from request parameters.
 from __future__ import annotations
 
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import HTTPException
 
 from data_platform.api.auth import AuthUser
-from data_platform.api.routers import app_routes
+from data_platform.api.routers import app_routes, integrations
 from data_platform.api.routers.app_routes import (
     FeedbackCreate,
     SecurityRuleCreate,
@@ -26,6 +27,7 @@ from data_platform.api.routers.app_routes import (
     delete_security_rule,
     dismiss_alert,
     get_alert_preferences,
+    get_kpis,
     get_threats,
     list_alert_history,
     list_cloudflare_integrations,
@@ -35,6 +37,10 @@ from data_platform.api.routers.app_routes import (
     release_quarantine_item,
     update_alert_preferences,
     update_threat_status,
+)
+from data_platform.api.routers.integrations import (
+    delete_workspace_cloudflare_token,
+    get_workspace_cloudflare_token,
 )
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -511,3 +517,58 @@ async def test_admin_overview_rejects_customer() -> None:
         await get_admin_overview(USER_A)
 
     assert exc_info.value.status_code == 403
+
+
+# ── Extra User-Scoped Isolation Tests ─────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_kpis_are_workspace_scoped(monkeypatch: pytest.MonkeyPatch) -> None:
+    """GET /v1/stats/kpi scopes event query to workspace_id."""
+    captured, query = _tracking_query({
+        "workspace-2": [{"safety_verdict": "phishing", "cnt": 10}],
+    })
+    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+    async def mock_count(ws: str) -> int:
+        return 5 if ws == "workspace-2" else 0
+    monkeypatch.setattr(app_routes, "_workspace_threat_count", mock_count)
+
+    session = MagicMock()
+    result = await get_kpis(session=session, current_user=USER_A)
+
+    assert result["threats_phishing_count"] == 0, "Alice must not see Bob's threats in KPI stats"
+    assert any("workspace-1" in params for _, params in captured)
+
+
+@pytest.mark.asyncio
+async def test_cloudflare_token_retrieval_is_workspace_scoped(monkeypatch: pytest.MonkeyPatch) -> None:
+    """GET /v1/integrations/cloudflare/token returns configured only for caller's workspace."""
+    captured: list[tuple[str, tuple[Any, ...]]] = []
+    async def mock_query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        captured.append((sql, params))
+        if "workspace-2" in params:
+            return [{"api_token": "token-b"}]
+        return []
+
+    monkeypatch.setattr(integrations, "_async_query", mock_query)
+    monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
+
+    result = await get_workspace_cloudflare_token(USER_A)
+    assert result == {"configured": False}
+    assert any("workspace-1" in params for _, params in captured)
+
+
+@pytest.mark.asyncio
+async def test_cloudflare_token_deletion_is_workspace_scoped(monkeypatch: pytest.MonkeyPatch) -> None:
+    """DELETE /v1/integrations/cloudflare/token scopes deletions to workspace_id."""
+    captured: list[tuple[str, tuple[Any, ...]]] = []
+    async def mock_query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        captured.append((sql, params))
+        return []
+
+    monkeypatch.setattr(integrations, "_async_query", mock_query)
+
+    result = await delete_workspace_cloudflare_token(USER_A)
+    assert result == {"status": "deleted"}
+    for _, params in captured:
+        assert "workspace-1" in params
