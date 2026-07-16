@@ -34,6 +34,9 @@ if (!/^[a-z_][a-z0-9_]*$/.test(authSchema)) {
 if (isProduction && !productionDatabaseUrl) {
   throw new Error("Production Better Auth requires SICURRE_BETTER_AUTH_DATABASE_URL.");
 }
+if (isProduction && authSecret === "dev-only-better-auth-secret-change-me-please-1234567890") {
+  throw new Error("Production Better Auth requires SICURRE_BETTER_AUTH_SECRET.");
+}
 if (isProduction && localDatabasePath) {
   throw new Error("Production Better Auth must not define SICURRE_LOCAL_BETTER_AUTH_DB_PATH.");
 }
@@ -77,20 +80,6 @@ export async function closeAuthDatabase(): Promise<void> {
   localDatabase?.close();
 }
 
-export async function authEmailExists(email: string): Promise<boolean> {
-  if (productionPool) {
-    const result = await productionPool.query(
-      `SELECT 1 AS found FROM "${authSchema}"."user" WHERE lower(email) = $1 LIMIT 1`,
-      [email],
-    );
-    return result.rowCount === 1;
-  }
-  const row = localDatabase!
-    .prepare('SELECT 1 AS found FROM "user" WHERE lower(email) = ? LIMIT 1')
-    .get(email) as { found?: number } | undefined;
-  return Boolean(row?.found);
-}
-
 type TurnstileVerification = {
   success: boolean;
   "error-codes"?: string[];
@@ -129,6 +118,11 @@ export const auth = betterAuth({
   basePath: "/api/auth",
   trustedOrigins,
   database: authDatabase,
+  advanced: {
+    ipAddress: {
+      ipAddressHeaders: ["x-real-ip"],
+    },
+  },
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
       if (ctx.path !== "/sign-up/email" || !process.env.TURNSTILE_SECRET_KEY?.trim()) {

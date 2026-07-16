@@ -115,11 +115,28 @@ def test_health_reports_success_and_http_failure(
     configured_settings: PocSettings,
 ) -> None:
     health_url = "http://model.test/health"
-    route = respx.get(health_url).mock(return_value=httpx.Response(200))
+    health_route = respx.get(health_url).mock(return_value=httpx.Response(200))
+    auth_route = respx.post(configured_settings.inference_api_url).mock(
+        return_value=httpx.Response(422)
+    )
     client = PocInferenceClient(configured_settings)
-    assert client.health() == (True, "Service local disponible")
-    route.mock(return_value=httpx.Response(503))
+    assert client.health() == (True, "Service local disponible et authentifié")
+    assert auth_route.calls[0].request.content == b"{}"
+    health_route.mock(return_value=httpx.Response(503))
     assert client.health() == (False, "HTTP 503")
+
+
+@respx.mock
+def test_health_reports_rejected_bearer_key(
+    configured_settings: PocSettings,
+) -> None:
+    respx.get("http://model.test/health").mock(return_value=httpx.Response(200))
+    respx.post(configured_settings.inference_api_url).mock(return_value=httpx.Response(401))
+
+    assert PocInferenceClient(configured_settings).health() == (
+        False,
+        "Clé d'inférence locale refusée",
+    )
 
 
 @respx.mock

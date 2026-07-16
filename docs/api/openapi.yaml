@@ -379,51 +379,6 @@ paths:
         "404":
           description: Dataset not found
 
-  /v1/model/classify:
-    post:
-      tags: [model]
-      summary: Classify an email as phishing, spam, or legitimate
-      security:
-        - ApiKeyAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ClassifyRequest"
-      responses:
-        "200":
-          description: Classification result
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ClassifyResponse"
-        "400":
-          description: Bad request
-        "401":
-          description: Unauthorized
-
-  /v1/model/versions:
-    get:
-      tags: [model]
-      summary: List model versions
-      security:
-        - BearerAuth: []
-      responses:
-        "200":
-          description: Model version catalog
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  items:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/ModelVersion"
-                  total:
-                    type: integer
-
   /v1/email/scan:
     post:
       tags: [app]
@@ -445,6 +400,47 @@ paths:
                 $ref: "#/components/schemas/EmailScanResponse"
         "401":
           description: Missing or invalid Worker secret
+        "503":
+          description: Inference is unavailable; the Worker must not treat the message as scanned
+
+  /v1/email/quarantine/{item_id}/content:
+    put:
+      tags: [internal]
+      summary: Store original MIME for a quarantined Worker message
+      description: >
+        Worker-only custody route. The MIME object is private, size bounded,
+        retained for at most the quarantine period, and deleted after release
+        or expiry.
+      security:
+        - WorkerSecretAuth: []
+      parameters:
+        - in: path
+          name: item_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          message/rfc822:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: MIME stored, including idempotent retry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuarantineCustodyResponse"
+        "401":
+          description: Missing or invalid Worker secret
+        "404":
+          description: Quarantine item does not belong to the Worker workspace
+        "409":
+          description: Different content was already stored for this item
+        "413":
+          description: MIME exceeds the configured custody limit
 
   /v1/auth/session:
     get:
@@ -550,6 +546,30 @@ paths:
         "409":
           description: Feedback already submitted for the same event/type
 
+  /v1/support/requests:
+    post:
+      tags: [app]
+      summary: Create a tenant-scoped support request
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SupportRequest"
+      responses:
+        "201":
+          description: Support request recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportResponse"
+        "422":
+          description: Invalid request fields
+        "429":
+          description: Support request rate limit exceeded
+
   /v1/quarantine:
     get:
       tags: [app]
@@ -580,9 +600,21 @@ paths:
             type: string
       responses:
         "200":
-          description: Release accepted
+          description: Original email delivered or an earlier release confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuarantineReleaseResponse"
+        "403":
+          description: Cloudflare Email Sending permission is missing
+        "409":
+          description: Item is unavailable, already releasing, or lacks original MIME
+        "424":
+          description: Cloudflare rejected or could not queue the delivery
         "404":
           description: Quarantine item not found
+        "503":
+          description: Private quarantine storage is temporarily unavailable
 
   /v1/quarantine/{id}/whitelist:
     post:
@@ -598,7 +630,16 @@ paths:
             type: string
       responses:
         "200":
-          description: Release and allow-list accepted
+          description: Release completed and sender allow-list state confirmed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/QuarantineReleaseResponse"
+                  - type: object
+                    properties:
+                      whitelisted_pattern:
+                        type: string
         "404":
           description: Quarantine item not found
 
@@ -701,10 +742,14 @@ paths:
       responses:
         "200":
           description: Integration removed
+        "400":
+          description: No stored Cloudflare credential is available
         "404":
           description: Integration not found
         "409":
           description: Provisioning is still in progress
+        "502":
+          description: Cloudflare rejected cleanup; local integration state is preserved
 
   /v1/integrations/cloudflare/token:
     get:
@@ -775,6 +820,158 @@ paths:
           description: Rate limit exceeded (10/minute)
         "503":
           description: Internal API not configured (INTERNAL_API_KEY not set)
+
+  /v1/stats/kpi:
+    get:
+      tags: [app]
+      summary: Get tenant-scoped classification counts and operator dataset counts
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Current KPI snapshot}
+
+  /v1/alerts/preferences:
+    get:
+      tags: [app]
+      summary: Get workspace alert preferences
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Alert preferences}
+    put:
+      tags: [app]
+      summary: Replace workspace alert preferences
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Preferences updated}
+
+  /v1/alerts/rules:
+    get:
+      tags: [app]
+      summary: List workspace allowlist and blocklist rules
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Workspace rules}
+    post:
+      tags: [app]
+      summary: Create a workspace rule
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Rule created}
+
+  /v1/alerts/rules/{id}:
+    delete:
+      tags: [app]
+      summary: Delete a workspace rule
+      security: [{BearerAuth: []}]
+      parameters:
+        - {in: path, name: id, required: true, schema: {type: string}}
+      responses:
+        "200": {description: Rule deleted}
+        "404": {description: Rule not found in this workspace}
+
+  /v1/alerts/history:
+    get:
+      tags: [app]
+      summary: List active workspace notifications
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Notification history}
+
+  /v1/alerts/history/{id}/dismiss:
+    post:
+      tags: [app]
+      summary: Dismiss a workspace notification
+      security: [{BearerAuth: []}]
+      parameters:
+        - {in: path, name: id, required: true, schema: {type: string}}
+      responses:
+        "200": {description: Notification dismissed}
+        "404": {description: Notification not found in this workspace}
+
+  /v1/domain-shield/{domain}/status:
+    get:
+      tags: [app]
+      summary: Read the persisted Domain Shield assessment or explicitly refresh it
+      security: [{BearerAuth: []}]
+      parameters:
+        - {in: path, name: domain, required: true, schema: {type: string}}
+        - {in: query, name: refresh, required: false, schema: {type: boolean, default: false}}
+      responses:
+        "200": {description: Domain Shield assessment}
+
+  /v1/domain-shield/{domain}/dmarc-reports:
+    get:
+      tags: [app]
+      summary: Get workspace DMARC aggregate-report summaries
+      security: [{BearerAuth: []}]
+      parameters:
+        - {in: path, name: domain, required: true, schema: {type: string}}
+      responses:
+        "200": {description: DMARC report summary and top sources}
+
+  /v1/domain-shield/{domain}/dmarc-reports/import:
+    post:
+      tags: [app]
+      summary: Import a DMARC XML or compressed XML aggregate report
+      security: [{BearerAuth: []}]
+      parameters:
+        - {in: path, name: domain, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/xml:
+            schema: {type: string, format: binary}
+          application/gzip:
+            schema: {type: string, format: binary}
+      responses:
+        "200": {description: Report imported idempotently}
+        "400": {description: Invalid report or mismatched domain}
+
+  /v1/admin/runtime-health:
+    get:
+      tags: [admin]
+      summary: Probe deployed app, inference, Cloudflare, and quarantine dependencies
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Platform runtime health}
+        "403": {description: Platform admin access required}
+
+  /v1/admin/overview:
+    get:
+      tags: [admin]
+      summary: Get global platform analytics and recent operational records
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Platform overview}
+        "403": {description: Platform admin access required}
+
+  /v1/datasets:
+    get:
+      tags: [admin]
+      summary: List global dataset versions for platform operators
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Dataset versions}
+        "403": {description: Platform admin access required}
+
+  /v1/data/datasets/{id}/publish:
+    post:
+      tags: [admin]
+      summary: Publish a dataset version as a platform operator
+      security: [{BearerAuth: []}]
+      parameters:
+        - {in: path, name: id, required: true, schema: {type: string}}
+      responses:
+        "200": {description: Publication result}
+        "403": {description: Platform admin access required}
+
+  /v1/pipeline/run:
+    post:
+      tags: [admin]
+      summary: Enqueue the fixed incremental data pipeline operation
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Allowlisted pipeline operation enqueued}
+        "403": {description: Platform admin access required}
 
 components:
   securitySchemes:
@@ -1121,8 +1318,12 @@ components:
 
     EmailScanRequest:
       type: object
-      required: [subject, sender, text]
+      required: [sender]
       properties:
+        message_id:
+          type: string
+          maxLength: 500
+          description: Stable Message-ID or raw-MIME SHA-256 used for retry idempotency.
         subject:
           type: string
           example: "Facture impayee - action requise"
@@ -1141,8 +1342,11 @@ components:
 
     EmailScanResponse:
       type: object
-      required: [verdict, label, score]
+      required: [event_id, verdict, label, score]
       properties:
+        event_id:
+          type: string
+          description: Stable tenant-scoped identifier also added to delivered mail as X-Sicurre-Event-ID.
         verdict:
           type: string
           enum: [safe, spam, phishing, quarantine]
@@ -1155,6 +1359,10 @@ components:
           maximum: 1
         explanation:
           type: string
+        quarantine_id:
+          type: string
+          nullable: true
+          description: Present only when the Worker must upload original MIME for custody.
 
     AuthSession:
       type: object
@@ -1262,6 +1470,38 @@ components:
           type: string
           format: date-time
 
+    SupportRequest:
+      type: object
+      required: [requester_name, requester_email, category, message]
+      properties:
+        requester_name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        requester_email:
+          type: string
+          format: email
+        category:
+          type: string
+          enum: [incident, dns, billing, feedback, other]
+        message:
+          type: string
+          minLength: 10
+          maxLength: 4000
+
+    SupportResponse:
+      type: object
+      required: [id, status, created_at]
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [open]
+        created_at:
+          type: string
+          format: date-time
+
     QuarantineItem:
       type: object
       properties:
@@ -1289,6 +1529,34 @@ components:
         created_at:
           type: string
           format: date-time
+
+    QuarantineCustodyResponse:
+      type: object
+      required: [status, idempotent]
+      properties:
+        status:
+          type: string
+          enum: [stored]
+        idempotent:
+          type: boolean
+
+    QuarantineReleaseResponse:
+      type: object
+      required: [status, forwarded_to, idempotent]
+      properties:
+        status:
+          type: string
+          enum: [released]
+        forwarded_to:
+          type: string
+          format: email
+        delivery_message_id:
+          type: string
+          nullable: true
+        queued:
+          type: boolean
+        idempotent:
+          type: boolean
 
     CloudflareSetupRequest:
       type: object
@@ -1360,11 +1628,14 @@ components:
 
     CloudflareTeardownRequest:
       type: object
-      required: [cf_api_token]
+      required: [integration_id]
       properties:
+        integration_id:
+          type: string
         cf_api_token:
           type: string
           writeOnly: true
+          description: Optional one-request override; the stored encrypted credential is used by default
 
     CloudflareTokenSaveRequest:
       type: object
@@ -1377,7 +1648,7 @@ components:
     CloudflareTokenStatus:
       type: object
       properties:
-        api_token:
-          type: string
+        configured:
+          type: boolean
           nullable: true
           description: Current implementation returns the stored token; production should replace this with presence metadata only.

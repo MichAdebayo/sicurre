@@ -14,7 +14,7 @@
 - Feedback loop: false positive / false negative reports stored in `app_feedback`
 
 ## Out-of-scope (MVP)
-- Gmail watch / Pub/Sub runtime ingestion
+- Post-delivery mailbox OAuth connectors; the MVP uses pre-delivery domain routing
 - Enterprise SOC/MDR functionality
 - Large-scale DLP / compliance archiving
 - Attachment sandbox detonation (possible later)

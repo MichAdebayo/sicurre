@@ -61,17 +61,14 @@ export function Sidebar({
     { id: "settings", label: t("sidebar.nav_settings"), icon: Settings },
   ] as const;
 
-  // Insert Audit Logs for admin users before the Settings link
+  const adminNav = [
+    { id: "logs", label: t("sidebar.nav_admin_console"), icon: History },
+    baseNav[5],
+  ] as const;
+
+  // Platform admins operate the service and do not own a customer mailbox.
   const mainNav = userRole === "admin"
-    ? [
-      baseNav[0], // dashboard
-      baseNav[1], // threats
-      baseNav[2], // quarantine
-      baseNav[3], // alerts
-      baseNav[4], // domain-shield
-      { id: "logs", label: t("sidebar.nav_admin_console"), icon: History },
-      baseNav[5], // settings
-    ]
+    ? adminNav
     : baseNav;
 
   const bottomNav = [
@@ -133,13 +130,6 @@ export function Sidebar({
 
       {/* Bottom Section */}
       <div className="px-3 pb-4 space-y-3 pt-3">
-        {isOnboardingLocked && (
-          <div className="rounded-lg border border-primary/15 bg-primary-fixed p-3 text-[11px] leading-5 text-on-primary-container dark:bg-primary-container">
-            <p className="font-bold">Setup en cours</p>
-            <p className="mt-1 opacity-80">Terminez la connexion Cloudflare dans Settings.</p>
-          </div>
-        )}
-
         {/* Support Link */}
         {bottomNav.map((item) => {
           const Icon = item.icon;

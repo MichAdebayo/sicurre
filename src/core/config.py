@@ -7,7 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlparse
 
-from pydantic import AliasChoices, Field, ValidationInfo, field_validator
+from pydantic import AliasChoices, Field, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -43,7 +43,16 @@ class Settings(BaseSettings):
     better_auth_timeout_seconds: float = 5.0
     better_auth_cookie_name: str = "better-auth.session_token"
     better_auth_schema: str = "auth"
-    platform_admin_emails: str = "admin@sicurre.fr"
+    platform_admin_emails: str = ""
+    secret_encryption_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "SICURRE_SECRET_ENCRYPTION_KEY",
+            "secret_encryption_key",
+        ),
+        repr=False,
+        description="URL-safe base64 encoding of the 32-byte application secret key.",
+    )
     raw_snapshot_storage_backend: str = "local"
     raw_snapshot_local_dir: Path = ROOT_DIR / "data" / "raw" / "api"
     raw_snapshot_prefix: str = "raw-snapshots"
@@ -52,6 +61,11 @@ class Settings(BaseSettings):
     raw_snapshot_r2_access_key_id: str | None = None
     raw_snapshot_r2_secret_access_key: str | None = None
     raw_snapshot_r2_region: str = "auto"
+    quarantine_storage_backend: str = "local"
+    quarantine_local_dir: Path = ROOT_DIR / "data" / "local" / "quarantine"
+    quarantine_r2_bucket_name: str | None = None
+    quarantine_r2_prefix: str = "quarantine"
+    quarantine_max_message_bytes: int = 5 * 1024 * 1024
     phishtank_api_key: str | None = None
     phishtank_user_agent: str = "phishtank/sicurre-research"
     phishtank_snapshot_storage_backend: str | None = None
@@ -264,6 +278,19 @@ class Settings(BaseSettings):
         if re.fullmatch(r"[a-z_][a-z0-9_]*", normalized) is None:
             raise ValueError("better_auth_schema must be a safe PostgreSQL identifier")
         return normalized
+
+    @model_validator(mode="after")
+    def _validate_production_secret_encryption(self) -> "Settings":
+        """Require a valid, dedicated encryption key for production secrets."""
+        from core.secret_cipher import encrypt_secret
+
+        if self.environment.lower() in {"production", "prod"}:
+            encrypt_secret(
+                "startup-validation",
+                configured_key=self.secret_encryption_key,
+                environment=self.environment,
+            )
+        return self
 
     @property
     def sync_database_url(self) -> str:

@@ -94,7 +94,14 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
       }
       runStepDiagnostics();
     } catch (err) {
-      console.error("Failed to refresh domain status:", err);
+      setSuccessNotification(null);
+      setErrorNotification(
+        err instanceof Error && err.message
+          ? err.message
+          : isFR
+            ? "Actualisation du domaine impossible."
+            : "Could not refresh the domain."
+      );
     }
   };
 
@@ -288,15 +295,13 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
   };
 
   const handleRunAutoFix = async () => {
-    const token = wsTokenData?.api_token;
-    if (!token) {
+    if (!wsTokenData?.configured) {
       setSuccessNotification(null);
       setErrorNotification(
         isFR
           ? "Configuration Cloudflare requise : Veuillez d'abord ajouter votre jeton API Cloudflare dans les Paramètres > onglet Intégrations."
           : "Cloudflare Integration Required: Please configure your Cloudflare API token in Settings > Integrations first."
       );
-      setTimeout(() => setErrorNotification(null), 4500);
       return;
     }
 
@@ -309,7 +314,6 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
 
     try {
       const payload = {
-        cf_api_token: token,
         zone_name: selectedDomain,
         destination_email: session?.email || "owner@sicurre.com",
         fix_spf: fixSpf,
@@ -327,36 +331,25 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
           : (isFR ? "Configuration appliquée" : "Setup applied")
       );
 
-      const refreshCachedShield = async () => {
-        await refetchCloudflareStatus();
-        await reloadShield();
-      };
+      let finalStatus = result.status;
+      for (let attempt = 0; finalStatus === "provisioning" && attempt < 15; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 2000));
+        const statusResult = await refetchCloudflareStatus();
+        finalStatus = statusResult.data?.status || finalStatus;
+        if (finalStatus === "error") {
+          throw new Error(statusResult.data?.error_message || (isFR ? "Échec de la configuration Cloudflare." : "Cloudflare setup failed."));
+        }
+      }
 
-      const refreshDnsShield = async () => {
+      if (finalStatus === "active" || finalStatus === "pending_verification") {
+        setAutoFixProgress("success");
         await refreshShieldMutation.mutateAsync(selectedDomain);
         await reloadShield();
-      };
-
-      await refreshCachedShield();
-      [3000, 8000, 16000].forEach((delayMs) => {
-        window.setTimeout(() => {
-          refreshCachedShield().catch((refreshErr) => {
-            console.error("Domain Shield cache refresh failed:", refreshErr);
-          });
-        }, delayMs);
-      });
-      [30000, 60000].forEach((delayMs) => {
-        window.setTimeout(() => {
-          refreshDnsShield().catch((refreshErr) => {
-            console.error("Domain Shield DNS refresh failed:", refreshErr);
-          });
-        }, delayMs);
-      });
-
-      setTimeout(() => {
-        setSuccessNotification(null);
-        setAutoFixProgress("idle");
-      }, 5500);
+        setSuccessNotification(isFR ? "Configuration appliquée" : "Setup applied");
+      } else {
+        setAutoFixProgress("routing");
+        setSuccessNotification(isFR ? "Configuration en cours" : "Setup in progress");
+      }
 
     } catch (err: any) {
       setAutoFixProgress("error");
@@ -367,10 +360,6 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
       setAutoFixErrorMsg(msg);
       setSuccessNotification(null);
       setErrorNotification(msg);
-      setTimeout(() => {
-        setErrorNotification(null);
-        setAutoFixProgress("idle");
-      }, 4500);
     }
   };
 
@@ -392,13 +381,19 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
         tone="success"
         message={successNotification || ""}
         visible={!!successNotification}
-        onClose={() => setSuccessNotification(null)}
+        onClose={() => {
+          setSuccessNotification(null);
+          setAutoFixProgress("idle");
+        }}
       />
       <AppToast
         tone="error"
         message={errorNotification || ""}
         visible={!!errorNotification}
-        onClose={() => setErrorNotification(null)}
+        onClose={() => {
+          setErrorNotification(null);
+          setAutoFixProgress("idle");
+        }}
       />
 
       <MotionDiv
@@ -911,7 +906,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                 )}
 
                 {/* Cloudflare token warning alert shown inline only when token is missing */}
-                {!wsTokenData?.api_token && (
+                {!wsTokenData?.configured && (
                   <div className="p-4 bg-error/5 border border-error/20 rounded-xl space-y-2 text-xs text-error select-none">
                     <p className="font-bold flex items-center gap-1.5">
                       <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -931,7 +926,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   <button
                     type="button"
                     onClick={handleRunAutoFix}
-                    disabled={autoFixProgress !== "idle" || !wsTokenData?.api_token}
+                    disabled={autoFixProgress !== "idle" || !wsTokenData?.configured}
                     className={`inline-flex h-10 w-full min-w-[13rem] items-center justify-center gap-2 rounded-lg border px-4 text-xs font-bold transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${
                       isAutoFixRunning
                         ? "border-primary/25 bg-primary-container text-on-primary-container cursor-wait"

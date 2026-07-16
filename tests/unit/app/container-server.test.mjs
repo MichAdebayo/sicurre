@@ -37,6 +37,7 @@ beforeAll(async () => {
         method: request.method,
         body: Buffer.concat(chunks).toString(),
         host: request.headers.host,
+        realIp: request.headers["x-real-ip"],
       }));
     });
   });
@@ -99,9 +100,13 @@ describe("app gateway routing and metrics", () => {
   });
 
   it("proxies GET, POST, and HEAD requests without leaking gateway headers", async () => {
-    const getResponse = await fetch(`${gatewayBase}/v1/items`);
+    const getResponse = await fetch(`${gatewayBase}/v1/items`, {
+      headers: { "x-real-ip": "203.0.113.200" },
+    });
     expect(getResponse.status).toBe(201);
-    expect((await getResponse.json()).method).toBe("GET");
+    const getBody = await getResponse.json();
+    expect(getBody.method).toBe("GET");
+    expect(getBody.realIp).toBe("127.0.0.1");
     expect(getResponse.headers.get("content-encoding")).toBeNull();
 
     const postResponse = await fetch(`${gatewayBase}/api/auth/check`, {

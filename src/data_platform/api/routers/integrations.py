@@ -20,15 +20,14 @@ Integrations router — two responsibilities:
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
-import json
 import logging
 import secrets
 import sqlite3
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid4, uuid5
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 from fastapi import (
@@ -44,12 +43,17 @@ from pydantic import BaseModel, Field
 
 from core.config import get_settings
 from core.loops import send_loops_transactional
+from core.rate_limit import limiter
+from core.secret_cipher import decrypt_secret, encrypt_secret
 from data_platform.api.auth import AuthUser, ensure_runtime_tables, get_current_user
-from db.runtime import execute_runtime_query
+from data_platform.cleaning.normalization import anonymize_pii
 from data_platform.services.cloudflare_provisioner import (
     CloudflareAPIError,
     CloudflareProvisioner,
 )
+from data_platform.services.quarantine_storage import build_quarantine_store
+from db.runtime import execute_runtime_query
+
 
 def _clean_str(val: str) -> str:
     if not val:
@@ -59,6 +63,7 @@ def _clean_str(val: str) -> str:
         val = val[2:-1]
     return val
 
+
 def _merge_spf(current_spf: str) -> str:
     cleaned = _clean_str(current_spf)
     if not cleaned:
@@ -66,7 +71,7 @@ def _merge_spf(current_spf: str) -> str:
     parts = cleaned.split()
     if not parts or parts[0] != "v=spf1":
         return "v=spf1 include:spf.cloudflare.com include:sicurre.com ~all"
-    
+
     mechanisms = []
     all_mechanism = "~all"
     for p in parts[1:]:
@@ -75,31 +80,58 @@ def _merge_spf(current_spf: str) -> str:
         else:
             if p not in mechanisms:
                 mechanisms.append(p)
-    
+
     for inc in ("include:spf.cloudflare.com", "include:sicurre.com"):
         if inc not in mechanisms:
             mechanisms.append(inc)
-    
+
     return f"v=spf1 {' '.join(mechanisms)} {all_mechanism}"
+
+
+def _minute_of_day(value: str) -> int:
+    hours, minutes = value.split(":", maxsplit=1)
+    return int(hours) * 60 + int(minutes)
+
+
+def _notification_is_allowed(preference: dict[str, Any] | None, now: datetime) -> bool:
+    """Apply phishing notification and user-local quiet-hour preferences."""
+    if preference and not bool(preference.get("notify_phishing", 1)):
+        return False
+    if not preference or not bool(preference.get("quiet_hours_enabled", 0)):
+        return True
+    try:
+        user_timezone = ZoneInfo(str(preference.get("timezone") or "Europe/Paris"))
+    except ZoneInfoNotFoundError:
+        user_timezone = ZoneInfo("UTC")
+    local_now = now.astimezone(user_timezone)
+    current = local_now.hour * 60 + local_now.minute
+    start = _minute_of_day(str(preference.get("quiet_hours_start") or "22:00"))
+    end = _minute_of_day(str(preference.get("quiet_hours_end") or "07:00"))
+    inside_quiet_hours = (
+        start <= current < end if start <= end else current >= start or current < end
+    )
+    return not inside_quiet_hours
+
 
 def _merge_dmarc(current_dmarc: str) -> str:
     cleaned = _clean_str(current_dmarc)
     if not cleaned:
         return "v=DMARC1; p=reject; rua=mailto:dmarc@sicurre.com"
-    
+
     policy = "quarantine"
     if "p=reject" in cleaned:
         policy = "reject"
-    
+
     import re
+
     rec = re.sub(r"p=[^;]+", f"p={policy}", cleaned)
-    
+
     if "rua=" in rec:
         if "dmarc@sicurre.com" not in rec:
             rec = re.sub(r"(rua=[^;'\"]+)", r"\1,mailto:dmarc@sicurre.com", rec)
     else:
         rec = rec.rstrip("; ") + "; rua=mailto:dmarc@sicurre.com"
-    
+
     return rec
 
 
@@ -238,6 +270,7 @@ async def _sync_domain_shield_dns(
         "updated_at": ts,
     }
 
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["integrations"])
@@ -249,9 +282,7 @@ router = APIRouter(tags=["integrations"])
 
 def _db_path() -> str:
     settings = get_settings()
-    return settings.database_url.replace("sqlite+aiosqlite:///", "").replace(
-        "sqlite:///", ""
-    )
+    return settings.database_url.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
 
 
 def _query(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
@@ -274,12 +305,22 @@ def _ensure_tables() -> None:
     ensure_runtime_tables()
 
 
+def _encrypt_provider_token(token: str) -> str:
+    settings = get_settings()
+    return encrypt_secret(
+        token,
+        configured_key=settings.secret_encryption_key,
+        environment=settings.environment,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Pydantic schemas
 # ---------------------------------------------------------------------------
 
 
 class EmailScanRequest(BaseModel):
+    message_id: str | None = Field(default=None, max_length=500)
     subject: str = Field(default="", max_length=500)
     sender: str = Field(default="", max_length=200)
     text: str = Field(default="", max_length=10_000)
@@ -288,21 +329,21 @@ class EmailScanRequest(BaseModel):
 
 
 class EmailScanResponse(BaseModel):
+    event_id: str
     verdict: str  # "phishing" | "safe"
     label: str  # "phishing" | "spam" | "legitimate"
     score: float
     explanation: str = ""
+    quarantine_id: str | None = None
 
 
 class CloudflareSetupRequest(BaseModel):
-    cf_api_token: str = Field(
-        ...,
+    cf_api_token: str | None = Field(
+        default=None,
         description="Cloudflare API token with DNS + Workers + Email Routing write access",
     )
     zone_name: str = Field(..., description="Domain to protect, e.g. vinse.app")
-    destination_email: str = Field(
-        ..., description="Where clean mail is forwarded after scanning"
-    )
+    destination_email: str = Field(..., description="Where clean mail is forwarded after scanning")
     fix_spf: bool = True
     fix_dkim: bool = True
     fix_dmarc: bool = True
@@ -321,8 +362,11 @@ class CloudflareStatusResponse(BaseModel):
 
 
 class TeardownRequest(BaseModel):
-    cf_api_token: str = Field(
-        ..., description="Cloudflare API token (required to remove Workers/rules)"
+    integration_id: str | None = Field(
+        default=None, description="Specific connected-domain integration to remove"
+    )
+    cf_api_token: str | None = Field(
+        default=None, description="Optional override for the stored Cloudflare API token"
     )
 
 
@@ -332,7 +376,9 @@ class TeardownRequest(BaseModel):
 
 
 @router.post("/v1/email/scan", response_model=EmailScanResponse)
+@limiter.limit("600/minute")
 async def scan_email(
+    request: Request,
     payload: EmailScanRequest,
     x_sicurre_secret: str | None = Header(default=None, alias="X-Sicurre-Secret"),
 ) -> EmailScanResponse:
@@ -344,6 +390,7 @@ async def scan_email(
     Cloudflare Workers and authenticated exclusively through the per-integration
     shared secret header.
     """
+    _ = request
     _ensure_tables()
 
     if not x_sicurre_secret:
@@ -367,16 +414,49 @@ async def scan_email(
     settings = get_settings()
     workspace_id = integration.get("workspace_id")
     now = datetime.now(timezone.utc).isoformat()
+    event_id = (
+        str(uuid5(NAMESPACE_URL, f"{workspace_id}:{payload.message_id.strip()}"))
+        if payload.message_id and payload.message_id.strip()
+        else str(uuid4())
+    )
+    existing_quarantine = await _async_query(
+        "SELECT id, safety_verdict, composite_score FROM app_quarantine_item "
+        "WHERE workspace_id = ? AND message_id = ? LIMIT 1",
+        (workspace_id, event_id),
+    )
+    if existing_quarantine:
+        held = existing_quarantine[0]
+        return EmailScanResponse(
+            event_id=event_id,
+            verdict="quarantine",
+            label=str(held["safety_verdict"]),
+            score=float(held["composite_score"]),
+            explanation="Existing idempotent quarantine decision.",
+            quarantine_id=str(held["id"]),
+        )
+    existing_event = await _async_query(
+        "SELECT safety_verdict, label_verdict, composite_score, explanation "
+        "FROM app_inference_event WHERE id = ? AND workspace_id = ? LIMIT 1",
+        (event_id, workspace_id),
+    )
+    if existing_event:
+        event = existing_event[0]
+        return EmailScanResponse(
+            event_id=event_id,
+            verdict=str(event["safety_verdict"]),
+            label=str(event["label_verdict"]),
+            score=float(event["composite_score"]),
+            explanation=str(event.get("explanation") or "Existing idempotent decision."),
+        )
 
     # ── Check Whitelist / Blocklist Rules ──────────────────────────────────
     rules = await _async_query(
-        "SELECT rule_type, pattern FROM app_security_rule WHERE workspace_id = ?",
-        (workspace_id,)
+        "SELECT rule_type, pattern FROM app_security_rule WHERE workspace_id = ?", (workspace_id,)
     )
-    
+
     matched_rule_type = None
     sender_lower = payload.sender.lower()
-    
+
     for rule in rules:
         pattern = rule["pattern"].lower()
         if "@" in pattern:
@@ -437,17 +517,19 @@ async def scan_email(
             score = float(result.get("composite_score") or 0.0)
             explanation = str(result.get("explanation") or "")
 
-        except Exception as exc:
-            # Fail-open: if inference is unavailable, mark as safe and log
+        except (httpx.HTTPError, ValueError, TypeError) as exc:
             logger.error("Inference API unavailable during email scan: %s", exc)
-            verdict_safety = "safe"
-            verdict_label = "legitimate"
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Inference service is temporarily unavailable",
+            ) from exc
 
     # ── Quarantine Handling ────────────────────────────────────────────────
     # If verdict is phishing, quarantine the email instead of bouncing
-    event_id = str(uuid4())
+    quarantine_id: str | None = None
+    classified_as_phishing = verdict_safety == "phishing"
     if verdict_safety == "phishing":
-        q_id = str(uuid4())
+        quarantine_id = str(uuid4())
         expires_at = (datetime.now(timezone.utc) + timedelta(days=14)).isoformat() + "Z"
         try:
             await _async_query(
@@ -458,17 +540,17 @@ async def scan_email(
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'held', ?, ?)
                 """,
                 (
-                    q_id,
+                    quarantine_id,
                     workspace_id,
                     event_id,
                     payload.sender,
                     payload.subject,
-                    payload.text,
+                    anonymize_pii(payload.text)[:4000],
                     verdict_safety,
                     score,
                     now,
-                    expires_at
-                )
+                    expires_at,
+                ),
             )
             # Log to alert history
             await _async_query(
@@ -482,43 +564,47 @@ async def scan_email(
                     workspace_id,
                     "Email Quarantined",
                     f"Email from {payload.sender} regarding '{payload.subject}' was quarantined.",
-                    now
-                )
+                    now,
+                ),
             )
             # Switch scan endpoint output verdict to "quarantine"
             verdict_safety = "quarantine"
 
-            # Fetch user name for Loops greeting
-            user_rows = await _async_query(
-                'SELECT name FROM "user" WHERE email = ? LIMIT 1',
-                (integration.get("user_email").lower(),)
+            preference_rows = await _async_query(
+                "SELECT * FROM app_alert_preference WHERE workspace_id = ? LIMIT 1",
+                (workspace_id,),
             )
-            first_name = "Utilisateur"
-            if user_rows and user_rows[0].get("name"):
-                first_name = user_rows[0]["name"].split(" ")[0]
-
-            date_str = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
-            
-            # Send alert email via Loops
-            await send_loops_transactional(
-                email=integration.get("user_email"),
-                transactional_id=settings.loops_threat_quarantined_transaction_id,
-                data_variables={
-                    "firstName": first_name,
-                    "domainName": integration.get("zone_name") or "votre domaine",
-                    "senderEmail": payload.sender,
-                    "emailSubject": payload.subject,
-                    "riskScore": int(score * 100),
-                    "interceptedAt": date_str,
-                    "quarantineUrl": f"{settings.public_api_url or 'http://localhost:5173'}/",
-                }
-            )
+            notification_time = datetime.now(timezone.utc)
+            if _notification_is_allowed(
+                preference_rows[0] if preference_rows else None,
+                notification_time,
+            ):
+                user_rows = await _async_query(
+                    'SELECT name FROM "user" WHERE email = ? LIMIT 1',
+                    (integration.get("user_email").lower(),),
+                )
+                first_name = "Utilisateur"
+                if user_rows and user_rows[0].get("name"):
+                    first_name = user_rows[0]["name"].split(" ")[0]
+                await send_loops_transactional(
+                    email=integration.get("user_email"),
+                    transactional_id=settings.loops_threat_quarantined_transaction_id,
+                    data_variables={
+                        "firstName": first_name,
+                        "domainName": integration.get("zone_name") or "votre domaine",
+                        "senderEmail": payload.sender,
+                        "emailSubject": payload.subject,
+                        "riskScore": int(score * 100),
+                        "interceptedAt": notification_time.strftime("%d/%m/%Y %H:%M UTC"),
+                        "quarantineUrl": f"{settings.public_api_url or 'http://localhost:5173'}/",
+                    },
+                )
         except Exception as exc:
             logger.warning("Could not quarantine phishing email: %s", exc)
 
     # ── Persist to audit log ────────────────────────────────────────────────
     now = datetime.now(timezone.utc).isoformat()
-    
+
     db_subject = payload.subject[:240]
     db_sender = payload.sender[:200]
     db_snippet = payload.text[:240]
@@ -554,8 +640,8 @@ async def scan_email(
                 verdict_safety,
                 verdict_label,
                 score,
-                1 if verdict_safety == "phishing" else 0,
-                0 if verdict_safety == "phishing" else 1,
+                1 if classified_as_phishing else 0,
+                0 if classified_as_phishing else 1,
                 "cloudflare_worker",
                 explanation[:500],
                 0.0,
@@ -578,11 +664,72 @@ async def scan_email(
         logger.warning("Could not persist audit log for email scan: %s", exc)
 
     return EmailScanResponse(
+        event_id=event_id,
         verdict=verdict_safety,
         label=verdict_label,
         score=score,
         explanation=explanation,
+        quarantine_id=quarantine_id,
     )
+
+
+@router.put("/v1/email/quarantine/{item_id}/content")
+@limiter.limit("120/minute")
+async def upload_quarantine_content(
+    item_id: str,
+    request: Request,
+    x_sicurre_secret: str | None = Header(default=None, alias="X-Sicurre-Secret"),
+) -> dict[str, Any]:
+    """Persist original MIME after a Worker receives a quarantine verdict."""
+    if not x_sicurre_secret:
+        raise HTTPException(status_code=401, detail="Missing X-Sicurre-Secret header")
+    secret_hash = hashlib.sha256(x_sicurre_secret.encode()).hexdigest()
+    integrations = await _async_query(
+        "SELECT workspace_id FROM cloudflare_integration "
+        "WHERE shared_secret_hash = ? AND status IN ('pending_verification','active') LIMIT 1",
+        (secret_hash,),
+    )
+    if not integrations:
+        raise HTTPException(status_code=401, detail="Invalid shared secret")
+    workspace_id = integrations[0]["workspace_id"]
+    items = await _async_query(
+        "SELECT raw_storage_uri, raw_content_hash FROM app_quarantine_item "
+        "WHERE id = ? AND workspace_id = ? AND status = 'held' LIMIT 1",
+        (item_id, workspace_id),
+    )
+    if not items:
+        raise HTTPException(status_code=404, detail="Quarantined item not found")
+
+    settings = get_settings()
+    payload = await request.body()
+    if not payload:
+        raise HTTPException(status_code=400, detail="Raw MIME content is required")
+    if len(payload) > settings.quarantine_max_message_bytes:
+        raise HTTPException(status_code=413, detail="Message exceeds quarantine storage limit")
+    content_hash = hashlib.sha256(payload).hexdigest()
+    existing = items[0]
+    if existing.get("raw_storage_uri"):
+        if existing.get("raw_content_hash") != content_hash:
+            raise HTTPException(status_code=409, detail="Quarantine content already exists")
+        return {"status": "stored", "idempotent": True}
+
+    stored = await build_quarantine_store(settings).write(
+        workspace_id=str(workspace_id),
+        item_id=item_id,
+        payload=payload,
+    )
+    await _async_query(
+        "UPDATE app_quarantine_item SET raw_storage_uri = ?, raw_content_hash = ?, "
+        "raw_size_bytes = ? WHERE id = ? AND workspace_id = ? AND raw_storage_uri IS NULL",
+        (
+            stored.storage_uri,
+            stored.content_hash,
+            stored.size_bytes,
+            item_id,
+            workspace_id,
+        ),
+    )
+    return {"status": "stored", "idempotent": False}
 
 
 # ---------------------------------------------------------------------------
@@ -591,6 +738,7 @@ async def scan_email(
 
 
 @router.post("/v1/integrations/cloudflare/setup", status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/hour")
 async def setup_cloudflare(
     payload: CloudflareSetupRequest,
     background_tasks: BackgroundTasks,
@@ -617,6 +765,24 @@ async def setup_cloudflare(
         "SELECT * FROM cloudflare_integration WHERE workspace_id = ? AND zone_name = ? LIMIT 1",
         (current_user.workspace_id, payload.zone_name),
     )
+    api_token = payload.cf_api_token
+    if not api_token:
+        token_rows = await _async_query(
+            "SELECT api_token FROM app_cloudflare_config WHERE workspace_id = ? LIMIT 1",
+            (current_user.workspace_id,),
+        )
+        if token_rows and token_rows[0].get("api_token"):
+            stored_token = token_rows[0]["api_token"]
+            api_token = decrypt_secret(
+                stored_token,
+                configured_key=settings.secret_encryption_key,
+                environment=settings.environment,
+            )
+    if not api_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cloudflare API token is not configured",
+        )
     if existing:
         row = existing[0]
         if row["status"] == "provisioning":
@@ -627,7 +793,7 @@ async def setup_cloudflare(
 
         now = datetime.now(timezone.utc).isoformat()
         try:
-            provisioner = CloudflareProvisioner(api_token=payload.cf_api_token)
+            provisioner = CloudflareProvisioner(api_token=api_token)
             dns_sync_result = await _sync_domain_shield_dns(
                 provisioner=provisioner,
                 workspace_id=current_user.workspace_id,
@@ -639,7 +805,7 @@ async def setup_cloudflare(
         except CloudflareAPIError as exc:
             await _async_query(
                 "UPDATE cloudflare_integration SET error_message=?, api_token=?, updated_at=? WHERE id=?",
-                (str(exc)[:500], payload.cf_api_token, now, row["id"]),
+                (str(exc)[:500], _encrypt_provider_token(api_token), now, row["id"]),
             )
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
@@ -664,7 +830,12 @@ async def setup_cloudflare(
                     SET shared_secret_hash=?, api_token=?, error_message=NULL, updated_at=?
                     WHERE id=?
                     """,
-                    (shared_secret_hash, payload.cf_api_token, now, row["id"]),
+                    (
+                        shared_secret_hash,
+                        _encrypt_provider_token(api_token),
+                        now,
+                        row["id"],
+                    ),
                 )
                 worker_update_result = {
                     "updated": True,
@@ -674,7 +845,12 @@ async def setup_cloudflare(
             except CloudflareAPIError as exc:
                 await _async_query(
                     "UPDATE cloudflare_integration SET error_message=?, api_token=?, updated_at=? WHERE id=?",
-                    (str(exc)[:500], payload.cf_api_token, now, row["id"]),
+                    (
+                        str(exc)[:500],
+                        _encrypt_provider_token(api_token),
+                        now,
+                        row["id"],
+                    ),
                 )
                 raise HTTPException(
                     status_code=status.HTTP_502_BAD_GATEWAY,
@@ -687,7 +863,7 @@ async def setup_cloudflare(
             SET api_token=?, error_message=NULL, updated_at=?
             WHERE id=?
             """,
-            (payload.cf_api_token, now, row["id"]),
+            (_encrypt_provider_token(api_token), now, row["id"]),
         )
         await _async_query(
             """
@@ -696,7 +872,12 @@ async def setup_cloudflare(
             ON CONFLICT(workspace_id) DO UPDATE SET
                 api_token=excluded.api_token, updated_at=excluded.updated_at
             """,
-            (current_user.workspace_id, payload.cf_api_token, now, now),
+            (
+                current_user.workspace_id,
+                _encrypt_provider_token(api_token),
+                now,
+                now,
+            ),
         )
         await _async_query(
             """
@@ -743,7 +924,7 @@ async def setup_cloudflare(
             "",
             "unknown",
             str(payload.destination_email),
-            payload.cf_api_token,
+            _encrypt_provider_token(api_token),
             "",
             "provisioning",
             now,
@@ -752,7 +933,7 @@ async def setup_cloudflare(
     )
 
     # Also automatically persist the token into app_cloudflare_config for the workspace
-    if payload.cf_api_token:
+    if api_token:
         await _async_query(
             """
             INSERT INTO app_cloudflare_config (workspace_id, api_token, created_at, updated_at)
@@ -760,13 +941,18 @@ async def setup_cloudflare(
             ON CONFLICT(workspace_id) DO UPDATE SET
                 api_token=excluded.api_token, updated_at=excluded.updated_at
             """,
-            (current_user.workspace_id, payload.cf_api_token, now, now),
+            (
+                current_user.workspace_id,
+                _encrypt_provider_token(api_token),
+                now,
+                now,
+            ),
         )
 
     dns_sync_result: dict[str, Any] | None = None
     try:
         dns_sync_result = await _sync_domain_shield_dns(
-            provisioner=CloudflareProvisioner(api_token=payload.cf_api_token),
+            provisioner=CloudflareProvisioner(api_token=api_token),
             workspace_id=current_user.workspace_id,
             zone_name=payload.zone_name,
             fix_spf=payload.fix_spf,
@@ -785,7 +971,7 @@ async def setup_cloudflare(
 
     async def _run_provisioning() -> None:
         try:
-            provisioner = CloudflareProvisioner(api_token=payload.cf_api_token)
+            provisioner = CloudflareProvisioner(api_token=api_token)
             result = await provisioner.provision(
                 zone_name=payload.zone_name,
                 destination_email=str(payload.destination_email),
@@ -813,7 +999,7 @@ async def setup_cloudflare(
                     integration_id,
                 ),
             )
-            
+
             try:
                 # Domain Shield DNS health writes are useful, but they are not the
                 # same as gateway provisioning. If they fail, keep the integration
@@ -952,9 +1138,7 @@ async def setup_cloudflare(
                 ),
             )
 
-            logger.info(
-                "Cloudflare provisioning complete for zone %s", payload.zone_name
-            )
+            logger.info("Cloudflare provisioning complete for zone %s", payload.zone_name)
         except (CloudflareAPIError, Exception) as exc:
             logger.exception("Cloudflare provisioning failed: %s", exc)
             ts = datetime.now(timezone.utc).isoformat()
@@ -1001,7 +1185,7 @@ async def cloudflare_status(
         "destination_email": row["destination_email"],
         "worker_name": row["worker_name"],
         "status": status,
-        "api_token": row.get("api_token"),
+        "token_configured": bool(row.get("api_token")),
         "error_message": row.get("error_message") if status == "error" else None,
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
@@ -1020,14 +1204,18 @@ async def teardown_cloudflare(
 ) -> dict[str, Any]:
     """Remove the Cloudflare Worker and routing rule then delete the DB record."""
     _ensure_tables()
-    rows = await _async_query(
-        "SELECT * FROM cloudflare_integration WHERE workspace_id = ? ORDER BY created_at DESC LIMIT 1",
-        (current_user.workspace_id,),
-    )
-    if not rows:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="No integration found"
+    if payload.integration_id:
+        rows = await _async_query(
+            "SELECT * FROM cloudflare_integration WHERE id = ? AND workspace_id = ? LIMIT 1",
+            (payload.integration_id, current_user.workspace_id),
         )
+    else:
+        rows = await _async_query(
+            "SELECT * FROM cloudflare_integration WHERE workspace_id = ? ORDER BY created_at DESC LIMIT 1",
+            (current_user.workspace_id,),
+        )
+    if not rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No integration found")
 
     row = rows[0]
     if row["status"] in ("provisioning",):
@@ -1036,8 +1224,31 @@ async def teardown_cloudflare(
             detail="Provisioning in progress; wait for it to complete before tearing down",
         )
 
+    settings = get_settings()
+    encrypted_token = payload.cf_api_token or row.get("api_token")
+    if not encrypted_token:
+        token_rows = await _async_query(
+            "SELECT api_token FROM app_cloudflare_config WHERE workspace_id = ? LIMIT 1",
+            (current_user.workspace_id,),
+        )
+        encrypted_token = token_rows[0].get("api_token") if token_rows else None
+    if not encrypted_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cloudflare API token is not configured",
+        )
+    api_token = (
+        encrypted_token
+        if payload.cf_api_token
+        else decrypt_secret(
+            str(encrypted_token),
+            configured_key=settings.secret_encryption_key,
+            environment=settings.environment,
+        )
+    )
+
     try:
-        provisioner = CloudflareProvisioner(api_token=payload.cf_api_token)
+        provisioner = CloudflareProvisioner(api_token=api_token)
         await provisioner.teardown(
             zone_id=row["zone_id"],
             account_id=row["account_id"],
@@ -1046,6 +1257,10 @@ async def teardown_cloudflare(
         )
     except CloudflareAPIError as exc:
         logger.warning("Cloudflare teardown had errors: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Cloudflare could not remove the routing resources: {exc}",
+        ) from exc
 
     await _async_query(
         "DELETE FROM cloudflare_integration WHERE id = ?",
@@ -1105,8 +1320,10 @@ async def verify_cloudflare_token(
 # ── 6. Global Workspace Token Management ──────────────────────────────────
 # ---------------------------------------------------------------------------
 
+
 class CloudflareTokenSaveRequest(BaseModel):
     cf_api_token: str = Field(..., description="Cloudflare API token to store")
+
 
 @router.get("/v1/integrations/cloudflare/token")
 async def get_workspace_cloudflare_token(
@@ -1114,7 +1331,7 @@ async def get_workspace_cloudflare_token(
 ) -> dict[str, Any]:
     """Retrieve the stored Cloudflare API token for the current workspace if an active domain is connected."""
     _ensure_tables()
-    
+
     # Require at least one connected domain in cloudflare_integration
     integ_rows = await _async_query(
         "SELECT api_token FROM cloudflare_integration WHERE workspace_id = ? AND api_token IS NOT NULL AND api_token != '' ORDER BY created_at DESC LIMIT 1",
@@ -1126,16 +1343,17 @@ async def get_workspace_cloudflare_token(
             "DELETE FROM app_cloudflare_config WHERE workspace_id = ?",
             (current_user.workspace_id,),
         )
-        return {"api_token": None}
+        return {"configured": False}
 
     rows = await _async_query(
         "SELECT api_token FROM app_cloudflare_config WHERE workspace_id = ? LIMIT 1",
         (current_user.workspace_id,),
     )
     if rows and rows[0]["api_token"]:
-        return {"api_token": rows[0]["api_token"]}
+        return {"configured": True}
 
-    return {"api_token": integ_rows[0]["api_token"]}
+    return {"configured": bool(integ_rows[0]["api_token"])}
+
 
 @router.post("/v1/integrations/cloudflare/token")
 async def save_workspace_cloudflare_token(
@@ -1156,7 +1374,7 @@ async def save_workspace_cloudflare_token(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Token verification failed: {str(exc)}",
-        )
+        ) from exc
 
     ts = datetime.now(timezone.utc).isoformat()
     await _async_query(
@@ -1166,9 +1384,15 @@ async def save_workspace_cloudflare_token(
         ON CONFLICT(workspace_id) DO UPDATE SET
             api_token=excluded.api_token, updated_at=excluded.updated_at
         """,
-        (current_user.workspace_id, payload.cf_api_token, ts, ts),
+        (
+            current_user.workspace_id,
+            _encrypt_provider_token(payload.cf_api_token),
+            ts,
+            ts,
+        ),
     )
     return {"status": "saved"}
+
 
 @router.delete("/v1/integrations/cloudflare/token")
 async def delete_workspace_cloudflare_token(
