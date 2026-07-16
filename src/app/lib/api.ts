@@ -10,6 +10,7 @@ const AUTH_PROVIDER_KEY = "sicurre_auth_provider";
 export type AuthFailureReason =
   | "unknown_account"
   | "invalid_password"
+  | "invalid_credentials"
   | "email_taken"
   | "invalid_email"
   | "weak_password"
@@ -100,6 +101,7 @@ export interface AdminOverview {
     quarantine_held_count: number;
     cloudflare_integrations_count: number;
     cloudflare_active_count: number;
+    support_open_count: number;
   };
   verdicts: { verdict: string; count: number }[];
   feedback_by_type: { feedback_type: string; count: number }[];
@@ -127,6 +129,14 @@ export interface AdminOverview {
     created_at: string;
     expires_at: string;
   }[];
+  recent_support: {
+    id: string;
+    workspace_id: string;
+    requester_email: string;
+    category: string;
+    status: string;
+    created_at: string;
+  }[];
 }
 
 export interface AdminRuntimeHealth {
@@ -152,14 +162,14 @@ export interface CloudflareStatus {
   zone_name?: string;
   destination_email?: string;
   worker_name?: string;
-  api_token?: string | null;
+  token_configured?: boolean;
   error_message?: string | null;
   created_at?: string;
   updated_at?: string;
 }
 
 export interface CloudflareSetupPayload {
-  cf_api_token: string;
+  cf_api_token?: string;
   zone_name: string;
   destination_email: string;
   fix_spf?: boolean;
@@ -173,7 +183,7 @@ export interface CfTokenVerifyPayload {
 }
 
 export interface CloudflareTeardownPayload {
-  cf_api_token: string;
+  integration_id: string;
 }
 
 export function getStoredAuthProvider(): AuthProvider {
@@ -225,24 +235,6 @@ async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-async function checkAuthEmailExists(email: string): Promise<boolean | null> {
-  try {
-    const response = await fetch(`${authBaseURL}/check-email`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    });
-    if (!response.ok) {
-      return null;
-    }
-    const body = await response.json().catch(() => ({}));
-    return Boolean(body.exists);
-  } catch {
-    return null;
-  }
-}
-
 function normalizeAuthProviderError(
   rawError: unknown,
   fallback: AuthFailureReason,
@@ -253,17 +245,16 @@ function normalizeAuthProviderError(
   if (text.includes("user already exists") || text.includes("already exist") || text.includes("email already")) {
     return "email_taken";
   }
-  if (text.includes("invalid email")) {
-    return "invalid_email";
-  }
+  if (text.includes("invalid email or password")) return "invalid_credentials";
+  if (text.includes("invalid email")) return "invalid_email";
   if (text.includes("password") && (text.includes("short") || text.includes("weak") || text.includes("length"))) {
     return "weak_password";
   }
-  if (text.includes("invalid password") || text.includes("invalid email or password")) {
+  if (text.includes("invalid password")) {
     return "invalid_password";
   }
   if (text.includes("user not found")) {
-    return "unknown_account";
+    return "invalid_credentials";
   }
   if (text.includes("turnstile_required")) {
     return "bot_verification_required";
@@ -295,20 +286,12 @@ export function useLogin() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (payload: { email: string; password: string }) => {
-      const accountExists = await checkAuthEmailExists(payload.email);
-      if (accountExists === false) {
-        throw createAuthError("unknown_account");
-      }
-
       const result = await authClient.signIn.email({
         email: payload.email,
         password: payload.password,
       });
       if (result.error) {
-        const reason = accountExists === true
-          ? normalizeAuthProviderError(result.error, "invalid_password")
-          : normalizeAuthProviderError(result.error, "login_failed");
-        throw createAuthError(reason);
+        throw createAuthError(normalizeAuthProviderError(result.error, "invalid_credentials"));
       }
       return result;
     },
@@ -328,11 +311,6 @@ export function useSignup() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (payload: { name: string; email: string; password: string; turnstileToken?: string }) => {
-      const accountExists = await checkAuthEmailExists(payload.email);
-      if (accountExists === true) {
-        throw createAuthError("email_taken");
-      }
-
       const result = await authClient.signUp.email({
         name: payload.name,
         email: payload.email,
@@ -362,11 +340,16 @@ export function useLogout() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      const result = await authClient.signOut();
-      if (result.error) {
-        throw new Error(result.error.message || "Déconnexion impossible.");
+      const response = await fetch(`${authBaseURL}/sign-out`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      if (!response.ok) {
+        throw new Error("Déconnexion impossible.");
       }
-      return result;
+      return response.json() as Promise<{ success: boolean }>;
     },
     onSettled: () => {
       clearStoredSession();
@@ -468,6 +451,21 @@ export function useCreateFeedback() {
   });
 }
 
+export function useCreateSupportRequest() {
+  return useMutation({
+    mutationFn: (payload: {
+      requester_name: string;
+      requester_email: string;
+      category: string;
+      message: string;
+    }) =>
+      fetchJson<{ id: string; status: string; created_at: string }>("/support/requests", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+  });
+}
+
 const CF_BASE = "/integrations/cloudflare";
 
 export function useCloudflareStatus() {
@@ -524,9 +522,9 @@ export function useTeardownCloudflare() {
 }
 
 export function useWorkspaceCloudflareToken() {
-  return useQuery<{ api_token: string | null }>({
+  return useQuery<{ configured: boolean }>({
     queryKey: ["cf-workspace-token"],
-    queryFn: () => fetchJson<{ api_token: string | null }>(`${CF_BASE}/token`),
+    queryFn: () => fetchJson<{ configured: boolean }>(`${CF_BASE}/token`),
   });
 }
 
@@ -560,10 +558,11 @@ export function useDeleteWorkspaceCloudflareToken() {
   });
 }
 
-export function useDatasets() {
+export function useDatasets(enabled = true) {
   return useQuery<Dataset[]>({
     queryKey: ["datasets"],
     queryFn: () => fetchJson<Dataset[]>("/datasets"),
+    enabled,
   });
 }
 
@@ -653,6 +652,7 @@ export interface AlertPreferences {
   quiet_hours_enabled: boolean;
   quiet_hours_start: string;
   quiet_hours_end: string;
+  timezone: string;
 }
 
 export function useAlertPreferences() {

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { VerdictBadge } from "../components/threats/verdict-badge";
+import { AppToast } from "../components/common/app-toast";
 import {
   AuthSession,
   useKPIStats,
@@ -78,9 +79,10 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
   const { t, i18n } = useTranslation();
   const { data: kpis, isLoading: kpisLoading } = useKPIStats();
   const { data: threats, isLoading: threatsLoading } = useThreatLogs();
-  const datasetsQuery = useDatasets();
+  const datasetsQuery = useDatasets(session.is_platform_admin);
   const runPipelineMutation = useRunPipeline();
-  const [pipelineSuccess, setPipelineSuccess] = useState(false);
+  const [pipelineMessage, setPipelineMessage] = useState("");
+  const [pipelineError, setPipelineError] = useState("");
 
   // States for dynamic interactive Last 7 days chart
   const [dateRange, setDateRange] = useState<"7d" | "30d" | "12m">("7d");
@@ -109,12 +111,13 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
   );
 
   const handleRunPipeline = async () => {
+    setPipelineMessage("");
+    setPipelineError("");
     try {
       await runPipelineMutation.mutateAsync();
-      setPipelineSuccess(true);
-      setTimeout(() => setPipelineSuccess(false), 5000);
+      setPipelineMessage("Pipeline lancé.");
     } catch (err) {
-      console.error(err);
+      setPipelineError(err instanceof Error ? err.message : "Impossible de lancer le pipeline.");
     }
   };
 
@@ -282,11 +285,6 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
             </div>
             
             <div className="space-y-4">
-              {pipelineSuccess && (
-                <div className="p-3 bg-safe/10 border border-safe/25 text-safe text-xs font-semibold rounded-lg">
-                  Pipeline lancé avec succès ! L'exécution s'exécute en arrière-plan.
-                </div>
-              )}
               {runPipelineMutation.isPending ? (
                 <Button disabled className="w-full flex items-center justify-center gap-2">
                   <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -367,6 +365,15 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
             </div>
           )}
         </div>
+        <AppToast
+          tone={pipelineError ? "error" : "success"}
+          message={pipelineError || pipelineMessage}
+          visible={Boolean(pipelineError || pipelineMessage)}
+          onClose={() => {
+            setPipelineError("");
+            setPipelineMessage("");
+          }}
+        />
       </MotionDiv>
     );
   }

@@ -82,9 +82,9 @@ export default function CGURoute({ onBack }: CGURouteProps) {
           <section className="space-y-3">
             <h2 className="font-display font-medium text-lg text-slate-200">3. Engagements & Responsabilités</h2>
             <p className="text-sm text-slate-400 leading-relaxed">
-              Sicurre s'engage à maintenir un niveau élevé de disponibilité (99.9% de SLA) et à appliquer les meilleures 
-              règles de sécurité informatique souveraine. L'utilisateur demeure responsable de la confidentialité de ses identifiants 
-              d'accès et du maintien des jetons API associés à ses domaines.
+              Sicurre met en œuvre des contrôles de sécurité, de supervision et de reprise adaptés à son environnement.
+              Aucun niveau de service contractuel n'est garanti pendant cette phase de validation. L'utilisateur demeure
+              responsable de la confidentialité de ses identifiants d'accès et du maintien des jetons API associés à ses domaines.
             </p>
           </section>
 
@@ -92,7 +92,7 @@ export default function CGURoute({ onBack }: CGURouteProps) {
             <h2 className="font-display font-medium text-lg text-slate-200">4. Modification et Résiliation</h2>
             <p className="text-sm text-slate-400 leading-relaxed">
               Sicurre se réserve le droit de modifier les présentes CGU à tout moment. L'utilisateur peut mettre fin à son 
-              abonnement ou révoquer la protection Sicurre à tout moment depuis le tableau de bord ou en supprimant le jeton Cloudflare.
+              utilisation ou révoquer la protection Sicurre à tout moment depuis le tableau de bord ou en supprimant le jeton Cloudflare.
             </p>
           </section>
 

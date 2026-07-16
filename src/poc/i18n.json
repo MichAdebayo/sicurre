@@ -149,6 +149,18 @@
     "source": "Source",
     "records": "Enregistrements",
     "last_run": "Dernière exécution",
+    "preflight_title": "État de préparation local",
+    "preflight_description": "Vérifications de démonstration sans afficher les chemins ni les secrets.",
+    "preflight_ready": "Prêt",
+    "preflight_attention": "À vérifier",
+    "preflight_blocked": "La démonstration locale ne peut pas démarrer. Configurez les éléments suivants dans .env.",
+    "preflight_admin_credentials": "Identifiants administrateur POC",
+    "preflight_viewer_credentials": "Identifiants observateur POC",
+    "preflight_inference_key": "Clé interne d'inférence POC",
+    "preflight_auth_database": "Base locale d'authentification POC",
+    "preflight_data_database": "Base locale de la plateforme de données",
+    "preflight_local_isolation": "Isolation SQLite locale",
+    "preflight_inference_endpoint": "API locale /v1/classify",
     "status": "Statut"
   },
   "en": {
@@ -301,6 +313,18 @@
     "source": "Source",
     "records": "Records",
     "last_run": "Last run",
+    "preflight_title": "Local readiness",
+    "preflight_description": "Demonstration checks that never display paths or secret values.",
+    "preflight_ready": "Ready",
+    "preflight_attention": "Check required",
+    "preflight_blocked": "The local demonstration cannot start. Configure these items in .env.",
+    "preflight_admin_credentials": "POC administrator credentials",
+    "preflight_viewer_credentials": "POC viewer credentials",
+    "preflight_inference_key": "POC internal inference key",
+    "preflight_auth_database": "POC local authentication database",
+    "preflight_data_database": "Local data-platform database",
+    "preflight_local_isolation": "Local SQLite isolation",
+    "preflight_inference_endpoint": "Local /v1/classify API",
     "status": "Status"
   }
 }
