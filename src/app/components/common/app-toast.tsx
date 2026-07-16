@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { CheckCircle2, Info, TriangleAlert, X, XCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
@@ -9,6 +10,7 @@ interface AppToastProps {
   message: string;
   onClose?: () => void;
   visible?: boolean;
+  durationMs?: number;
 }
 
 const toneStyles: Record<AppToastTone, string> = {
@@ -25,8 +27,21 @@ const toneIcons = {
   info: Info,
 };
 
-export function AppToast({ tone, message, onClose, visible = true }: AppToastProps) {
+export function AppToast({
+  tone,
+  message,
+  onClose,
+  visible = true,
+  durationMs = tone === "error" ? 7000 : 4500,
+}: AppToastProps) {
   const Icon = toneIcons[tone];
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    if (!visible || !message || !onClose || paused || durationMs <= 0) return;
+    const timeoutId = window.setTimeout(onClose, durationMs);
+    return () => window.clearTimeout(timeoutId);
+  }, [durationMs, message, onClose, paused, visible]);
 
   return (
     <AnimatePresence>
@@ -38,8 +53,12 @@ export function AppToast({ tone, message, onClose, visible = true }: AppToastPro
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 18 }}
           transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
+          onMouseEnter={() => setPaused(true)}
+          onMouseLeave={() => setPaused(false)}
+          onFocusCapture={() => setPaused(true)}
+          onBlurCapture={() => setPaused(false)}
           className={clsx(
-            "fixed bottom-6 left-4 right-4 z-50 flex min-h-12 items-center gap-3 rounded-none px-4 py-3 text-[15px] font-semibold leading-5 shadow-lg md:left-[272px] md:right-12",
+            "fixed bottom-6 left-4 right-4 z-50 flex min-h-12 items-center gap-3 overflow-hidden rounded-md px-4 py-3 text-[15px] font-semibold leading-5 shadow-lg md:left-[272px] md:right-12",
             toneStyles[tone],
           )}
         >
@@ -54,6 +73,16 @@ export function AppToast({ tone, message, onClose, visible = true }: AppToastPro
             >
               <X className="h-5 w-5" />
             </button>
+          )}
+          {!paused && durationMs > 0 && (
+            <motion.span
+              key={`${tone}-${message}`}
+              aria-hidden="true"
+              className="absolute inset-x-0 bottom-0 h-1 origin-left bg-white/45"
+              initial={{ scaleX: 1 }}
+              animate={{ scaleX: 0 }}
+              transition={{ duration: durationMs / 1000, ease: "linear" }}
+            />
           )}
         </motion.div>
       )}

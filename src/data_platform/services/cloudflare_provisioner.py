@@ -38,8 +38,9 @@ _WORKER_JS = """\
  * Flow:
  *   1. Extract sender, subject and body from the inbound email
  *   2. POST to Sicurre scan endpoint (SICURRE_SCAN_URL)
- *   3. If verdict == "phishing"  → reject the message
- *   4. Otherwise                 → forward to FORWARD_TO with X-Sicurre trace headers
+ *   3. If quarantined, upload the original MIME for controlled release
+ *   4. If verdict == "phishing"  → reject the message
+ *   5. Otherwise                 → forward to FORWARD_TO with X-Sicurre trace headers
  *
  * Environment bindings (set via Cloudflare Workers secrets):
  *   SICURRE_SCAN_URL      – e.g. https://api.yourdomain.com/v1/email/scan
@@ -51,10 +52,12 @@ export default {
     const from    = message.from    || '';
     const subject = message.headers.get('subject') || message.headers.get('Subject') || '';
 
-    // Read raw email body; cap at 6 000 bytes for the scan API
+    // Read the original MIME once. Only a short text projection is classified.
+    let rawBytes = new ArrayBuffer(0);
     let bodyText = '';
     try {
-      const rawText = await new Response(message.raw).text();
+      rawBytes = await new Response(message.raw).arrayBuffer();
+      const rawText = new TextDecoder('utf-8', { fatal: false }).decode(rawBytes);
       // Strip MIME boundary/header noise so the model gets cleaner text
       bodyText = rawText
         .replace(/--[A-Za-z0-9_\\-\\.]+(?:--)?/g, '')
@@ -64,11 +67,20 @@ export default {
         .slice(0, 5_500);
     } catch (_) { /* fail-open body read */ }
 
+    const headerMessageId = message.headers.get('message-id') || message.headers.get('Message-ID') || '';
+    let messageId = headerMessageId.trim();
+    if (!messageId && rawBytes.byteLength) {
+      const digest = await crypto.subtle.digest('SHA-256', rawBytes);
+      messageId = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+    }
+
     // ── Call Sicurre scan endpoint ──────────────────────────────────────────
     let verdict = 'safe';
     let scanStatus = 'unavailable';
     let confidence = '';
     let scanHttpStatus = '';
+    let quarantineId = '';
+    let eventId = '';
     try {
       const resp = await fetch(env.SICURRE_SCAN_URL, {
         method : 'POST',
@@ -77,6 +89,7 @@ export default {
           'X-Sicurre-Secret' : env.SICURRE_SHARED_SECRET,
         },
         body  : JSON.stringify({
+          message_id     : messageId,
           subject,
           sender         : from,
           text           : bodyText,
@@ -90,13 +103,15 @@ export default {
         const data = await resp.json();
         verdict = (data.verdict || 'safe').toLowerCase();
         scanStatus = 'scanned';
-        confidence = data.confidence === undefined ? '' : String(data.confidence);
+        confidence = data.score === undefined ? '' : String(data.score);
+        quarantineId = data.quarantine_id ? String(data.quarantine_id) : '';
+        eventId = data.event_id ? String(data.event_id) : '';
       } else {
         scanStatus = 'api-error';
       }
-    } catch (error) {
+    } catch (_) {
       scanStatus = 'api-unreachable';
-      // Fail-open: scan unavailable → forward the message
+      // Preserve mail availability, but never claim the message was scanned.
     }
 
     if (verdict === 'phishing') {
@@ -105,7 +120,27 @@ export default {
     }
 
     if (verdict === 'quarantine') {
-      // Quarantined: drop silently (held in Sicurre DB for review)
+      if (!quarantineId || !rawBytes.byteLength) {
+        message.setReject('Sicurre quarantine storage unavailable; message was not discarded');
+        return;
+      }
+      const uploadUrl = env.SICURRE_SCAN_URL.replace(/\\/v1\\/email\\/scan\\/?$/, `/v1/email/quarantine/${quarantineId}/content`);
+      try {
+        const upload = await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'message/rfc822',
+            'X-Sicurre-Secret': env.SICURRE_SHARED_SECRET,
+          },
+          body: rawBytes,
+          signal: AbortSignal.timeout(15_000),
+        });
+        if (!upload.ok) {
+          message.setReject('Sicurre quarantine storage failed; message was not discarded');
+        }
+      } catch (_) {
+        message.setReject('Sicurre quarantine storage unreachable; message was not discarded');
+      }
       return;
     }
 
@@ -118,6 +153,7 @@ export default {
     traceHeaders.set('X-Sicurre-Verdict', verdict);
     traceHeaders.set('X-Sicurre-Scan-Http-Status', scanHttpStatus);
     traceHeaders.set('X-Sicurre-Confidence', confidence);
+    traceHeaders.set('X-Sicurre-Event-ID', eventId);
     await message.forward(env.FORWARD_TO, traceHeaders);
   },
 };
@@ -138,9 +174,7 @@ class ProvisioningResult:
     shared_secret_hash: str  # SHA-256 hex – store in DB
     shared_secret_plain: str = field(repr=False)  # used once then discarded
     destination_verified: bool = False
-    message: str = (
-        "Provisioning complete. Check inbox for Cloudflare verification email."
-    )
+    message: str = "Provisioning complete. Check inbox for Cloudflare verification email."
 
 
 # ---------------------------------------------------------------------------
@@ -176,13 +210,9 @@ class CloudflareProvisioner:
             r = await client.get(f"{CF_BASE}{path}", headers=self._headers, **kw)
         return self._unwrap(r, context=f"GET {path}")
 
-    async def _post(
-        self, path: str, body: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
+    async def _post(self, path: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=20.0) as client:
-            r = await client.post(
-                f"{CF_BASE}{path}", headers=self._headers, json=body or {}
-            )
+            r = await client.post(f"{CF_BASE}{path}", headers=self._headers, json=body or {})
         return self._unwrap(r, context=f"POST {path}")
 
     async def _post_multipart(self, path: str, files: dict) -> dict[str, Any]:
@@ -200,12 +230,25 @@ class CloudflareProvisioner:
     def _unwrap(r: httpx.Response, *, context: str = "Cloudflare API") -> dict[str, Any]:
         try:
             data = r.json()
-        except Exception:
-            r.raise_for_status()
-            return {}
-        if not data.get("success", True):
+        except ValueError as error:
+            raise CloudflareAPIError(
+                f"{context}: invalid JSON response",
+                status_code=r.status_code,
+            ) from error
+        if not isinstance(data, dict):
+            raise CloudflareAPIError(
+                f"{context}: invalid response payload",
+                status_code=r.status_code,
+            )
+        if not r.is_success or data.get("success") is not True:
             errors = data.get("errors", [])
-            msg = "; ".join(e.get("message", str(e)) for e in errors) or r.text
+            if not isinstance(errors, list):
+                errors = [errors]
+            msg = "; ".join(
+                str(error.get("message") or error) if isinstance(error, dict) else str(error)
+                for error in errors
+            )
+            msg = msg or str(data.get("error") or data.get("message") or r.reason_phrase)
             raise CloudflareAPIError(f"{context}: {msg}", status_code=r.status_code)
         return data
 
@@ -221,7 +264,6 @@ class CloudflareProvisioner:
 
     async def get_zone(self, zone_name: str) -> tuple[str, str]:
         """Return (zone_id, account_id) for the given domain name."""
-        data = await self._get("/zones", params={"name": zone_name})  # type: ignore[arg-type]
         # Note: _get doesn't take params directly, pass via query string
         async with httpx.AsyncClient(timeout=20.0) as client:
             r = await client.get(
@@ -248,15 +290,8 @@ class CloudflareProvisioner:
             await self._post(f"/zones/{zone_id}/email/routing/enable")
             logger.info("Email Routing enabled on zone %s", zone_id)
         except CloudflareAPIError as exc:
-            # CF returns an error if already enabled or if we lack permissions to modify it (but it might be already active); treat as success
-            if (
-                "already enabled" in str(exc).lower()
-                or "authentication error" in str(exc).lower()
-                or exc.status_code in {400, 403}
-            ):
-                logger.info(
-                    "Email Routing already enabled or permission restricted on zone %s (skipped)", zone_id
-                )
+            if "already enabled" in str(exc).lower():
+                logger.info("Email Routing already enabled on zone %s", zone_id)
             else:
                 raise
 
@@ -266,22 +301,20 @@ class CloudflareProvisioner:
         Cloudflare will send a verification email to that address.
         Returns the destination address `tag` for tracking.
         """
-        try:
-            # Check if already exists in registered list
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                r = await client.get(
-                    f"{CF_BASE}/accounts/{account_id}/email/routing/addresses",
-                    headers=self._headers,
-                )
-            addresses_data = self._unwrap(
-                r, context=f"GET /accounts/{account_id}/email/routing/addresses"
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            r = await client.get(
+                f"{CF_BASE}/accounts/{account_id}/email/routing/addresses",
+                headers=self._headers,
             )
-            for addr in addresses_data.get("result", []):
-                if str(addr.get("email")).lower() == email.lower():
-                    logger.info("Destination address %s already registered (tag=%s)", email, addr["tag"])
-                    return str(addr["tag"])
-        except Exception as exc:
-            logger.warning("Could not list destination addresses: %s", exc)
+        addresses_data = self._unwrap(
+            r, context=f"GET /accounts/{account_id}/email/routing/addresses"
+        )
+        for addr in addresses_data.get("result", []):
+            if str(addr.get("email")).lower() == email.lower():
+                logger.info(
+                    "Destination address %s already registered (tag=%s)", email, addr["tag"]
+                )
+                return str(addr["tag"])
 
         data = await self._post(
             f"/accounts/{account_id}/email/routing/addresses",
@@ -330,9 +363,7 @@ class CloudflareProvisioner:
                 headers=headers,
                 files=files,
             )
-        self._unwrap(
-            r, context=f"PUT /accounts/{account_id}/workers/scripts/{worker_name}"
-        )
+        self._unwrap(r, context=f"PUT /accounts/{account_id}/workers/scripts/{worker_name}")
         logger.info("Worker '%s' deployed to account %s", worker_name, account_id)
 
     async def create_email_routing_rule(
@@ -350,28 +381,25 @@ class CloudflareProvisioner:
             "Authorization": f"Bearer {self._token}",
             "Content-Type": "application/json",
         }
-        
-        # 1. Fetch and clean up conflicting rules matching target_email
-        try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                r = await client.get(
-                    f"{CF_BASE}/zones/{zone_id}/email/routing/rules",
-                    headers=headers,
-                )
-            rules_data = self._unwrap(
-                r, context=f"GET /zones/{zone_id}/email/routing/rules"
+
+        # 1. Fetch and clean up conflicting rules matching target_email. Failure
+        # must abort; creating another rule after an unreadable/undeletable
+        # conflict would violate provisioning idempotency.
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            r = await client.get(
+                f"{CF_BASE}/zones/{zone_id}/email/routing/rules",
+                headers=headers,
             )
-            for rule in rules_data.get("result", []):
-                matchers = rule.get("matchers", [])
-                for m in matchers:
-                    if (
-                        m.get("type") == "literal"
-                        and str(m.get("value")).lower() == target_email.lower()
-                    ):
-                        logger.info("Deleting conflicting rule %s for %s", rule["id"], target_email)
-                        await self.delete_email_rule(zone_id, rule["id"])
-        except Exception as exc:
-            logger.warning("Could not check/clean conflicting rules: %s", exc)
+        rules_data = self._unwrap(r, context=f"GET /zones/{zone_id}/email/routing/rules")
+        for rule in rules_data.get("result", []):
+            matchers = rule.get("matchers", [])
+            for matcher in matchers:
+                if (
+                    matcher.get("type") == "literal"
+                    and str(matcher.get("value")).lower() == target_email.lower()
+                ):
+                    logger.info("Deleting conflicting rule %s for %s", rule["id"], target_email)
+                    await self.delete_email_rule(zone_id, rule["id"])
 
         # 2. Create the new Worker-based routing rule
         body = {
@@ -382,11 +410,7 @@ class CloudflareProvisioner:
             "priority": 0,
         }
         data = await self._post(f"/zones/{zone_id}/email/routing/rules", body=body)
-        rule_id = (
-            data.get("result", {}).get("id")
-            or data.get("result", {}).get("tag")
-            or "unknown"
-        )
+        rule_id = data.get("result", {}).get("id") or data.get("result", {}).get("tag") or "unknown"
         logger.info("Email routing rule created (id=%s) for %s", rule_id, target_email)
         return str(rule_id)
 
@@ -407,7 +431,8 @@ class CloudflareProvisioner:
     async def get_email_routing_status(self, zone_id: str) -> dict[str, Any]:
         """Return current Email Routing status for a zone."""
         data = await self._get(f"/zones/{zone_id}/email/routing")
-        return data.get("result", {})
+        res = data.get("result", {})
+        return res if isinstance(res, dict) else {}
 
     async def get_dns_records(self, zone_id: str) -> list[dict[str, Any]]:
         """Fetch all DNS records for a given zone."""
@@ -418,7 +443,8 @@ class CloudflareProvisioner:
                 params={"per_page": 100},
             )
         data = self._unwrap(r, context=f"GET /zones/{zone_id}/dns_records")
-        return data.get("result", [])
+        res = data.get("result", [])
+        return res if isinstance(res, list) else []
 
     # ── full provisioning flow ──────────────────────────────────────────────
 
@@ -455,9 +481,7 @@ class CloudflareProvisioner:
                     f"{CF_BASE}/zones/{zone_id}/email/routing/rules",
                     headers=self._headers,
                 )
-            rules_data = self._unwrap(
-                r, context=f"GET /zones/{zone_id}/email/routing/rules"
-            )
+            rules_data = self._unwrap(r, context=f"GET /zones/{zone_id}/email/routing/rules")
             for rule in rules_data.get("result", []):
                 matchers = rule.get("matchers", [])
                 for m in matchers:
@@ -471,7 +495,10 @@ class CloudflareProvisioner:
                                 val = a["value"]
                                 if isinstance(val, list) and val:
                                     actual_forward_to = str(val[0])
-                                    logger.info("Auto-resolved destination email from old rule: %s", actual_forward_to)
+                                    logger.info(
+                                        "Auto-resolved destination email from old rule: %s",
+                                        actual_forward_to,
+                                    )
                                     break
         except Exception as exc:
             logger.warning("Could not auto-resolve forwarding destination from rules: %s", exc)
@@ -490,7 +517,10 @@ class CloudflareProvisioner:
                 for addr in addresses_data.get("result", []):
                     if addr.get("status") == "verified":
                         actual_forward_to = str(addr["email"])
-                        logger.info("Auto-resolved destination email from verified list: %s", actual_forward_to)
+                        logger.info(
+                            "Auto-resolved destination email from verified list: %s",
+                            actual_forward_to,
+                        )
                         break
             except Exception as exc:
                 logger.warning("Could not auto-resolve from verified destination list: %s", exc)
@@ -561,7 +591,7 @@ class CloudflareProvisioner:
         # 1. Fetch existing records to check for duplicates
         records = await self.get_dns_records(zone_id)
         existing_id = None
-        
+
         # Cloudflare zone names are fully qualified in responses. Normalize both side-by-side comparison
         target_name_normalized = name.lower().rstrip(".")
         for rec in records:
@@ -571,24 +601,22 @@ class CloudflareProvisioner:
                     existing_id = rec["id"]
                     break
 
-        body = {
-            "type": rec_type,
-            "name": name,
-            "content": content_clean,
-            "ttl": 3600
-        }
+        body = {"type": rec_type, "name": name, "content": content_clean, "ttl": 3600}
 
         if existing_id:
-            logger.info("Updating existing DNS record %s (%s) with content: %s", existing_id, name, content_clean)
+            logger.info(
+                "Updating existing DNS record %s (%s) with content: %s",
+                existing_id,
+                name,
+                content_clean,
+            )
             async with httpx.AsyncClient(timeout=20.0) as client:
                 r = await client.put(
                     f"{CF_BASE}/zones/{zone_id}/dns_records/{existing_id}",
                     headers=self._headers,
                     json=body,
                 )
-            self._unwrap(
-                r, context=f"PUT /zones/{zone_id}/dns_records/{existing_id}"
-            )
+            self._unwrap(r, context=f"PUT /zones/{zone_id}/dns_records/{existing_id}")
         else:
             logger.info("Creating new DNS record (%s) with content: %s", name, content_clean)
             async with httpx.AsyncClient(timeout=20.0) as client:

@@ -103,7 +103,6 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
   ]);
 
   // Teardown state
-  const [teardownToken, setTeardownToken] = useState("");
   const [showTeardown, setShowTeardown] = useState(false);
 
   // Sync background provisioning state with UI progress checklist
@@ -208,11 +207,10 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
   // ── Teardown ──────────────────────────────────────────────────────────────
 
   const handleTeardown = async () => {
-    if (!teardownToken.trim()) return;
+    if (!cfStatus?.id) return;
     try {
-      await teardownMutation.mutateAsync({ cf_api_token: teardownToken });
+      await teardownMutation.mutateAsync({ integration_id: cfStatus.id });
       setShowTeardown(false);
-      setTeardownToken("");
       refetch();
     } catch {
       // error shown via teardownMutation.error
@@ -363,15 +361,8 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
         ) : (
           <div className="p-4 border border-error/20 bg-error/[0.03] rounded-xl space-y-3">
             <p className="text-xs font-semibold text-error">
-              Fournissez votre token Cloudflare pour supprimer le Worker et la règle de routage.
+              Le Worker et la règle de routage Cloudflare seront supprimés avant la dissociation locale.
             </p>
-            <Input
-              label="Token Cloudflare"
-              type="password"
-              value={teardownToken}
-              onChange={e => setTeardownToken(e.target.value)}
-              placeholder="Votre token CF…"
-            />
             {teardownMutation.isError && (
               <p className="text-xs text-error">{(teardownMutation.error as Error)?.message}</p>
             )}
@@ -380,7 +371,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
                 variant="danger"
                 size="sm"
                 onClick={handleTeardown}
-                disabled={!teardownToken || teardownMutation.isPending}
+                disabled={!intStatus.id || teardownMutation.isPending}
                 className="gap-1.5 text-[11px]"
               >
                 {teardownMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
@@ -430,9 +421,11 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
           </button>
         ) : (
           <div className="p-4 border border-error/20 bg-error/[0.03] rounded-xl space-y-3">
-            <Input label="Token Cloudflare" type="password" value={teardownToken} onChange={e => setTeardownToken(e.target.value)} placeholder="Votre token CF…" />
+            <p className="text-xs font-semibold text-error">
+              Le Worker et la règle de routage Cloudflare seront supprimés avant la dissociation locale.
+            </p>
             <div className="flex gap-2">
-              <Button variant="danger" size="sm" onClick={handleTeardown} disabled={!teardownToken || teardownMutation.isPending} className="gap-1.5 text-[11px]">
+              <Button variant="danger" size="sm" onClick={handleTeardown} disabled={!intStatus.id || teardownMutation.isPending} className="gap-1.5 text-[11px]">
                 {teardownMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                 Supprimer
               </Button>

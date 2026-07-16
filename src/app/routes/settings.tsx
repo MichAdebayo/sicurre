@@ -10,7 +10,6 @@ import {
   Trash2,
   AlertTriangle,
   Plus,
-  CreditCard,
   Settings,
   Eye,
   EyeOff,
@@ -20,6 +19,7 @@ import {
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { CloudflareIntegrator } from "../components/common/cloudflare-integrator";
+import { AppToast } from "../components/common/app-toast";
 import cloudflareLogo from "../assets/cloudflare-svgrepo-com.svg";
 import {
   AuthSession,
@@ -31,7 +31,6 @@ import {
   useWorkspaceCloudflareToken,
   useSaveWorkspaceCloudflareToken,
   useDeleteWorkspaceCloudflareToken,
-  useKPIStats,
 } from "../lib/api";
 
 const MotionDiv = motion.div as any;
@@ -43,10 +42,7 @@ interface SettingsRouteProps {
 
 export default function SettingsRoute({ session, initialTab }: SettingsRouteProps) {
   const { t, i18n } = useTranslation();
-  const { data: kpis } = useKPIStats();
-  const totalScans = kpis?.raw_records_count ?? 0;
-
-  const [activeTab, setActiveTab] = useState<"profile" | "security" | "preferences" | "domains" | "integrations" | "billing">(
+  const [activeTab, setActiveTab] = useState<"profile" | "security" | "preferences" | "domains" | "integrations">(
     (initialTab as any) || (session.onboarding_required ? "domains" : "profile")
   );
 
@@ -106,30 +102,6 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
       setSelectedIntegrationDomainId(domains[0].id || "");
     }
   }, [domains, selectedIntegrationDomainId]);
-
-  useEffect(() => {
-    if (!integrationSuccess) return;
-    const t = setTimeout(() => setIntegrationSuccess(""), 4000);
-    return () => clearTimeout(t);
-  }, [integrationSuccess]);
-
-  useEffect(() => {
-    if (!integrationError) return;
-    const t = setTimeout(() => setIntegrationError(""), 4000);
-    return () => clearTimeout(t);
-  }, [integrationError]);
-
-  useEffect(() => {
-    if (!integrationsSuccess) return;
-    const t = setTimeout(() => setIntegrationsSuccess(""), 4000);
-    return () => clearTimeout(t);
-  }, [integrationsSuccess]);
-
-  useEffect(() => {
-    if (!integrationsError) return;
-    const t = setTimeout(() => setIntegrationsError(""), 4000);
-    return () => clearTimeout(t);
-  }, [integrationsError]);
 
   const updateProfileMutation = useUpdateProfile();
   const changePasswordMutation = useChangePassword();
@@ -232,11 +204,23 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
     setRemoveDomainConfirmId(null);
     setIntegrationError("");
     setIntegrationSuccess("");
-    setIntegrationError(
-      lang === "fr"
-        ? "La désactivation nécessite un jeton Cloudflare. Ouvrez Domain Shield pour supprimer le Worker et la règle de routage."
-        : "Disconnecting requires a Cloudflare token. Open Domain Shield to remove the Worker and routing rule."
-    );
+    try {
+      await teardownMutation.mutateAsync({ integration_id: id });
+      await refetchDomains();
+      setIntegrationSuccess(
+        lang === "fr"
+          ? "Domaine dissocié."
+          : "Domain disconnected.",
+      );
+    } catch (error) {
+      setIntegrationError(
+        error instanceof Error
+          ? error.message
+          : lang === "fr"
+            ? "Impossible de dissocier ce domaine."
+            : "Unable to disconnect this domain.",
+      );
+    }
   };
 
   const handleSaveToken = async (e: React.FormEvent) => {
@@ -283,8 +267,20 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
     { id: "preferences", label: t("settings.tab_preferences"), icon: Settings },
     { id: "domains", label: t("settings.tab_domains"), icon: Globe },
     { id: "integrations", label: lang === "fr" ? "Intégrations" : "Integrations", icon: Puzzle },
-    { id: "billing", label: t("settings.tab_billing"), icon: CreditCard },
   ] as const;
+  const toastError = saveError || integrationError || integrationsError;
+  const toastSuccess = saveStatus
+    ? t("settings.save_success")
+    : integrationSuccess || integrationsSuccess;
+
+  const clearToast = () => {
+    setSaveStatus(false);
+    setSaveError("");
+    setIntegrationSuccess("");
+    setIntegrationError("");
+    setIntegrationsSuccess("");
+    setIntegrationsError("");
+  };
 
   return (
     <MotionDiv
@@ -369,14 +365,6 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                     </select>
                   </div>
                 </div>
-
-                {saveStatus && (
-                  <div className="p-3 bg-safe/[0.06] border border-safe/15 text-safe text-xs rounded-lg font-medium flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 shrink-0" />
-                    <span>{t("settings.save_success")}</span>
-                  </div>
-                )}
-                {saveError && <p className="text-xs text-error font-semibold">{saveError}</p>}
 
                 <div className="flex justify-end pt-2">
                   <Button type="submit" className="gap-2 text-xs font-bold cursor-pointer">
@@ -518,19 +506,6 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                         : "Add a Cloudflare domain to unlock the app and start email routing."}
                     </p>
                   </div>
-                </div>
-              )}
-
-              {integrationSuccess && (
-                <div className="p-3 bg-safe/10 border border-safe/25 text-safe text-xs font-semibold rounded-lg flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>{integrationSuccess}</span>
-                </div>
-              )}
-              {integrationError && (
-                <div className="p-3 bg-error/10 border border-error/25 text-error text-xs font-semibold rounded-lg flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4" />
-                  <span>{integrationError}</span>
                 </div>
               )}
 
@@ -682,18 +657,6 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                   )}
                 </div>
 
-                {/* Notifications Area */}
-                {integrationsError && (
-                  <div className="p-3.5 bg-error/10 border border-error/20 text-error rounded-lg text-xs font-semibold">
-                    {integrationsError}
-                  </div>
-                )}
-                {integrationsSuccess && (
-                  <div className="p-3.5 bg-safe/10 border border-safe/20 text-safe rounded-lg text-xs font-semibold">
-                    {integrationsSuccess}
-                  </div>
-                )}
-
                 {/* Setup or Token Details */}
                 {isEditingToken ? (
                   <form onSubmit={handleSaveToken} className="space-y-4 max-w-xl">
@@ -751,7 +714,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                       </button>
                     </div>
                   </form>
-                ) : wsTokenData?.api_token ? (
+                ) : wsTokenData?.configured ? (
                   <div className="border border-border-subtle rounded-xl bg-surface-low/10 divide-y divide-border-subtle/50 hover:shadow-sm transition-all overflow-hidden">
                     {/* Top Row: Integration Status & Token Info + Actions */}
                     <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
@@ -767,24 +730,14 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                             </span>
                           </h4>
 
-                          {/* Eyeballed Token Display */}
+                          {/* Provider credentials are write-only in the browser. */}
                           <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border-subtle/50 text-xs w-full">
-                            <span className="font-bold text-on-surface-variant shrink-0">Token :</span>
-                            <span className="font-mono bg-surface-low px-3 py-1 rounded text-[10px] select-all font-semibold grow max-w-xs md:max-w-md tracking-wider block overflow-hidden text-ellipsis whitespace-nowrap">
-                              {workspaceTokenVisible ? wsTokenData.api_token : "••••••••••••••••••••••••••••••••••••••••••••••••"}
+                            <span className="font-bold text-on-surface-variant shrink-0">
+                              {lang === "fr" ? "Identifiant :" : "Credential:"}
                             </span>
-                            <button
-                              type="button"
-                              onClick={() => setWorkspaceTokenVisible(!workspaceTokenVisible)}
-                              className="p-1 text-on-surface-variant/70 hover:text-primary transition-colors cursor-pointer shrink-0"
-                              title={lang === "fr" ? "Afficher/Masquer" : "Toggle Visibility"}
-                            >
-                              {workspaceTokenVisible ? (
-                                <EyeOff className="w-3.5 h-3.5" />
-                              ) : (
-                                <Eye className="w-3.5 h-3.5" />
-                              )}
-                            </button>
+                            <span className="bg-surface-low px-3 py-1 rounded text-xs font-semibold grow max-w-xs md:max-w-md block overflow-hidden text-ellipsis whitespace-nowrap">
+                              {lang === "fr" ? "Stocké de façon sécurisée" : "Stored securely"}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -794,7 +747,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                           variant="primary"
                           size="sm"
                           onClick={() => {
-                            setCfTokenInput(wsTokenData.api_token || "");
+                            setCfTokenInput("");
                             setIsEditingToken(true);
                           }}
                           className="font-bold text-xs h-9 cursor-pointer"
@@ -823,132 +776,6 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
             </div>
           )}
 
-          {/* Billing Tab */}
-          {activeTab === "billing" && (
-            <div className="space-y-6">
-              {/* Current usage progress gauge */}
-              <div className="bg-surface-lowest rounded-xl border border-border-subtle p-6 shadow-sm space-y-4">
-                <div className="flex items-center gap-2.5 pb-4 border-b border-border-subtle">
-                  <CreditCard className="w-5 h-5 text-primary" />
-                  <h3 className="font-display font-bold text-[19px] text-on-surface">
-                    {t("settings.billing_usage")}
-                  </h3>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span className="font-bold text-on-surface">{t("settings.usage_emails")}</span>
-                    <span className="font-bold text-on-surface-variant">
-                      {totalScans} / 250 {lang === "fr" ? "emails scannés" : "emails analyzed"}
-                    </span>
-                  </div>
-                  <div className="w-full h-2 bg-surface-container rounded-full overflow-hidden">
-                    <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${Math.min((totalScans / 250) * 100, 100)}%` }} />
-                  </div>
-                  <p className="text-sm font-semibold text-on-surface-variant leading-normal">
-                    {lang === "fr"
-                      ? "Votre abonnement gratuit se réinitialise le 1er du mois. Upgradez pour augmenter vos quotas."
-                      : "Usage resets on the 1st of each month. Upgrade to lift monthly volumetric ingestion limits."}
-                  </p>
-                </div>
-              </div>
-
-              {/* Pricing Cards Grid */}
-              <div className="bg-surface-lowest rounded-xl border border-border-subtle p-6 shadow-sm space-y-6">
-                <div>
-                  <h3 className="font-display font-bold text-[19px] text-on-surface">
-                    {t("settings.billing_upgrade")}
-                  </h3>
-                  <p className="text-sm font-semibold text-on-surface-variant mt-1">
-                    {lang === "fr"
-                      ? "Sélectionnez l'offre adaptée à votre activité de freelance ou PME."
-                      : "Choose the package matching your operations count and freelance workflow."}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* Free Tier (Includes Popular Badge) */}
-                  <div className="border border-primary rounded-xl p-5 flex flex-col justify-between hover:shadow-md transition-all relative overflow-hidden bg-primary/[0.01]">
-                    <div className="absolute top-0 right-0 bg-primary text-on-primary text-[10px] font-bold px-2.5 py-0.5 rounded-bl uppercase">
-                      Popular
-                    </div>
-                    <div className="space-y-3">
-                      <span className="text-xs font-bold text-primary uppercase tracking-wider block">
-                        {t("settings.billing_free")}
-                      </span>
-                      <div className="flex items-baseline gap-1">
-                        <span className="font-display font-bold text-3xl text-on-surface">€0</span>
-                        <span className="text-xs font-bold text-on-surface-variant">/{t("settings.price_per_month")}</span>
-                      </div>
-                      <p className="text-sm font-medium text-on-surface-variant leading-normal">
-                        {t("settings.billing_free_desc")}
-                      </p>
-                      <ul className="text-xs space-y-2 text-on-surface pt-3 border-t border-border-subtle/50 font-semibold">
-                        <li>• 1 Protected Domain</li>
-                        <li>• 250 analyzed emails/mo</li>
-                        <li>• Phishing email quarantine</li>
-                      </ul>
-                    </div>
-                    <Button variant="outline" disabled className="w-full text-xs mt-6 font-bold">
-                      {lang === "fr" ? "Plan Actuel" : "Current Plan"}
-                    </Button>
-                  </div>
-
-                  {/* Growth Tier (Coming Soon) */}
-                  <div className="border border-border-subtle rounded-xl p-5 flex flex-col justify-between hover:border-primary/30 transition-all bg-surface-low/10">
-                    <div className="space-y-3">
-                      <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider block">
-                        {t("settings.billing_growth")}
-                      </span>
-                      <div className="flex items-baseline gap-1">
-                        <span className="font-display font-bold text-3xl text-on-surface">€19</span>
-                        <span className="text-xs font-bold text-on-surface-variant">/{t("settings.price_per_month")}</span>
-                      </div>
-                      <p className="text-sm font-medium text-on-surface-variant leading-normal">
-                        {t("settings.billing_growth_desc")}
-                      </p>
-                      <ul className="text-xs space-y-2 text-on-surface pt-3 border-t border-border-subtle/50 font-semibold">
-                        <li>• <strong>Up to 3 domains</strong></li>
-                        <li>• 10,000 emails/mo</li>
-                        <li>• Live AI priority scans</li>
-                        <li>• Quiet hours & rules</li>
-                        <li>• Quarantine Queue</li>
-                      </ul>
-                    </div>
-                    <Button variant="outline" disabled className="w-full text-xs mt-6 font-bold">
-                      {lang === "fr" ? "Bientôt disponible" : "Coming Soon"}
-                    </Button>
-                  </div>
-
-                  {/* Business Tier (Coming Soon) */}
-                  <div className="border border-border-subtle rounded-xl p-5 flex flex-col justify-between hover:border-primary/30 transition-all bg-surface-low/10">
-                    <div className="space-y-3">
-                      <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider block">
-                        {t("settings.billing_business")}
-                      </span>
-                      <div className="flex items-baseline gap-1">
-                        <span className="font-display font-bold text-3xl text-on-surface">€49</span>
-                        <span className="text-xs font-bold text-on-surface-variant">/{t("settings.price_per_month")}</span>
-                      </div>
-                      <p className="text-sm font-medium text-on-surface-variant leading-normal">
-                        {t("settings.billing_business_desc")}
-                      </p>
-                      <ul className="text-xs space-y-2 text-on-surface pt-3 border-t border-border-subtle/50 font-semibold">
-                        <li>• <strong>Up to 10 domains</strong></li>
-                        <li>• 100,000 emails/mo</li>
-                        <li>• Custom white/blacklists</li>
-                        <li>• Loops SMTP integration</li>
-                        <li>• Dedicated slack support</li>
-                      </ul>
-                    </div>
-                    <Button variant="outline" disabled className="w-full text-xs mt-6 font-bold">
-                      {lang === "fr" ? "Bientôt disponible" : "Coming Soon"}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -1029,6 +856,12 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
           </div>
         </div>
       )}
+      <AppToast
+        tone={toastError ? "error" : "success"}
+        message={toastError || toastSuccess}
+        visible={Boolean(toastError || toastSuccess)}
+        onClose={clearToast}
+      />
     </MotionDiv>
   );
 }
