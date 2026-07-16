@@ -241,9 +241,9 @@ export function TopBar({
   };
 
   return (
-    <header className="h-14 bg-transparent px-0 flex items-center justify-between shrink-0 relative z-40">
+    <header className="h-14 min-w-0 flex-1 bg-transparent px-0 flex items-center justify-between shrink-0 relative z-40">
       {/* Title Placeholder / Brand Space to balance the header layout */}
-      <div className="font-display font-semibold text-sm text-on-surface-variant opacity-80">
+      <div className="truncate font-display font-semibold text-sm text-on-surface-variant opacity-80">
         {activeDomain ? `${activeDomain} Workspace` : "Sicurre Console"}
       </div>
 

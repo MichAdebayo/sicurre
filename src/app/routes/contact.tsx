@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Mail, MapPin, Send, CheckCircle2, MessageSquare, Clock, Home } from "lucide-react";
+import { motion } from "framer-motion";
+import { Mail, MapPin, Send, MessageSquare, Clock, Home } from "lucide-react";
 import sicurreLogo from "../assets/sicurre.svg";
 
 const MotionDiv = motion.div as any;
@@ -16,29 +16,15 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
     subject: "support",
     message: "",
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.email || !formData.message) return;
-
-    setIsSubmitting(true);
-    // Simulate sending email to contact@sicurre.com
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setIsSuccess(true);
-    }, 1800);
-  };
-
-  const handleReset = () => {
-    setFormData({
-      name: "",
-      email: "",
-      subject: "support",
-      message: "",
-    });
-    setIsSuccess(false);
+    const subject = encodeURIComponent(`[Sicurre - ${formData.subject}] ${formData.name}`);
+    const body = encodeURIComponent(
+      `Nom: ${formData.name}\nE-mail: ${formData.email}\n\n${formData.message}`,
+    );
+    window.location.href = `mailto:contact@sicurre.com?subject=${subject}&body=${body}`;
   };
 
   return (
@@ -84,13 +70,13 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
 
               <div className="relative z-10 space-y-6">
                 <div>
-                  <span className="text-[10px] font-extrabold tracking-widest text-[#F59E0B] uppercase">ASSISTANCE 24/7</span>
+                  <span className="text-[10px] font-extrabold tracking-widest text-[#F59E0B] uppercase">CONTACT SICURRE</span>
                   <h2 className="font-display font-medium text-2xl text-slate-100 mt-1 leading-tight">
                     Discutons ensemble
                   </h2>
                 </div>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Notre équipe de support client et nos ingénieurs en cybersécurité vous répondent en moins de 15 minutes.
+                  Préparez votre message ici, puis envoyez-le depuis votre messagerie habituelle.
                 </p>
 
                 <div className="space-y-4 pt-2">
@@ -99,8 +85,8 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
                       <Clock className="w-4 h-4" />
                     </div>
                     <div>
-                      <p className="text-[10px] text-slate-400 font-semibold uppercase leading-none">Réponse moyenne</p>
-                      <p className="text-sm font-bold mt-1 text-white">12 minutes</p>
+                      <p className="text-[10px] text-slate-400 font-semibold uppercase leading-none">Canal</p>
+                      <p className="text-sm font-bold mt-1 text-white">E-mail</p>
                     </div>
                   </div>
 
@@ -140,7 +126,7 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
                 Sécurité & Chiffrement
               </h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Toutes les informations soumises via ce formulaire sont chiffrées de bout en bout (AES-256) avant transmission.
+                Cette page n’enregistre pas votre message. Votre application de messagerie prend en charge l’envoi.
               </p>
             </div>
           </div>
@@ -156,13 +142,9 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
               }}
               className="rounded-2xl p-8 shadow-2xl h-full min-h-[420px] flex flex-col justify-center relative overflow-hidden"
             >
-              <AnimatePresence mode="wait">
-                {!isSuccess ? (
                   <MotionDiv
-                    key="form"
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
                     transition={{ duration: 0.25 }}
                     className="space-y-6 text-left"
                   >
@@ -229,72 +211,13 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
 
                       <button
                         type="submit"
-                        disabled={isSubmitting}
-                        className={`w-full py-3.5 bg-primary text-white hover:bg-navy-dark font-semibold rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-md shadow-primary/20 cursor-pointer active:scale-[0.98] ${isSubmitting ? "opacity-75 cursor-not-allowed" : ""
-                          }`}
+                        className="w-full py-3.5 bg-primary text-white hover:bg-navy-dark font-semibold rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-md shadow-primary/20 cursor-pointer active:scale-[0.98]"
                       >
-                        {isSubmitting ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            <span>Envoi en cours...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Send className="w-4 h-4" />
-                            <span>Envoyer le message</span>
-                          </>
-                        )}
+                        <Send className="w-4 h-4" />
+                        <span>Ouvrir ma messagerie</span>
                       </button>
                     </form>
                   </MotionDiv>
-                ) : (
-                  <MotionDiv
-                    key="success"
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.35, ease: "easeOut" }}
-                    className="flex flex-col items-center justify-center text-center space-y-6 py-6"
-                  >
-                    {/* Floating/Flying Mail Envelope Animation */}
-                    <div className="relative w-20 h-20 flex items-center justify-center">
-                      <MotionDiv
-                        initial={{ y: 0, opacity: 1, scale: 1 }}
-                        animate={{ y: -60, x: 80, opacity: 0, scale: 0.5 }}
-                        transition={{ duration: 1.2, ease: "easeInOut" }}
-                        className="absolute w-12 h-9 rounded bg-[#F59E0B] border border-white flex items-center justify-center text-slate-900 shadow-md"
-                      >
-                        <Mail className="w-5 h-5" />
-                      </MotionDiv>
-
-                      <MotionDiv
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ delay: 0.8, duration: 0.3, type: "spring" }}
-                        className="text-emerald-400"
-                      >
-                        <CheckCircle2 className="w-16 h-16" />
-                      </MotionDiv>
-                    </div>
-
-                    <div className="space-y-2 max-w-sm">
-                      <h4 className="font-display font-medium text-2xl text-slate-100 tracking-tight">
-                        Message envoyé !
-                      </h4>
-                      <p className="text-sm text-slate-400 leading-relaxed">
-                        Merci <strong className="text-white">{formData.name}</strong>, votre message a bien été envoyé de manière sécurisée
-                        à <strong className="text-white">contact@sicurre.com</strong>. Nous vous recontactons d'ici quelques minutes.
-                      </p>
-                    </div>
-
-                    <button
-                      onClick={handleReset}
-                      className="px-6 py-2.5 text-xs font-semibold text-white/90 bg-white/[0.06] hover:bg-white/[0.12] border border-white/15 rounded-xl transition-all cursor-pointer"
-                    >
-                      Envoyer un autre message
-                    </button>
-                  </MotionDiv>
-                )}
-              </AnimatePresence>
 
             </div>
           </div>

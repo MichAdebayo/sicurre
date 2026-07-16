@@ -94,6 +94,7 @@ services:
       PORT: "5173"
       API_SERVICE_URL: http://sicurre-api:8001
       AUTH_SERVICE_URL: http://auth-service:3005
+      TRUST_PROXY_HEADERS: "true"
     ports:
       - "127.0.0.1:${SICURRE_APP_HOST_PORT:-8002}:5173"
     healthcheck:

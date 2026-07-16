@@ -20,6 +20,7 @@ APP_TABLE_NAMES = (
     "app_domain_shield_history",
     "app_dmarc_report_summary",
     "app_feedback",
+    "app_support_request",
 )
 
 
@@ -122,7 +123,9 @@ app_inference_event = sa.Table(
 )
 
 
-def _workspace_table(name: str, *columns: sa.Column, constraints: tuple[sa.SchemaItem, ...] = ()) -> sa.Table:
+def _workspace_table(
+    name: str, *columns: sa.Column, constraints: tuple[sa.SchemaItem, ...] = ()
+) -> sa.Table:
     return sa.Table(name, Base.metadata, *columns, *constraints)
 
 
@@ -142,7 +145,10 @@ app_security_rule = _workspace_table(
     _text_column("rule_type", nullable=False),
     _text_column("pattern", nullable=False),
     _text_column("created_at", nullable=False),
-    constraints=(sa.PrimaryKeyConstraint("id"), sa.Index("ix_app_security_rule_workspace_id", "workspace_id")),
+    constraints=(
+        sa.PrimaryKeyConstraint("id"),
+        sa.Index("ix_app_security_rule_workspace_id", "workspace_id"),
+    ),
 )
 
 app_alert_preference = _workspace_table(
@@ -153,6 +159,7 @@ app_alert_preference = _workspace_table(
     sa.Column("quiet_hours_enabled", sa.Integer(), nullable=False, server_default=sa.text("0")),
     _text_column("quiet_hours_start", nullable=False, default="22:00"),
     _text_column("quiet_hours_end", nullable=False, default="07:00"),
+    _text_column("timezone", nullable=False, default="Europe/Paris"),
     constraints=(sa.PrimaryKeyConstraint("workspace_id"),),
 )
 
@@ -164,7 +171,10 @@ app_alert_history = _workspace_table(
     _text_column("message", nullable=False),
     sa.Column("is_dismissed", sa.Integer(), nullable=False, server_default=sa.text("0")),
     _text_column("created_at", nullable=False),
-    constraints=(sa.PrimaryKeyConstraint("id"), sa.Index("ix_app_alert_history_workspace_id", "workspace_id")),
+    constraints=(
+        sa.PrimaryKeyConstraint("id"),
+        sa.Index("ix_app_alert_history_workspace_id", "workspace_id"),
+    ),
 )
 
 app_quarantine_item = _workspace_table(
@@ -175,12 +185,24 @@ app_quarantine_item = _workspace_table(
     _text_column("sender", nullable=False),
     _text_column("subject", nullable=False),
     _text_column("body_text", nullable=False),
+    _text_column("raw_storage_uri", nullable=True),
+    _text_column("raw_content_hash", nullable=True),
+    sa.Column("raw_size_bytes", sa.Integer(), nullable=True),
     _text_column("safety_verdict", nullable=False),
     sa.Column("composite_score", sa.Float(), nullable=False),
     _text_column("status", nullable=False, default="held"),
     _text_column("created_at", nullable=False),
     _text_column("expires_at", nullable=False),
-    constraints=(sa.PrimaryKeyConstraint("id"), sa.Index("ix_app_quarantine_item_workspace_id", "workspace_id")),
+    _text_column("delivery_message_id", nullable=True),
+    _text_column("delivered_at", nullable=True),
+    _text_column("last_delivery_error", nullable=True),
+    constraints=(
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint(
+            "workspace_id", "message_id", name="uq_app_quarantine_workspace_message"
+        ),
+        sa.Index("ix_app_quarantine_item_workspace_id", "workspace_id"),
+    ),
 )
 
 app_domain_shield_status = _workspace_table(
@@ -199,7 +221,10 @@ app_domain_shield_status = _workspace_table(
     sa.Column("reputation_score", sa.Integer(), nullable=False),
     _text_column("score_grade", nullable=False),
     _text_column("updated_at", nullable=False),
-    constraints=(sa.PrimaryKeyConstraint("domain"), sa.Index("ix_app_domain_shield_status_workspace_id", "workspace_id")),
+    constraints=(
+        sa.PrimaryKeyConstraint("domain"),
+        sa.Index("ix_app_domain_shield_status_workspace_id", "workspace_id"),
+    ),
 )
 
 app_domain_shield_history = _workspace_table(
@@ -216,7 +241,10 @@ app_domain_shield_history = _workspace_table(
     _text_column("start_date", nullable=False),
     _text_column("end_date", nullable=True),
     sa.Column("is_current", sa.Integer(), nullable=False, server_default=sa.text("1")),
-    constraints=(sa.PrimaryKeyConstraint("id"), sa.Index("ix_app_domain_shield_history_domain", "domain")),
+    constraints=(
+        sa.PrimaryKeyConstraint("id"),
+        sa.Index("ix_app_domain_shield_history_domain", "domain"),
+    ),
 )
 
 app_dmarc_report_summary = _workspace_table(
@@ -234,10 +262,16 @@ app_dmarc_report_summary = _workspace_table(
     _text_column("dkim_result", nullable=True),
     _text_column("spf_result", nullable=True),
     _text_column("header_from", nullable=True),
+    _text_column("report_fingerprint", nullable=True),
     _text_column("created_at", nullable=False),
     constraints=(
         sa.PrimaryKeyConstraint("id"),
         sa.Index("ix_app_dmarc_report_summary_workspace_domain", "workspace_id", "domain"),
+        sa.UniqueConstraint(
+            "workspace_id",
+            "report_fingerprint",
+            name="uq_app_dmarc_report_workspace_fingerprint",
+        ),
     ),
 )
 
@@ -257,5 +291,24 @@ app_feedback = _workspace_table(
         sa.UniqueConstraint("workspace_id", "event_id", "feedback_type"),
         sa.Index("ix_app_feedback_workspace_id", "workspace_id"),
         sa.Index("ix_app_feedback_event_id", "event_id"),
+    ),
+)
+
+app_support_request = _workspace_table(
+    "app_support_request",
+    _text_column("id", nullable=False),
+    _text_column("workspace_id", nullable=False),
+    _text_column("workspace_member_user_id", nullable=False),
+    _text_column("requester_name", nullable=False),
+    _text_column("requester_email", nullable=False),
+    _text_column("category", nullable=False),
+    _text_column("message", nullable=False),
+    _text_column("status", nullable=False, default="open"),
+    _text_column("created_at", nullable=False),
+    _text_column("updated_at", nullable=False),
+    constraints=(
+        sa.PrimaryKeyConstraint("id"),
+        sa.Index("ix_app_support_request_workspace_id", "workspace_id"),
+        sa.Index("ix_app_support_request_status", "status"),
     ),
 )

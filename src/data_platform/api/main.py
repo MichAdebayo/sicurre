@@ -13,8 +13,10 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.sdk.trace.sampling import ParentBased, TraceIdRatioBased
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from core.config import get_settings
+from core.provider_credentials import encrypt_legacy_provider_credentials
 from core.rate_limit import limiter
 from data_platform.api.routers import router as data_platform_router
 from data_platform.api.routers.app_routes import router as app_routes_router
@@ -82,6 +84,10 @@ async def run_scheduler_loop() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
+    if settings.environment.lower() in {"production", "prod"}:
+        migrated_credentials = await encrypt_legacy_provider_credentials(settings)
+        if migrated_credentials:
+            logger.info("Encrypted %d legacy provider credential record(s)", migrated_credentials)
     task = None
     if settings.scheduler_enabled:
         task = asyncio.create_task(run_scheduler_loop())
@@ -106,6 +112,7 @@ def create_app() -> FastAPI:
     )
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_middleware(SlowAPIMiddleware)
     app.include_router(data_platform_router)
     app.include_router(internal_router)
     app.include_router(app_routes_router)
@@ -113,6 +120,7 @@ def create_app() -> FastAPI:
     configure_tracing(app)
 
     @app.get("/health", tags=["system"])
+    @limiter.exempt
     async def healthcheck() -> dict[str, str]:
         return {"status": "ok", "environment": settings.environment}
 

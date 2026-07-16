@@ -135,6 +135,10 @@ scratch/screenshots/
 node_modules/
 assets/
 ui-ideas/
+# POC runtime assets are application source and must exist in clean checkouts.
+!src/poc/assets/
+!src/poc/assets/*.css
+!src/poc/assets/*.svg
 # Frontend source assets must be committed so clean CI builds match local builds.
 !src/app/assets/
 !src/app/assets/*.svg
@@ -153,3 +157,7 @@ deploy/grafana/*.md
 deploy/nginx/*.md
 
 DEPLOYMENT_BLOCKERS.md
+cert-readiness-audit.md
+
+scripts/README.md
+docs/architecture/issue-artifact.md

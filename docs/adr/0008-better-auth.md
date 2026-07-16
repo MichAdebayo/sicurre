@@ -18,12 +18,11 @@ Use **Better Auth** — a TypeScript/framework-agnostic auth library that runs a
 a sidecar service beside the FastAPI backend. Keep that boundary rather than
 switching the public app to Neon Auth during the current deployment pass.
 
-The current local/container smoke runtime uses a SQLite-backed Better Auth
-database volume. Before public multi-host production, migrate Better Auth to
-the existing Neon PostgreSQL instance using a dedicated `auth` schema and
-Better Auth's PostgreSQL adapter. The public `/api/auth/*` boundary remains
-unchanged, so this is a persistence migration rather than an auth-provider
-rewrite.
+Local development and container smoke tests use a dedicated SQLite Better Auth
+database. Production uses the existing Neon PostgreSQL instance through a
+dedicated `auth` schema and Better Auth's PostgreSQL adapter. The public
+`/api/auth/*` boundary is identical in both environments; only persistence
+changes.
 
 ## Alternatives considered
 
@@ -51,9 +50,9 @@ rewrite.
 2. FastAPI validates sessions by calling Better Auth's session verification endpoint (or by verifying JWT tokens Better Auth issues).
 3. FastAPI maps the authenticated Better Auth user to `app_workspace` and `workspace_member`.
 4. Better Auth manages auth tables; Sicurre API manages Cloudflare integration tokens separately.
-5. The Better Auth PostgreSQL migration runs before enabling public production
-   accounts. It uses a dedicated `auth` schema so library-owned tables cannot
-   collide with Sicurre domain tables.
+5. Production startup uses the dedicated Neon `auth` schema so library-owned
+   tables cannot collide with Sicurre domain tables. Production rejects any
+   local SQLite path configuration.
 
 ## Consequences
 

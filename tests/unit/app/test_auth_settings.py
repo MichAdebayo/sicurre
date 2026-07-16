@@ -5,6 +5,8 @@ from pydantic import ValidationError
 
 from core.config import Settings
 
+TEST_SECRET_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+
 
 def test_dev_tokens_allowed_in_dev_by_default() -> None:
     settings = Settings(environment="dev")
@@ -13,13 +15,17 @@ def test_dev_tokens_allowed_in_dev_by_default() -> None:
 
 
 def test_dev_tokens_disabled_in_prod_by_default() -> None:
-    settings = Settings(environment="prod")
+    settings = Settings(environment="prod", secret_encryption_key=TEST_SECRET_KEY)
 
     assert settings.allow_dev_tokens is False
 
 
 def test_explicit_dev_token_override_wins() -> None:
-    settings = Settings(environment="prod", auth_allow_dev_tokens=True)
+    settings = Settings(
+        environment="prod",
+        auth_allow_dev_tokens=True,
+        secret_encryption_key=TEST_SECRET_KEY,
+    )
 
     assert settings.allow_dev_tokens is True
 
@@ -83,6 +89,11 @@ def test_snapshot_override_and_normalized_sets() -> None:
     assert settings.platform_admin_email_set == frozenset(
         {"admin@sicurre.com", "owner@sicurre.com"}
     )
+
+
+def test_platform_admin_access_requires_explicit_configuration() -> None:
+    """No public email address is privileged by default."""
+    assert Settings(_env_file=None, platform_admin_emails="").platform_admin_email_set == frozenset()
 
 
 def test_better_auth_schema_is_normalized_and_validated() -> None:

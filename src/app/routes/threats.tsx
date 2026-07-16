@@ -1,19 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import {
   Search,
   Download,
-  Trash2,
-  RotateCcw,
+  Inbox,
   Flag,
   AlertTriangle,
 } from "lucide-react";
 import {
   useThreatLogs,
-  useUpdateThreatStatus,
   useCreateFeedback,
-  AuthSession,
 } from "../lib/api";
 import { VerdictBadge } from "../components/threats/verdict-badge";
 import { Button } from "../components/ui/button";
@@ -22,13 +19,12 @@ import { AppToast } from "../components/common/app-toast";
 const MotionDiv = motion.div as any;
 
 interface ThreatsRouteProps {
-  session: AuthSession;
+  onOpenQuarantine: () => void;
 }
 
-export default function ThreatsRoute({ session }: ThreatsRouteProps) {
+export default function ThreatsRoute({ onOpenQuarantine }: ThreatsRouteProps) {
   const { t, i18n } = useTranslation();
   const { data: threats, isLoading, error, refetch } = useThreatLogs();
-  const updateStatusMutation = useUpdateThreatStatus();
   const feedbackMutation = useCreateFeedback();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -46,34 +42,6 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
 
   const [actionSuccess, setActionSuccess] = useState("");
   const [actionError, setActionError] = useState("");
-
-  useEffect(() => {
-    if (!actionSuccess) return;
-    const t = setTimeout(() => setActionSuccess(""), 4000);
-    return () => clearTimeout(t);
-  }, [actionSuccess]);
-
-  useEffect(() => {
-    if (!actionError) return;
-    const t = setTimeout(() => setActionError(""), 4000);
-    return () => clearTimeout(t);
-  }, [actionError]);
-
-  const handleUpdateStatus = async (id: string, newStatus: "trashed" | "restored") => {
-    setActionSuccess("");
-    setActionError("");
-    try {
-      await updateStatusMutation.mutateAsync({ id, status: newStatus });
-      setActionSuccess(
-        newStatus === "trashed"
-          ? (i18n.language === "fr" ? "Menace mise en quarantaine." : "Threat quarantined.")
-          : (i18n.language === "fr" ? "Menace restaurée." : "Threat restored.")
-      );
-      refetch();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to update status.");
-    }
-  };
 
   const handleReportFalseNegative = async (id: string) => {
     setActionSuccess("");
@@ -159,7 +127,7 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
   };
 
   // Dynamic SLA limit config
-  const slaMs = session?.sla_latency_ms || 10000;
+  const slaMs = 10000;
 
   const getLatencyData = (slaLimit: number) => {
     const threatsList = threats || [];
@@ -589,24 +557,12 @@ export default function ThreatsRoute({ session }: ThreatsRouteProps) {
                           <Button
                             variant="outline"
                             size="sm"
-                            disabled={updateStatusMutation.isPending}
-                            onClick={() =>
-                              handleUpdateStatus(
-                                threat.id,
-                                threat.status === "trashed" ? "restored" : "trashed",
-                              )
-                            }
+                            onClick={onOpenQuarantine}
                             className="h-8 text-[11px]"
                           >
-                            {threat.status === "trashed" ? (
-                              <RotateCcw className="w-3.5 h-3.5" />
-                            ) : (
-                              <Trash2 className="w-3.5 h-3.5" />
-                            )}
+                            <Inbox className="w-3.5 h-3.5" />
                             <span>
-                              {threat.status === "trashed"
-                                ? t("threats.action_restore")
-                                : t("threats.action_trash")}
+                              {i18n.language === "fr" ? "Ouvrir la quarantaine" : "Open quarantine"}
                             </span>
                           </Button>
                         ) : (

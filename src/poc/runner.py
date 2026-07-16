@@ -10,18 +10,19 @@ import json
 import subprocess
 from collections.abc import Generator
 from pathlib import Path
+from typing import Any
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 
 
-def _is_trace_line(line: str) -> dict | None:
+def _is_trace_line(line: str) -> dict[str, Any] | None:
     """Attempt to parse a line as a SemanticTraceLogger JSON payload."""
     stripped = line.strip()
     if not stripped.startswith("{"):
         return None
     try:
-        payload = json.loads(stripped)
-        if "stage" in payload and "status" in payload:
+        payload: Any = json.loads(stripped)
+        if isinstance(payload, dict) and "stage" in payload and "status" in payload:
             return payload
     except (json.JSONDecodeError, KeyError):
         pass
