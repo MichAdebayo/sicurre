@@ -71,6 +71,7 @@ async def test_token_get_is_write_only(monkeypatch) -> None:
             return [{"api_token": "enc:v1:ciphertext"}]
         return [{"api_token": "enc:v1:ciphertext"}]
 
+    monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
     monkeypatch.setattr(integrations, "_async_query", query)
 
     response = await get_workspace_cloudflare_token(_user())
