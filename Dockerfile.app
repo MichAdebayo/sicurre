@@ -32,8 +32,7 @@ CMD ["node", "scripts/app/container_server.mjs"]
 FROM deps AS auth
 
 WORKDIR /app
-ENV NODE_ENV=production \
-    SICURRE_BETTER_AUTH_PORT=3005
+ENV NODE_ENV=production
 
 RUN mkdir -p data/local
 
