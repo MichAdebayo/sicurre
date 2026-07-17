@@ -178,6 +178,11 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("PUBLIC_API_URL", "SICURRE_PUBLIC_API_URL"),
     )
+    internal_app_probe_url: str | None = Field(
+        default=None,
+        validation_alias="SICURRE_INTERNAL_APP_PROBE_URL",
+        description="Private app gateway base URL used only by runtime health probes.",
+    )
     scheduler_enabled: bool = False
     telemetry_traces_enabled: bool = False
     telemetry_otlp_endpoint: str = "http://alloy:4318/v1/traces"
