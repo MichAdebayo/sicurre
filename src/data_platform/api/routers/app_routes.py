@@ -595,7 +595,9 @@ async def _probe_inference_runtime(
 
 
 async def _probe_public_app_runtime(
-    client: httpx.AsyncClient, public_api_url: str | None
+    client: httpx.AsyncClient,
+    public_api_url: str | None,
+    probe_base_url: str | None = None,
 ) -> tuple[list[dict], str | None]:
     if not public_api_url:
         return [
@@ -608,7 +610,9 @@ async def _probe_public_app_runtime(
 
     base_url = public_api_url.rstrip("/")
     scan_url = f"{base_url}/v1/email/scan"
-    health_url = f"{base_url}/health"
+    probe_base = (probe_base_url or base_url).rstrip("/")
+    probe_scan_url = f"{probe_base}/v1/email/scan"
+    health_url = f"{probe_base}/health"
     results = []
 
     started = datetime.now(timezone.utc)
@@ -637,7 +641,7 @@ async def _probe_public_app_runtime(
     started = datetime.now(timezone.utc)
     try:
         response = await client.post(
-            scan_url,
+            probe_scan_url,
             json={
                 "subject": "Sicurre preflight probe",
                 "sender": "preflight@example.com",
@@ -657,7 +661,7 @@ async def _probe_public_app_runtime(
                 component="email_scan_gateway",
                 status=status_value,
                 message=message,
-                checked_url=scan_url,
+                checked_url=probe_scan_url,
                 latency_ms=_http_latency_ms(started),
             )
         )
@@ -668,7 +672,7 @@ async def _probe_public_app_runtime(
                 status="down",
                 message="Worker scan gateway is unreachable.",
                 detail=str(exc)[:220],
-                checked_url=scan_url,
+                checked_url=probe_scan_url,
             )
         )
 
@@ -883,7 +887,9 @@ async def get_admin_runtime_health(current_user: AuthUser = Depends(get_current_
     async with httpx.AsyncClient(timeout=6.0) as client:
         inference_components = await _probe_inference_runtime(client, settings.inference_api_url)
         public_app_components, expected_scan_url = await _probe_public_app_runtime(
-            client, settings.public_api_url
+            client,
+            settings.public_api_url,
+            settings.internal_app_probe_url,
         )
         cloudflare_components = await _probe_cloudflare_runtime(
             client,
