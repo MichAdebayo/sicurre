@@ -5,7 +5,7 @@ import hashlib
 from fastapi import Request
 from slowapi import Limiter
 
-from core.security import extract_bearer_token
+from core.security import extract_bearer_token, extract_better_auth_session_cookie
 
 
 def get_rate_limit_key(request: Request) -> str:
@@ -19,8 +19,9 @@ def get_rate_limit_key(request: Request) -> str:
         secret_hash = hashlib.sha256(worker_secret.encode("utf-8")).hexdigest()[:16]
         return f"worker:{secret_hash}"
 
-    session_cookie = request.cookies.get("better-auth.session_token")
-    if session_cookie:
+    resolved_cookie = extract_better_auth_session_cookie(request, "better-auth.session_token")
+    if resolved_cookie:
+        _, session_cookie = resolved_cookie
         session_hash = hashlib.sha256(session_cookie.encode("utf-8")).hexdigest()[:16]
         return f"session:{session_hash}"
 

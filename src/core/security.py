@@ -22,6 +22,8 @@ class AuthenticatedPrincipal(BaseModel):
 _bearer_scheme = HTTPBearer(auto_error=False)
 _credentials_dependency = Security(_bearer_scheme)
 _settings_dependency = Depends(get_settings)
+
+
 def extract_bearer_token(authorization_header: str | None) -> str | None:
     if authorization_header is None:
         return None
@@ -30,6 +32,20 @@ def extract_bearer_token(authorization_header: str | None) -> str | None:
     if scheme.lower() != "bearer" or not token:
         return None
     return token.strip()
+
+
+def extract_better_auth_session_cookie(
+    request: Request, configured_name: str
+) -> tuple[str, str] | None:
+    """Resolve local or HTTPS-prefixed Better Auth session cookies."""
+    candidate_names = [configured_name]
+    if not configured_name.startswith("__Secure-"):
+        candidate_names.insert(0, f"__Secure-{configured_name}")
+    for cookie_name in candidate_names:
+        cookie_value = request.cookies.get(cookie_name)
+        if cookie_value:
+            return cookie_name, cookie_value
+    return None
 
 
 def _unauthorized(detail: str = "Authentication required") -> HTTPException:
@@ -64,6 +80,7 @@ async def _validate_with_better_auth(
     token: str | None,
     settings: Settings,
     session_cookie: str | None = None,
+    session_cookie_name: str | None = None,
     client_ip: str | None = None,
 ) -> AuthenticatedPrincipal | None:
     if not settings.better_auth_base_url:
@@ -72,18 +89,14 @@ async def _validate_with_better_auth(
     if token is None and session_cookie is None:
         return None
 
-    endpoint = (
-        f"{settings.better_auth_base_url.rstrip('/')}"
-        f"{settings.better_auth_session_path}"
-    )
-    async with httpx.AsyncClient(
-        timeout=settings.better_auth_timeout_seconds
-    ) as client:
+    endpoint = f"{settings.better_auth_base_url.rstrip('/')}{settings.better_auth_session_path}"
+    async with httpx.AsyncClient(timeout=settings.better_auth_timeout_seconds) as client:
         headers: dict[str, str] = {}
         if token:
             headers["Authorization"] = f"Bearer {token}"
         if session_cookie:
-            headers["Cookie"] = f"{settings.better_auth_cookie_name}={session_cookie}"
+            cookie_name = session_cookie_name or settings.better_auth_cookie_name
+            headers["Cookie"] = f"{cookie_name}={session_cookie}"
         if client_ip:
             headers["x-real-ip"] = client_ip
         response = await client.get(
@@ -105,9 +118,7 @@ async def _validate_with_better_auth(
     return _principal_from_better_auth_payload(payload)
 
 
-def _validate_with_dev_token(
-    token: str, settings: Settings
-) -> AuthenticatedPrincipal | None:
+def _validate_with_dev_token(token: str, settings: Settings) -> AuthenticatedPrincipal | None:
     if not settings.allow_dev_tokens:
         return None
     if token not in settings.dev_bearer_tokens:
@@ -134,7 +145,10 @@ async def require_authenticated_principal(
         return principal
 
     token = credentials.credentials if credentials is not None else None
-    session_cookie = request.cookies.get(settings.better_auth_cookie_name)
+    resolved_cookie = extract_better_auth_session_cookie(request, settings.better_auth_cookie_name)
+    session_cookie_name, session_cookie = (
+        resolved_cookie if resolved_cookie is not None else (None, None)
+    )
     if token is None and session_cookie is None:
         raise _unauthorized()
 
@@ -150,6 +164,7 @@ async def require_authenticated_principal(
                 token,
                 settings,
                 session_cookie=session_cookie,
+                session_cookie_name=session_cookie_name,
                 client_ip=request.headers.get("x-real-ip")
                 or (request.client.host if request.client else None),
             )
