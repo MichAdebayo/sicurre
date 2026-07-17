@@ -17,6 +17,8 @@ services:
       SICURRE_ENVIRONMENT: production
       SICURRE_AUTH_ENABLED: "true"
       SICURRE_BETTER_AUTH_BASE_URL: http://auth-service:3005
+      SICURRE_INFERENCE_API_URL: http://inference.sicurre.internal:8000/v1/classify
+      SICURRE_INTERNAL_APP_PROBE_URL: http://sicurre-app:5173
       SICURRE_TELEMETRY_TRACES_ENABLED: "true"
       SICURRE_TELEMETRY_OTLP_ENDPOINT: http://alloy:4318/v1/traces
       SICURRE_TELEMETRY_TRACE_SAMPLE_RATIO: ${SICURRE_TELEMETRY_TRACE_SAMPLE_RATIO:-1.0}
@@ -41,6 +43,7 @@ services:
       start_period: 30s
     networks:
       - sicurre-internal
+      - sicurre-service-mesh
     <<: *default-logging
 
   sicurre-data-release:
@@ -166,3 +169,6 @@ services:
 networks:
   sicurre-internal:
     driver: bridge
+  sicurre-service-mesh:
+    name: sicurre-service-mesh
+    external: true

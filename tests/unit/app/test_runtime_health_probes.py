@@ -97,6 +97,30 @@ async def test_public_app_probe_proves_gateway_auth_boundary() -> None:
 
 
 @pytest.mark.asyncio
+async def test_public_app_probe_uses_private_route_without_changing_worker_url() -> None:
+    """Probe privately while preserving the public URL expected by Cloudflare."""
+    requested_urls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested_urls.append(str(request.url))
+        return httpx.Response(200 if request.method == "GET" else 401)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        result, scan_url = await app_routes._probe_public_app_runtime(
+            client,
+            "https://sicurre.example",
+            "http://sicurre-app:5173",
+        )
+
+    assert scan_url == "https://sicurre.example/v1/email/scan"
+    assert requested_urls == [
+        "http://sicurre-app:5173/health",
+        "http://sicurre-app:5173/v1/email/scan",
+    ]
+    assert [item["status"] for item in result] == ["ok", "ok"]
+
+
+@pytest.mark.asyncio
 async def test_public_app_probe_rejects_missing_and_unreachable_runtime() -> None:
     """Missing configuration and connection failures cannot appear healthy."""
     async with httpx.AsyncClient() as client:
