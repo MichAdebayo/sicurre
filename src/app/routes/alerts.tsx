@@ -57,22 +57,50 @@ function historyToneClass(tone: AppToastTone) {
   return "border-primary/15 bg-primary-fixed/50";
 }
 
+function QueryFailure({ onRetry }: { onRetry: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <div role="alert" className="rounded-lg border border-error/25 bg-error-container/35 p-4 text-sm text-on-surface">
+      <p className="font-semibold">{t("common.load_error")}</p>
+      <button type="button" onClick={onRetry} className="mt-2 font-bold text-primary hover:text-primary-hover">
+        {t("common.retry")}
+      </button>
+    </div>
+  );
+}
+
 export default function AlertsRoute() {
   const { t, i18n } = useTranslation();
 
   // Queries & Mutations
-  const { data: preferences, isLoading: prefsLoading } = useAlertPreferences();
+  const {
+    data: preferences,
+    isLoading: prefsLoading,
+    isError: prefsFailed,
+    refetch: refetchPreferences,
+  } = useAlertPreferences();
   const updatePrefsMutation = useUpdateAlertPreferences();
 
-  const { data: rules, isLoading: rulesLoading, refetch: refetchRules } = useSecurityRules();
+  const {
+    data: rules,
+    isLoading: rulesLoading,
+    isError: rulesFailed,
+    refetch: refetchRules,
+  } = useSecurityRules();
   const createRuleMutation = useCreateSecurityRule();
   const deleteRuleMutation = useDeleteSecurityRule();
 
-  const { data: history, isLoading: historyLoading } = useAlertHistory();
+  const {
+    data: history,
+    isLoading: historyLoading,
+    isError: historyFailed,
+    refetch: refetchHistory,
+  } = useAlertHistory();
   const dismissAlertMutation = useDismissAlert();
 
   // Form states
   const [notifyPhishing, setNotifyPhishing] = useState(true);
+  const [notifySpam, setNotifySpam] = useState(false);
   const [quietEnabled, setQuietEnabled] = useState(false);
   const [quietStart, setQuietStart] = useState("22:00");
   const [quietEnd, setQuietEnd] = useState("07:00");
@@ -88,6 +116,7 @@ export default function AlertsRoute() {
   useEffect(() => {
     if (preferences) {
       setNotifyPhishing(preferences.notify_phishing);
+      setNotifySpam(preferences.notify_spam);
       setQuietEnabled(preferences.quiet_hours_enabled);
       setQuietStart(preferences.quiet_hours_start);
       setQuietEnd(preferences.quiet_hours_end);
@@ -101,7 +130,7 @@ export default function AlertsRoute() {
     try {
       await updatePrefsMutation.mutateAsync({
         notify_phishing: notifyPhishing,
-        notify_spam: false,
+        notify_spam: notifySpam,
         quiet_hours_enabled: quietEnabled,
         quiet_hours_start: quietStart,
         quiet_hours_end: quietEnd,
@@ -196,6 +225,8 @@ export default function AlertsRoute() {
 
             {prefsLoading ? (
               <div className="h-20 bg-surface-low rounded-xl animate-pulse" />
+            ) : prefsFailed ? (
+              <QueryFailure onRetry={() => void refetchPreferences()} />
             ) : (
               <div className="space-y-4">
                 <label className="flex items-start gap-3 cursor-pointer group">
@@ -213,6 +244,24 @@ export default function AlertsRoute() {
                       {i18n.language === "fr"
                         ? "Envoie un e-mail lorsqu’une menace est placée en quarantaine."
                         : "Sends an email when a threat is placed in quarantine."}
+                    </p>
+                  </div>
+                </label>
+                <label className="flex items-start gap-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={notifySpam}
+                    onChange={(e) => setNotifySpam(e.target.checked)}
+                    className="w-4 h-4 mt-1 rounded text-primary border-border-subtle focus:ring-primary/20 accent-primary"
+                  />
+                  <div>
+                    <span className="text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">
+                      {t("alerts.notify_spam")}
+                    </span>
+                    <p className="text-xs text-on-surface-variant/70 mt-0.5">
+                      {i18n.language === "fr"
+                        ? "Envoie un e-mail lorsqu’un message est classé comme spam."
+                        : "Sends an email when a message is classified as spam."}
                     </p>
                   </div>
                 </label>
@@ -334,6 +383,8 @@ export default function AlertsRoute() {
             <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
               {rulesLoading ? (
                 <div className="h-16 bg-surface-low rounded-xl animate-pulse" />
+              ) : rulesFailed ? (
+                <QueryFailure onRetry={() => void refetchRules()} />
               ) : !rules || rules.length === 0 ? (
                 <div className="text-center py-8 text-sm text-on-surface-variant/50">
                   {t("alerts.no_rules")}
@@ -392,6 +443,8 @@ export default function AlertsRoute() {
                 <div key={i} className="h-16 bg-surface-low rounded-xl animate-pulse" />
               ))}
             </div>
+          ) : historyFailed ? (
+            <QueryFailure onRetry={() => void refetchHistory()} />
           ) : !history || history.length === 0 ? (
             <div className="text-center py-12 text-sm text-on-surface-variant/50 flex flex-col items-center justify-center">
               <CheckCircle2 className="w-8 h-8 text-safe/40 mb-2" />

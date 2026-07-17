@@ -110,11 +110,13 @@ class LegacyDbConnector:
                     FROM threat_log t
                     JOIN users u ON t.user_id = u.id
                 """
+                parameters: dict[str, str] = {}
                 if since_date:
-                    query_str += f" WHERE t.created_at > '{since_date}' ORDER BY t.created_at ASC"
-                    
+                    query_str += " WHERE t.created_at > :since_date ORDER BY t.created_at ASC"
+                    parameters["since_date"] = since_date
+
                 query = text(query_str)
-                result = await conn.execute(query)
+                result = await conn.execute(query, parameters)
                 # Convert rows to dict mappings
                 rows = result.mappings().fetchall()
                 return [dict(row) for row in rows]

@@ -1651,4 +1651,4 @@ components:
         configured:
           type: boolean
           nullable: true
-          description: Current implementation returns the stored token; production should replace this with presence metadata only.
+          description: Indicates whether an encrypted Cloudflare token is available; the token value is never returned.
