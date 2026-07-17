@@ -28,19 +28,31 @@ def _metric(column: Any, label: str, value: int) -> None:
     )
 
 
+def _source_label(source: str, translate: Callable[[str], str]) -> str:
+    """Return a concise label while retaining canonical lineage separately."""
+    reconstruction_key = source.rsplit("/", maxsplit=1)[-1]
+    if source.startswith("reconstructed/current_frozen/"):
+        return translate(f"reconstructed_source_{reconstruction_key}")
+    return source
+
+
 def _render_sources(evidence: DataEvidence, translate: Callable[[str], str]) -> None:
     if not (
-        evidence.table_exists("data_source_system") and evidence.table_exists("data_ingestion_run")
+        evidence.table_exists("data_source_system")
+        and evidence.table_exists("data_ingestion_run")
+        and evidence.table_exists("data_raw_record")
     ):
         st.info(translate("run_pipeline_hint"))
         return
     sources = evidence.query(
         """
         SELECT ss.name, ss.source_type,
-               COALESCE(SUM(ir.raw_record_count), 0) AS total_records,
-               MAX(ir.finished_at) AS last_run
+               COUNT(rr.id) AS total_records,
+               (SELECT MAX(ir.finished_at)
+                FROM data_ingestion_run ir
+                WHERE ir.source_system_id = ss.id) AS last_run
         FROM data_source_system ss
-        LEFT JOIN data_ingestion_run ir ON ir.source_system_id = ss.id
+        LEFT JOIN data_raw_record rr ON rr.source_system_id = ss.id
         GROUP BY ss.id
         ORDER BY total_records DESC
         LIMIT 30
@@ -49,6 +61,7 @@ def _render_sources(evidence: DataEvidence, translate: Callable[[str], str]) -> 
     chart_rows = [
         {
             "source": row["name"],
+            "source_label": _source_label(str(row["name"]), translate),
             "count": int(row.get("total_records") or 0),
             "type": str(row.get("source_type") or "other"),
         }
@@ -57,14 +70,8 @@ def _render_sources(evidence: DataEvidence, translate: Callable[[str], str]) -> 
     ]
     if chart_rows:
         st.markdown(f"#### {translate('source_breakdown')}")
-        colors = {
-            "api": "#2563A6",
-            "file": "#B45309",
-            "scraping": "#BE185D",
-            "sql": "#047857",
-            "bigdata": "#6D28D9",
-            "manual": "#C2410C",
-        }
+        if any(str(row["source"]).startswith("reconstructed/") for row in chart_rows):
+            st.caption(translate("reconstructed_lineage_note"))
         specification = {
             "mark": {
                 "type": "bar",
@@ -73,7 +80,7 @@ def _render_sources(evidence: DataEvidence, translate: Callable[[str], str]) -> 
             },
             "encoding": {
                 "y": {
-                    "field": "source",
+                    "field": "source_label",
                     "type": "nominal",
                     "sort": "-x",
                     "axis": {"title": None, "labelFontSize": 13},
@@ -83,19 +90,12 @@ def _render_sources(evidence: DataEvidence, translate: Callable[[str], str]) -> 
                     "type": "quantitative",
                     "axis": {"title": None, "grid": False, "labelFontSize": 12},
                 },
-                "color": {
-                    "field": "type",
-                    "type": "nominal",
-                    "scale": {
-                        "domain": list(colors.keys()),
-                        "range": list(colors.values()),
-                    },
-                    "legend": {
-                        "title": translate("source"),
-                        "orient": "bottom",
-                        "labelFontSize": 12,
-                    },
-                },
+                "color": {"value": "#4A90D9"},
+                "tooltip": [
+                    {"field": "source", "type": "nominal", "title": translate("source")},
+                    {"field": "type", "type": "nominal", "title": translate("source_method")},
+                    {"field": "count", "type": "quantitative", "title": translate("records")},
+                ],
             },
             "config": {"background": "transparent", "view": {"stroke": "transparent"}},
         }

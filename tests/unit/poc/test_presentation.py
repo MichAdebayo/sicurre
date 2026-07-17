@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from poc.presentation.datasets import _source_label
 from poc.presentation.formatting import (
     effective_label,
     effective_verdict,
@@ -20,6 +21,20 @@ from poc.presentation.pipeline_page import redact_terminal_line
 from poc.presentation.remediation import filter_threats, partition_delivered_events
 from poc.presentation.result import confidence_bar, result_style
 from poc.presentation.theme import initialize_theme, load_theme_css, set_theme
+
+
+def test_dataset_source_labels_preserve_real_sources_and_shorten_reconstruction() -> None:
+    """Recovered provenance remains readable without disguising real source names."""
+    translations = {
+        "reconstructed_source_native_external": "Recovered external sources",
+    }
+    translate = lambda key: translations.get(key, key)  # noqa: E731
+
+    assert _source_label("PhishTank", translate) == "PhishTank"
+    assert (
+        _source_label("reconstructed/current_frozen/native_external", translate)
+        == "Recovered external sources"
+    )
 
 
 def test_presentation_formatting_preserves_existing_contract() -> None:

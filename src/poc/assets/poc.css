@@ -338,7 +338,7 @@ div[data-baseweb="popover"] span,
 
 /* ── Checkboxes ───────────────────────────────────────── */
 input[type="checkbox"] {
-  accent-color: var(--accent) !important;
+  accent-color: var(--primary) !important;
 }
 [data-testid="stCheckbox"] label,
 [data-testid="stCheckbox"] span,
@@ -351,18 +351,28 @@ div[data-baseweb="checkbox"] > div:first-child {
   border-color: var(--border) !important;
 }
 div[data-baseweb="checkbox"]:focus-within > div:first-child {
-  border-color: var(--accent) !important;
+  border-color: var(--primary) !important;
 }
 div[data-baseweb="checkbox"] input:checked + div {
-  background-color: var(--accent) !important;
-  border-color: var(--accent) !important;
+  background-color: var(--primary) !important;
+  border-color: var(--primary) !important;
+}
+/* BaseWeb renders the visible checkmark span before the hidden input. */
+[data-baseweb="checkbox"]:has(input:checked) > span {
+  background-color: var(--primary) !important;
+  border-color: var(--primary) !important;
+}
+[data-baseweb="checkbox"]:has(input:checked) > span svg,
+[data-baseweb="checkbox"]:has(input:checked) > span svg * {
+  fill: #FFFFFF !important;
+  stroke: #FFFFFF !important;
 }
 div[data-baseweb="checkbox"] input:checked + div svg {
   fill: #FFFFFF !important;
   stroke: #FFFFFF !important;
 }
 div[data-baseweb="checkbox"]:hover div {
-  border-color: var(--accent) !important;
+  border-color: var(--primary) !important;
 }
 
 /* ── Streamlit Tabs active highlight ──────────────────── */
@@ -371,14 +381,51 @@ button[data-baseweb="tab"] {
   transition: color 0.15s ease !important;
 }
 button[data-baseweb="tab"]:hover {
-  color: var(--accent) !important;
+  color: var(--primary-dark) !important;
 }
 button[data-baseweb="tab"][aria-selected="true"] {
-  color: var(--accent) !important;
-  border-bottom-color: var(--accent) !important;
+  color: var(--primary-dark) !important;
+  border-bottom-color: var(--primary) !important;
 }
 div[data-baseweb="tab-highlight"] {
-  background-color: var(--accent) !important;
+  background-color: var(--primary) !important;
+}
+
+/* Segmented controls are navigation within a task, not warning states. */
+[data-testid="stSegmentedControl"] button {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text-2) !important;
+}
+[data-testid="stSegmentedControl"] button:hover {
+  background: var(--nav-hover) !important;
+  color: var(--text) !important;
+}
+[data-testid="stSegmentedControl"] button[aria-pressed="true"],
+[data-testid="stSegmentedControl"] button[data-selected="true"] {
+  background: var(--primary-light) !important;
+  border-color: var(--primary) !important;
+  color: var(--text) !important;
+}
+[data-baseweb="button-group"] button[kind="segmented_control"] {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text-2) !important;
+}
+[data-baseweb="button-group"] button[kind="segmented_control"] * {
+  color: var(--text-2) !important;
+}
+[data-baseweb="button-group"] button[kind="segmented_control"]:hover {
+  background: var(--nav-hover) !important;
+  border-color: var(--primary-border) !important;
+}
+[data-baseweb="button-group"] button[kind="segmented_controlActive"] {
+  background: var(--primary-light) !important;
+  border-color: var(--primary) !important;
+  color: var(--text) !important;
+}
+[data-baseweb="button-group"] button[kind="segmented_controlActive"] * {
+  color: var(--text) !important;
 }
 
 /* ── Sidebar spacing & positioning ────────────────────── */
@@ -575,7 +622,7 @@ div[data-testid="stMarkdownContainer"] h6 {
   padding: 18px;
   box-shadow: var(--shadow);
 }
-.result-phishing { border-top: 4px solid var(--accent); }
+.result-phishing { border-top: 4px solid var(--danger-semantic); }
 .result-spam     { border-top: 4px solid var(--warning); }
 .result-safe     { border-top: 4px solid var(--safe); }
 
@@ -583,8 +630,7 @@ div[data-testid="stMarkdownContainer"] h6 {
 .threat-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-left: 4px solid var(--accent);
-  border-radius: 0 10px 10px 0;
+  border-radius: 8px;
   padding: 12px 14px;
   margin-bottom: 6px;
 }
@@ -794,10 +840,35 @@ div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid=
   color: #FFFFFF !important;
 }
 
-/* ── Dropdown select icon amber ───────────────────────── */
+/* ── Dropdown affordance uses the interaction color ──── */
 [data-baseweb="select"] svg {
-  fill: var(--accent) !important;
-  color: var(--accent) !important;
+  fill: var(--primary-dark) !important;
+  color: var(--primary-dark) !important;
+}
+
+/* Streamlit's sidebar collapse control is rendered outside sidebar content. */
+[data-testid="stSidebarCollapseButton"] button:hover,
+[data-testid="stSidebarCollapseButton"] button:focus,
+[data-testid="stSidebarCollapsedControl"] button:hover,
+[data-testid="stSidebarCollapsedControl"] button:focus {
+  background: var(--primary-dark) !important;
+  color: #FFFFFF !important;
+}
+[data-testid="stSidebarCollapseButton"] button:hover svg,
+[data-testid="stSidebarCollapseButton"] button:focus svg,
+[data-testid="stSidebarCollapsedControl"] button:hover svg,
+[data-testid="stSidebarCollapsedControl"] button:focus svg,
+[data-testid="stSidebarCollapseButton"] button:hover svg *,
+[data-testid="stSidebarCollapsedControl"] button:hover svg * {
+  fill: #FFFFFF !important;
+  stroke: #FFFFFF !important;
+  color: #FFFFFF !important;
+}
+[data-testid="stSidebarCollapseButton"] button:hover [data-testid="stIconMaterial"],
+[data-testid="stSidebarCollapseButton"] button:focus [data-testid="stIconMaterial"],
+[data-testid="stSidebarCollapsedControl"] button:hover [data-testid="stIconMaterial"],
+[data-testid="stSidebarCollapsedControl"] button:focus [data-testid="stIconMaterial"] {
+  color: #FFFFFF !important;
 }
 
 /* ── Sidebar flex bottom push ─────────────────────────── */
