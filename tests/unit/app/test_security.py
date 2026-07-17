@@ -13,6 +13,7 @@ from core.security import (
     _principal_from_better_auth_payload,
     _validate_with_better_auth,
     extract_bearer_token,
+    extract_better_auth_session_cookie,
     require_authenticated_principal,
     require_internal_key,
 )
@@ -30,6 +31,17 @@ def test_extract_bearer_token_rejects_malformed_headers() -> None:
     assert extract_bearer_token("Basic token") is None
     assert extract_bearer_token("Bearer") is None
     assert extract_bearer_token("Bearer  token ") == "token"
+
+
+def test_secure_better_auth_cookie_takes_precedence_in_production() -> None:
+    request = _request(
+        cookie=("better-auth.session_token=local; __Secure-better-auth.session_token=production")
+    )
+
+    assert extract_better_auth_session_cookie(request, "better-auth.session_token") == (
+        "__Secure-better-auth.session_token",
+        "production",
+    )
 
 
 @pytest.mark.parametrize(
@@ -132,13 +144,14 @@ async def test_better_auth_validation_sends_session_cookie(monkeypatch) -> None:
         None,
         settings,
         "cookie-value",
+        session_cookie_name="__Secure-session",
         client_ip="203.0.113.10",
     )
 
     assert principal is not None
     assert principal.subject == "cookie-user"
     assert captured == {
-        "Cookie": "session=cookie-value",
+        "Cookie": "__Secure-session=cookie-value",
         "x-real-ip": "203.0.113.10",
     }
 

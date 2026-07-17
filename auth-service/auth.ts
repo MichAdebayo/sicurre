@@ -7,6 +7,7 @@ import { APIError, createAuthMiddleware } from "better-auth/api";
 import { getMigrations } from "better-auth/db/migration";
 import { Pool } from "pg";
 
+import { ensureConfiguredAdmin, type AdminSeedResult } from "./admin-seed.js";
 import "./env.js";
 
 const authBaseUrl =
@@ -80,6 +81,45 @@ export async function closeAuthDatabase(): Promise<void> {
   localDatabase?.close();
 }
 
+let internalAdminSeedActive = false;
+
+export async function seedProductionAdmin(): Promise<AdminSeedResult> {
+  if (!productionPool) return "disabled";
+
+  return ensureConfiguredAdmin(
+    {
+      email: process.env.SICURRE_ADMIN_EMAIL,
+      password: process.env.SICURRE_ADMIN_PASSWORD,
+      name: process.env.SICURRE_ADMIN_NAME,
+    },
+    {
+      exists: async (email) => {
+        const result = await productionPool.query(
+          `SELECT 1 FROM "${authSchema}"."user" WHERE lower(email) = lower($1) LIMIT 1`,
+          [email],
+        );
+        return result.rowCount === 1;
+      },
+      create: async ({ email, password, name }) => {
+        internalAdminSeedActive = true;
+        try {
+          await auth.api.signUpEmail({ body: { email, password, name } });
+        } finally {
+          internalAdminSeedActive = false;
+        }
+      },
+      normalize: async ({ email, name }) => {
+        await productionPool.query(
+          `UPDATE "${authSchema}"."user"
+           SET name = $1, "emailVerified" = true, "updatedAt" = $2
+           WHERE lower(email) = lower($3)`,
+          [name, new Date(), email],
+        );
+      },
+    },
+  );
+}
+
 type TurnstileVerification = {
   success: boolean;
   "error-codes"?: string[];
@@ -125,7 +165,11 @@ export const auth = betterAuth({
   },
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
-      if (ctx.path !== "/sign-up/email" || !process.env.TURNSTILE_SECRET_KEY?.trim()) {
+      if (
+        internalAdminSeedActive
+        || ctx.path !== "/sign-up/email"
+        || !process.env.TURNSTILE_SECRET_KEY?.trim()
+      ) {
         return;
       }
 
@@ -187,6 +231,8 @@ export const auth = betterAuth({
   emailVerification: {
     sendOnSignUp: true,
     sendVerificationEmail: async ({ user, url }) => {
+      if (internalAdminSeedActive) return;
+
       const apiKey = process.env.LOOPS_API_KEY;
       const transactionalId = process.env.LOOPS_SIGN_UP_TRANSACTION_ID;
       if (!apiKey || !transactionalId) {

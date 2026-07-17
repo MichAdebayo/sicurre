@@ -22,9 +22,7 @@ def _request(*, headers: list[tuple[bytes, bytes]] | None = None) -> Request:
 
 
 def test_rate_limit_prefers_bearer_identity_without_exposing_token() -> None:
-    key = get_rate_limit_key(
-        _request(headers=[(b"authorization", b"Bearer customer-secret")])
-    )
+    key = get_rate_limit_key(_request(headers=[(b"authorization", b"Bearer customer-secret")]))
 
     assert key.startswith("token:")
     assert "customer-secret" not in key
@@ -66,6 +64,16 @@ def test_rate_limit_uses_hashed_session_identity() -> None:
 
     assert key.startswith("session:")
     assert "session-secret" not in key
+
+
+def test_rate_limit_uses_secure_production_session_identity() -> None:
+    """Hash the HTTPS-prefixed Better Auth cookie used in production."""
+    key = get_rate_limit_key(
+        _request(headers=[(b"cookie", b"__Secure-better-auth.session_token=secure-session")])
+    )
+
+    assert key.startswith("session:")
+    assert "secure-session" not in key
 
 
 def test_default_limit_applies_to_undecorated_public_routes() -> None:
