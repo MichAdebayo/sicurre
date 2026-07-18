@@ -9,6 +9,7 @@ import pytest
 
 from data_platform.services.quarantine_delivery import (
     QuarantineDeliveryError,
+    prepare_restoration_mime,
     resolve_sending_address,
     send_raw_email,
 )
@@ -67,22 +68,62 @@ async def test_cloudflare_raw_delivery_accepts_queued_recipient() -> None:
 @pytest.mark.asyncio
 async def test_resolve_sending_address_accepts_verified_destination() -> None:
     """Release envelopes use the routing domain for a verified destination."""
-    transport = httpx.MockTransport(
-        lambda _: httpx.Response(
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/email/routing/addresses"):
+            return httpx.Response(
+                200,
+                json={
+                    "success": True,
+                    "result": [
+                        {"email": "owner@example.test", "verified": "2026-07-18"}
+                    ],
+                },
+            )
+        return httpx.Response(
             200,
-            json={"success": True, "result": [{"email": "owner@example.test", "verified": "2026-07-18"}]},
+            json={
+                "success": True,
+                "result": [
+                    {
+                        "enabled": True,
+                        "matchers": [
+                            {"type": "literal", "value": "owner@example.test"}
+                        ],
+                    }
+                ],
+            },
         )
-    )
+    transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
         address = await resolve_sending_address(
             api_token="token",
             account_id="account",
+            zone_id="zone",
             zone_name="example.test",
             recipient="owner@example.test",
             client=client,
         )
 
-    assert address == "quarantine@example.test"
+    assert address == "owner@example.test"
+
+
+def test_prepare_restoration_mime_preserves_original_sender_context() -> None:
+    """Restoration rewrites authenticated headers without losing reply context."""
+    raw = (
+        b"From: Attacker <sender@outside.test>\r\n"
+        b"To: victim@example.test\r\n"
+        b"DKIM-Signature: stale\r\nSubject: Invoice\r\n\r\nBody"
+    )
+
+    restored = prepare_restoration_mime(
+        raw, sender="owner@example.test", recipient="destination@example.net"
+    ).decode()
+
+    assert "From: Sicurre Restoration <owner@example.test>" in restored
+    assert "To: destination@example.net" in restored
+    assert "Reply-To: Attacker <sender@outside.test>" in restored
+    assert "X-Sicurre-Original-From: Attacker <sender@outside.test>" in restored
+    assert "DKIM-Signature" not in restored
 
 
 @pytest.mark.asyncio
@@ -115,7 +156,8 @@ async def test_cloudflare_network_failure_is_stable(operation: str) -> None:
         with pytest.raises(QuarantineDeliveryError) as exc_info:
             if operation == "resolve":
                 await resolve_sending_address(
-                    api_token="token", account_id="account", zone_name="example.test",
+                    api_token="token", account_id="account", zone_id="zone",
+                    zone_name="example.test",
                     recipient="owner@example.test", client=client
                 )
             else:
@@ -138,7 +180,8 @@ async def test_resolve_sending_address_permission_error() -> None:
     async with httpx.AsyncClient(transport=transport) as client:
         with pytest.raises(QuarantineDeliveryError) as exc_info:
             await resolve_sending_address(
-                api_token="token", account_id="account", zone_name="example.test",
+                api_token="token", account_id="account", zone_id="zone",
+                zone_name="example.test",
                 recipient="owner@example.test", client=client
             )
 
@@ -157,7 +200,8 @@ async def test_resolve_sending_address_requires_successful_response() -> None:
     async with httpx.AsyncClient(transport=transport) as client:
         with pytest.raises(QuarantineDeliveryError) as exc_info:
             await resolve_sending_address(
-                api_token="token", account_id="account", zone_name="example.test",
+                api_token="token", account_id="account", zone_id="zone",
+                zone_name="example.test",
                 recipient="owner@example.test", client=client
             )
 
@@ -177,11 +221,74 @@ async def test_resolve_sending_address_requires_verified_destination() -> None:
     async with httpx.AsyncClient(transport=transport) as client:
         with pytest.raises(QuarantineDeliveryError) as exc_info:
             await resolve_sending_address(
-                api_token="token", account_id="account", zone_name="example.test",
+                api_token="token", account_id="account", zone_id="zone",
+                zone_name="example.test",
                 recipient="owner@example.test", client=client
             )
 
     assert exc_info.value.code == "verified_destination_required"
+
+
+@pytest.mark.asyncio
+async def test_resolve_sending_address_rejects_failed_rules_lookup() -> None:
+    """Routing-rule provider failures do not invent an unauthorized sender."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/email/routing/addresses"):
+            return httpx.Response(
+                200,
+                json={"result": [{"email": "owner@example.test", "verified": True}]},
+            )
+        return httpx.Response(500, json={"errors": [{"message": "Rules unavailable"}]})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(QuarantineDeliveryError) as exc_info:
+            await resolve_sending_address(
+                api_token="token",
+                account_id="account",
+                zone_id="zone",
+                zone_name="example.test",
+                recipient="owner@example.test",
+                client=client,
+            )
+
+    assert exc_info.value.code == "cloudflare_delivery_failed"
+    assert str(exc_info.value) == "Rules unavailable"
+
+
+@pytest.mark.asyncio
+async def test_resolve_sending_address_requires_enabled_literal_alias() -> None:
+    """Disabled, malformed, and catch-all rules cannot become sender identities."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/email/routing/addresses"):
+            return httpx.Response(
+                200,
+                json={"result": [{"email": "owner@example.test", "verified": True}]},
+            )
+        return httpx.Response(
+            200,
+            json={
+                "result": [
+                    "malformed",
+                    {"enabled": False, "matchers": []},
+                    {"enabled": True, "matchers": ["bad", {"type": "all"}]},
+                ]
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(QuarantineDeliveryError) as exc_info:
+            await resolve_sending_address(
+                api_token="token",
+                account_id="account",
+                zone_id="zone",
+                zone_name="example.test",
+                recipient="owner@example.test",
+                client=client,
+            )
+
+    assert exc_info.value.code == "email_routing_sender_required"
 
 
 @pytest.mark.asyncio
