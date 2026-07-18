@@ -43,7 +43,7 @@ class GitHubActionsGateway:
     async def dispatch_training(
         self,
         *,
-        ref: str = "mlops",
+        ref: str = "main",
         kaggle_slug: str,
         workflow: str = "train.yml",
     ) -> None:

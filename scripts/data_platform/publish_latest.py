@@ -18,6 +18,7 @@ from core.database import AsyncSessionFactory
 from data_platform.services.dataset_publish import (
     DatasetPublishService,
     GitHubDispatchPublishError,
+    kaggle_dataset_url,
 )
 from data_platform.services.shared.kaggle_gateway import KaggleGateway, write_split_csv
 from db.models.lineage import DataDataset, SplitName
@@ -142,18 +143,16 @@ async def main() -> None:
             print("\n============================================================")
             print("Publish successful.")
             print(f"Kaggle URL: {result.kaggle_url}")
-            print(f"Kaggle Version ID: {result.kaggle_version_id}")
+            version_label = result.kaggle_version_id or "unknown"
+            print(f"Kaggle Version ID: {version_label}")
             print(f"GitHub Actions Dispatch Sent: {result.github_dispatch_sent}")
             print("============================================================")
         except GitHubDispatchPublishError as exc:
             print("\n============================================================")
             print("Kaggle publish succeeded, but GitHub dispatch failed.")
-            print(f"Kaggle Version ID: {exc.kaggle_version_id}")
-            print(
-                "Kaggle URL: "
-                f"https://www.kaggle.com/datasets/{exc.kaggle_slug}/versions/"
-                f"{exc.kaggle_version_id}"
-            )
+            version_label = exc.kaggle_version_id or "unknown"
+            print(f"Kaggle Version ID: {version_label}")
+            print(f"Kaggle URL: {kaggle_dataset_url(exc.kaggle_slug, exc.kaggle_version_id)}")
             print(f"GitHub dispatch error detail: {exc}")
             print("============================================================")
 
