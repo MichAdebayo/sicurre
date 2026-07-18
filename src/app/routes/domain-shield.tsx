@@ -71,9 +71,13 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
     data: shieldStatus,
     isLoading: shieldLoading,
     error: shieldError,
-    refetch: reloadShield,
   } = useDomainShieldStatus(selectedDomain, !!selectedDomain);
-  const { data: dmarcReports } = useDmarcReportSummary(selectedDomain, !!selectedDomain);
+  const {
+    data: dmarcReports,
+    isLoading: dmarcReportsLoading,
+    isError: dmarcReportsFailed,
+    refetch: refetchDmarcReports,
+  } = useDmarcReportSummary(selectedDomain, !!selectedDomain);
   const { refetch: refetchCloudflareStatus } = useCloudflareStatus();
 
   const refreshShieldMutation = useRefreshDomainShieldStatus();
@@ -344,7 +348,6 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
       if (finalStatus === "active" || finalStatus === "pending_verification") {
         setAutoFixProgress("success");
         await refreshShieldMutation.mutateAsync(selectedDomain);
-        await reloadShield();
         setSuccessNotification(isFR ? "Configuration appliquée" : "Setup applied");
       } else {
         setAutoFixProgress("routing");
@@ -1296,7 +1299,17 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   {hasSicurreDmarcReporting ? t("domain_shield.report_enabled") : t("domain_shield.status_partial")}
                 </span>
               </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-4">
+              {dmarcReportsLoading ? (
+                <div className="mt-4 h-20 animate-pulse rounded-lg bg-surface-low" />
+              ) : dmarcReportsFailed ? (
+                <div role="alert" className="mt-4 rounded-lg border border-error/25 bg-error-container/35 p-4 text-sm text-on-surface">
+                  <p className="font-semibold">{t("common.load_error")}</p>
+                  <button type="button" onClick={() => void refetchDmarcReports()} className="mt-2 font-bold text-primary hover:text-primary-hover">
+                    {t("common.retry")}
+                  </button>
+                </div>
+              ) : (
+              <><div className="mt-4 grid gap-3 sm:grid-cols-4">
                 {[
                   { label: t("domain_shield.report_count"), value: dmarcReports?.report_count ?? 0 },
                   { label: t("domain_shield.report_messages"), value: dmarcReports?.total_messages ?? 0 },
@@ -1324,6 +1337,8 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                 <p className="mt-3 text-[11px] font-semibold text-on-surface-variant">
                   {t("domain_shield.report_empty")}
                 </p>
+              )}
+              </>
               )}
             </div>
           </div>

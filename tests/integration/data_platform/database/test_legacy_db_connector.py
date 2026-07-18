@@ -89,6 +89,22 @@ async def test_legacy_db_connector_uses_configured_sqlite_path(
 
 
 @pytest.mark.asyncio
+async def test_legacy_db_connector_binds_incremental_cursor(
+    tmp_path: Path,
+) -> None:
+    """Treat an untrusted cursor as data rather than executable SQL."""
+    db_path = tmp_path / "test_external_threats.db"
+    _prepare_external_db(db_path)
+    connector = LegacyDbConnector(db_url=f"sqlite+aiosqlite:///{db_path}")
+
+    rows = await connector.fetch_threats("9999-01-01' OR 1=1 --")
+
+    assert rows == []
+    with sqlite3.connect(db_path) as connection:
+        assert connection.execute("SELECT COUNT(*) FROM threat_log").fetchone() == (1,)
+
+
+@pytest.mark.asyncio
 async def test_legacy_db_connector_error_mentions_configured_path(
     tmp_path: Path,
 ) -> None:

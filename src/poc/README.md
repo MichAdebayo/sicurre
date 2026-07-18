@@ -33,12 +33,9 @@ Par défaut, aucune écriture externe n'est autorisée. Le cron de démonstratio
 ## Démarrage
 
 ```bash
-# Terminal 1, dans le dépôt Sicurre ML
-# Charger le secret POC sous le nom attendu par le service ML, puis démarrer l'API.
-set -a
-source ../sicurre/.env
-set +a
-INFERENCE_API_KEY="$SICURRE_POC_INFERENCE_API_KEY" make dev
+# Terminal 1, dans ce dépôt
+# Le lanceur transmet explicitement la clé POC au processus Sicurre-ML.
+make poc-inference
 
 # Terminal 2, dans ce dépôt
 make poc
@@ -50,6 +47,9 @@ tandis que Sicurre ML reçoit `INFERENCE_API_KEY`. Leur valeur doit être identi
 pour le processus local. Le pré-vol du POC vérifie à la fois `/health` et
 l'acceptation de la clé sans exécuter le modèle ; une clé différente est signalée
 comme refusée avant la démonstration.
+
+`SICURRE_ML_REPO` permet de remplacer le chemin frère par défaut
+`../sicurre-ml` si le dépôt ML se trouve ailleurs.
 
 Le POC propose trois modes d'inférence :
 

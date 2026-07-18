@@ -30,48 +30,53 @@ class DeliveryResult:
 async def resolve_sending_address(
     *,
     api_token: str,
-    zone_id: str,
+    account_id: str,
+    zone_name: str,
+    recipient: str,
     client: httpx.AsyncClient | None = None,
 ) -> str:
-    """Return an enabled Cloudflare Email Sending envelope address."""
+    """Validate a free-plan routing destination and return its envelope sender."""
     request_client = client or httpx.AsyncClient(timeout=15.0)
     owns_client = client is None
     try:
         response = await request_client.get(
-            f"{CF_BASE}/zones/{zone_id}/email/sending/subdomains",
+            f"{CF_BASE}/accounts/{account_id}/email/routing/addresses",
             headers={"Authorization": f"Bearer {api_token}"},
         )
     except httpx.HTTPError as exc:
         raise QuarantineDeliveryError(
             "cloudflare_unreachable",
-            "Cloudflare Email Sending readiness is temporarily unreachable.",
+            "Cloudflare Email Routing destinations are temporarily unreachable.",
         ) from exc
     finally:
         if owns_client:
             await request_client.aclose()
     if response.status_code in {401, 403}:
         raise QuarantineDeliveryError(
-            "email_sending_permission_required",
-            "Cloudflare Email Sending: Edit permission is required to release messages.",
+            "email_routing_permission_required",
+            "Cloudflare denied access to Email Routing destinations. Confirm Email "
+            "Routing Addresses: Read is scoped to this account.",
         )
     payload = _json_object(response)
     if not response.is_success:
         raise QuarantineDeliveryError("cloudflare_delivery_failed", _cloudflare_error(payload))
     result = payload.get("result") if isinstance(payload.get("result"), list) else []
-    domain = next(
+    destination = next(
         (
-            str(item.get("name"))
+            item
             for item in result
-            if isinstance(item, dict) and item.get("enabled") and item.get("name")
+            if isinstance(item, dict)
+            and str(item.get("email") or "").lower() == recipient.lower()
         ),
         None,
     )
-    if not domain:
+    if not destination or not destination.get("verified"):
         raise QuarantineDeliveryError(
-            "email_sending_domain_required",
-            "Enable a Cloudflare Email Sending domain before releasing messages.",
+            "verified_destination_required",
+            "Verify the connected destination address in Cloudflare Email Routing "
+            "before releasing messages.",
         )
-    return f"quarantine@{domain}"
+    return f"quarantine@{zone_name}"
 
 
 async def send_raw_email(
@@ -112,7 +117,8 @@ async def send_raw_email(
     if response.status_code in {401, 403}:
         raise QuarantineDeliveryError(
             "email_sending_permission_required",
-            "Cloudflare Email Sending: Edit permission is required to release messages.",
+            "Cloudflare denied delivery. Confirm Email Sending: Edit is scoped to "
+            "the account and the recipient is a verified Email Routing destination.",
         )
     if not response.is_success or payload.get("success") is not True:
         detail = _cloudflare_error(payload)
