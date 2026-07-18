@@ -51,17 +51,37 @@ def _seed_data_evidence(data_path: Path) -> None:
                 created_at TEXT NOT NULL
             )
         """)
-        conn.execute("CREATE TABLE IF NOT EXISTS data_raw_record (id TEXT PRIMARY KEY)")
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS data_raw_record "
+            "(id TEXT PRIMARY KEY, source_system_id TEXT)"
+        )
         conn.execute("CREATE TABLE IF NOT EXISTS data_normalized_message (id TEXT PRIMARY KEY)")
         conn.execute("CREATE TABLE IF NOT EXISTS data_dataset_item (id TEXT PRIMARY KEY)")
 
         # Seed data
-        conn.execute("INSERT INTO data_source_system (id, name, source_type) VALUES ('ss-1', 'PhishTank', 'api')")
-        conn.execute("INSERT INTO data_source_system (id, name, source_type) VALUES ('ss-2', 'CERT-FR', 'scraping')")
-        conn.execute("INSERT INTO data_ingestion_run (id, source_system_id, raw_record_count, finished_at, status) VALUES ('ir-1', 'ss-1', 100, '2026-07-15T12:00:00Z', 'success')")
-        conn.execute("INSERT INTO data_ingestion_run (id, source_system_id, raw_record_count, finished_at, status) VALUES ('ir-2', 'ss-2', 50, '2026-07-15T13:00:00Z', 'success')")
-        conn.execute("INSERT INTO data_dataset (version_tag, status, item_count, created_at) VALUES ('base-20260715', 'frozen', 120, '2026-07-15T14:00:00Z')")
-        conn.execute("INSERT INTO data_raw_record (id) VALUES ('1'), ('2')")
+        conn.execute(
+            "INSERT INTO data_source_system (id, name, source_type) VALUES ('ss-1', 'PhishTank', 'api')"
+        )
+        conn.execute(
+            "INSERT INTO data_source_system (id, name, source_type) VALUES ('ss-2', 'CERT-FR', 'scraping')"
+        )
+        conn.execute(
+            "INSERT INTO data_source_system (id, name, source_type) VALUES "
+            "('ss-3', 'reconstructed/current_frozen/native_external', 'manual')"
+        )
+        conn.execute(
+            "INSERT INTO data_ingestion_run (id, source_system_id, raw_record_count, finished_at, status) VALUES ('ir-1', 'ss-1', 100, '2026-07-15T12:00:00Z', 'success')"
+        )
+        conn.execute(
+            "INSERT INTO data_ingestion_run (id, source_system_id, raw_record_count, finished_at, status) VALUES ('ir-2', 'ss-2', 50, '2026-07-15T13:00:00Z', 'success')"
+        )
+        conn.execute(
+            "INSERT INTO data_dataset (version_tag, status, item_count, created_at) VALUES ('base-20260715', 'frozen', 120, '2026-07-15T14:00:00Z')"
+        )
+        conn.execute(
+            "INSERT INTO data_raw_record (id, source_system_id) "
+            "VALUES ('1', 'ss-1'), ('2', 'ss-2'), ('3', 'ss-3')"
+        )
         conn.execute("INSERT INTO data_normalized_message (id) VALUES ('1'), ('2')")
         conn.execute("INSERT INTO data_dataset_item (id) VALUES ('1'), ('2')")
         conn.commit()
@@ -88,6 +108,7 @@ def poc_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AppTest:
         yield "Done.\n"
 
     from poc.presentation import pipeline_page
+
     monkeypatch.setattr(pipeline_page, "stream_operation", mock_stream_operation)
 
     environment = {
@@ -175,7 +196,7 @@ def test_successful_simulation_populates_operational_pages(poc_app: AppTest) -> 
     assert not poc_app.exception
 
     open_page(poc_app, "Flux de données", "nav_pipeline")
-    assert any(button.label == "Reconstruire la base" for button in poc_app.button)
+    assert any(button.label == "1. Reconstruire la base" for button in poc_app.button)
 
     open_page(poc_app, "Paramètres", "nav_settings")
     assert len(poc_app.selectbox) == 2
@@ -226,10 +247,13 @@ def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
     # Verify seeded counts are shown
     assert any("base-20260715" in md.value for md in poc_app.markdown)
     assert any("PhishTank" in md.value for md in poc_app.markdown)
+    assert any("totaux V1 sont reconstruits" in caption.value for caption in poc_app.caption)
 
     # 2. Test Pipeline Page - Admin Successful Run
     open_page(poc_app, "Flux de données", "nav_pipeline")
-    cron_btn = next(btn for btn in poc_app.button if btn.label == "Cron incrémental")
+    assert any(btn.label == "1. Reconstruire la base" for btn in poc_app.button)
+    assert any(btn.label == "3. Normaliser + construire" for btn in poc_app.button)
+    cron_btn = next(btn for btn in poc_app.button if btn.label == "2. Collecter SEKOIA")
     cron_btn.click().run()
     assert not poc_app.exception
     assert any("Dernière opération terminée avec succès" in info.value for info in poc_app.info)
@@ -262,4 +286,3 @@ def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
 
     open_page(poc_app, "Flux de données", "nav_pipeline")
     assert any("Accès réservé" in warning.value for warning in poc_app.warning)
-

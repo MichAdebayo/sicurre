@@ -65,22 +65,24 @@ async def test_cloudflare_raw_delivery_accepts_queued_recipient() -> None:
 
 
 @pytest.mark.asyncio
-async def test_resolve_sending_address_rejects_disabled_domain() -> None:
-    """Release envelopes use a domain Cloudflare reports as enabled."""
+async def test_resolve_sending_address_accepts_verified_destination() -> None:
+    """Release envelopes use the routing domain for a verified destination."""
     transport = httpx.MockTransport(
         lambda _: httpx.Response(
             200,
-            json={"success": True, "result": [{"name": "mail.example.test", "enabled": True}]},
+            json={"success": True, "result": [{"email": "owner@example.test", "verified": "2026-07-18"}]},
         )
     )
     async with httpx.AsyncClient(transport=transport) as client:
         address = await resolve_sending_address(
             api_token="token",
-            zone_id="zone",
+            account_id="account",
+            zone_name="example.test",
+            recipient="owner@example.test",
             client=client,
         )
 
-    assert address == "quarantine@mail.example.test"
+    assert address == "quarantine@example.test"
 
 
 @pytest.mark.asyncio
@@ -112,7 +114,10 @@ async def test_cloudflare_network_failure_is_stable(operation: str) -> None:
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
         with pytest.raises(QuarantineDeliveryError) as exc_info:
             if operation == "resolve":
-                await resolve_sending_address(api_token="token", zone_id="zone", client=client)
+                await resolve_sending_address(
+                    api_token="token", account_id="account", zone_name="example.test",
+                    recipient="owner@example.test", client=client
+                )
             else:
                 await send_raw_email(
                     api_token="token",
@@ -132,9 +137,12 @@ async def test_resolve_sending_address_permission_error() -> None:
     transport = httpx.MockTransport(lambda _: httpx.Response(401, json={"success": False}))
     async with httpx.AsyncClient(transport=transport) as client:
         with pytest.raises(QuarantineDeliveryError) as exc_info:
-            await resolve_sending_address(api_token="token", zone_id="zone", client=client)
+            await resolve_sending_address(
+                api_token="token", account_id="account", zone_name="example.test",
+                recipient="owner@example.test", client=client
+            )
 
-    assert exc_info.value.code == "email_sending_permission_required"
+    assert exc_info.value.code == "email_routing_permission_required"
 
 
 @pytest.mark.asyncio
@@ -148,23 +156,32 @@ async def test_resolve_sending_address_requires_successful_response() -> None:
     )
     async with httpx.AsyncClient(transport=transport) as client:
         with pytest.raises(QuarantineDeliveryError) as exc_info:
-            await resolve_sending_address(api_token="token", zone_id="zone", client=client)
+            await resolve_sending_address(
+                api_token="token", account_id="account", zone_name="example.test",
+                recipient="owner@example.test", client=client
+            )
 
     assert exc_info.value.code == "cloudflare_delivery_failed"
     assert str(exc_info.value) == "Email Sending is unavailable"
 
 
 @pytest.mark.asyncio
-async def test_resolve_sending_address_requires_enabled_domain() -> None:
-    """A successful response without an enabled domain cannot release mail."""
+async def test_resolve_sending_address_requires_verified_destination() -> None:
+    """An unverified destination cannot receive a released message."""
     transport = httpx.MockTransport(
-        lambda _: httpx.Response(200, json={"success": True, "result": [{"name": "disabled.test"}]})
+        lambda _: httpx.Response(
+            200,
+            json={"success": True, "result": [{"email": "owner@example.test", "verified": None}]},
+        )
     )
     async with httpx.AsyncClient(transport=transport) as client:
         with pytest.raises(QuarantineDeliveryError) as exc_info:
-            await resolve_sending_address(api_token="token", zone_id="zone", client=client)
+            await resolve_sending_address(
+                api_token="token", account_id="account", zone_name="example.test",
+                recipient="owner@example.test", client=client
+            )
 
-    assert exc_info.value.code == "email_sending_domain_required"
+    assert exc_info.value.code == "verified_destination_required"
 
 
 @pytest.mark.asyncio
