@@ -167,7 +167,10 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("INTERNAL_API_KEY", "SICURRE_INTERNAL_API_KEY"),
     )
-    inference_api_key: str | None = Field(default=None, validation_alias="INFERENCE_API_KEY")
+    inference_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("SICURRE_INFERENCE_API_KEY", "INFERENCE_API_KEY"),
+    )
     inference_api_url: str | None = Field(
         default=None,
         validation_alias=AliasChoices("SICURRE_INFERENCE_API_URL", "INFERENCE_API_URL"),

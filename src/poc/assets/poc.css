@@ -9,6 +9,8 @@ __THEME_OVERRIDE__
   --text-2: #475569;
   --text-muted: #64748B;
   --cta-text: #06111F;
+  --cta-bg: #2E6BB5;
+  --cta-hover: #245996;
   --empty-text: #475569;
   --primary: #4A90D9;
   --primary-dark: #2E6BB5;
@@ -41,7 +43,9 @@ __THEME_OVERRIDE__
     --text: #F8FAFC;
     --text-2: #B7C4D7;
     --text-muted: #8090A6;
-    --cta-text: #06111F;
+    --cta-text: #FFFFFF;
+    --cta-bg: #2E6BB5;
+    --cta-hover: #3B7BC4;
     --empty-text: #F8FAFC;
     --primary: #4A90D9;
     --primary-dark: #86C3F3;
@@ -70,7 +74,8 @@ __THEME_OVERRIDE__
   --bg: #07111F; --surface: #0B1626; --border: #26364F;
   --border-line: rgba(255, 255, 255, 0.25);
   --text: #F8FAFC; --text-2: #B7C4D7; --text-muted: #8090A6;
-  --cta-text: #06111F; --empty-text: #F8FAFC;
+  --cta-text: #FFFFFF; --cta-bg: #2E6BB5; --cta-hover: #3B7BC4;
+  --empty-text: #F8FAFC;
   --primary: #4A90D9; --primary-dark: #86C3F3;
   --primary-light: #153F73; --primary-border: #33445F;
   --accent: #F59E0B; --accent-dark: #B45309;
@@ -117,9 +122,9 @@ button[kind="primaryFormSubmit"],
 button[data-testid="stBaseButton-primaryFormSubmit"],
 .stButton > button[kind="primary"],
 div[data-testid="stFormSubmitButton"] button {
-  background: var(--primary) !important;
+  background: var(--cta-bg) !important;
   color: var(--cta-text) !important;
-  border: 1px solid var(--primary-dark) !important;
+  border: 1px solid var(--cta-bg) !important;
   border-radius: 8px !important;
   font-weight: 600 !important;
   transition: all 0.15s ease !important;
@@ -184,8 +189,8 @@ div[data-testid="stFormSubmitButton"] button:active,
 div[data-testid="stFormSubmitButton"] button:hover *,
 div[data-testid="stFormSubmitButton"] button:focus *,
 div[data-testid="stFormSubmitButton"] button:active * {
-  background: var(--primary-dark) !important;
-  border-color: var(--primary-dark) !important;
+  background: var(--cta-hover) !important;
+  border-color: var(--cta-hover) !important;
   color: var(--cta-text) !important;
 }
 
@@ -946,14 +951,14 @@ div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid=
 /* Final primary-state contract shared by light and dark themes. */
 [data-testid="stSidebar"] button[data-testid="stBaseButton-primary"],
 [data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] * {
-    background: var(--primary) !important;
+    background: var(--cta-bg) !important;
     color: var(--cta-text) !important;
 }
 [data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:hover,
 [data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:focus,
 [data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:hover *,
 [data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:focus * {
-    background: var(--primary-dark) !important;
+    background: var(--cta-hover) !important;
     color: var(--cta-text) !important;
 }
 input:focus,

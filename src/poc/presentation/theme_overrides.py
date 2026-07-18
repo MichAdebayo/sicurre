@@ -17,6 +17,8 @@ LIGHT_OVERRIDES = """
   --text-2: #475569 !important;
   --text-muted: #64748B !important;
   --cta-text: #06111F !important;
+  --cta-bg: #2E6BB5 !important;
+  --cta-hover: #245996 !important;
   --empty-text: #475569 !important;
   --primary: #4A90D9 !important;
   --primary-dark: #2E6BB5 !important;
@@ -42,7 +44,9 @@ DARK_OVERRIDES = """
   --text: #F8FAFC !important;
   --text-2: #B7C4D7 !important;
   --text-muted: #8090A6 !important;
-  --cta-text: #06111F !important;
+  --cta-text: #FFFFFF !important;
+  --cta-bg: #2E6BB5 !important;
+  --cta-hover: #3B7BC4 !important;
   --empty-text: #F8FAFC !important;
   --primary: #4A90D9 !important;
   --primary-dark: #86C3F3 !important;

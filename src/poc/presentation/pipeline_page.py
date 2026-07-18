@@ -94,9 +94,10 @@ def render_pipeline_page(
     )
     for column, (translation_key, help_key, operation) in zip(st.columns(3), actions, strict=True):
         with column:
-            st.caption(translate(help_key))
             if st.button(
                 translate(translation_key),
+                key=f"pipeline_action_{operation}",
+                help=translate(help_key),
                 disabled=busy,
                 use_container_width=True,
                 type="primary",

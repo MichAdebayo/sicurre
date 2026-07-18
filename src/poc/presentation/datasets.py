@@ -2,12 +2,28 @@
 
 from __future__ import annotations
 
+import json
+from collections import Counter
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any, Protocol
 
 import streamlit as st
 
 from poc.presentation.formatting import format_number
+
+ROOT_DIR = Path(__file__).resolve().parents[3]
+FROZEN_METADATA_PATH = (
+    ROOT_DIR / "data" / "final" / "provenance" / "current_frozen" / "metadata.json"
+)
+SOURCE_FAMILY_COLORS = {
+    "api": "#2E6BB5",
+    "file": "#0F766E",
+    "database": "#7C3AED",
+    "bigdata": "#B45309",
+    "scraping": "#BE123C",
+    "other": "#64748B",
+}
 
 
 class DataEvidence(Protocol):
@@ -36,6 +52,78 @@ def _source_label(source: str, translate: Callable[[str], str]) -> str:
     return source
 
 
+def _source_family(source: str, source_type: str = "") -> str:
+    """Map persisted or frozen source names to certification acquisition families."""
+    normalized = source.lower().replace("_", "-")
+    normalized_type = source_type.lower().replace("_", "-")
+    if "common-crawl" in normalized:
+        return "bigdata"
+    if normalized.startswith("sap-labs") or "certfr" in normalized or "sekoia" in normalized:
+        return "scraping"
+    if normalized.startswith("kaggle"):
+        return "file"
+    if normalized.startswith("database/") or normalized.startswith("synthetic-generated"):
+        return "database"
+    type_aliases = {
+        "api": "api",
+        "file": "file",
+        "database": "database",
+        "db": "database",
+        "bigdata": "bigdata",
+        "big-data": "bigdata",
+        "scraping": "scraping",
+    }
+    return type_aliases.get(normalized_type, "other")
+
+
+def _load_frozen_source_distribution(
+    metadata_path: Path = FROZEN_METADATA_PATH,
+) -> dict[str, int]:
+    """Read immutable V1 source totals without claiming per-record lineage."""
+    try:
+        payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    distribution = payload.get("source_distribution", {})
+    if not isinstance(distribution, dict):
+        return {}
+    return {
+        str(source): int(count)
+        for source, count in distribution.items()
+        if isinstance(count, int) and count > 0
+    }
+
+
+def _source_family_rows(
+    sources: list[dict[str, Any]], frozen_distribution: dict[str, int]
+) -> list[dict[str, Any]]:
+    """Combine recovered V1 totals with real post-V1 source lineage."""
+    totals: Counter[str] = Counter()
+    provider_counts: Counter[str] = Counter()
+    has_reconstructed_base = any(
+        str(row.get("name", "")).startswith("reconstructed/current_frozen/") for row in sources
+    )
+    if has_reconstructed_base:
+        for source, count in frozen_distribution.items():
+            family = _source_family(source)
+            totals[family] += count
+            provider_counts[family] += 1
+
+    for row in sources:
+        source = str(row.get("name", ""))
+        count = int(row.get("total_records") or 0)
+        if count <= 0 or source.startswith("reconstructed/current_frozen/"):
+            continue
+        family = _source_family(source, str(row.get("source_type") or ""))
+        totals[family] += count
+        provider_counts[family] += 1
+
+    return [
+        {"family": family, "count": count, "provider_count": provider_counts[family]}
+        for family, count in totals.most_common()
+    ]
+
+
 def _render_sources(evidence: DataEvidence, translate: Callable[[str], str]) -> None:
     if not (
         evidence.table_exists("data_source_system")
@@ -58,21 +146,19 @@ def _render_sources(evidence: DataEvidence, translate: Callable[[str], str]) -> 
         LIMIT 30
         """
     )
-    chart_rows = [
-        {
-            "source": row["name"],
-            "source_label": _source_label(str(row["name"]), translate),
-            "count": int(row.get("total_records") or 0),
-            "type": str(row.get("source_type") or "other"),
-        }
-        for row in sources
-        if int(row.get("total_records") or 0) > 0
-    ]
+    frozen_distribution = _load_frozen_source_distribution()
+    chart_rows = _source_family_rows(sources, frozen_distribution)
+    for row in chart_rows:
+        row["family_label"] = translate(f"source_family_{row['family']}")
     if chart_rows:
         st.markdown(f"#### {translate('source_breakdown')}")
-        if any(str(row["source"]).startswith("reconstructed/") for row in chart_rows):
+        if any(str(row["name"]).startswith("reconstructed/") for row in sources):
             st.caption(translate("reconstructed_lineage_note"))
+        present_families = {str(row["family"]) for row in chart_rows}
+        family_order = [family for family in SOURCE_FAMILY_COLORS if family in present_families]
+        family_labels = [translate(f"source_family_{family}") for family in family_order]
         specification = {
+            "height": 220,
             "mark": {
                 "type": "bar",
                 "cornerRadiusTopRight": 3,
@@ -80,21 +166,37 @@ def _render_sources(evidence: DataEvidence, translate: Callable[[str], str]) -> 
             },
             "encoding": {
                 "y": {
-                    "field": "source_label",
+                    "field": "family_label",
                     "type": "nominal",
                     "sort": "-x",
-                    "axis": {"title": None, "labelFontSize": 13},
+                    "axis": {"title": None, "labelFontSize": 13, "labelOverlap": False},
                 },
                 "x": {
                     "field": "count",
                     "type": "quantitative",
                     "axis": {"title": None, "grid": False, "labelFontSize": 12},
                 },
-                "color": {"value": "#4A90D9"},
+                "color": {
+                    "field": "family_label",
+                    "type": "nominal",
+                    "legend": {"title": None, "orient": "bottom", "columns": 3},
+                    "scale": {
+                        "domain": family_labels,
+                        "range": [SOURCE_FAMILY_COLORS[family] for family in family_order],
+                    },
+                },
                 "tooltip": [
-                    {"field": "source", "type": "nominal", "title": translate("source")},
-                    {"field": "type", "type": "nominal", "title": translate("source_method")},
+                    {
+                        "field": "family_label",
+                        "type": "nominal",
+                        "title": translate("source_method"),
+                    },
                     {"field": "count", "type": "quantitative", "title": translate("records")},
+                    {
+                        "field": "provider_count",
+                        "type": "quantitative",
+                        "title": translate("source_count"),
+                    },
                 ],
             },
             "config": {"background": "transparent", "view": {"stroke": "transparent"}},
@@ -126,7 +228,7 @@ def _render_sources(evidence: DataEvidence, translate: Callable[[str], str]) -> 
             "<div class='card' style='padding:9px 12px;margin-bottom:4px;'>"
             "<div style='display:flex;justify-content:space-between;align-items:center;'>"
             f"<span style='font-size:0.9rem;font-weight:600;color:var(--text);'>"
-            f"{row.get('name', '')}</span>"
+            f"{_source_label(str(row.get('name', '')), translate)}</span>"
             f"<span class='badge {badge_class}'>{status}</span></div>"
             f"<div style='font-size:0.78rem;color:var(--text-muted);'>"
             f"{format_number(count)} {translate('records')} &middot; {finished_at}</div></div>",
