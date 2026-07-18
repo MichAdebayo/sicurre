@@ -10,6 +10,7 @@ export default defineConfig({
         "auth-service/server.ts",
         "scripts/app/container_server.mjs",
         "src/app/lib/schemas.ts",
+        "src/app/lib/navigation.ts",
         "src/app/components/common/app-shell.tsx",
         "src/app/components/common/app-toast.tsx",
         "src/app/components/common/sidebar.tsx",

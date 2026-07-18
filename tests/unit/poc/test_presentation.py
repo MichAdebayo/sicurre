@@ -6,6 +6,12 @@ from pathlib import Path
 
 import pytest
 
+from poc.presentation.datasets import (
+    _load_frozen_source_distribution,
+    _source_family,
+    _source_family_rows,
+    _source_label,
+)
 from poc.presentation.formatting import (
     effective_label,
     effective_verdict,
@@ -20,6 +26,79 @@ from poc.presentation.pipeline_page import redact_terminal_line
 from poc.presentation.remediation import filter_threats, partition_delivered_events
 from poc.presentation.result import confidence_bar, result_style
 from poc.presentation.theme import initialize_theme, load_theme_css, set_theme
+
+
+def test_dataset_source_labels_preserve_real_sources_and_shorten_reconstruction() -> None:
+    """Recovered provenance remains readable without disguising real source names."""
+    translations = {
+        "reconstructed_source_native_external": "Recovered external sources",
+    }
+    translate = lambda key: translations.get(key, key)  # noqa: E731
+
+    assert _source_label("PhishTank", translate) == "PhishTank"
+    assert (
+        _source_label("reconstructed/current_frozen/native_external", translate)
+        == "Recovered external sources"
+    )
+
+
+@pytest.mark.parametrize(
+    ("source", "source_type", "family"),
+    [
+        ("kaggle_multilingual_spam", "", "file"),
+        ("common-crawl-bigdata", "", "bigdata"),
+        ("synthetic-generated-common-crawl-signal", "", "bigdata"),
+        ("database/faker/synthetic_spam", "", "database"),
+        ("sap-labs-blog", "", "scraping"),
+        ("PhishTank", "api", "api"),
+        ("SEKOIA Community IOC", "scraping", "scraping"),
+    ],
+)
+def test_dataset_sources_map_to_certification_families(
+    source: str, source_type: str, family: str
+) -> None:
+    assert _source_family(source, source_type) == family
+
+
+def test_frozen_source_distribution_is_validated(tmp_path: Path) -> None:
+    metadata = tmp_path / "metadata.json"
+    metadata.write_text(
+        json.dumps(
+            {
+                "source_distribution": {
+                    "kaggle_multilingual_spam": 4,
+                    "ignored_zero": 0,
+                    "ignored_text": "2",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert _load_frozen_source_distribution(metadata) == {"kaggle_multilingual_spam": 4}
+
+
+def test_dataset_family_rows_conserve_frozen_base_and_add_live_lineage() -> None:
+    sources = [
+        {
+            "name": "reconstructed/current_frozen/native_external",
+            "source_type": "manual",
+            "total_records": 6,
+        },
+        {"name": "PhishTank", "source_type": "api", "total_records": 3},
+        {"name": "SEKOIA Community IOC", "source_type": "scraping", "total_records": 2},
+    ]
+    frozen = {
+        "kaggle_multilingual_spam": 4,
+        "common-crawl-bigdata": 1,
+        "sap-labs-blog": 1,
+    }
+
+    rows = _source_family_rows(sources, frozen)
+    totals = {row["family"]: row["count"] for row in rows}
+
+    assert totals == {"file": 4, "api": 3, "scraping": 3, "bigdata": 1}
+    assert sum(totals.values()) == sum(frozen.values()) + 5
 
 
 def test_presentation_formatting_preserves_existing_contract() -> None:

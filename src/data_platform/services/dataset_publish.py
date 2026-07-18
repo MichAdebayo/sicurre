@@ -66,6 +66,12 @@ class DatasetPublishResult:
     github_dispatch_sent: bool
 
 
+def kaggle_dataset_url(slug: str, version_id: int) -> str:
+    """Return a valid Kaggle URL even when its client omits the version number."""
+    base_url = f"https://www.kaggle.com/datasets/{slug}"
+    return f"{base_url}/versions/{version_id}" if version_id > 0 else base_url
+
+
 class DatasetPublishService:
     """Orchestrates publishing a frozen DataDataset.
 
@@ -181,9 +187,7 @@ class DatasetPublishService:
             ) from exc
 
         # ── 6. Return result ─────────────────────────────────────────────────
-        kaggle_url = (
-            f"https://www.kaggle.com/datasets/{slug}/versions/{kaggle_version_id}"
-        )
+        kaggle_url = kaggle_dataset_url(slug, kaggle_version_id)
         return DatasetPublishResult(
             kaggle_url=kaggle_url,
             kaggle_version_id=kaggle_version_id,

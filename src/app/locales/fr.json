@@ -12,7 +12,9 @@
     "success": "Succès",
     "quarantine": "Quarantaine",
     "alerts": "Alertes & Règles",
-    "domain_shield": "Domain Shield"
+    "domain_shield": "Domain Shield",
+    "load_error": "Impossible de charger ces données.",
+    "retry": "Réessayer"
   },
   "login": {
     "title": "Connectez-vous à votre espace Sicurre",

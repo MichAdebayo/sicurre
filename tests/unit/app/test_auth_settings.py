@@ -49,6 +49,16 @@ def test_sicurre_inference_url_overrides_local_fallback(monkeypatch) -> None:
     assert settings.inference_api_url == "https://api.sicurre.com/v1/classify"
 
 
+def test_sicurre_inference_key_overrides_unprefixed_fallback(monkeypatch) -> None:
+    """The app resolves its documented production inference credential."""
+    monkeypatch.setenv("INFERENCE_API_KEY", "legacy-key")
+    monkeypatch.setenv("SICURRE_INFERENCE_API_KEY", "shared-production-key")
+
+    settings = Settings(_env_file=None)
+
+    assert settings.inference_api_key == "shared-production-key"
+
+
 @pytest.mark.parametrize(
     "url",
     ["not-a-url", "https://internal/v1/classify", "https://api.sicurre.com/v1/email/scan"],
@@ -93,7 +103,9 @@ def test_snapshot_override_and_normalized_sets() -> None:
 
 def test_platform_admin_access_requires_explicit_configuration() -> None:
     """No public email address is privileged by default."""
-    assert Settings(_env_file=None, platform_admin_emails="").platform_admin_email_set == frozenset()
+    assert (
+        Settings(_env_file=None, platform_admin_emails="").platform_admin_email_set == frozenset()
+    )
 
 
 def test_better_auth_schema_is_normalized_and_validated() -> None:
