@@ -196,7 +196,7 @@ def test_successful_simulation_populates_operational_pages(poc_app: AppTest) -> 
     assert not poc_app.exception
 
     open_page(poc_app, "Flux de données", "nav_pipeline")
-    assert any(button.label == "Reconstruire la base" for button in poc_app.button)
+    assert any(button.label == "1. Reconstruire la base" for button in poc_app.button)
 
     open_page(poc_app, "Paramètres", "nav_settings")
     assert len(poc_app.selectbox) == 2
@@ -247,13 +247,13 @@ def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
     # Verify seeded counts are shown
     assert any("base-20260715" in md.value for md in poc_app.markdown)
     assert any("PhishTank" in md.value for md in poc_app.markdown)
-    assert any("base V1 récupérée" in caption.value for caption in poc_app.caption)
+    assert any("totaux V1 sont reconstruits" in caption.value for caption in poc_app.caption)
 
     # 2. Test Pipeline Page - Admin Successful Run
     open_page(poc_app, "Flux de données", "nav_pipeline")
-    assert any("préfixe R2 demonstrations/poc" in caption.value for caption in poc_app.caption)
-    assert any("Aucun envoi Kaggle" in caption.value for caption in poc_app.caption)
-    cron_btn = next(btn for btn in poc_app.button if btn.label == "Cron incrémental")
+    assert any(btn.label == "1. Reconstruire la base" for btn in poc_app.button)
+    assert any(btn.label == "3. Normaliser + construire" for btn in poc_app.button)
+    cron_btn = next(btn for btn in poc_app.button if btn.label == "2. Collecter SEKOIA")
     cron_btn.click().run()
     assert not poc_app.exception
     assert any("Dernière opération terminée avec succès" in info.value for info in poc_app.info)
