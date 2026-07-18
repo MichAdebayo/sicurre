@@ -163,6 +163,7 @@ async def test_scan_email_returns_503_when_inference_unavailable(
 class TestEmailScanRequestValidation:
     """Verify field constraints on the email scan request schema."""
 
+
     def test_rejects_oversized_subject(self) -> None:
         with pytest.raises(ValidationError, match="String should have at most 500"):
             EmailScanRequest(subject="X" * 501, sender="a@b.com", text="Hi")

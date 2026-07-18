@@ -8,6 +8,11 @@ import {
   useCurrentSession,
   useLogout,
 } from "./lib/api";
+import {
+  getSidebarPageFromPath,
+  resolveAuthorizedPage,
+  sidebarPagePaths,
+} from "./lib/navigation";
 
 const LandingRoute = lazy(() => import("./routes/landing"));
 const LoginRoute = lazy(() => import("./routes/login"));
@@ -105,11 +110,22 @@ function AppContent() {
     }
     setViewStateState(view);
   };
-  const [activePage, setActivePage] = useState<SidebarPage>("dashboard");
+  const [activePage, setActivePage] = useState<SidebarPage>(
+    () => getSidebarPageFromPath(window.location.pathname) ?? "dashboard",
+  );
   const [settingsTab, setSettingsTab] = useState<string | undefined>();
   const sessionQuery = useCurrentSession(sessionLookupEnabled);
   const logoutMutation = useLogout();
   const session = sessionQuery.data;
+
+  const setAuthenticatedPage = (page: SidebarPage, replace = false) => {
+    const nextPath = sidebarPagePaths[page];
+    if (window.location.pathname !== nextPath) {
+      const method = replace ? "replaceState" : "pushState";
+      window.history[method]({ sicurrePage: page }, "", nextPath);
+    }
+    setActivePage(page);
+  };
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("sicurre_theme");
@@ -131,15 +147,17 @@ function AppContent() {
   useEffect(() => {
     if (session) {
       setHasStoredSession(true);
-      if (session.is_platform_admin) {
-        setActivePage("logs");
-      }
+      const requested = getSidebarPageFromPath(window.location.pathname);
+      setAuthenticatedPage(resolveAuthorizedPage(requested, {
+        isPlatformAdmin: session.is_platform_admin,
+        onboardingRequired: session.onboarding_required,
+      }), true);
     }
   }, [session]);
 
   useEffect(() => {
     if (session?.onboarding_required && activePage !== "settings") {
-      setActivePage("settings");
+      setAuthenticatedPage("settings", true);
     }
   }, [session?.onboarding_required, activePage]);
 
@@ -149,21 +167,29 @@ function AppContent() {
       if (pathView) {
         sessionStorage.setItem("sicurre_view_state", pathView);
         setViewStateState(pathView);
+        return;
+      }
+      const page = getSidebarPageFromPath(window.location.pathname);
+      if (page && session) {
+        setActivePage(resolveAuthorizedPage(page, {
+          isPlatformAdmin: session.is_platform_admin,
+          onboardingRequired: session.onboarding_required,
+        }));
       }
     };
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
+  }, [session]);
 
   useEffect(() => {
     if (session && !session.is_platform_admin && activePage === "logs") {
-      setActivePage("dashboard");
+      setAuthenticatedPage("dashboard", true);
     }
   }, [session, activePage]);
 
   const handleLoginSuccess = () => {
-    window.history.replaceState({}, document.title, "/");
+    window.history.replaceState({}, document.title, sidebarPagePaths.dashboard);
     sessionStorage.removeItem("sicurre_view_state");
     setSessionLookupEnabled(true);
     setHasStoredSession(true);
@@ -228,7 +254,7 @@ function AppContent() {
     if (tab) {
       setSettingsTab(tab);
     }
-    setActivePage("settings");
+    setAuthenticatedPage("settings");
   };
 
   return (
@@ -239,7 +265,7 @@ function AppContent() {
         if (session.is_platform_admin && page !== "logs" && page !== "settings" && page !== "support") {
           return;
         }
-        setActivePage(page);
+        setAuthenticatedPage(page);
       }}
       onLogout={handleLogout}
       userName={session.display_name}
@@ -250,7 +276,7 @@ function AppContent() {
       <AnimatePresence mode="wait">
         {activePage === "dashboard" && !session.is_platform_admin && <DashboardRoute key="dashboard" session={session} onGoToSettings={handleGoToSettings} />}
         {activePage === "threats" && !session.is_platform_admin && (
-          <ThreatsRoute key="threats" onOpenQuarantine={() => setActivePage("quarantine")} />
+          <ThreatsRoute key="threats" onOpenQuarantine={() => setAuthenticatedPage("quarantine")} />
         )}
         {activePage === "quarantine" && !session.is_platform_admin && <QuarantineRoute key="quarantine" />}
         {activePage === "alerts" && !session.is_platform_admin && <AlertsRoute key="alerts" />}

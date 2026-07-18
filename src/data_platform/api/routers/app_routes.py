@@ -686,7 +686,8 @@ async def _probe_cloudflare_runtime(
 ) -> list[dict]:
     rows = await _admin_rows(
         """
-        SELECT zone_name, zone_id, account_id, worker_name, rule_id, api_token, status
+        SELECT zone_name, zone_id, account_id, worker_name, rule_id, api_token,
+               destination_email, status
         FROM cloudflare_integration
         WHERE status IN ('active', 'pending_verification', 'provisioning')
         ORDER BY updated_at DESC
@@ -804,27 +805,34 @@ async def _probe_cloudflare_runtime(
                 )
             )
 
-    if zone_id:
-        sending_url = f"{CF_BASE}/zones/{zone_id}/email/sending/subdomains"
+    if account_id:
+        sending_url = f"{CF_BASE}/accounts/{account_id}/email/routing/addresses"
         try:
             response = await client.get(sending_url, headers=headers)
             payload = response.json()
-            subdomains = payload.get("result", []) if response.status_code == 200 else []
-            enabled = [item for item in subdomains if item.get("enabled")]
+            addresses = payload.get("result", []) if response.status_code == 200 else []
+            destination = str(row.get("destination_email") or "").lower()
+            verified = any(
+                str(item.get("email") or "").lower() == destination and item.get("verified")
+                for item in addresses
+            )
             if response.status_code in {401, 403}:
                 sending_status = "down"
-                sending_message = "Cloudflare Email Sending: Edit permission is missing."
+                sending_message = (
+                    "Cloudflare denied access to Email Routing destinations. Confirm "
+                    "account-scoped Email Routing Addresses: Read permission."
+                )
             elif response.status_code != 200:
                 sending_status = "degraded"
-                sending_message = "Cloudflare Email Sending readiness could not be verified."
-            elif not enabled:
+                sending_message = "Cloudflare delivery readiness could not be verified."
+            elif not verified:
                 sending_status = "degraded"
                 sending_message = (
-                    "No enabled Cloudflare Email Sending domain is available for releases."
+                    "The connected Email Routing destination is not verified for releases."
                 )
             else:
                 sending_status = "ok"
-                sending_message = "Cloudflare Email Sending is ready for quarantine releases."
+                sending_message = "Verified Email Routing delivery is ready for releases."
             results.append(
                 _runtime_status(
                     component="cloudflare_email_sending",
@@ -1204,7 +1212,9 @@ async def _release_quarantine_item(*, id: str, current_user: AuthUser) -> dict:
         )
         envelope_from = await resolve_sending_address(
             api_token=api_token,
-            zone_id=str(integration["zone_id"]),
+            account_id=str(integration["account_id"]),
+            zone_name=str(integration["zone_name"]),
+            recipient=str(integration["destination_email"]),
         )
         result = await send_raw_email(
             api_token=api_token,
@@ -1219,7 +1229,7 @@ async def _release_quarantine_item(*, id: str, current_user: AuthUser) -> dict:
             "WHERE id = ? AND workspace_id = ?",
             (str(exc)[:240], id, current_user.workspace_id),
         )
-        status_code = 403 if exc.code == "email_sending_permission_required" else 424
+        status_code = 403 if exc.code.endswith("permission_required") else 424
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception("Quarantine release failed")
