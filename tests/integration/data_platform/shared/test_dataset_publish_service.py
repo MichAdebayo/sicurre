@@ -148,6 +148,22 @@ async def test_publish_returns_result_on_success(session: AsyncSession) -> None:
 
 
 @pytest.mark.asyncio
+async def test_publish_uses_dataset_root_when_kaggle_omits_version(
+    session: AsyncSession,
+) -> None:
+    dataset = await _insert_frozen_dataset(session)
+    svc = DatasetPublishService(settings=_full_settings())
+    kaggle_stub = AsyncMock(spec=KaggleGateway)
+    kaggle_stub.push_version.return_value = 0
+    github_stub = AsyncMock(spec=GitHubActionsGateway)
+
+    with patch.object(svc, "_require_secrets", return_value=(kaggle_stub, github_stub)):
+        result = await svc.publish(session, dataset.id)
+
+    assert result.kaggle_url == "https://www.kaggle.com/datasets/testuser/sicurre-data"
+
+
+@pytest.mark.asyncio
 async def test_publish_writes_kaggle_version_to_db(session: AsyncSession) -> None:
     dataset = await _insert_frozen_dataset(session)
     svc = DatasetPublishService(settings=_full_settings())

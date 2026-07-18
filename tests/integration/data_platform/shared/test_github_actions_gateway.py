@@ -39,7 +39,7 @@ async def test_dispatch_training_success(gateway: GitHubActionsGateway) -> None:
     import json
 
     body = json.loads(request.content)
-    assert body["ref"] == "mlops"
+    assert body["ref"] == "main"
     assert body["inputs"]["training_dataset"] == "user/sicurre-data"
 
 

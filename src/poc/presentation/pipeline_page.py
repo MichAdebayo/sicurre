@@ -88,14 +88,16 @@ def render_pipeline_page(
         st.warning(translate("pipeline_busy"))
 
     actions = (
-        ("pipeline_base", "base_replay"),
-        ("pipeline_cron", "incremental_demo"),
-        ("pipeline_push", "release_preview"),
+        ("pipeline_base", "pipeline_base_help", "base_replay"),
+        ("pipeline_cron", "pipeline_cron_help", "incremental_demo"),
+        ("pipeline_push", "pipeline_push_help", "release_preview"),
     )
-    for column, (translation_key, operation) in zip(st.columns(3), actions, strict=True):
+    for column, (translation_key, help_key, operation) in zip(st.columns(3), actions, strict=True):
         with column:
             if st.button(
                 translate(translation_key),
+                key=f"pipeline_action_{operation}",
+                help=translate(help_key),
                 disabled=busy,
                 use_container_width=True,
                 type="primary",

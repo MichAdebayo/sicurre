@@ -441,10 +441,15 @@ export default function QuarantineRoute() {
 
 function quarantineActionError(error: unknown, isFrench: boolean): string {
   const message = error instanceof Error ? error.message : "";
-  if (message.includes("Email Sending: Edit")) {
+  if (message.includes("Email Sending")) {
     return isFrench
-      ? "Ajoutez l’autorisation Cloudflare « Email Sending: Edit » au token."
-      : "Add Cloudflare Email Sending: Edit permission to the token.";
+      ? "Cloudflare refuse l’envoi. Vérifiez la destination Email Routing et la permission « Email Sending: Edit » du compte."
+      : "Cloudflare denied sending. Verify the Email Routing destination and account-level Email Sending: Edit permission.";
+  }
+  if (message.includes("destination") || message.includes("Routing Addresses")) {
+    return isFrench
+      ? "Vérifiez l’adresse de destination dans Cloudflare Email Routing avant de délivrer ce message."
+      : "Verify the destination address in Cloudflare Email Routing before delivering this message.";
   }
   if (message.includes("Original email content is unavailable")) {
     return isFrench

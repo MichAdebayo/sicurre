@@ -174,6 +174,7 @@ async def test_cloudflare_probe_validates_all_runtime_resources(
         return [
             {
                 "zone_name": "example.test",
+                "destination_email": "owner@example.test",
                 "zone_id": "zone",
                 "account_id": "account",
                 "worker_name": "sicurre-mail",
@@ -199,7 +200,8 @@ async def test_cloudflare_probe_validates_all_runtime_resources(
         if request.url.path.endswith("/email/routing/rules"):
             return httpx.Response(200, json={"result": [{"id": "rule", "enabled": True}]})
         return httpx.Response(
-            200, json={"result": [{"name": "mail.example.test", "enabled": True}]}
+            200,
+            json={"result": [{"email": "owner@example.test", "verified": "2026-07-18"}]},
         )
 
     monkeypatch.setattr(app_routes, "_admin_rows", integration)
@@ -350,9 +352,9 @@ async def test_cloudflare_probe_reports_undecryptable_credential(
 @pytest.mark.parametrize(
     ("status_code", "payload", "expected_status", "message_fragment"),
     [
-        (403, {"success": False}, "down", "permission is missing"),
+        (403, {"success": False}, "down", "Routing destinations"),
         (500, {"success": False}, "degraded", "could not be verified"),
-        (200, {"result": []}, "degraded", "No enabled"),
+        (200, {"result": []}, "degraded", "not verified"),
     ],
 )
 async def test_cloudflare_probe_distinguishes_email_sending_failures(
@@ -368,6 +370,7 @@ async def test_cloudflare_probe_distinguishes_email_sending_failures(
         return [
             {
                 "zone_name": "example.test",
+                "destination_email": "owner@example.test",
                 "zone_id": "zone",
                 "account_id": "account",
                 "worker_name": "worker",
@@ -418,6 +421,7 @@ async def test_cloudflare_probe_handles_email_sending_probe_exception(
         return [
             {
                 "zone_name": "example.test",
+                "destination_email": "owner@example.test",
                 "zone_id": "zone",
                 "account_id": "account",
                 "worker_name": "worker",

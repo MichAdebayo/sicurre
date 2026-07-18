@@ -12,7 +12,9 @@
     "success": "Success",
     "quarantine": "Quarantine",
     "alerts": "Alerts & Rules",
-    "domain_shield": "Domain Shield"
+    "domain_shield": "Domain Shield",
+    "load_error": "These data could not be loaded.",
+    "retry": "Try again"
   },
   "login": {
     "title": "Sign in to your Sicurre account",

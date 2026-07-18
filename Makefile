@@ -17,7 +17,7 @@
         annotate \
         generate-data dataset-build dataset-export publish-latest dataset-release monthly-release \
         seed-frozen-dataset \
-		poc-replay-frozen \
+		poc-replay-frozen poc-inference \
 		poc-cron-demo poc-release-preview poc-staging-publish \
         pipeline-push run-pipeline demo-v1 demo-v2 \
         poc db-seed r2-freeze-proof dev-app dev
@@ -84,6 +84,7 @@ help:
 	@echo ""
 	@echo "  POC"
 	@echo "  make poc                       - Launch Streamlit POC dashboard"
+	@echo "  make poc-inference             - Launch Sicurre-ML with the POC bearer key"
 	@echo ""
 	@echo "  Dev"
 	@echo "  make db-seed                   - Manually seed external_threats.db (dev utility)"
@@ -356,6 +357,29 @@ demo-v2:
 	@echo "Demo V2 Dataset Generated"
 
 # ── POC ───────────────────────────────────────────────────────────────────────
+
+SICURRE_ML_REPO ?= ../sicurre-ml
+
+poc-inference:
+	@test -f .env || (echo "ERROR: root .env is required" && exit 1)
+	@test -f "$(SICURRE_ML_REPO)/Makefile" || (echo "ERROR: Sicurre-ML repository not found at $(SICURRE_ML_REPO)" && exit 1)
+	@set -a; . ./.env; set +a; \
+		test -n "$$SICURRE_POC_INFERENCE_API_KEY" || (echo "ERROR: SICURRE_POC_INFERENCE_API_KEY is missing" && exit 1); \
+		status=$$(curl --silent --output /dev/null --write-out "%{http_code}" \
+			--header "Authorization: Bearer $$SICURRE_POC_INFERENCE_API_KEY" \
+			--header "Content-Type: application/json" \
+			--data '{}' "$$SICURRE_POC_INFERENCE_API_URL" || true); \
+		if [ "$$status" = "422" ]; then \
+			echo "Sicurre-ML is already running and accepts the POC bearer key."; \
+			exit 0; \
+		fi; \
+		if [ "$$status" = "401" ]; then \
+			echo "ERROR: port 8000 is serving Sicurre-ML with a different bearer key."; \
+			echo "Stop that process, then run make poc-inference again."; \
+			exit 1; \
+		fi; \
+		cd "$(SICURRE_ML_REPO)"; \
+		INFERENCE_API_KEY="$$SICURRE_POC_INFERENCE_API_KEY" $(MAKE) serve-reload
 
 poc-seed:
 	@echo "Seeding POC users (admin + demo)..."
