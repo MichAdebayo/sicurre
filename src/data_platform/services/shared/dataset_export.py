@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import json
-from pathlib import Path
 
 import pandas as pd
 from sqlalchemy import create_engine, text
 
 from core.config import ROOT_DIR, get_settings
+from data_platform.services.shared.dataset_manifest import build_dataset_manifest
 from data_platform.services.shared.snapshot_storage import build_snapshot_store
 
 
@@ -30,7 +30,8 @@ class DatasetExportService:
         print("=" * 60)
 
         query = text("""
-            SELECT 
+            SELECT
+                d.id as dataset_id,
                 d.name as dataset_name,
                 d.item_count,
                 di.split_name,
@@ -53,6 +54,7 @@ class DatasetExportService:
             raise ValueError(f"No records found for dataset version: {version_tag}")
 
         export_results: list[dict[str, str]] = []
+        split_payloads: dict[str, bytes] = {}
         for split in ["train", "val", "test"]:
             split_df = dataframe[dataframe["split_name"] == split].copy()
             if split_df.empty:
@@ -76,12 +78,9 @@ class DatasetExportService:
                 "class_weights": sample_weights,
             }
 
-            csv_payload = (
-                split_df[["text", "label"]].to_csv(index=False).encode("utf-8")
-            )
-            json_payload = json.dumps(metadata, indent=2, ensure_ascii=False).encode(
-                "utf-8"
-            )
+            csv_payload = split_df[["text", "label"]].to_csv(index=False).encode("utf-8")
+            split_payloads[split] = csv_payload
+            json_payload = json.dumps(metadata, indent=2, ensure_ascii=False).encode("utf-8")
 
             export_results.append(
                 asyncio.run(
@@ -98,12 +97,40 @@ class DatasetExportService:
                 f"\n📁 Exported Split: [{split.upper()}] to raw-snapshots/{self.export_prefix}/{version_tag}/{split}"
             )
             print(f"   > Generated: dataset.csv      ({len(split_df):,} rows)")
-            print(
-                f"   > Generated: metadata.json    ({len(label_stats)} identified classes)"
-            )
+            print(f"   > Generated: metadata.json    ({len(label_stats)} identified classes)")
         for result in export_results:
             print(f"   > CSV URI : {result['csv_uri']}")
             print(f"   > JSON URI: {result['json_uri']}")
+
+        manifest_payload, manifest_checksum = build_dataset_manifest(
+            dataset_id=str(dataframe["dataset_id"].iloc[0]),
+            version_tag=version_tag,
+            item_count=len(dataframe),
+            split_payloads=split_payloads,
+        )
+        manifest_uri = asyncio.run(
+            self._export_manifest(version_tag=version_tag, payload=manifest_payload)
+        )
+        with self.engine.begin() as connection:
+            connection.execute(
+                text(
+                    """
+                    UPDATE data_dataset
+                    SET artifact_uri = :artifact_uri,
+                        content_checksum = :content_checksum,
+                        schema_version = :schema_version
+                    WHERE version_tag = :version_tag
+                    """
+                ),
+                {
+                    "artifact_uri": manifest_uri,
+                    "content_checksum": manifest_checksum,
+                    "schema_version": "1",
+                    "version_tag": version_tag,
+                },
+            )
+        print(f"   > Manifest URI: {manifest_uri}")
+        print(f"   > Manifest SHA-256: {manifest_checksum}")
 
         print("\n✅ Dataset export completed successfully!")
 
@@ -135,3 +162,16 @@ class DatasetExportService:
             content_type="application/json; charset=utf-8",
         )
         return {"csv_uri": csv_result.storage_uri, "json_uri": json_result.storage_uri}
+
+    async def _export_manifest(self, *, version_tag: str, payload: bytes) -> str:
+        """Persist the canonical manifest above the split object prefixes."""
+        key = self.snapshot_store.build_object_key(
+            source_prefix=f"{self.export_prefix}/{version_tag}",
+            filename="dataset-manifest.json",
+        )
+        result = await self.snapshot_store.write_snapshot(
+            object_key=key,
+            payload=payload,
+            content_type="application/json; charset=utf-8",
+        )
+        return result.storage_uri

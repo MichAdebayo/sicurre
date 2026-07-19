@@ -270,6 +270,33 @@ cron run.
 The current placeholder `train.csv` in Kaggle was only a connectivity smoke
 test. The real workflow is the frozen dataset export plus publish endpoint.
 
+## Model Provenance And Promotion
+
+MLflow remains authoritative for experiment parameters, complete metrics,
+evaluation artifacts, and registry versions. Sicurre stores only operational
+lineage needed to explain which immutable model was evaluated, approved, and
+deployed:
+
+- `data_evaluation_set` registers an immutable, human-reviewed evaluation-only
+  JSONL asset. It has its own R2 URI/checksum and cannot enter training splits.
+- `ml_model_version` links one candidate to its frozen `data_dataset`, semantic
+  model version, service source revision, GitHub training run, MLflow
+  run/version, and immutable Hugging Face repository revision.
+- `ml_model_evaluation` links candidate and incumbent to the same approved
+  evaluation-set version. Its small metric snapshot records only weighted F1,
+  phishing recall, and legitimate false-positive counts used by the decision;
+  full evidence remains in the referenced MLflow evaluation run.
+- `ml_model_deployment` records the result of the manually approved promotion
+  workflow, approver, immutable deployed revision, previous model, and rollback
+  or failure evidence.
+
+Training always creates a `candidate`. Promotion is never a training side
+effect. The owner reviews MLflow evidence, manually dispatches the Sicurre-ML
+promotion workflow, and approves its single GitHub `production` environment.
+Only a passing evaluation plus a successful deployment callback changes the
+recorded production model; the incumbent is then retained as `retired` for
+deterministic rollback.
+
 ## CRUD Policy
 
 Full CRUD:

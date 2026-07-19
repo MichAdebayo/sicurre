@@ -8,9 +8,8 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import UUID
 
 import pytest
 import pytest_asyncio
@@ -31,7 +30,6 @@ from data_platform.services.shared.github_actions_gateway import (
 )
 from data_platform.services.shared.kaggle_gateway import KaggleGateway, KagglePushError
 from db.models.lineage import DataDataset, DatasetStatus
-from db.queries.records import DatasetQueries
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -82,7 +80,7 @@ async def _insert_frozen_dataset(session: AsyncSession) -> DataDataset:
         version_tag="v1.0.0",
         target_usage="training",
         status=DatasetStatus.FROZEN.value,
-        frozen_at=datetime.now(timezone.utc),
+        frozen_at=datetime.now(UTC),
         item_count=0,
     )
     session.add(dataset)
@@ -145,6 +143,16 @@ async def test_publish_returns_result_on_success(session: AsyncSession) -> None:
     assert result.kaggle_version_id == 3
     assert "testuser/sicurre-data" in result.kaggle_url
     assert "3" in result.kaggle_url
+    await session.refresh(dataset)
+    assert dataset.content_checksum is not None
+    assert len(dataset.content_checksum) == 64
+    assert dataset.schema_version == "1"
+    github_stub.dispatch_training.assert_awaited_once_with(
+        kaggle_slug="testuser/sicurre-data",
+        dataset_id=str(dataset.id),
+        dataset_version="v1.0.0",
+        dataset_sha256=dataset.content_checksum,
+    )
 
 
 @pytest.mark.asyncio

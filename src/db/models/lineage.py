@@ -421,6 +421,9 @@ class DataDataset(Base):
     frozen_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     item_count: Mapped[int] = mapped_column(sa.Integer(), nullable=False, default=0)
     kaggle_version_id: Mapped[int | None] = mapped_column(sa.Integer())
+    artifact_uri: Mapped[str | None] = mapped_column(sa.Text())
+    content_checksum: Mapped[str | None] = mapped_column(sa.Text())
+    schema_version: Mapped[str | None] = mapped_column(sa.Text())
     published_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True), nullable=False, default=utc_now
