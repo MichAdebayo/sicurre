@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from argparse import Namespace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -85,3 +86,51 @@ async def test_publish_evaluation_set_stores_and_registers_manifest(
     assert registration.object_uri.startswith("r2://evaluation/")
     store.write_snapshot.assert_awaited_once()
     register.assert_awaited_once()
+
+
+def test_publish_cli_parses_and_prints_registration(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The publication entrypoint preserves explicit reviewer arguments."""
+    input_path = tmp_path / "golden.jsonl"
+    input_path.write_text("{}\n")
+    registration = command.EvaluationSetRegistration.model_validate(
+        {
+            "name": "golden",
+            "version_tag": "golden-v1",
+            "schema_version": "1",
+            "provenance": "synthetic_provisional",
+            "status": "approved",
+            "object_uri": "r2://evaluation/golden.jsonl",
+            "content_checksum": "a" * 64,
+            "item_count": 60,
+            "label_counts": {"phishing": 25, "legitimate": 25, "spam": 10},
+            "language_counts": {"fr": 60},
+            "reviewed_by": "repository-owner",
+            "reviewed_at": "2026-07-19T17:29:21Z",
+        }
+    )
+    publish = AsyncMock(return_value=registration)
+    monkeypatch.setattr(command, "publish", publish)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "publish",
+            "--input",
+            str(input_path),
+            "--version-tag",
+            "golden-v1",
+            "--reviewed-by",
+            "repository-owner",
+            "--reviewed-at",
+            "2026-07-19T17:29:21Z",
+            "--backend",
+            "r2",
+        ],
+    )
+    command.main()
+    assert '"version_tag": "golden-v1"' in capsys.readouterr().out
+    publish.assert_awaited_once()
