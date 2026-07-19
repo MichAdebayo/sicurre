@@ -15,6 +15,11 @@ _DISPATCH_URL = (
     "https://api.github.com/repos/owner-test/sicurre-ml/actions/workflows/train.yml/dispatches"
 )
 _WORKFLOW_URL = "https://api.github.com/repos/owner-test/sicurre-ml/actions/workflows/train.yml"
+LINEAGE = {
+    "dataset_id": "545aaf99-05cd-4a4b-b31a-689265d873ae",
+    "dataset_version": "base-20260718-144342",
+    "dataset_sha256": "a" * 64,
+}
 
 
 @pytest.fixture
@@ -32,7 +37,7 @@ async def test_dispatch_training_success(gateway: GitHubActionsGateway) -> None:
     """204 response completes without error."""
     respx.post(_DISPATCH_URL).mock(return_value=httpx.Response(204))
 
-    await gateway.dispatch_training(kaggle_slug="user/sicurre-data")
+    await gateway.dispatch_training(kaggle_slug="user/sicurre-data", **LINEAGE)
 
     assert respx.calls.call_count == 1
     request = respx.calls.last.request
@@ -41,6 +46,9 @@ async def test_dispatch_training_success(gateway: GitHubActionsGateway) -> None:
     body = json.loads(request.content)
     assert body["ref"] == "main"
     assert body["inputs"]["training_dataset"] == "user/sicurre-data"
+    assert body["inputs"]["dataset_id"] == LINEAGE["dataset_id"]
+    assert body["inputs"]["dataset_version"] == LINEAGE["dataset_version"]
+    assert body["inputs"]["dataset_sha256"] == LINEAGE["dataset_sha256"]
 
 
 @pytest.mark.asyncio
@@ -50,7 +58,7 @@ async def test_dispatch_training_sends_bearer_token(
 ) -> None:
     respx.post(_DISPATCH_URL).mock(return_value=httpx.Response(204))
 
-    await gateway.dispatch_training(kaggle_slug="user/sicurre-data")
+    await gateway.dispatch_training(kaggle_slug="user/sicurre-data", **LINEAGE)
 
     auth_header = respx.calls.last.request.headers.get("Authorization", "")
     assert auth_header == "Bearer test-token"
@@ -68,7 +76,7 @@ async def test_dispatch_training_raises_on_non_204(
         )
 
         with pytest.raises(GitHubDispatchError):
-            await gateway.dispatch_training(kaggle_slug="user/sicurre-data")
+            await gateway.dispatch_training(kaggle_slug="user/sicurre-data", **LINEAGE)
 
 
 @pytest.mark.asyncio
@@ -77,7 +85,7 @@ async def test_dispatch_training_custom_ref(gateway: GitHubActionsGateway) -> No
     """Custom ref is forwarded in the request body."""
     respx.post(_DISPATCH_URL).mock(return_value=httpx.Response(204))
 
-    await gateway.dispatch_training(kaggle_slug="user/sicurre-data", ref="main")
+    await gateway.dispatch_training(kaggle_slug="user/sicurre-data", ref="main", **LINEAGE)
 
     import json
 
@@ -95,7 +103,7 @@ async def test_dispatch_training_custom_workflow() -> None:
     respx.post(custom_url).mock(return_value=httpx.Response(204))
 
     gw = GitHubActionsGateway(token="tok", owner="owner-test", repo="sicurre-ml")
-    await gw.dispatch_training(kaggle_slug="slug", workflow="retrain.yml")
+    await gw.dispatch_training(kaggle_slug="slug", workflow="retrain.yml", **LINEAGE)
 
     assert respx.calls.call_count == 1
 
