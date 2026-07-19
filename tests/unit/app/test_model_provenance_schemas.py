@@ -78,6 +78,15 @@ def test_approved_evaluation_set_requires_review_and_balanced_counts() -> None:
                 "language_counts": {"fr": 1},
             }
         )
+    with pytest.raises(ValidationError, match="only French"):
+        EvaluationSetRegistration.model_validate(
+            {
+                **base,
+                "reviewed_by": "owner",
+                "reviewed_at": "2026-07-19T10:00:00Z",
+                "language_counts": {"fr": 1, "en": 1},
+            }
+        )
 
 
 def test_reported_evaluation_outcome_must_match_metrics() -> None:
