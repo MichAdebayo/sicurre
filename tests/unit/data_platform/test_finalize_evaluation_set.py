@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
+from data_platform.cli.datasets import finalize_evaluation_set as command
 from data_platform.cli.datasets.finalize_evaluation_set import finalize
 from data_platform.services.evaluation_set_asset import load_evaluation_records
 
@@ -60,3 +62,44 @@ def test_finalize_rejects_non_pending_input(tmp_path: Path) -> None:
             reviewed_by="repository-owner",
             reviewed_at=datetime(2026, 7, 19, tzinfo=UTC),
         )
+
+
+def test_finalize_ignores_blank_lines(tmp_path: Path) -> None:
+    """Review formatting whitespace does not alter the canonical asset."""
+    draft = tmp_path / "draft.jsonl"
+    _draft(draft)
+    draft.write_text("\n" + draft.read_text() + "\n")
+    checksum = finalize(
+        draft,
+        tmp_path / "golden.jsonl",
+        reviewed_by="repository-owner",
+        reviewed_at=datetime(2026, 7, 19, tzinfo=UTC),
+    )
+    assert len(checksum) == 64
+
+
+def test_finalize_cli_parses_and_prints_checksum(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The operational entrypoint forwards explicit review evidence."""
+    draft = tmp_path / "draft.jsonl"
+    output = tmp_path / "golden.jsonl"
+    _draft(draft)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "finalize",
+            "--input",
+            str(draft),
+            "--output",
+            str(output),
+            "--reviewed-by",
+            "repository-owner",
+            "--reviewed-at",
+            "2026-07-19T17:29:21+00:00",
+        ],
+    )
+    command.main()
+    assert len(capsys.readouterr().out.strip()) == 64
+    assert output.exists()
