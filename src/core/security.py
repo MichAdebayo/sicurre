@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 from typing import Any
 
 import httpx
@@ -192,5 +193,5 @@ async def require_internal_key(
             detail="Internal API not configured",
         )
     token = credentials.credentials if credentials is not None else None
-    if not token or token != settings.internal_api_key:
+    if not token or not hmac.compare_digest(token, settings.internal_api_key):
         raise _unauthorized("Invalid internal API key")

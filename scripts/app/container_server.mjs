@@ -38,7 +38,8 @@ export function shouldProxy(pathname) {
     pathname === "/health" ||
     pathname === "/openapi.json" ||
     pathname.startsWith("/v1") ||
-    pathname.startsWith("/auth")
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/internal/ml/")
   ) {
     return apiServiceUrl;
   }
@@ -49,7 +50,7 @@ export function metricRoute(pathname) {
   if (pathname === "/__app/health") return "health";
   if (pathname === "/metrics") return "metrics";
   if (pathname.startsWith("/api/auth")) return "auth";
-  if (pathname === "/health" || pathname === "/openapi.json" || pathname.startsWith("/v1") || pathname.startsWith("/auth")) {
+  if (pathname === "/health" || pathname === "/openapi.json" || pathname.startsWith("/v1") || pathname.startsWith("/auth") || pathname.startsWith("/internal/ml/")) {
     return "api";
   }
   if (pathname.startsWith("/assets")) return "assets";

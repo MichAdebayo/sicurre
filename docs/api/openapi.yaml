@@ -7,7 +7,7 @@ info:
     three layers: Data API for Bloc 1, Model API for Bloc 2, and Application
     API for Bloc 3.
 servers:
-  - url: https://api.sicurre.example.com
+  - url: https://sicurre.com
 tags:
   - name: health
   - name: data-sources
@@ -839,6 +839,9 @@ paths:
               schema: {$ref: "#/components/schemas/LineageRecordResponse"}
         "401": {description: Missing or invalid internal API key}
         "409": {description: Version exists with conflicting immutable content}
+        "422": {description: Invalid evaluation-set manifest}
+        "429": {description: Rate limit exceeded (10/minute)}
+        "503": {description: Internal API authentication is not configured}
 
   /internal/ml/candidates:
     post:
@@ -858,6 +861,9 @@ paths:
               schema: {$ref: "#/components/schemas/LineageRecordResponse"}
         "401": {description: Missing or invalid internal API key}
         "409": {description: MLflow run is linked to conflicting lineage}
+        "422": {description: Invalid payload or unknown frozen training dataset}
+        "429": {description: Rate limit exceeded (10/minute)}
+        "503": {description: Internal API authentication is not configured}
 
   /internal/ml/evaluations:
     post:
@@ -878,6 +884,8 @@ paths:
         "401": {description: Missing or invalid internal API key}
         "409": {description: MLflow evaluation run has conflicting lineage}
         "422": {description: Candidate or approved evaluation set is unavailable}
+        "429": {description: Rate limit exceeded (10/minute)}
+        "503": {description: Internal API authentication is not configured}
 
   /internal/ml/deployments:
     post:
@@ -898,6 +906,8 @@ paths:
         "401": {description: Missing or invalid internal API key}
         "409": {description: Promotion workflow run has conflicting lineage}
         "422": {description: Candidate has no passing evaluation}
+        "429": {description: Rate limit exceeded (10/minute)}
+        "503": {description: Internal API authentication is not configured}
 
   /v1/stats/kpi:
     get:
