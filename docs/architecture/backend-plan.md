@@ -191,6 +191,11 @@ This capability spans all domains and is the technical backbone of the monitorin
 - `ml_model_evaluation`
 - `ml_model_deployment`
 
+These tables are implemented in `src/db/models/mlops.py` alongside the
+evaluation-only `data_evaluation_set`. MLflow remains authoritative for full
+experiment metrics; these tables retain cross-system identity, the bounded
+promotion decision, approval, deployment, and rollback lineage.
+
 ### Application tables
 
 - Better Auth library tables: `user`, `session`, `account`, `verification`

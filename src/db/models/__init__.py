@@ -12,10 +12,10 @@ from db.models.lineage import (
     DataProcessingRun,
     DataRawObject,
     DataRawRecord,
-    DataSourceSystem,
     DatasetStatus,
-    GenerationSourceLinkRole,
+    DataSourceSystem,
     GenerationReviewState,
+    GenerationSourceLinkRole,
     IngestionStatus,
     NormalizedLabel,
     ObjectType,
@@ -26,6 +26,17 @@ from db.models.lineage import (
     SplitName,
     UserRole,
 )
+from db.models.mlops import (
+    DataEvaluationSet,
+    DeploymentStatus,
+    EvaluationOutcome,
+    EvaluationSetStatus,
+    MlModelDeployment,
+    MlModelEvaluation,
+    MlModelVersion,
+    ModelStage,
+)
+
 __all__ = [
     "AnnotationLabel",
     "AnnotationLabelSource",
@@ -53,4 +64,12 @@ __all__ = [
     "SourceType",
     "SplitName",
     "UserRole",
+    "DataEvaluationSet",
+    "DeploymentStatus",
+    "EvaluationOutcome",
+    "EvaluationSetStatus",
+    "MlModelDeployment",
+    "MlModelEvaluation",
+    "MlModelVersion",
+    "ModelStage",
 ]
