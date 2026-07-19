@@ -7,7 +7,7 @@ from sqlalchemy import engine_from_config, pool
 
 from core.config import get_settings
 from core.database import Base
-from db.models import lineage  # noqa: F401
+from db.models import lineage, mlops  # noqa: F401
 
 config = context.config
 settings = get_settings()

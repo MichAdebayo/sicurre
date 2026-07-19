@@ -158,6 +158,7 @@ deploy/nginx/*.md
 
 DEPLOYMENT_BLOCKERS.md
 cert-readiness-audit.md
+golden-set-draft.fr.jsonl
 
 scripts/README.md
 docs/architecture/issue-artifact.md

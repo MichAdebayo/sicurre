@@ -473,14 +473,24 @@ class DatasetQueries:
         *,
         kaggle_version_id: int,
         published_at: datetime,
+        artifact_uri: str | None = None,
+        content_checksum: str | None = None,
+        schema_version: str | None = None,
     ) -> None:
+        values: dict[str, object] = {
+            "kaggle_version_id": kaggle_version_id,
+            "published_at": published_at,
+        }
+        if artifact_uri is not None:
+            values["artifact_uri"] = artifact_uri
+        if content_checksum is not None:
+            values["content_checksum"] = content_checksum
+        if schema_version is not None:
+            values["schema_version"] = schema_version
         result = await session.execute(
             sa.update(DataDataset)
             .where(sa.cast(DataDataset.id, sa.Text()).in_(_uuid_string_variants(dataset_id)))
-            .values(
-                kaggle_version_id=kaggle_version_id,
-                published_at=published_at,
-            )
+            .values(**values)
         )
         if result.rowcount == 0:
             await session.rollback()
