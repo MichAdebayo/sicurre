@@ -14,7 +14,7 @@ from __future__ import annotations
 from alembic import op
 
 from core.database import Base
-from db.models import lineage  # noqa: F401
+from db.models import lineage, mlops  # noqa: F401
 
 revision = "20260708_0001"
 down_revision = None

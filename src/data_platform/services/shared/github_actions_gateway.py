@@ -45,15 +45,26 @@ class GitHubActionsGateway:
         *,
         ref: str = "main",
         kaggle_slug: str,
+        dataset_id: str,
+        dataset_version: str,
+        dataset_sha256: str,
         workflow: str = "train.yml",
     ) -> None:
         """POST workflow_dispatch to trigger train.yml on the ML repo.
 
         Raises GitHubDispatchError on any non-204 response.
-        Always passes kaggle_slug explicitly so train.yml ignores its static secret.
+        Includes immutable Sicurre lineage so ML never infers identity from Kaggle.
         """
         url = self._DISPATCH_URL.format(owner=self._owner, repo=self._repo, workflow=workflow)
-        payload = {"ref": ref, "inputs": {"training_dataset": kaggle_slug}}
+        payload = {
+            "ref": ref,
+            "inputs": {
+                "training_dataset": kaggle_slug,
+                "dataset_id": dataset_id,
+                "dataset_version": dataset_version,
+                "dataset_sha256": dataset_sha256,
+            },
+        }
 
         async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.post(url, headers=self._headers(), json=payload)

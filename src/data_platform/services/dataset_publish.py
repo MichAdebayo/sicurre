@@ -3,13 +3,14 @@ from __future__ import annotations
 import logging
 import tempfile
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import Settings
+from data_platform.services.shared.dataset_manifest import build_dataset_manifest
 from data_platform.services.shared.github_actions_gateway import (
     GitHubActionsGateway,
     GitHubDispatchError,
@@ -20,7 +21,7 @@ from data_platform.services.shared.kaggle_gateway import (
     write_split_csv,
 )
 from db.models.lineage import DatasetStatus, SplitName
-from db.queries.records import DatasetNotFoundError, DatasetQueries
+from db.queries.records import DatasetQueries
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +149,16 @@ class DatasetPublishService:
                     rows = [{"text": text, "label": label} for text, label in rows_raw]
                     write_split_csv(rows, export_dir / f"{split}.csv")
 
+            manifest_payload, manifest_checksum = build_dataset_manifest(
+                dataset_id=dataset.id,
+                version_tag=dataset.version_tag,
+                item_count=dataset.item_count,
+                split_payloads={
+                    path.stem: path.read_bytes() for path in sorted(export_dir.glob("*.csv"))
+                },
+            )
+            (export_dir / "dataset-manifest.json").write_bytes(manifest_payload)
+
             # ── 3. kaggle datasets version ───────────────────────────────────
             slug = str(cfg.kaggle_dataset_slug)
             try:
@@ -160,13 +171,19 @@ class DatasetPublishService:
                 raise KagglePushPublishError(exc) from exc
 
         # ── 4. Write publish result to DB (best-effort) ──────────────────────
-        published_at = datetime.now(timezone.utc)
+        published_at = datetime.now(UTC)
+        artifact_uri = dataset.artifact_uri or (
+            f"kaggle://{slug}/versions/{kaggle_version_id}/dataset-manifest.json"
+        )
         try:
             await self._queries.update_publish_result(
                 session,
                 dataset_id,
                 kaggle_version_id=kaggle_version_id,
                 published_at=published_at,
+                artifact_uri=artifact_uri,
+                content_checksum=manifest_checksum,
+                schema_version="1",
             )
         except Exception:
             logger.warning(
@@ -178,7 +195,12 @@ class DatasetPublishService:
 
         # ── 5. GitHub workflow_dispatch ──────────────────────────────────────
         try:
-            await github_gw.dispatch_training(kaggle_slug=slug)
+            await github_gw.dispatch_training(
+                kaggle_slug=slug,
+                dataset_id=str(dataset.id),
+                dataset_version=dataset.version_tag,
+                dataset_sha256=manifest_checksum,
+            )
         except GitHubDispatchError as exc:
             raise GitHubDispatchPublishError(
                 exc,

@@ -821,6 +821,84 @@ paths:
         "503":
           description: Internal API not configured (INTERNAL_API_KEY not set)
 
+  /internal/ml/evaluation-sets:
+    post:
+      tags: [internal]
+      summary: Register or approve an immutable evaluation-only asset
+      security: [{InternalServiceAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/EvaluationSetRegistration"}
+      responses:
+        "200":
+          description: Idempotently persisted evaluation-set manifest
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/LineageRecordResponse"}
+        "401": {description: Missing or invalid internal API key}
+        "409": {description: Version exists with conflicting immutable content}
+
+  /internal/ml/candidates:
+    post:
+      tags: [internal]
+      summary: Register a successful training result as a candidate
+      security: [{InternalServiceAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ModelCandidateRegistration"}
+      responses:
+        "200":
+          description: Idempotently persisted candidate identity
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/LineageRecordResponse"}
+        "401": {description: Missing or invalid internal API key}
+        "409": {description: MLflow run is linked to conflicting lineage}
+
+  /internal/ml/evaluations:
+    post:
+      tags: [internal]
+      summary: Record a golden-set decision with its MLflow evidence reference
+      security: [{InternalServiceAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ModelEvaluationRegistration"}
+      responses:
+        "200":
+          description: Idempotently persisted evaluation decision
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/LineageRecordResponse"}
+        "401": {description: Missing or invalid internal API key}
+        "409": {description: MLflow evaluation run has conflicting lineage}
+        "422": {description: Candidate or approved evaluation set is unavailable}
+
+  /internal/ml/deployments:
+    post:
+      tags: [internal]
+      summary: Record a manually approved production promotion result
+      security: [{InternalServiceAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ModelDeploymentRegistration"}
+      responses:
+        "200":
+          description: Idempotently persisted deployment result
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/LineageRecordResponse"}
+        "401": {description: Missing or invalid internal API key}
+        "409": {description: Promotion workflow run has conflicting lineage}
+        "422": {description: Candidate has no passing evaluation}
+
   /v1/stats/kpi:
     get:
       tags: [app]
@@ -992,6 +1070,83 @@ components:
       scheme: bearer
       description: Static service bearer token for internal platform calls.
   schemas:
+    LineageRecordResponse:
+      type: object
+      required: [id, status, idempotent]
+      properties:
+        id: {type: string, format: uuid}
+        status: {type: string}
+        idempotent: {type: boolean}
+
+    EvaluationSetRegistration:
+      type: object
+      required: [name, version_tag, schema_version, provenance, status, object_uri, content_checksum, item_count, label_counts, language_counts]
+      properties:
+        name: {type: string}
+        version_tag: {type: string}
+        schema_version: {type: string}
+        provenance: {type: string, enum: [synthetic_provisional]}
+        status: {type: string, enum: [draft, approved]}
+        object_uri: {type: string, example: "r2://sicurre-evaluation/golden-v1/golden.jsonl"}
+        content_checksum: {type: string, description: Lowercase SHA-256 digest}
+        item_count: {type: integer, minimum: 1}
+        label_counts: {type: object, additionalProperties: {type: integer}}
+        language_counts: {type: object, additionalProperties: {type: integer}}
+        reviewed_by: {type: string, nullable: true}
+        reviewed_at: {type: string, format: date-time, nullable: true}
+
+    ModelCandidateRegistration:
+      type: object
+      required: [model_name, semantic_version, service_source_revision, mlflow_run_id, mlflow_model_version, huggingface_repository, huggingface_revision, training_github_run_id, training_dataset_version_tag]
+      properties:
+        model_name: {type: string}
+        semantic_version: {type: string}
+        service_source_revision: {type: string, pattern: "^[a-fA-F0-9]{40}$"}
+        mlflow_run_id: {type: string}
+        mlflow_model_version: {type: string}
+        huggingface_repository: {type: string}
+        huggingface_revision: {type: string}
+        training_github_run_id: {type: string}
+        training_dataset_version_tag: {type: string}
+
+    PromotionMetricSnapshot:
+      type: object
+      required: [candidate_weighted_f1, production_weighted_f1, candidate_phishing_recall, production_phishing_recall, candidate_legitimate_false_positives, production_legitimate_false_positives]
+      properties:
+        candidate_weighted_f1: {type: number, minimum: 0, maximum: 1}
+        production_weighted_f1: {type: number, minimum: 0, maximum: 1}
+        candidate_phishing_recall: {type: number, minimum: 0, maximum: 1}
+        production_phishing_recall: {type: number, minimum: 0, maximum: 1}
+        candidate_legitimate_false_positives: {type: integer, minimum: 0}
+        production_legitimate_false_positives: {type: integer, minimum: 0}
+
+    ModelEvaluationRegistration:
+      type: object
+      required: [candidate_mlflow_run_id, evaluation_set_version_tag, evaluation_set_checksum, mlflow_evaluation_run_id, outcome, metrics, evaluated_at]
+      properties:
+        candidate_mlflow_run_id: {type: string}
+        incumbent_huggingface_revision: {type: string, nullable: true}
+        evaluation_set_version_tag: {type: string}
+        evaluation_set_checksum: {type: string}
+        mlflow_evaluation_run_id: {type: string}
+        outcome: {type: string, enum: [passed, failed, inconclusive]}
+        metrics: {$ref: "#/components/schemas/PromotionMetricSnapshot"}
+        evaluated_at: {type: string, format: date-time}
+
+    ModelDeploymentRegistration:
+      type: object
+      required: [candidate_mlflow_run_id, mlflow_evaluation_run_id, github_run_id, approved_by, approved_at, status]
+      properties:
+        candidate_mlflow_run_id: {type: string}
+        mlflow_evaluation_run_id: {type: string}
+        github_run_id: {type: string}
+        approved_by: {type: string}
+        approved_at: {type: string, format: date-time}
+        status: {type: string, enum: [active, failed, rolled_back]}
+        deployed_revision: {type: string, nullable: true}
+        failure_reason: {type: string, nullable: true}
+        deployed_at: {type: string, format: date-time, nullable: true}
+
     PhishtankSnapshotResponse:
       type: object
       required: [urls, count, source, generated_at]
