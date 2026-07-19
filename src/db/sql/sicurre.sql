@@ -168,6 +168,9 @@ CREATE TABLE data_dataset (
     frozen_at timestamptz,
     item_count integer NOT NULL DEFAULT 0,
     kaggle_version_id integer,
+    artifact_uri text,
+    content_checksum text,
+    schema_version text,
     published_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz
@@ -185,6 +188,76 @@ CREATE TABLE data_dataset_item (
 );
 
 CREATE INDEX idx_dataset_split ON data_dataset_item (dataset_id, split_name);
+
+CREATE TABLE data_evaluation_set (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    name text NOT NULL,
+    version_tag text NOT NULL UNIQUE,
+    schema_version text NOT NULL,
+    provenance text NOT NULL,
+    status text NOT NULL CHECK (status IN ('draft', 'approved', 'archived')),
+    object_uri text NOT NULL,
+    content_checksum text NOT NULL UNIQUE,
+    item_count integer NOT NULL,
+    label_counts jsonb NOT NULL DEFAULT '{}'::jsonb,
+    language_counts jsonb NOT NULL DEFAULT '{}'::jsonb,
+    reviewed_by text,
+    reviewed_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE ml_model_version (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    model_name text NOT NULL,
+    semantic_version text NOT NULL,
+    service_source_revision text NOT NULL,
+    stage text NOT NULL CHECK (stage IN ('candidate', 'production', 'retired', 'rejected')),
+    mlflow_run_id text NOT NULL UNIQUE,
+    mlflow_model_version text NOT NULL,
+    huggingface_repository text NOT NULL,
+    huggingface_revision text NOT NULL,
+    training_github_run_id text NOT NULL,
+    training_dataset_id uuid NOT NULL REFERENCES data_dataset(id) ON DELETE RESTRICT,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz,
+    CONSTRAINT uq_model_registry_version UNIQUE (model_name, mlflow_model_version)
+);
+
+CREATE INDEX idx_model_stage_created ON ml_model_version (stage, created_at);
+
+CREATE TABLE ml_model_evaluation (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    candidate_model_id uuid NOT NULL REFERENCES ml_model_version(id) ON DELETE CASCADE,
+    incumbent_model_id uuid REFERENCES ml_model_version(id) ON DELETE RESTRICT,
+    evaluation_set_id uuid NOT NULL REFERENCES data_evaluation_set(id) ON DELETE RESTRICT,
+    mlflow_evaluation_run_id text NOT NULL UNIQUE,
+    outcome text NOT NULL CHECK (outcome IN ('passed', 'failed', 'inconclusive')),
+    metric_snapshot jsonb NOT NULL DEFAULT '{}'::jsonb,
+    policy_name text NOT NULL DEFAULT 'provisional_synthetic_non_regression_v1',
+    evaluated_at timestamptz NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_candidate_evaluation_set UNIQUE (candidate_model_id, evaluation_set_id)
+);
+
+CREATE TABLE ml_model_deployment (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    model_version_id uuid NOT NULL REFERENCES ml_model_version(id) ON DELETE RESTRICT,
+    previous_model_version_id uuid REFERENCES ml_model_version(id) ON DELETE RESTRICT,
+    evaluation_id uuid NOT NULL REFERENCES ml_model_evaluation(id) ON DELETE RESTRICT,
+    environment text NOT NULL DEFAULT 'production',
+    status text NOT NULL CHECK (status IN ('active', 'failed', 'rolled_back', 'retired')),
+    github_run_id text NOT NULL UNIQUE,
+    approved_by text NOT NULL,
+    approved_at timestamptz NOT NULL,
+    deployed_revision text,
+    failure_reason text,
+    deployed_at timestamptz,
+    retired_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_deployment_environment_created
+    ON ml_model_deployment (environment, created_at);
 
 CREATE TABLE data_generation_sample_source_link (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
