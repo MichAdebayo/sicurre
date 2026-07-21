@@ -286,14 +286,25 @@ class CloudflareProvisioner:
 
     async def enable_email_routing(self, zone_id: str) -> None:
         """Enable Email Routing for a zone (idempotent)."""
+        dns_records = await self.get_dns_records(zone_id)
+        if any(
+            record.get("type") == "MX"
+            and str(record.get("content", "")).lower().rstrip(".").endswith("mx.cloudflare.net")
+            for record in dns_records
+        ):
+            logger.info("Email Routing DNS is already configured on zone %s", zone_id)
+            return
         try:
-            await self._post(f"/zones/{zone_id}/email/routing/enable")
+            await self._post(f"/zones/{zone_id}/email/routing/dns")
             logger.info("Email Routing enabled on zone %s", zone_id)
         except CloudflareAPIError as exc:
             if "already enabled" in str(exc).lower():
                 logger.info("Email Routing already enabled on zone %s", zone_id)
             else:
-                raise
+                raise CloudflareAPIError(
+                    f"Email Routing activation failed; Zone Settings:Edit is required: {exc}",
+                    status_code=exc.status_code,
+                ) from exc
 
     async def create_destination_address(self, account_id: str, email: str) -> str:
         """
