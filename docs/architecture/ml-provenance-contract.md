@@ -10,9 +10,9 @@ audit a candidate, its evaluation, and its deployment outcome.
 Approved asset:
 
 - version: `golden-20260719-v1`
-- URI: `r2://sicurre-raw/raw-snapshots/evaluation_sets/golden-20260719-v1/golden.jsonl`
-- bucket: `sicurre-raw`
-- object key: `raw-snapshots/evaluation_sets/golden-20260719-v1/golden.jsonl`
+- URI: `r2://sicurre-golden-evaluation-dataset/golden.jsonl`
+- bucket: `sicurre-golden-evaluation-dataset`
+- object key: `golden.jsonl`
 - SHA-256: `bc329213cacddab409a63deb9d663e593351b6e740a45cdada4c201e3beea346`
 - content: 60 French JSONL records (25 phishing, 25 legitimate, 10 spam)
 
@@ -21,22 +21,18 @@ Sicurre-ML stores these GitHub Actions secrets:
 - `R2_EVALUATION_ACCESS_KEY_ID`
 - `R2_EVALUATION_SECRET_ACCESS_KEY`
 - `R2_EVALUATION_ENDPOINT`
-- `R2_EVALUATION_BUCKET` with value `sicurre-raw`
+- `R2_EVALUATION_BUCKET_NAME` with value `sicurre-golden-evaluation-dataset`
 
 The endpoint is the account's S3 endpoint and the S3 region is `auto`. The
 credential must have Cloudflare R2 **Object Read only** permission and be
-restricted to the `sicurre-raw` bucket. The workflow performs `GetObject` for
+restricted to the dedicated evaluation bucket. The workflow performs `GetObject` for
 the exact key above and must reject the download unless its computed SHA-256
 matches the approved checksum. It must not discover a golden set by listing for
 the newest key.
 
-Cloudflare long-lived R2 tokens can be restricted to buckets, not object-key
-prefixes. Consequently, a token scoped to `sicurre-raw` can technically read
-other objects in that bucket even though Sicurre-ML is contractually restricted
-to `raw-snapshots/evaluation_sets/*`. If IAM-enforced prefix isolation is
-required, use Cloudflare temporary credentials restricted to that prefix, or
-move evaluation assets to a dedicated bucket and issue an Object Read only
-token for that bucket.
+The dedicated bucket and Object Read only token provide bucket-level least
+privilege. Sicurre-ML has no credentials for training or raw-snapshot buckets
+and performs no list operation.
 
 ## Callback authentication
 
