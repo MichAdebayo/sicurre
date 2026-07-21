@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import {
   Cloud,
   CheckCircle2,
@@ -29,26 +30,26 @@ import {
 
 const MotionDiv = motion.div as any;
 
-function formatCloudflareError(message?: string | null): string {
-  if (!message) return "Erreur inconnue.";
+function formatCloudflareError(t: TFunction, message?: string | null): string {
+  if (!message) return t("domain_shield.cloudflare_unknown_error");
   const lower = message.toLowerCase();
   if (lower.includes("zone settings:edit")) {
-    return "Cloudflare Email Routing n'est pas encore activé. Ajoutez la permission Zone Settings:Edit, puis réessayez.";
+    return t("domain_shield.cloudflare_zone_settings_permission_error");
   }
   if (lower.includes("dns_records") || lower.includes("dns update failed")) {
-    return "Le token Cloudflare peut lire le domaine, mais il ne peut pas modifier les DNS. Ajoutez la permission DNS:Edit sur la zone puis réessayez.";
+    return t("domain_shield.cloudflare_dns_permission_error");
   }
   if (lower.includes("workers/scripts")) {
-    return "Cloudflare a refusé le déploiement du Worker. Vérifiez la permission Workers Scripts:Edit sur le compte.";
+    return t("domain_shield.cloudflare_worker_permission_error");
   }
   if (lower.includes("email/routing/rules")) {
-    return "Cloudflare a refusé la règle de routage. Vérifiez la permission Email Routing Rules:Edit sur la zone.";
+    return t("domain_shield.cloudflare_routing_permission_error");
   }
   if (lower.includes("email/routing/addresses")) {
-    return "Cloudflare a refusé l'adresse de destination. Vérifiez la permission Email Routing Addresses:Edit sur le compte.";
+    return t("domain_shield.cloudflare_address_permission_error");
   }
   if (lower.includes("authentication error")) {
-    return "Cloudflare a refusé cette opération. Vérifiez que le token couvre le compte et la zone sélectionnés.";
+    return t("domain_shield.cloudflare_scope_error");
   }
   if (lower.includes("zone") && lower.includes("not found")) {
     return "Le domaine est introuvable sur ce compte Cloudflare ou le token n'a pas accès à cette zone.";
@@ -144,7 +145,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
           onSuccess?.();
         }, 1500);
       } else if (cfStatus?.status === "error") {
-        setStages(prev => prev.map(s => s.id === "routing" ? { ...s, status: "error", errorMsg: formatCloudflareError(cfStatus.error_message || "Échec de la configuration finale.") } : s));
+        setStages(prev => prev.map(s => s.id === "routing" ? { ...s, status: "error", errorMsg: formatCloudflareError(t, cfStatus.error_message || "Échec de la configuration finale.") } : s));
       }
     }
     return () => {
@@ -180,7 +181,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
       });
 
       if (!result.valid) {
-        setStages(prev => prev.map(s => s.id === "verify" ? { ...s, status: "error", errorMsg: formatCloudflareError(result.error || "Token ou domaine invalide.") } : s));
+        setStages(prev => prev.map(s => s.id === "verify" ? { ...s, status: "error", errorMsg: formatCloudflareError(t, result.error || "Token ou domaine invalide.") } : s));
         return;
       }
 
@@ -212,7 +213,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
     } catch (err: any) {
       setStages(prev => prev.map(s => {
         if (s.status === "loading") {
-          return { ...s, status: "error", errorMsg: formatCloudflareError(err.message || "Une erreur est survenue lors de cette étape.") };
+          return { ...s, status: "error", errorMsg: formatCloudflareError(t, err.message || "Une erreur est survenue lors de cette étape.") };
         }
         return s;
       }));
@@ -460,7 +461,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
           <AlertTriangle className="w-5 h-5 text-error shrink-0 mt-0.5" />
           <div>
             <p className="font-bold text-sm text-error mb-1">Échec du provisionnement</p>
-            <p className="text-[13px] leading-5 text-on-error-container">{formatCloudflareError(intStatus.error_message)}</p>
+            <p className="text-[13px] leading-5 text-on-error-container">{formatCloudflareError(t, intStatus.error_message)}</p>
           </div>
         </div>
         <p className="text-[13px] text-on-surface-variant">Vérifiez le token et les permissions, puis réessayez.</p>
