@@ -72,7 +72,6 @@ async def register_evaluation_set(
         "name": payload.name,
         "schema_version": payload.schema_version,
         "provenance": payload.provenance,
-        "object_uri": payload.object_uri,
         "content_checksum": payload.content_checksum.lower(),
         "item_count": payload.item_count,
         "label_counts": payload.label_counts,
@@ -84,6 +83,7 @@ async def register_evaluation_set(
                 "evaluation_set_conflict",
                 "The evaluation-set version already exists with different content.",
             )
+        existing.object_uri = payload.object_uri
         if payload.status == EvaluationSetStatus.APPROVED.value:
             existing.status = payload.status
             existing.reviewed_by = payload.reviewed_by
@@ -94,6 +94,7 @@ async def register_evaluation_set(
     record = DataEvaluationSet(
         **immutable,
         version_tag=payload.version_tag,
+        object_uri=payload.object_uri,
         status=payload.status,
         reviewed_by=payload.reviewed_by,
         reviewed_at=payload.reviewed_at,

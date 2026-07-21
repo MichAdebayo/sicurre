@@ -64,6 +64,7 @@ describe("app gateway routing and metrics", () => {
   it.each([
     ["/api/auth/session", "auth"],
     ["/v1/threats", "api"],
+    ["/internal/ml/candidates", "api"],
     ["/openapi.json", "api"],
     ["/assets/app.js", "assets"],
     ["/metrics", "metrics"],
@@ -77,6 +78,8 @@ describe("app gateway routing and metrics", () => {
     expect(gateway.shouldProxy("/api/auth/session")).toBe(process.env.AUTH_SERVICE_URL);
     expect(gateway.shouldProxy("/v1/threats")).toBe(process.env.API_SERVICE_URL);
     expect(gateway.shouldProxy("/auth/session")).toBe(process.env.API_SERVICE_URL);
+    expect(gateway.shouldProxy("/internal/ml/evaluations")).toBe(process.env.API_SERVICE_URL);
+    expect(gateway.shouldProxy("/internal/phishtank/snapshot")).toBeNull();
     expect(gateway.shouldProxy("/dashboard")).toBeNull();
   });
 
