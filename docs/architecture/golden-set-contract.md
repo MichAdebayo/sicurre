@@ -60,8 +60,9 @@ The resulting `data_evaluation_set` row records the R2 URI, checksum, counts,
 schema version, provenance marker, reviewer, and review time.
 
 The first approved provisional version is `golden-20260719-v1`. It contains 60
-French records (25 phishing, 25 legitimate, and 10 spam), is stored at
-`r2://sicurre-raw/raw-snapshots/evaluation_sets/golden-20260719-v1/golden.jsonl`,
+French records (25 phishing, 25 legitimate, and 10 spam), is stored in the
+dedicated read-only evaluation bucket at
+`r2://sicurre-golden-evaluation-dataset/golden.jsonl`,
 and has SHA-256 checksum
 `bc329213cacddab409a63deb9d663e593351b6e740a45cdada4c201e3beea346`.
 

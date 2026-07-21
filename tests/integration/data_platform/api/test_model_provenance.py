@@ -94,7 +94,7 @@ def evaluation_set_payload(status: str = "approved") -> dict[str, object]:
         "schema_version": "1",
         "provenance": "synthetic_provisional",
         "status": status,
-        "object_uri": "r2://sicurre-evaluation/golden-20260719-v1/golden.jsonl",
+        "object_uri": "r2://sicurre-golden-evaluation-dataset/golden.jsonl",
         "content_checksum": CHECKSUM,
         "item_count": 60,
         "label_counts": {"phishing": 25, "legitimate": 25, "spam": 10},
@@ -246,8 +246,18 @@ async def test_lineage_callbacks_reject_unknown_or_conflicting_dependencies(
     )
     assert response.json()["detail"]["code"] == "evaluation_set_checksum_mismatch"
 
+    relocated_set = evaluation_set_payload()
+    relocated_set["object_uri"] = "r2://replacement-evaluation/golden.jsonl"
+    response = await client.post(
+        "/internal/ml/evaluation-sets", headers=AUTH_HEADERS, json=relocated_set
+    )
+    assert response.status_code == 200
+    assert response.json()["idempotent"] is True
+
     conflicting_set = evaluation_set_payload()
-    conflicting_set["object_uri"] = "r2://other/golden.jsonl"
+    conflicting_set["item_count"] = 61
+    conflicting_set["label_counts"] = {"phishing": 26, "legitimate": 25, "spam": 10}
+    conflicting_set["language_counts"] = {"fr": 61}
     response = await client.post(
         "/internal/ml/evaluation-sets", headers=AUTH_HEADERS, json=conflicting_set
     )
