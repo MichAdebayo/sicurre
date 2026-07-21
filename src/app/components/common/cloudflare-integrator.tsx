@@ -32,8 +32,23 @@ const MotionDiv = motion.div as any;
 function formatCloudflareError(message?: string | null): string {
   if (!message) return "Erreur inconnue.";
   const lower = message.toLowerCase();
-  if (lower.includes("authentication error") || lower.includes("dns update failed")) {
+  if (lower.includes("zone settings:edit")) {
+    return "Cloudflare Email Routing n'est pas encore activé. Ajoutez la permission Zone Settings:Edit, puis réessayez.";
+  }
+  if (lower.includes("dns_records") || lower.includes("dns update failed")) {
     return "Le token Cloudflare peut lire le domaine, mais il ne peut pas modifier les DNS. Ajoutez la permission DNS:Edit sur la zone puis réessayez.";
+  }
+  if (lower.includes("workers/scripts")) {
+    return "Cloudflare a refusé le déploiement du Worker. Vérifiez la permission Workers Scripts:Edit sur le compte.";
+  }
+  if (lower.includes("email/routing/rules")) {
+    return "Cloudflare a refusé la règle de routage. Vérifiez la permission Email Routing Rules:Edit sur la zone.";
+  }
+  if (lower.includes("email/routing/addresses")) {
+    return "Cloudflare a refusé l'adresse de destination. Vérifiez la permission Email Routing Addresses:Edit sur le compte.";
+  }
+  if (lower.includes("authentication error")) {
+    return "Cloudflare a refusé cette opération. Vérifiez que le token couvre le compte et la zone sélectionnés.";
   }
   if (lower.includes("zone") && lower.includes("not found")) {
     return "Le domaine est introuvable sur ce compte Cloudflare ou le token n'a pas accès à cette zone.";
