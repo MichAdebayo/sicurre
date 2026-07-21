@@ -92,8 +92,11 @@ async def test_get_zone_not_found() -> None:
 @respx.mock
 async def test_enable_email_routing_success() -> None:
     provisioner = CloudflareProvisioner(api_token="token")
+    respx.get("https://api.cloudflare.com/client/v4/zones/zone-123/dns_records").mock(
+        return_value=httpx.Response(200, json={"success": True, "result": []})
+    )
     route = respx.post(
-        "https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/enable"
+        "https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/dns"
     ).mock(return_value=httpx.Response(200, json={"success": True}))
     await provisioner.enable_email_routing("zone-123")
     assert route.called
@@ -103,7 +106,10 @@ async def test_enable_email_routing_success() -> None:
 @respx.mock
 async def test_enable_email_routing_already_enabled() -> None:
     provisioner = CloudflareProvisioner(api_token="token")
-    respx.post("https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/enable").mock(
+    respx.get("https://api.cloudflare.com/client/v4/zones/zone-123/dns_records").mock(
+        return_value=httpx.Response(200, json={"success": True, "result": []})
+    )
+    respx.post("https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/dns").mock(
         return_value=httpx.Response(
             400,
             json={"success": False, "errors": [{"message": "already enabled"}]},
@@ -118,14 +124,42 @@ async def test_enable_email_routing_already_enabled() -> None:
 async def test_enable_email_routing_surfaces_permission_error() -> None:
     """A generic 403 is actionable and cannot masquerade as idempotent success."""
     provisioner = CloudflareProvisioner(api_token="token")
-    respx.post("https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/enable").mock(
+    respx.get("https://api.cloudflare.com/client/v4/zones/zone-123/dns_records").mock(
+        return_value=httpx.Response(200, json={"success": True, "result": []})
+    )
+    respx.post("https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/dns").mock(
         return_value=httpx.Response(
             403,
             json={"success": False, "errors": [{"message": "permission denied"}]},
         )
     )
-    with pytest.raises(CloudflareAPIError, match="permission denied"):
+    with pytest.raises(CloudflareAPIError, match="Zone Settings:Edit is required"):
         await provisioner.enable_email_routing("zone-123")
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_enable_email_routing_skips_existing_cloudflare_mx() -> None:
+    """Existing routing DNS avoids a redundant privileged enable request."""
+    provisioner = CloudflareProvisioner(api_token="token")
+    respx.get("https://api.cloudflare.com/client/v4/zones/zone-123/dns_records").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "success": True,
+                "result": [
+                    {"type": "MX", "content": "route1.mx.cloudflare.net", "name": "example.com"}
+                ],
+            },
+        )
+    )
+    enable_route = respx.post(
+        "https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/dns"
+    ).mock(return_value=httpx.Response(200, json={"success": True, "result": {}}))
+
+    await provisioner.enable_email_routing("zone-123")
+
+    assert not enable_route.called
 
 
 @pytest.mark.asyncio
@@ -349,8 +383,11 @@ async def test_provision_flow() -> None:
             },
         )
     )
-    # Mock enable routing
-    respx.post("https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/enable").mock(
+    # Mock DNS preflight and enable routing
+    respx.get("https://api.cloudflare.com/client/v4/zones/zone-123/dns_records").mock(
+        return_value=httpx.Response(200, json={"success": True, "result": []})
+    )
+    respx.post("https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/dns").mock(
         return_value=httpx.Response(200, json={"success": True})
     )
     # Mock fetching existing routing rules (return a mock literal matcher to test auto-resolve from rule)
