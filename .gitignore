@@ -96,6 +96,7 @@ data/models/
 docs/ops/
 docs/certification/
 docs/architecture/notebook-*.md
+docs/architecture/diagrams/final/
 docs/architecture/threat-model.md
 docs/architecture/privacy-rgpd.md
 docs/architecture/data-platform-cadence.md
