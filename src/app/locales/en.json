@@ -211,7 +211,13 @@
     "report_aligned": "Aligned",
     "report_failed": "Failures",
     "report_empty": "No DMARC reports imported yet.",
-    "cloudflare_dns_permission_error": "The Cloudflare token can read the domain, but it is missing permission to edit DNS records."
+    "cloudflare_dns_permission_error": "The Cloudflare token can read the domain, but it is missing permission to edit DNS records.",
+    "cloudflare_zone_settings_permission_error": "Cloudflare Email Routing is not enabled yet. Add Zone Settings:Edit, then try again.",
+    "cloudflare_worker_permission_error": "Cloudflare rejected the Worker deployment. Check Workers Scripts:Edit on the account.",
+    "cloudflare_routing_permission_error": "Cloudflare rejected the routing rule. Check Email Routing Rules:Edit on the zone.",
+    "cloudflare_address_permission_error": "Cloudflare rejected the destination address. Check Email Routing Addresses:Edit on the account.",
+    "cloudflare_scope_error": "Cloudflare rejected this operation. Check that the token covers the selected account and zone.",
+    "cloudflare_unknown_error": "Unknown Cloudflare error."
   },
   "settings": {
     "title": "Sicurre Configuration",
