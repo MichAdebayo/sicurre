@@ -233,6 +233,26 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
     }
   };
 
+  const handleRetry = async () => {
+    if (!cfStatus?.zone_name || !cfStatus.destination_email) return;
+    try {
+      await setupMutation.mutateAsync({
+        zone_name: cfStatus.zone_name,
+        destination_email: cfStatus.destination_email,
+      });
+      await refetch();
+      setIsIntegrating(true);
+      setStages([
+        { id: "verify", label: "Vérification des informations d'identification", description: "Vérification du token API Cloudflare et de l'accès au domaine.", status: "success" },
+        { id: "dns", label: "Configuration des enregistrements DNS", description: "Configuration des enregistrements MX nécessaires pour l'acheminement des e-mails.", status: "success" },
+        { id: "worker", label: "Déploiement du Worker", description: "Déploiement du Worker Sicurre pour analyser chaque e-mail entrant en temps réel.", status: "success" },
+        { id: "routing", label: "Liaison du routage & validation finale", description: "Création de la règle catch-all et test final de connectivité de la passerelle.", status: "loading" },
+      ]);
+    } catch {
+      await refetch();
+    }
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   // Clean, quiet skeleton loader when status is checking for the first time
@@ -468,12 +488,11 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
         <Button
           variant="outline"
           size="sm"
-          onClick={async () => {
-            refetch();
-          }}
+          onClick={handleRetry}
+          disabled={setupMutation.isPending}
           className="gap-1.5 text-[11px]"
         >
-          <RefreshCw className="w-3.5 h-3.5" /> Réessayer
+          {setupMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Réessayer
         </Button>
       </MotionDiv>
     );

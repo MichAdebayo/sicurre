@@ -395,3 +395,42 @@ async def test_teardown_preserves_local_state_when_cloudflare_fails(monkeypatch)
     assert exc_info.value.status_code == 502
     assert "Email Routing: Edit permission is missing" in exc_info.value.detail
     assert not any(sql.startswith("DELETE FROM cloudflare_integration") for sql in statements)
+
+
+@pytest.mark.asyncio
+async def test_teardown_discards_failed_local_attempt_without_provider_token(monkeypatch) -> None:
+    """A failed attempt with no remote resources can always be removed locally."""
+    statements: list[str] = []
+
+    async def query(sql: str, _params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        statements.append(sql)
+        if sql.startswith("SELECT * FROM cloudflare_integration"):
+            return [
+                {
+                    "id": "integration-failed",
+                    "status": "error",
+                    "api_token": None,
+                    "zone_id": "",
+                    "account_id": "",
+                    "worker_name": "",
+                    "rule_id": "unknown",
+                    "zone_name": "failed.example",
+                }
+            ]
+        return []
+
+    class UnexpectedProvisioner:
+        def __init__(self, **_kwargs: Any) -> None:
+            raise AssertionError("Local cleanup must not call Cloudflare")
+
+    monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
+    monkeypatch.setattr(integrations, "_async_query", query)
+    monkeypatch.setattr(integrations, "CloudflareProvisioner", UnexpectedProvisioner)
+
+    response = await teardown_cloudflare(
+        TeardownRequest(integration_id="integration-failed"), _user()
+    )
+
+    assert response == {"status": "removed", "zone_name": "failed.example"}
+    assert any(sql.startswith("DELETE FROM cloudflare_integration") for sql in statements)
+    assert not any(sql.startswith("DELETE FROM app_cloudflare_config") for sql in statements)
