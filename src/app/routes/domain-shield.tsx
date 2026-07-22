@@ -715,6 +715,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     return "success";
                   }
                   if (step.id === "reputation") {
+                    if (shieldStatus?.blacklists?.error) return "warning";
                     return shieldStatus?.blacklists?.listed ? "error" : "success";
                   }
                   return step.valid ? "success" : "error";
@@ -724,42 +725,40 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                 let statusBadge = null;
 
                 if (isStepRunning) {
-                  cardClass = "border-[#2e6bb5] bg-[#d0e4ff]/10 shadow-[0_0_12px_rgba(46,107,181,0.15)] ring-1 ring-[#2e6bb5]/20 scale-[1.02] opacity-100";
+                  cardClass = "border-primary/35 bg-primary/[0.03] ring-1 ring-primary/15 opacity-100";
                   statusBadge = (
-                    <span className="flex items-center gap-1.5 text-[10px] font-bold text-[#2e6bb5] uppercase">
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#2e6bb5]" />
+                    <span className="flex items-center gap-1.5 text-[11px] font-semibold text-primary">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                       {isFR ? "Analyse..." : "Analyzing..."}
                     </span>
                   );
                 } else if (isStepCompleted) {
+                  cardClass = "border-border-subtle bg-surface-lowest opacity-100";
                   if (severity === "success") {
-                    cardClass = "border-emerald-200 bg-emerald-50/[0.08] opacity-100";
                     statusBadge = (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#047857] bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-safe-bg px-2.5 py-0.5 text-[11px] font-semibold text-safe">
                         <Check className="w-3.5 h-3.5" />
                         {t("domain_shield.status_conform")}
                       </span>
                     );
                   } else if (severity === "warning") {
-                    cardClass = "border-amber-200 bg-amber-50/[0.08] opacity-100";
                     statusBadge = (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#b45309] bg-amber-50 px-2.5 py-0.5 rounded-md border border-amber-200">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-warning-bg px-2.5 py-0.5 text-[11px] font-semibold text-warning">
                         <AlertTriangle className="w-3.5 h-3.5" />
                         {t("domain_shield.status_partial")}
                       </span>
                     );
                   } else {
-                    cardClass = "border-red-200 bg-red-50/[0.08] opacity-100";
                     statusBadge = (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-2.5 py-0.5 rounded-md border border-red-200">
-                        <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                      <span className="inline-flex items-center gap-1 rounded-md bg-danger-bg px-2.5 py-0.5 text-[11px] font-semibold text-danger">
+                        <AlertTriangle className="w-3.5 h-3.5" />
                         {t("domain_shield.status_missing")}
                       </span>
                     );
                   }
                 } else {
                   statusBadge = (
-                    <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase">
+                    <span className="text-[11px] font-semibold text-on-surface-variant/55">
                       {isFR ? "En attente" : "Pending"}
                     </span>
                   );
@@ -1029,6 +1028,16 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                             {isFR 
                               ? `Listes : ${shieldStatus.blacklists.matched.join(", ")}` 
                               : `Feeds: ${shieldStatus.blacklists.matched.join(", ")}`}
+                          </span>
+                        </>
+                      ) : shieldStatus?.blacklists?.error ? (
+                        <>
+                          <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-warning/25 bg-warning-bg px-2.5 py-1 text-xs font-bold text-warning">
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                            {t("domain_shield.reputation_unavailable")}
+                          </span>
+                          <span className="max-w-64 text-left text-[11px] font-semibold text-on-surface-variant sm:text-right">
+                            {t("domain_shield.reputation_unavailable_desc")}
                           </span>
                         </>
                       ) : (
