@@ -192,6 +192,8 @@
     "blacklist_monitor": "Domain Blocklist Monitor",
     "blacklist_clean": "Clean",
     "blacklist_listed": "Listed in blocklists! Check DNS integrity.",
+    "reputation_unavailable": "Check unavailable",
+    "reputation_unavailable_desc": "The provider did not accept the query. No score penalty applied.",
     "dns_spf": "SPF Record",
     "dns_dkim": "DKIM Selector Status",
     "dns_dmarc": "DMARC Policy Check",

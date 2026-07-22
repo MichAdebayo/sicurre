@@ -192,6 +192,8 @@
     "blacklist_monitor": "Surveillance des Listes Noires IP/Domaine",
     "blacklist_clean": "Sain",
     "blacklist_listed": "Inscrit dans une liste noire ! Inspectez vos DNS.",
+    "reputation_unavailable": "Vérification indisponible",
+    "reputation_unavailable_desc": "Le fournisseur n'a pas accepté la requête. Aucun retrait de points.",
     "dns_spf": "Enregistrement SPF",
     "dns_dkim": "Statut du Sélecteur DKIM",
     "dns_dmarc": "Politique DMARC",

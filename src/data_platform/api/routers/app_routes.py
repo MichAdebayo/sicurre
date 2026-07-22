@@ -2,6 +2,7 @@ import asyncio
 import gzip
 import hashlib
 import io
+import ipaddress
 import logging
 import os
 import sqlite3
@@ -1525,20 +1526,48 @@ def _get_ssl_expiry_days(domain: str) -> int:
     return -1
 
 
-async def _check_domain_blacklists(domain: str) -> list[str]:
+def _classify_blocklist_response(
+    provider: str, addresses: list[str]
+) -> tuple[bool, str | None]:
+    """Distinguish a real listing from a DNSBL access/error response."""
+    parsed = []
+    for address in addresses:
+        with suppress(ValueError):
+            parsed.append(ipaddress.ip_address(address))
+
+    if provider == "Spamhaus DBL":
+        if any(str(address).startswith("127.255.255.") for address in parsed):
+            return False, "Spamhaus indisponible depuis le résolveur du serveur"
+        return any(address in ipaddress.ip_network("127.0.0.0/16") for address in parsed), None
+
+    if provider == "SURBL List":
+        if any(str(address) == "127.0.0.1" for address in parsed):
+            return False, "SURBL indisponible depuis le résolveur du serveur"
+        return any(address in ipaddress.ip_network("127.0.0.0/8") for address in parsed), None
+
+    return False, None
+
+
+async def _check_domain_blacklists(domain: str) -> tuple[list[str], list[str]]:
     import dns.resolver
 
     blacklists = {"dbl.spamhaus.org": "Spamhaus DBL", "multi.surbl.org": "SURBL List"}
-    listed_on = []
+    listed_on: list[str] = []
+    unavailable: list[str] = []
     for rbl, name in blacklists.items():
         try:
-            # Query domain.dnsbl
             query_host = f"{domain}.{rbl}"
-            await asyncio.to_thread(dns.resolver.resolve, query_host, "A")
-            listed_on.append(name)
+            answers = await asyncio.to_thread(dns.resolver.resolve, query_host, "A")
+            listed, error = _classify_blocklist_response(
+                name, [str(answer) for answer in answers]
+            )
+            if listed:
+                listed_on.append(name)
+            elif error:
+                unavailable.append(error)
         except Exception:
             pass
-    return listed_on
+    return listed_on, unavailable
 
 
 @router.get("/v1/domain-shield/{domain}/status")
@@ -1547,7 +1576,8 @@ async def check_domain_shield_status(
 ):
     await _require_workspace_domain(domain, current_user.workspace_id)
     # Run dynamic blacklist check
-    blacklists_listed = await _check_domain_blacklists(domain)
+    blacklists_listed, blacklist_errors = await _check_domain_blacklists(domain)
+    blacklist_error = "; ".join(blacklist_errors) or None
 
     # Try fetching from DB cache first
     if not refresh:
@@ -1602,7 +1632,7 @@ async def check_domain_shield_status(
                 "blacklists": {
                     "listed": len(blacklists_listed) > 0,
                     "matched": blacklists_listed,
-                    "error": None,
+                    "error": blacklist_error,
                 },
                 "updated_at": row["updated_at"],
             }
@@ -1630,7 +1660,7 @@ async def check_domain_shield_status(
         "blacklists": {
             "listed": len(blacklists_listed) > 0,
             "matched": blacklists_listed,
-            "error": None,
+            "error": blacklist_error,
         },
     }
 
