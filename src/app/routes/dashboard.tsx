@@ -694,7 +694,11 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
 
                       {/* Right Classification Badge */}
                       <div className="shrink-0 pl-2">
-                        <VerdictBadge verdict={alert.verdict} confidence={alert.confidence} />
+                        <VerdictBadge
+                          verdict={alert.verdict}
+                          confidence={alert.confidence}
+                          showRisk={false}
+                        />
                       </div>
                     </div>
                   ))}

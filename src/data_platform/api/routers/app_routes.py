@@ -274,11 +274,13 @@ async def get_kpis(
     legitimate_count = 0
 
     rows = await async_query_auth_db(
-        "SELECT safety_verdict, COUNT(*) as cnt FROM app_inference_event WHERE workspace_id = ? GROUP BY safety_verdict",
+        "SELECT COALESCE(label_verdict, CASE WHEN safety_verdict = 'safe' "
+        "THEN 'legitimate' ELSE safety_verdict END) AS label_verdict, COUNT(*) as cnt "
+        "FROM app_inference_event WHERE workspace_id = ? GROUP BY 1",
         (current_user.workspace_id,),
     )
     for row in rows:
-        verdict = row["safety_verdict"]
+        verdict = row["label_verdict"]
         count = row["cnt"]
         if verdict in ("phishing", "quarantine"):
             phishing_count += count
@@ -307,7 +309,7 @@ async def get_threats(current_user: AuthUser = Depends(get_current_user)):
                 subject,
                 sender,
                 snippet AS body_preview,
-                CASE WHEN safety_verdict = 'safe' THEN 'legitimate' ELSE safety_verdict END AS verdict,
+                COALESCE(label_verdict, CASE WHEN safety_verdict = 'safe' THEN 'legitimate' ELSE safety_verdict END) AS verdict,
                 composite_score AS confidence,
                 created_at AS received_at,
                 COALESCE(override_verdict, 'active') AS status,
@@ -365,7 +367,11 @@ async def update_threat_status(
             ),
         )
         rows = await async_query_auth_db(
-            "SELECT id, id AS message_id, subject, sender, snippet AS body_preview, CASE WHEN safety_verdict = 'safe' THEN 'legitimate' ELSE safety_verdict END AS verdict, composite_score AS confidence, created_at AS received_at, override_verdict AS status FROM app_inference_event WHERE id = ? AND workspace_id = ?",
+            "SELECT id, id AS message_id, subject, sender, snippet AS body_preview, "
+            "COALESCE(label_verdict, CASE WHEN safety_verdict = 'safe' THEN 'legitimate' "
+            "ELSE safety_verdict END) AS verdict, composite_score AS confidence, "
+            "created_at AS received_at, override_verdict AS status "
+            "FROM app_inference_event WHERE id = ? AND workspace_id = ?",
             (id, current_user.workspace_id),
         )
         if not rows:
@@ -957,11 +963,11 @@ async def get_admin_overview(current_user: AuthUser = Depends(get_current_user))
     verdict_rows = await _admin_rows(
         """
         SELECT
-            CASE WHEN safety_verdict = 'safe' THEN 'legitimate' ELSE safety_verdict END AS verdict,
+            COALESCE(label_verdict, CASE WHEN safety_verdict = 'safe' THEN 'legitimate' ELSE safety_verdict END) AS verdict,
             COUNT(*) AS count
         FROM app_inference_event
         WHERE (is_deleted IS NULL OR is_deleted = 0)
-        GROUP BY safety_verdict
+        GROUP BY 1
         """
     )
     feedback_rows = await _admin_rows(
