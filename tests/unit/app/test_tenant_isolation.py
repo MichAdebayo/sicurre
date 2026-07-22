@@ -574,7 +574,7 @@ async def test_kpis_are_workspace_scoped(monkeypatch: pytest.MonkeyPatch) -> Non
     """GET /v1/stats/kpi scopes event query to workspace_id."""
     captured, query = _tracking_query(
         {
-            "workspace-2": [{"safety_verdict": "phishing", "cnt": 10}],
+            "workspace-2": [{"label_verdict": "phishing", "cnt": 10}],
         }
     )
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
