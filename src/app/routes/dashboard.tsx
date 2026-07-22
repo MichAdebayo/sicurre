@@ -90,7 +90,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
 
   // Domains & Shield status check for security score
   const { data: domainsList } = useCloudflareList();
-  const [cachedActiveDomain, setCachedActiveDomain] = useState(readLastActiveDomain);
+  const [cachedActiveDomain] = useState(readLastActiveDomain);
 
   const cloudflareActiveDomain = domainsList && domainsList.length > 0
     ? (domainsList.find((d) => d.status === "active")?.zone_name || domainsList[0].zone_name)
@@ -102,7 +102,6 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
   useEffect(() => {
     if (!cloudflareActiveDomain || typeof window === "undefined") return;
     window.localStorage.setItem(LAST_ACTIVE_DOMAIN_KEY, cloudflareActiveDomain);
-    setCachedActiveDomain(cloudflareActiveDomain);
   }, [cloudflareActiveDomain]);
 
   const { data: shieldStatus } = useDomainShieldStatus(
