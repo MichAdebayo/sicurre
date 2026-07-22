@@ -89,6 +89,14 @@ function RouteFallback() {
   );
 }
 
+function PageRouteFallback() {
+  return (
+    <div className="flex min-h-48 items-center justify-center text-sm font-semibold text-on-surface-variant">
+      Chargement…
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <Suspense fallback={<RouteFallback />}>
@@ -273,18 +281,20 @@ function AppContent() {
       userRole={session.is_platform_admin ? "admin" : session.role}
       onboardingRequired={session.onboarding_required}
     >
-      <AnimatePresence mode="wait">
-        {activePage === "dashboard" && !session.is_platform_admin && <DashboardRoute key="dashboard" session={session} onGoToSettings={handleGoToSettings} />}
-        {activePage === "threats" && !session.is_platform_admin && (
-          <ThreatsRoute key="threats" onOpenQuarantine={() => setAuthenticatedPage("quarantine")} />
-        )}
-        {activePage === "quarantine" && !session.is_platform_admin && <QuarantineRoute key="quarantine" />}
-        {activePage === "alerts" && !session.is_platform_admin && <AlertsRoute key="alerts" />}
-        {activePage === "domain-shield" && !session.is_platform_admin && <DomainShieldRoute key="domain-shield" session={session} />}
-        {activePage === "logs" && session.is_platform_admin && <LogsRoute key="logs" />}
-        {activePage === "settings" && <SettingsRoute key="settings" session={session} initialTab={settingsTab} />}
-        {activePage === "support" && <SupportRoute key="support" session={session} />}
-      </AnimatePresence>
+      <Suspense fallback={<PageRouteFallback />}>
+        <AnimatePresence mode="wait">
+          {activePage === "dashboard" && !session.is_platform_admin && <DashboardRoute key="dashboard" session={session} onGoToSettings={handleGoToSettings} />}
+          {activePage === "threats" && !session.is_platform_admin && (
+            <ThreatsRoute key="threats" onOpenQuarantine={() => setAuthenticatedPage("quarantine")} />
+          )}
+          {activePage === "quarantine" && !session.is_platform_admin && <QuarantineRoute key="quarantine" />}
+          {activePage === "alerts" && !session.is_platform_admin && <AlertsRoute key="alerts" />}
+          {activePage === "domain-shield" && !session.is_platform_admin && <DomainShieldRoute key="domain-shield" session={session} />}
+          {activePage === "logs" && session.is_platform_admin && <LogsRoute key="logs" />}
+          {activePage === "settings" && <SettingsRoute key="settings" session={session} initialTab={settingsTab} />}
+          {activePage === "support" && <SupportRoute key="support" session={session} />}
+        </AnimatePresence>
+      </Suspense>
     </AppShell>
   );
 }

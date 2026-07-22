@@ -112,18 +112,6 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
   const changePasswordMutation = useChangePassword();
   const authProvider = getStoredAuthProvider();
 
-  // Apply theme class on mount to ensure light/dark variables resolve
-  useEffect(() => {
-    const savedTheme =
-      localStorage.getItem("sicurre_theme") ||
-      (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-    if (savedTheme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  }, []);
-
   useEffect(() => {
     const parts = session.display_name.trim().split(/\s+/);
     setFirstName(parts[0] || "");
@@ -529,10 +517,10 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
           {activeTab === "domains" && (
             <div className="space-y-6">
               {session.onboarding_required && (
-                <div className="rounded-xl border border-primary/15 bg-primary/[0.04] p-4 text-xs text-on-surface font-semibold flex gap-2">
-                  <AlertTriangle className="w-4.5 h-4.5 text-primary shrink-0" />
+                <div className="flex gap-2 rounded-xl border border-warning/25 bg-warning-bg p-4 text-xs font-semibold text-on-surface">
+                  <AlertTriangle className="w-4.5 h-4.5 shrink-0 text-warning" />
                   <div>
-                    <p className="text-primary">{lang === "fr" ? "Configuration requise" : "Onboarding required"}</p>
+                    <p className="text-on-surface">{lang === "fr" ? "Configuration requise" : "Onboarding required"}</p>
                     <p className="mt-0.5 text-on-surface-variant font-normal">
                       {lang === "fr"
                         ? failedDomain
@@ -618,7 +606,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                               <tr key={dom.id} className="hover:bg-surface-low/20 transition-colors">
                                 <td className="px-4 py-3 font-semibold text-on-surface">{dom.zone_name}</td>
                                 <td className="px-4 py-3">
-                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${dom.status === "active"
+                                  <span className={`rounded px-2 py-0.5 text-[11px] font-semibold ${dom.status === "active"
                                     ? "bg-safe/10 text-safe"
                                     : dom.status === "error"
                                       ? "bg-error/10 text-error"
