@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import {
   Cloud,
   CheckCircle2,
@@ -29,11 +30,26 @@ import {
 
 const MotionDiv = motion.div as any;
 
-function formatCloudflareError(message?: string | null): string {
-  if (!message) return "Erreur inconnue.";
+function formatCloudflareError(t: TFunction, message?: string | null): string {
+  if (!message) return t("domain_shield.cloudflare_unknown_error");
   const lower = message.toLowerCase();
-  if (lower.includes("authentication error") || lower.includes("dns update failed")) {
-    return "Le token Cloudflare peut lire le domaine, mais il ne peut pas modifier les DNS. Ajoutez la permission DNS:Edit sur la zone puis réessayez.";
+  if (lower.includes("zone settings:edit")) {
+    return t("domain_shield.cloudflare_zone_settings_permission_error");
+  }
+  if (lower.includes("dns_records") || lower.includes("dns update failed")) {
+    return t("domain_shield.cloudflare_dns_permission_error");
+  }
+  if (lower.includes("workers/scripts")) {
+    return t("domain_shield.cloudflare_worker_permission_error");
+  }
+  if (lower.includes("email/routing/rules")) {
+    return t("domain_shield.cloudflare_routing_permission_error");
+  }
+  if (lower.includes("email/routing/addresses")) {
+    return t("domain_shield.cloudflare_address_permission_error");
+  }
+  if (lower.includes("authentication error")) {
+    return t("domain_shield.cloudflare_scope_error");
   }
   if (lower.includes("zone") && lower.includes("not found")) {
     return "Le domaine est introuvable sur ce compte Cloudflare ou le token n'a pas accès à cette zone.";
@@ -129,7 +145,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
           onSuccess?.();
         }, 1500);
       } else if (cfStatus?.status === "error") {
-        setStages(prev => prev.map(s => s.id === "routing" ? { ...s, status: "error", errorMsg: formatCloudflareError(cfStatus.error_message || "Échec de la configuration finale.") } : s));
+        setStages(prev => prev.map(s => s.id === "routing" ? { ...s, status: "error", errorMsg: formatCloudflareError(t, cfStatus.error_message || "Échec de la configuration finale.") } : s));
       }
     }
     return () => {
@@ -165,7 +181,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
       });
 
       if (!result.valid) {
-        setStages(prev => prev.map(s => s.id === "verify" ? { ...s, status: "error", errorMsg: formatCloudflareError(result.error || "Token ou domaine invalide.") } : s));
+        setStages(prev => prev.map(s => s.id === "verify" ? { ...s, status: "error", errorMsg: formatCloudflareError(t, result.error || "Token ou domaine invalide.") } : s));
         return;
       }
 
@@ -197,7 +213,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
     } catch (err: any) {
       setStages(prev => prev.map(s => {
         if (s.status === "loading") {
-          return { ...s, status: "error", errorMsg: formatCloudflareError(err.message || "Une erreur est survenue lors de cette étape.") };
+          return { ...s, status: "error", errorMsg: formatCloudflareError(t, err.message || "Une erreur est survenue lors de cette étape.") };
         }
         return s;
       }));
@@ -214,6 +230,26 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
       refetch();
     } catch {
       // error shown via teardownMutation.error
+    }
+  };
+
+  const handleRetry = async () => {
+    if (!cfStatus?.zone_name || !cfStatus.destination_email) return;
+    try {
+      await setupMutation.mutateAsync({
+        zone_name: cfStatus.zone_name,
+        destination_email: cfStatus.destination_email,
+      });
+      await refetch();
+      setIsIntegrating(true);
+      setStages([
+        { id: "verify", label: "Vérification des informations d'identification", description: "Vérification du token API Cloudflare et de l'accès au domaine.", status: "success" },
+        { id: "dns", label: "Configuration des enregistrements DNS", description: "Configuration des enregistrements MX nécessaires pour l'acheminement des e-mails.", status: "success" },
+        { id: "worker", label: "Déploiement du Worker", description: "Déploiement du Worker Sicurre pour analyser chaque e-mail entrant en temps réel.", status: "success" },
+        { id: "routing", label: "Liaison du routage & validation finale", description: "Création de la règle catch-all et test final de connectivité de la passerelle.", status: "loading" },
+      ]);
+    } catch {
+      await refetch();
     }
   };
 
@@ -445,19 +481,18 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
           <AlertTriangle className="w-5 h-5 text-error shrink-0 mt-0.5" />
           <div>
             <p className="font-bold text-sm text-error mb-1">Échec du provisionnement</p>
-            <p className="text-[13px] leading-5 text-on-error-container">{formatCloudflareError(intStatus.error_message)}</p>
+            <p className="text-[13px] leading-5 text-on-error-container">{formatCloudflareError(t, intStatus.error_message)}</p>
           </div>
         </div>
         <p className="text-[13px] text-on-surface-variant">Vérifiez le token et les permissions, puis réessayez.</p>
         <Button
           variant="outline"
           size="sm"
-          onClick={async () => {
-            refetch();
-          }}
+          onClick={handleRetry}
+          disabled={setupMutation.isPending}
           className="gap-1.5 text-[11px]"
         >
-          <RefreshCw className="w-3.5 h-3.5" /> Réessayer
+          {setupMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Réessayer
         </Button>
       </MotionDiv>
     );

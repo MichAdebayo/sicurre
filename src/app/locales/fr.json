@@ -211,7 +211,13 @@
     "report_aligned": "Alignés",
     "report_failed": "Échecs",
     "report_empty": "Aucun rapport DMARC importé pour le moment.",
-    "cloudflare_dns_permission_error": "Le token Cloudflare peut lire le domaine, mais il n'a pas la permission de modifier les DNS."
+    "cloudflare_dns_permission_error": "Le token Cloudflare peut lire le domaine, mais il n'a pas la permission de modifier les DNS.",
+    "cloudflare_zone_settings_permission_error": "Cloudflare Email Routing n'est pas encore activé. Ajoutez la permission Zone Settings:Edit, puis réessayez.",
+    "cloudflare_worker_permission_error": "Cloudflare a refusé le déploiement du Worker. Vérifiez la permission Workers Scripts:Edit sur le compte.",
+    "cloudflare_routing_permission_error": "Cloudflare a refusé la règle de routage. Vérifiez la permission Email Routing Rules:Edit sur la zone.",
+    "cloudflare_address_permission_error": "Cloudflare a refusé l'adresse de destination. Vérifiez la permission Email Routing Addresses:Edit sur le compte.",
+    "cloudflare_scope_error": "Cloudflare a refusé cette opération. Vérifiez que le token couvre le compte et la zone sélectionnés.",
+    "cloudflare_unknown_error": "Erreur Cloudflare inconnue."
   },
   "settings": {
     "title": "Configuration de Sicurre",
