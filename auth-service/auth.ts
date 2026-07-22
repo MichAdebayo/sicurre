@@ -194,7 +194,8 @@ export const auth = betterAuth({
   },
   emailAndPassword: {
     enabled: true,
-    autoSignIn: true,
+    autoSignIn: false,
+    requireEmailVerification: true,
     minPasswordLength: 8,
     maxPasswordLength: 128,
     sendResetPassword: async ({ user, url }) => {
@@ -230,6 +231,8 @@ export const auth = betterAuth({
   },
   emailVerification: {
     sendOnSignUp: true,
+    sendOnSignIn: true,
+    autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url }) => {
       if (internalAdminSeedActive) return;
 
@@ -237,7 +240,7 @@ export const auth = betterAuth({
       const transactionalId = process.env.LOOPS_SIGN_UP_TRANSACTION_ID;
       if (!apiKey || !transactionalId) {
         console.warn(`[Loops] Missing key or Transaction ID for sign up verification to ${user.email}`);
-        return;
+        throw new Error("Sign-up verification email is not configured");
       }
       try {
         const res = await fetch("https://api.loops.so/v1/transactional", {
@@ -256,10 +259,13 @@ export const auth = betterAuth({
           }),
         });
         if (!res.ok) {
-          console.error(`[Loops] Verification mail error: ${res.status} - ${await res.text()}`);
+          const detail = await res.text();
+          console.error(`[Loops] Verification mail error: ${res.status} - ${detail}`);
+          throw new Error(`Verification email provider returned ${res.status}`);
         }
       } catch (err) {
         console.error(`[Loops] Verification mail exception:`, err);
+        throw err;
       }
     },
   },
