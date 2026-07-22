@@ -8,13 +8,14 @@ from typing import Any
 
 import httpx
 import pytest
-from fastapi import HTTPException
+from fastapi import BackgroundTasks, HTTPException
 from starlette.requests import Request
 
 from data_platform.api.auth import AuthUser
 from data_platform.api.routers import integrations
 from data_platform.api.routers.integrations import (
     CloudflareTokenSaveRequest,
+    CloudflareSetupRequest,
     EmailScanRequest,
     TeardownRequest,
     _notification_is_allowed,
@@ -22,6 +23,7 @@ from data_platform.api.routers.integrations import (
     get_workspace_cloudflare_token,
     save_workspace_cloudflare_token,
     scan_email,
+    setup_cloudflare,
     teardown_cloudflare,
     upload_quarantine_content,
 )
@@ -36,6 +38,20 @@ def _user() -> AuthUser:
         workspace_id="workspace-1",
         workspace_name="Workspace",
         is_platform_admin=False,
+    )
+
+
+def _request() -> Request:
+    return Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/v1/integrations/cloudflare/setup",
+            "headers": [],
+            "client": ("127.0.0.1", 4000),
+            "server": ("testserver", 80),
+            "scheme": "http",
+        }
     )
 
 
@@ -395,3 +411,159 @@ async def test_teardown_preserves_local_state_when_cloudflare_fails(monkeypatch)
     assert exc_info.value.status_code == 502
     assert "Email Routing: Edit permission is missing" in exc_info.value.detail
     assert not any(sql.startswith("DELETE FROM cloudflare_integration") for sql in statements)
+
+
+@pytest.mark.asyncio
+async def test_teardown_discards_failed_local_attempt_without_provider_token(monkeypatch) -> None:
+    """A failed attempt with no remote resources can always be removed locally."""
+    statements: list[str] = []
+
+    async def query(sql: str, _params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        statements.append(sql)
+        if sql.startswith("SELECT * FROM cloudflare_integration"):
+            return [
+                {
+                    "id": "integration-failed",
+                    "status": "error",
+                    "api_token": None,
+                    "zone_id": "",
+                    "account_id": "",
+                    "worker_name": "",
+                    "rule_id": "unknown",
+                    "zone_name": "failed.example",
+                }
+            ]
+        return []
+
+    class UnexpectedProvisioner:
+        def __init__(self, **_kwargs: Any) -> None:
+            raise AssertionError("Local cleanup must not call Cloudflare")
+
+    monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
+    monkeypatch.setattr(integrations, "_async_query", query)
+    monkeypatch.setattr(integrations, "CloudflareProvisioner", UnexpectedProvisioner)
+
+    response = await teardown_cloudflare(
+        TeardownRequest(integration_id="integration-failed"), _user()
+    )
+
+    assert response == {"status": "removed", "zone_name": "failed.example"}
+    assert any(sql.startswith("DELETE FROM cloudflare_integration") for sql in statements)
+    assert not any(sql.startswith("DELETE FROM app_cloudflare_config") for sql in statements)
+
+
+@pytest.mark.asyncio
+async def test_setup_replaces_failed_local_attempt_using_saved_token(monkeypatch) -> None:
+    """Retry discards stale local state and starts a fresh provision operation."""
+    statements: list[tuple[str, tuple[Any, ...]]] = []
+
+    async def query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        statements.append((sql, params))
+        if "FROM cloudflare_integration" in sql:
+            return [
+                {
+                    "id": "integration-failed",
+                    "status": "error",
+                    "zone_id": "",
+                    "account_id": "",
+                    "worker_name": "",
+                }
+            ]
+        if "SELECT api_token FROM app_cloudflare_config" in sql:
+            return [{"api_token": "encrypted-token"}]
+        return []
+
+    async def sync_dns(**_kwargs: Any) -> dict[str, Any]:
+        return {"status": "unchanged"}
+
+    monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
+    monkeypatch.setattr(integrations, "_async_query", query)
+    monkeypatch.setattr(integrations, "decrypt_secret", lambda *_args, **_kwargs: "saved-token")
+    monkeypatch.setattr(integrations, "_sync_domain_shield_dns", sync_dns)
+
+    response = await setup_cloudflare(
+        CloudflareSetupRequest(
+            zone_name="failed.example",
+            destination_email="owner@example.test",
+        ),
+        BackgroundTasks(),
+        _request(),
+        _user(),
+    )
+
+    assert response["status"] == "provisioning"
+    assert any(
+        sql.startswith("DELETE FROM cloudflare_integration")
+        and params == ("integration-failed", "workspace-1")
+        for sql, params in statements
+    )
+    assert any("INSERT INTO cloudflare_integration" in sql for sql, _ in statements)
+
+
+@pytest.mark.asyncio
+async def test_teardown_uses_workspace_token_when_integration_token_is_absent(monkeypatch) -> None:
+    """Live teardown falls back to the workspace credential without browser input."""
+
+    async def query(sql: str, _params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        if sql.startswith("SELECT * FROM cloudflare_integration"):
+            return [
+                {
+                    "id": "integration-1",
+                    "status": "active",
+                    "api_token": None,
+                    "zone_id": "zone-1",
+                    "account_id": "account-1",
+                    "worker_name": "worker-1",
+                    "rule_id": "rule-1",
+                    "zone_name": "one.example",
+                }
+            ]
+        if "SELECT api_token FROM app_cloudflare_config" in sql:
+            return [{"api_token": "workspace-token"}]
+        return []
+
+    class Provisioner:
+        def __init__(self, api_token: str) -> None:
+            assert api_token == "decrypted-token"
+
+        async def teardown(self, **_kwargs: Any) -> None:
+            return None
+
+    monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
+    monkeypatch.setattr(integrations, "_async_query", query)
+    monkeypatch.setattr(integrations, "decrypt_secret", lambda *_args, **_kwargs: "decrypted-token")
+    monkeypatch.setattr(integrations, "CloudflareProvisioner", Provisioner)
+
+    response = await teardown_cloudflare(TeardownRequest(integration_id="integration-1"), _user())
+
+    assert response["status"] == "removed"
+
+
+@pytest.mark.asyncio
+async def test_live_teardown_reports_missing_provider_token(monkeypatch) -> None:
+    """A live resource is never silently detached when no provider token exists."""
+
+    async def query(sql: str, _params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        if sql.startswith("SELECT * FROM cloudflare_integration"):
+            return [
+                {
+                    "id": "integration-1",
+                    "status": "active",
+                    "api_token": None,
+                    "zone_id": "zone-1",
+                    "account_id": "account-1",
+                    "worker_name": "worker-1",
+                    "rule_id": "rule-1",
+                    "zone_name": "one.example",
+                }
+            ]
+        return []
+
+    monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
+    monkeypatch.setattr(integrations, "_async_query", query)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await teardown_cloudflare(TeardownRequest(integration_id="integration-1"), _user())
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "Cloudflare API token is not configured"
