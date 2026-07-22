@@ -4,9 +4,10 @@ import { clsx } from "clsx";
 interface VerdictBadgeProps {
   verdict: "phishing" | "spam" | "legitimate" | "quarantine";
   confidence: number;
+  showRisk?: boolean;
 }
 
-export function VerdictBadge({ verdict, confidence }: VerdictBadgeProps) {
+export function VerdictBadge({ verdict, confidence, showRisk = true }: VerdictBadgeProps) {
   let badgeStyles = "bg-safe-bg text-safe border-safe/20";
   let Icon = ShieldCheck;
   let label = "Légitime";
@@ -21,8 +22,7 @@ export function VerdictBadge({ verdict, confidence }: VerdictBadgeProps) {
     label = "Spam";
   }
 
-  // French format: space before percent symbol
-  const formattedConfidence = `${(confidence * 100).toFixed(0)} %`;
+  const formattedRisk = `Risque ${Math.round(confidence * 100)} %`;
 
   return (
     <div
@@ -33,9 +33,11 @@ export function VerdictBadge({ verdict, confidence }: VerdictBadgeProps) {
     >
       <Icon className="w-4 h-4 stroke-[1.5]" />
       <span>{label}</span>
-      <span className="font-mono text-mono-data opacity-90 ml-1.5">
-        {formattedConfidence}
-      </span>
+      {showRisk && (
+        <span className="font-mono text-mono-data opacity-90 ml-1.5">
+          {formattedRisk}
+        </span>
+      )}
     </div>
   );
 }
