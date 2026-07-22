@@ -11,6 +11,7 @@ export type AuthFailureReason =
   | "unknown_account"
   | "invalid_password"
   | "invalid_credentials"
+  | "email_unverified"
   | "email_taken"
   | "invalid_email"
   | "weak_password"
@@ -246,6 +247,9 @@ function normalizeAuthProviderError(
     return "email_taken";
   }
   if (text.includes("invalid email or password")) return "invalid_credentials";
+  if (text.includes("email_not_verified") || text.includes("email not verified")) {
+    return "email_unverified";
+  }
   if (text.includes("invalid email")) return "invalid_email";
   if (text.includes("password") && (text.includes("short") || text.includes("weak") || text.includes("length"))) {
     return "weak_password";
@@ -315,6 +319,7 @@ export function useSignup() {
         name: payload.name,
         email: payload.email,
         password: payload.password,
+        callbackURL: `${window.location.origin}/`,
         fetchOptions: payload.turnstileToken
           ? { headers: { "x-turnstile-token": payload.turnstileToken } }
           : undefined,
@@ -324,14 +329,9 @@ export function useSignup() {
       }
       return result;
     },
-    onSuccess: async () => {
+    onSuccess: () => {
       localStorage.setItem(AUTH_PROVIDER_KEY, "password");
       queryClient.invalidateQueries({ queryKey: ["auth-session"] });
-      const session = await queryClient.fetchQuery({
-        queryKey: ["auth-session"],
-        queryFn: () => fetchJson<AuthSession>("/auth/session"),
-      });
-      persistSession(session, "password");
     },
   });
 }

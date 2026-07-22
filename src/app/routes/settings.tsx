@@ -15,6 +15,8 @@ import {
   EyeOff,
   Puzzle,
   Info,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -27,6 +29,7 @@ import {
   useChangePassword,
   useUpdateProfile,
   useCloudflareList,
+  useSetupCloudflare,
   useTeardownCloudflare,
   useWorkspaceCloudflareToken,
   useSaveWorkspaceCloudflareToken,
@@ -79,9 +82,11 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
   // Queries for multi-domain setup and integrations
   const { data: domains, isLoading: domainsLoading, refetch: refetchDomains } = useCloudflareList();
   const teardownMutation = useTeardownCloudflare();
+  const retrySetupMutation = useSetupCloudflare();
   const [showIntegrator, setShowIntegrator] = useState(false);
   const [integrationSuccess, setIntegrationSuccess] = useState("");
   const [integrationError, setIntegrationError] = useState("");
+  const [retryingDomainId, setRetryingDomainId] = useState<string | null>(null);
   const [visibleTokens, setVisibleTokens] = useState<Record<string, boolean>>({});
 
   // Workspace-level global Cloudflare Token management
@@ -223,6 +228,33 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
     }
   };
 
+  const handleRetryDomain = async (domain: NonNullable<typeof domains>[number]) => {
+    if (!domain.zone_name || !domain.destination_email) return;
+    setIntegrationError("");
+    setIntegrationSuccess("");
+    setRetryingDomainId(domain.id || null);
+    try {
+      await retrySetupMutation.mutateAsync({
+        zone_name: domain.zone_name,
+        destination_email: domain.destination_email,
+      });
+      await refetchDomains();
+      setIntegrationSuccess(
+        lang === "fr" ? "Nouvelle tentative lancée." : "Retry started.",
+      );
+    } catch (error) {
+      setIntegrationError(
+        error instanceof Error
+          ? error.message
+          : lang === "fr"
+            ? "Impossible de relancer la configuration."
+            : "Unable to retry configuration.",
+      );
+    } finally {
+      setRetryingDomainId(null);
+    }
+  };
+
   const handleSaveToken = async (e: React.FormEvent) => {
     e.preventDefault();
     setIntegrationsError("");
@@ -272,6 +304,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
   const toastSuccess = saveStatus
     ? t("settings.save_success")
     : integrationSuccess || integrationsSuccess;
+  const failedDomain = domains?.find((domain) => domain.status === "error");
 
   const clearToast = () => {
     setSaveStatus(false);
@@ -502,8 +535,12 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                     <p className="text-primary">{lang === "fr" ? "Configuration requise" : "Onboarding required"}</p>
                     <p className="mt-0.5 text-on-surface-variant font-normal">
                       {lang === "fr"
-                        ? "Ajoutez un domaine Cloudflare pour déverrouiller l’app et commencer le routage e-mail."
-                        : "Add a Cloudflare domain to unlock the app and start email routing."}
+                        ? failedDomain
+                          ? `Relancez la configuration de ${failedDomain.zone_name} pour déverrouiller l’app.`
+                          : "Ajoutez un domaine Cloudflare pour déverrouiller l’app et commencer le routage e-mail."
+                        : failedDomain
+                          ? `Retry ${failedDomain.zone_name} configuration to unlock the app.`
+                          : "Add a Cloudflare domain to unlock the app and start email routing."}
                     </p>
                   </div>
                 </div>
@@ -526,7 +563,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                   {!showIntegrator && (
                     <Button onClick={() => setShowIntegrator(true)} className="text-xs font-bold gap-1 cursor-pointer">
                       <Plus className="w-3.5 h-3.5" />
-                      {t("settings.add_domain")}
+                      {domains?.length ? t("settings.add_another_domain") : t("settings.add_domain")}
                     </Button>
                   )}
                 </div>
@@ -596,13 +633,30 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                                 </td>
                                 <td className="px-4 py-3 font-semibold text-on-surface-variant">{dom.destination_email}</td>
                                 <td className="px-4 py-3 text-right">
-                                  <button
-                                    onClick={() => dom.id && handleRemoveDomain(dom.id)}
-                                    className="p-1.5 rounded hover:bg-surface-low hover:text-error text-on-surface-variant/50 transition-colors cursor-pointer"
-                                    title={lang === "fr" ? "Dissocier" : "Disconnect"}
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
+                                  <div className="inline-flex items-center gap-1">
+                                    {dom.status === "error" && (
+                                      <button
+                                        onClick={() => void handleRetryDomain(dom)}
+                                        disabled={retrySetupMutation.isPending}
+                                        className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-50 transition-colors cursor-pointer"
+                                        title={lang === "fr" ? "Réessayer la configuration" : "Retry configuration"}
+                                        aria-label={lang === "fr" ? `Réessayer la configuration de ${dom.zone_name}` : `Retry ${dom.zone_name} configuration`}
+                                      >
+                                        {retrySetupMutation.isPending && retryingDomainId === dom.id
+                                          ? <Loader2 className="w-4 h-4 animate-spin" />
+                                          : <RefreshCw className="w-4 h-4" />}
+                                        <span>{lang === "fr" ? "Réessayer" : "Retry"}</span>
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => dom.id && handleRemoveDomain(dom.id)}
+                                      className="p-2 rounded-md hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error text-on-surface-variant transition-colors cursor-pointer"
+                                      title={lang === "fr" ? "Dissocier" : "Disconnect"}
+                                      aria-label={lang === "fr" ? `Dissocier ${dom.zone_name}` : `Disconnect ${dom.zone_name}`}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
                             ))}
