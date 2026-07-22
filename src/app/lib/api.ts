@@ -418,6 +418,7 @@ export function useThreatLogs() {
   return useQuery<ThreatLog[]>({
     queryKey: ["threats"],
     queryFn: () => fetchJson<ThreatLog[]>("/threats"),
+    refetchInterval: 10000,
   });
 }
 
