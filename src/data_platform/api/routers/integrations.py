@@ -784,6 +784,17 @@ async def setup_cloudflare(
             detail="Cloudflare API token is not configured",
         )
     if existing:
+        failed_row = existing[0]
+        has_remote_resources = all(
+            failed_row.get(field) for field in ("zone_id", "account_id", "worker_name")
+        )
+        if failed_row.get("status") == "error" and not has_remote_resources:
+            await _async_query(
+                "DELETE FROM cloudflare_integration WHERE id = ? AND workspace_id = ?",
+                (failed_row["id"], current_user.workspace_id),
+            )
+            existing = []
+    if existing:
         row = existing[0]
         if row["status"] == "provisioning":
             raise HTTPException(
@@ -1224,43 +1235,46 @@ async def teardown_cloudflare(
             detail="Provisioning in progress; wait for it to complete before tearing down",
         )
 
-    settings = get_settings()
-    encrypted_token = payload.cf_api_token or row.get("api_token")
-    if not encrypted_token:
-        token_rows = await _async_query(
-            "SELECT api_token FROM app_cloudflare_config WHERE workspace_id = ? LIMIT 1",
-            (current_user.workspace_id,),
+    has_remote_resources = all(row.get(field) for field in ("zone_id", "account_id", "worker_name"))
+    local_failed_attempt = row["status"] == "error" and not has_remote_resources
+    if has_remote_resources:
+        settings = get_settings()
+        encrypted_token = payload.cf_api_token or row.get("api_token")
+        if not encrypted_token:
+            token_rows = await _async_query(
+                "SELECT api_token FROM app_cloudflare_config WHERE workspace_id = ? LIMIT 1",
+                (current_user.workspace_id,),
+            )
+            encrypted_token = token_rows[0].get("api_token") if token_rows else None
+        if not encrypted_token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cloudflare API token is not configured",
+            )
+        api_token = (
+            encrypted_token
+            if payload.cf_api_token
+            else decrypt_secret(
+                str(encrypted_token),
+                configured_key=settings.secret_encryption_key,
+                environment=settings.environment,
+            )
         )
-        encrypted_token = token_rows[0].get("api_token") if token_rows else None
-    if not encrypted_token:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cloudflare API token is not configured",
-        )
-    api_token = (
-        encrypted_token
-        if payload.cf_api_token
-        else decrypt_secret(
-            str(encrypted_token),
-            configured_key=settings.secret_encryption_key,
-            environment=settings.environment,
-        )
-    )
 
-    try:
-        provisioner = CloudflareProvisioner(api_token=api_token)
-        await provisioner.teardown(
-            zone_id=row["zone_id"],
-            account_id=row["account_id"],
-            worker_name=row["worker_name"],
-            rule_id=row.get("rule_id") or "unknown",
-        )
-    except CloudflareAPIError as exc:
-        logger.warning("Cloudflare teardown had errors: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Cloudflare could not remove the routing resources: {exc}",
-        ) from exc
+        try:
+            provisioner = CloudflareProvisioner(api_token=api_token)
+            await provisioner.teardown(
+                zone_id=row["zone_id"],
+                account_id=row["account_id"],
+                worker_name=row["worker_name"],
+                rule_id=row.get("rule_id") or "unknown",
+            )
+        except CloudflareAPIError as exc:
+            logger.warning("Cloudflare teardown had errors: %s", exc)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Cloudflare could not remove the routing resources: {exc}",
+            ) from exc
 
     await _async_query(
         "DELETE FROM cloudflare_integration WHERE id = ?",
@@ -1272,7 +1286,7 @@ async def teardown_cloudflare(
         "SELECT id FROM cloudflare_integration WHERE workspace_id = ? LIMIT 1",
         (current_user.workspace_id,),
     )
-    if not remaining:
+    if not remaining and not local_failed_attempt:
         # Parent domain removed: purge orphaned workspace tokens and shield cache
         await _async_query(
             "DELETE FROM app_cloudflare_config WHERE workspace_id = ?",
