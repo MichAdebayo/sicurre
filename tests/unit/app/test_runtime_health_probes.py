@@ -241,16 +241,19 @@ async def test_kpis_aggregate_each_class_for_current_workspace(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """KPI totals preserve all three model classes and quarantine aliases."""
+    captured_sql = ""
 
     async def threat_count(_: str) -> int:
         return 10
 
-    async def query(*_: object, **__: object) -> list[dict]:
+    async def query(sql: str, *_: object, **__: object) -> list[dict]:
+        nonlocal captured_sql
+        captured_sql = sql
         return [
-            {"safety_verdict": "phishing", "cnt": 2},
-            {"safety_verdict": "quarantine", "cnt": 1},
-            {"safety_verdict": "spam", "cnt": 3},
-            {"safety_verdict": "legitimate", "cnt": 4},
+            {"label_verdict": "phishing", "cnt": 2},
+            {"label_verdict": "quarantine", "cnt": 1},
+            {"label_verdict": "spam", "cnt": 3},
+            {"label_verdict": "legitimate", "cnt": 4},
         ]
 
     monkeypatch.setattr(app_routes, "_workspace_threat_count", threat_count)
@@ -262,6 +265,7 @@ async def test_kpis_aggregate_each_class_for_current_workspace(
     assert result["threats_phishing_count"] == 3
     assert result["threats_spam_count"] == 3
     assert result["threats_legitimate_count"] == 4
+    assert "label_verdict" in captured_sql
 
 
 @pytest.mark.asyncio
@@ -270,7 +274,11 @@ async def test_threat_list_masks_non_threat_content(
 ) -> None:
     """Legitimate content is masked while quarantined evidence stays reviewable."""
 
-    async def query(*_: object, **__: object) -> list[dict]:
+    captured_sql = ""
+
+    async def query(sql: str, *_: object, **__: object) -> list[dict]:
+        nonlocal captured_sql
+        captured_sql = sql
         base = {
             "message_id": "message",
             "confidence": 0.9,
@@ -307,6 +315,7 @@ async def test_threat_list_masks_non_threat_content(
     assert result[0]["status"] == "active"
     assert result[1]["subject"] == "Suspicious invoice"
     assert result[1]["sender"] == "attacker@example.test"
+    assert "label_verdict" in captured_sql
 
 
 @pytest.mark.asyncio
