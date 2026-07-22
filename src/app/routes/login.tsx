@@ -7,7 +7,7 @@ import { loginSchema, signUpSchema } from "../lib/schemas";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { AuthFlowError, type AuthFailureReason, useLogin, useSignup } from "../lib/api";
-import { authBaseURL } from "../lib/auth-client";
+import { authBaseURL, authClient } from "../lib/auth-client";
 import { Turnstile } from "../components/auth/turnstile";
 
 const MotionDiv = motion.div as any;
@@ -38,6 +38,8 @@ export default function LoginRoute({
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState("");
   const [authNotice, setAuthNotice] = useState("");
+  const [verificationEmailSent, setVerificationEmailSent] = useState(false);
+  const [isResendingVerification, setIsResendingVerification] = useState(false);
   const [resetToken, setResetToken] = useState(
     () => new URLSearchParams(window.location.search).get("token") || "",
   );
@@ -56,6 +58,7 @@ export default function LoginRoute({
     setIsSignUp(initialMode === "signup");
     setAuthError("");
     setAuthNotice("");
+    setVerificationEmailSent(false);
     setTurnstileToken("");
   }, [initialMode]);
 
@@ -132,7 +135,8 @@ export default function LoginRoute({
       }
       try {
         await signupMutation.mutateAsync({ name, email, password, turnstileToken });
-        onLoginSuccess();
+        setPassword("");
+        setVerificationEmailSent(true);
       } catch (error) {
         const reason = getAuthFailureReason(error, "signup_failed");
         setAuthError(t(`login.errors.${reason}`));
@@ -154,6 +158,24 @@ export default function LoginRoute({
         const reason = getAuthFailureReason(error, "login_failed");
         setAuthError(t(`login.errors.${reason}`));
       }
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setAuthError("");
+    setAuthNotice("");
+    setIsResendingVerification(true);
+    try {
+      const result = await authClient.sendVerificationEmail({
+        email,
+        callbackURL: `${window.location.origin}/`,
+      });
+      if (result.error) throw new Error("VERIFICATION_EMAIL_FAILED");
+      setAuthNotice("Un nouveau lien de vérification vient d’être envoyé.");
+    } catch {
+      setAuthError("Impossible d’envoyer le lien pour le moment. Réessayez dans quelques instants.");
+    } finally {
+      setIsResendingVerification(false);
     }
   };
 
@@ -233,13 +255,15 @@ export default function LoginRoute({
         {/* Brand Header */}
         <div className="flex flex-col items-center text-center mb-8">
           <h1 className="font-display font-bold text-2xl text-white tracking-tight">
-            {resetToken && !isResetComplete
+            {verificationEmailSent
+              ? "Vérifiez votre adresse e-mail"
+              : resetToken && !isResetComplete
               ? "Nouveau mot de passe"
               : isSignUp
                 ? "Créer un compte"
                 : "Connexion à Sicurre"}
           </h1>
-          {!resetToken && <p className="text-[13px] text-slate-400 mt-2.5">
+          {!resetToken && !verificationEmailSent && <p className="text-[13px] text-slate-400 mt-2.5">
             {isSignUp ? "Vous avez déjà un compte ? " : "Vous n'avez pas de compte ? "}
             <button
               onClick={() => {
@@ -259,6 +283,44 @@ export default function LoginRoute({
         </div>
 
         {/* Form Container */}
+        {verificationEmailSent ? (
+          <div className="w-full text-center space-y-5" role="status">
+            <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-primary/15 text-primary">
+              <Mail className="h-5 w-5" />
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm leading-6 text-slate-300">
+                Nous avons envoyé un lien à <strong className="text-white">{email}</strong>.
+                Cliquez dessus pour activer votre compte Sicurre.
+              </p>
+            </div>
+            {authError && <p className="text-sm text-red-300" role="alert">{authError}</p>}
+            {authNotice && <p className="text-sm text-emerald-200">{authNotice}</p>}
+            <div className="flex flex-col gap-2">
+              <Button
+                type="button"
+                fullWidth
+                variant="outline"
+                disabled={isResendingVerification}
+                onClick={() => void handleResendVerification()}
+              >
+                {isResendingVerification ? "Envoi en cours…" : "Renvoyer le lien"}
+              </Button>
+              <button
+                type="button"
+                onClick={() => {
+                  setVerificationEmailSent(false);
+                  setIsSignUp(false);
+                  setAuthError("");
+                  setAuthNotice("");
+                }}
+                className="text-sm font-medium text-slate-300 hover:text-white transition-colors cursor-pointer"
+              >
+                Revenir à la connexion
+              </button>
+            </div>
+          </div>
+        ) : (
         <div className="w-full space-y-5">
           {/* Core Credentials Form */}
           <form onSubmit={handleAuth} className="space-y-4">
@@ -375,6 +437,7 @@ export default function LoginRoute({
             </Button>
           </form>
         </div>
+        )}
 
         {/* Footer */}
         <p className="text-center text-[11px] text-slate-500 mt-10 leading-relaxed">
