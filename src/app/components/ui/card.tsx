@@ -20,15 +20,15 @@ export function Card({
       className={clsx(
         "rounded-xl transition-all duration-200",
         // Variant styling
-        variant === "default" && "bg-surface-lowest text-on-surface border border-border-subtle",
-        variant === "safe" && "bg-surface-safe text-on-surface border border-safe/20",
-        variant === "alert" && "bg-surface-alert text-on-surface border border-secondary/20",
-        variant === "dark" && "glass-card-dark text-white",
+        variant === "default" && "bg-surface-lowest text-on-surface border border-border-subtle/80 shadow-[0_1px_2px_rgba(0,0,0,0.04)]",
+        variant === "safe" && "bg-emerald-500/[0.03] text-on-surface border border-emerald-500/20",
+        variant === "alert" && "bg-amber-500/[0.03] text-on-surface border border-amber-500/20",
+        variant === "dark" && "bg-surface-low text-white border border-border-subtle",
         // Elevation styling
         elevation === "flat" && "",
         elevation === "border" && "border",
-        elevation === "hover" && "hover:shadow-md border",
-        elevation === "shadow" && "shadow-lg border",
+        elevation === "hover" && "hover:border-border-subtle hover:shadow-sm border",
+        elevation === "shadow" && "shadow-sm border",
         className,
       )}
       {...props}

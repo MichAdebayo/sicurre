@@ -1,4 +1,3 @@
-import { ShieldCheck, ShieldAlert, MailWarning } from "lucide-react";
 import { clsx } from "clsx";
 
 interface VerdictBadgeProps {
@@ -8,36 +7,37 @@ interface VerdictBadgeProps {
 }
 
 export function VerdictBadge({ verdict, confidence, showRisk = true }: VerdictBadgeProps) {
-  let badgeStyles = "bg-safe-bg text-safe border-safe/20";
-  let Icon = ShieldCheck;
+  let badgeStyles = "bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border-emerald-500/20";
+  let dotStyles = "bg-emerald-500";
   let label = "Légitime";
 
   if (verdict === "phishing" || verdict === "quarantine") {
-    badgeStyles = "bg-error/10 text-error border-error/20";
-    Icon = ShieldAlert;
+    badgeStyles = "bg-rose-500/10 text-rose-800 dark:text-rose-300 border-rose-500/20";
+    dotStyles = "bg-rose-500";
     label = "Phishing";
   } else if (verdict === "spam") {
-    badgeStyles = "bg-warning-bg text-warning border-warning/20";
-    Icon = MailWarning;
+    badgeStyles = "bg-amber-500/10 text-amber-900 dark:text-amber-300 border-amber-500/20";
+    dotStyles = "bg-amber-500";
     label = "Spam";
   }
 
-  const formattedRisk = `Risque ${Math.round(confidence * 100)} %`;
+  const formattedRisk = `${Math.round(confidence * 100)}%`;
 
   return (
     <div
       className={clsx(
-        "inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-body-sm font-semibold transition-all select-none whitespace-nowrap",
+        "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-xs font-medium transition-all select-none whitespace-nowrap",
         badgeStyles,
       )}
     >
-      <Icon className="w-4 h-4 stroke-[1.5]" />
+      <span className={clsx("w-1.5 h-1.5 rounded-full shrink-0", dotStyles)} />
       <span>{label}</span>
       {showRisk && (
-        <span className="font-mono text-mono-data opacity-90 ml-1.5">
+        <span className="font-mono text-[11px] opacity-75 ml-0.5">
           {formattedRisk}
         </span>
       )}
     </div>
   );
 }
+
