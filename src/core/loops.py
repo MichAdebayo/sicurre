@@ -1,14 +1,17 @@
-import httpx
 import logging
-from typing import Any, Dict
+from typing import Any
+
+import httpx
+
 from core.config import get_settings
 
 logger = logging.getLogger("sicurre.loops")
+LOOPS_TRANSACTIONAL_URL = "https://app.loops.so/api/v1/transactional"
 
 async def send_loops_transactional(
     email: str,
     transactional_id: str | None,
-    data_variables: Dict[str, Any]
+    data_variables: dict[str, Any],
 ) -> bool:
     """Send a transactional email using the Loops.so API.
 
@@ -31,7 +34,6 @@ async def send_loops_transactional(
         logger.warning("Loops Transactional ID is missing. Skipping email dispatch to %s.", email)
         return False
 
-    url = "https://api.loops.so/v1/transactional"
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -44,7 +46,11 @@ async def send_loops_transactional(
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(url, json=payload, headers=headers)
+            response = await client.post(
+                LOOPS_TRANSACTIONAL_URL,
+                json=payload,
+                headers=headers,
+            )
             
             # Handle successful response
             if response.status_code in (200, 201):
