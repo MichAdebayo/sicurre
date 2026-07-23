@@ -47,28 +47,23 @@ function KPIBlock({
   value: string;
   variant?: "default" | "phishing" | "spam" | "legitimate" | "primary";
 }) {
-  const styles = {
-    default: "border-border-subtle bg-white text-on-surface",
-    primary: "border-primary/30 bg-primary/[0.02] text-primary shadow-sm",
-    phishing: "border-error/30 bg-error/[0.02] text-error shadow-sm",
-    spam: "border-warning/25 bg-warning-bg/70 text-warning shadow-sm",
-    legitimate: "border-safe/30 bg-safe/[0.02] text-safe shadow-sm",
-  };
-
-  const textStyles = {
-    default: "text-on-surface",
-    primary: "text-primary",
-    phishing: "text-error",
-    spam: "text-warning",
-    legitimate: "text-safe",
+  const indicatorDot = {
+    default: null,
+    primary: <span className="w-2 h-2 rounded-full bg-primary shrink-0" />,
+    phishing: <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />,
+    spam: <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />,
+    legitimate: <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />,
   };
 
   return (
-    <div className={`rounded-xl border p-5 shadow-sm transition-all duration-300 ${styles[variant]}`}>
-      <p className="text-[11px] font-bold text-on-surface-variant uppercase tracking-[0.12em] mb-2">
-        {label}
-      </p>
-      <p className={`font-display font-bold text-[32px] tracking-tight leading-none ${textStyles[variant]}`}>
+    <div className="rounded-xl border border-border-subtle/80 bg-surface-lowest p-5 transition-all duration-200 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <p className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-[0.1em] font-sans">
+          {label}
+        </p>
+        {indicatorDot[variant]}
+      </div>
+      <p className="font-display font-bold text-[32px] tracking-tight leading-none text-on-surface">
         {value}
       </p>
     </div>

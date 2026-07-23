@@ -526,7 +526,7 @@ export default function ThreatsRoute({ onOpenQuarantine }: ThreatsRouteProps) {
                   >
                     <tr className="hover:bg-surface-low/20 transition-all text-xs">
                       <td className="px-5 py-3.5">
-                        <span className="text-xs text-on-surface-variant font-medium">
+                        <span className="font-mono text-xs text-on-surface-variant/80">
                           {new Date(threat.received_at).toLocaleString(i18n.language === "fr" ? "fr-FR" : "en-US", {
                             day: "numeric",
                             month: "short",
