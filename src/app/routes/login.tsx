@@ -286,40 +286,59 @@ export default function LoginRoute({
 
         {/* Form Container */}
         {verificationEmailSent ? (
-          <div className="w-full text-center space-y-5" role="status">
-            <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-primary/15 text-primary">
-              <Mail className="h-5 w-5" />
+          <div className="w-full text-center space-y-6 py-2" role="status">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20 text-primary shadow-sm">
+              <Mail className="h-7 w-7 stroke-[1.75]" />
             </div>
             <div className="space-y-2">
-              <p className="text-sm leading-6 text-slate-300">
-                Nous avons envoyé un lien à <strong className="text-white">{email}</strong>.
-                Cliquez dessus pour activer votre compte Sicurre.
+              <h3 className="text-xl font-bold text-white font-display tracking-tight">
+                Vérifiez votre boîte mail
+              </h3>
+              <p className="text-sm leading-relaxed text-slate-300">
+                Nous avons envoyé un lien de confirmation à <br />
+                <strong className="text-white font-semibold text-base select-all">{email}</strong>
+              </p>
+              <p className="text-xs text-slate-400 max-w-xs mx-auto pt-1 leading-normal">
+                Cliquez sur le lien reçu par e-mail pour activer votre compte et vous connecter.
               </p>
             </div>
-            {authError && <p className="text-sm text-red-300" role="alert">{authError}</p>}
-            {authNotice && <p className="text-sm text-emerald-200">{authNotice}</p>}
-            <div className="flex flex-col gap-2">
+
+            {authError && (
+              <div className="p-3 bg-red-950/30 border border-red-900/40 text-red-400 text-xs rounded-xl font-medium">
+                {authError}
+              </div>
+            )}
+            {authNotice && (
+              <div className="rounded-xl border border-emerald-800/50 bg-emerald-950/35 p-3 text-xs font-medium text-emerald-200">
+                {authNotice}
+              </div>
+            )}
+
+            <div className="pt-4 space-y-5 border-t border-white/10">
               <Button
                 type="button"
                 fullWidth
-                variant="outline"
                 disabled={isResendingVerification}
                 onClick={() => void handleResendVerification()}
+                className="!bg-primary hover:!bg-primary/90 !text-on-primary font-semibold text-sm !py-3 rounded-xl shadow-md shadow-primary/20 transition-all duration-200 cursor-pointer active:scale-[0.98]"
               >
-                {isResendingVerification ? "Envoi en cours…" : "Renvoyer le lien"}
+                {isResendingVerification ? "Envoi en cours…" : "Renvoyer l'e-mail de confirmation"}
               </Button>
-              <button
-                type="button"
-                onClick={() => {
-                  setVerificationEmailSent(false);
-                  setIsSignUp(false);
-                  setAuthError("");
-                  setAuthNotice("");
-                }}
-                className="text-sm font-medium text-slate-300 hover:text-white transition-colors cursor-pointer"
-              >
-                Revenir à la connexion
-              </button>
+
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVerificationEmailSent(false);
+                    setIsSignUp(false);
+                    setAuthError("");
+                    setAuthNotice("");
+                  }}
+                  className="text-xs font-medium text-slate-400 hover:text-white transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <span>← Revenir à l'écran de connexion</span>
+                </button>
+              </div>
             </div>
           </div>
         ) : (
