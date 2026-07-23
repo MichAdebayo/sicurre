@@ -58,7 +58,6 @@ export default function LoginRoute({
     setIsSignUp(initialMode === "signup");
     setAuthError("");
     setAuthNotice("");
-    setVerificationEmailSent(false);
     setTurnstileToken("");
   }, [initialMode]);
 
@@ -124,7 +123,8 @@ export default function LoginRoute({
     }
 
     if (isSignUp) {
-      if (turnstileConfig.status === "enabled" && !turnstileToken) {
+      const tokenToSubmit = turnstileToken || (import.meta.env.DEV ? "1x00000000000000000000AA" : "");
+      if (import.meta.env.PROD && turnstileConfig.status === "enabled" && !tokenToSubmit) {
         setAuthError(t("login.errors.bot_verification_required"));
         return;
       }
@@ -134,7 +134,7 @@ export default function LoginRoute({
         return;
       }
       try {
-        await signupMutation.mutateAsync({ name, email, password, turnstileToken });
+        await signupMutation.mutateAsync({ name, email, password, turnstileToken: tokenToSubmit });
         setPassword("");
         setVerificationEmailSent(true);
       } catch (error) {
@@ -202,7 +202,7 @@ export default function LoginRoute({
   };
 
   const isSubmitting = loginMutation.isPending || signupMutation.isPending;
-  const isTurnstileBlocking = isSignUp && (
+  const isTurnstileBlocking = isSignUp && import.meta.env.PROD && (
     turnstileConfig.status === "loading"
     || turnstileConfig.status === "error"
     || (turnstileConfig.status === "enabled" && !turnstileToken)
@@ -266,8 +266,10 @@ export default function LoginRoute({
           {!resetToken && !verificationEmailSent && <p className="text-[13px] text-slate-400 mt-2.5">
             {isSignUp ? "Vous avez déjà un compte ? " : "Vous n'avez pas de compte ? "}
             <button
+              type="button"
               onClick={() => {
                 setIsSignUp(!isSignUp);
+                setVerificationEmailSent(false);
                 setAuthError("");
                 setAuthNotice("");
                 setPassword("");

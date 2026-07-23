@@ -331,7 +331,6 @@ export function useSignup() {
     },
     onSuccess: () => {
       localStorage.setItem(AUTH_PROVIDER_KEY, "password");
-      queryClient.invalidateQueries({ queryKey: ["auth-session"] });
     },
   });
 }

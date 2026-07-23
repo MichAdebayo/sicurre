@@ -194,7 +194,7 @@ export const auth = betterAuth({
   },
   emailAndPassword: {
     enabled: true,
-    autoSignIn: false,
+    autoSignIn: !isProduction,
     requireEmailVerification: true,
     minPasswordLength: 8,
     maxPasswordLength: 128,
@@ -206,7 +206,7 @@ export const auth = betterAuth({
         return;
       }
       try {
-        const res = await fetch("https://api.loops.so/v1/transactional", {
+        const res = await fetch("https://app.loops.so/api/v1/transactional", {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${apiKey}`,
@@ -240,29 +240,38 @@ export const auth = betterAuth({
       const transactionalId = process.env.LOOPS_SIGN_UP_TRANSACTION_ID;
       if (!apiKey || !transactionalId) {
         console.warn(`[Loops] Missing key or Transaction ID for sign up verification to ${user.email}`);
+        if (!isProduction) return;
         throw new Error("Sign-up verification email is not configured");
       }
+      const payload = {
+        transactionalId,
+        email: user.email,
+        dataVariables: {
+          firstName: user.name.split(" ")[0] || "Utilisateur",
+          verificationUrl: url,
+        },
+      };
+      console.log(`[Loops] Sending verification email to ${user.email}`);
+      console.log(`[Loops] API Key (first 8): ${apiKey.slice(0, 8)}...`);
+      console.log(`[Loops] Transaction ID: ${transactionalId}`);
+      console.log(`[Loops] Verification URL: ${url}`);
       try {
-        const res = await fetch("https://api.loops.so/v1/transactional", {
+        const res = await fetch("https://app.loops.so/api/v1/transactional", {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${apiKey}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            transactionalId,
-            email: user.email,
-            dataVariables: {
-              firstName: user.name.split(" ")[0] || "Utilisateur",
-              verificationUrl: url,
-            },
-          }),
+          body: JSON.stringify(payload),
         });
+        const responseBody = await res.text();
+        console.log(`[Loops] Response status: ${res.status}`);
+        console.log(`[Loops] Response body: ${responseBody}`);
         if (!res.ok) {
-          const detail = await res.text();
-          console.error(`[Loops] Verification mail error: ${res.status} - ${detail}`);
+          console.error(`[Loops] Verification mail error: ${res.status} - ${responseBody}`);
           throw new Error(`Verification email provider returned ${res.status}`);
         }
+        console.log(`[Loops] Verification email successfully queued for ${user.email}`);
       } catch (err) {
         console.error(`[Loops] Verification mail exception:`, err);
         throw err;
