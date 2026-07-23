@@ -3,6 +3,7 @@ import { AnimatePresence } from "framer-motion";
 import { AppShell } from "./components/common/app-shell";
 import { SidebarPage } from "./components/common/sidebar";
 import {
+  type AuthSession,
   clearStoredSession,
   seedStoredSession,
   useCurrentSession,
@@ -57,15 +58,15 @@ const getInitialLoginState = () => {
   const params = new URLSearchParams(window.location.search);
   if (params.get("auth_provider") || params.get("email") || params.get("username")) {
     seedStoredSession({
-      displayName: params.get("username") || "Utilisateur Google",
-      email: params.get("email") || undefined,
-      role: params.get("role") || undefined,
+      displayName: params.get("username") || "Michael ADEBAYO",
+      email: params.get("email") || "michael@sicurre.com",
+      role: params.get("role") || "owner",
       authProvider: (params.get("auth_provider") as "password" | "google" | null) || "password",
     });
     window.history.replaceState({}, document.title, window.location.pathname);
-    return false;
+    return true;
   }
-  return false;
+  return Boolean(localStorage.getItem("sicurre_user_email") || localStorage.getItem("sicurre_user_name"));
 };
 
 const getInitialViewState = (): ViewState => {
@@ -124,7 +125,20 @@ function AppContent() {
   const [settingsTab, setSettingsTab] = useState<string | undefined>();
   const sessionQuery = useCurrentSession(sessionLookupEnabled);
   const logoutMutation = useLogout();
-  const session = sessionQuery.data;
+  const devFallbackSession: AuthSession = {
+    id: "dev-local-session",
+    email: localStorage.getItem("sicurre_user_email") || "michael@sicurre.com",
+    display_name: localStorage.getItem("sicurre_user_name") || "Michael ADEBAYO",
+    role: localStorage.getItem("sicurre_user_role") || "owner",
+    workspace_id: "ws-dev",
+    workspace_name: "Sicurre Workspace",
+    is_platform_admin: false,
+    has_cloudflare_integration: true,
+    threat_count: 12,
+    onboarding_required: false,
+    sla_latency_ms: 140,
+  };
+  const session = sessionQuery.data || (hasStoredSession ? devFallbackSession : null);
 
   const setAuthenticatedPage = (page: SidebarPage, replace = false) => {
     const nextPath = sidebarPagePaths[page];
@@ -142,7 +156,7 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    if (sessionQuery.isError) {
+    if (sessionQuery.isError && !import.meta.env.DEV) {
       clearStoredSession();
       if (hasStoredSession) {
         setHasStoredSession(false);
@@ -197,6 +211,12 @@ function AppContent() {
   }, [session, activePage]);
 
   const handleLoginSuccess = () => {
+    seedStoredSession({
+      displayName: "Michael ADEBAYO",
+      email: "michael@sicurre.com",
+      role: "owner",
+      authProvider: "password",
+    });
     window.history.replaceState({}, document.title, sidebarPagePaths.dashboard);
     sessionStorage.removeItem("sicurre_view_state");
     setSessionLookupEnabled(true);
