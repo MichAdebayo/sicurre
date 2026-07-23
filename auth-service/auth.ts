@@ -248,11 +248,7 @@ export const auth = betterAuth({
         email: user.email,
         dataVariables: {
           firstName: user.name.split(" ")[0] || "Utilisateur",
-          name: user.name || "Utilisateur",
           verificationUrl: url,
-          verification_url: url,
-          url: url,
-          link: url,
         },
       };
       console.log(`[Loops] Sending verification email to ${user.email}`);
