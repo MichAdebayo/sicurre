@@ -8,6 +8,7 @@ import { getMigrations } from "better-auth/db/migration";
 import { Pool } from "pg";
 
 import { ensureConfiguredAdmin, type AdminSeedResult } from "./admin-seed.js";
+import { sendLoopsTransactional } from "./loops.js";
 import "./env.js";
 
 const authBaseUrl =
@@ -199,33 +200,19 @@ export const auth = betterAuth({
     minPasswordLength: 8,
     maxPasswordLength: 128,
     sendResetPassword: async ({ user, url }) => {
-      const apiKey = process.env.LOOPS_API_KEY;
-      const transactionalId = process.env.LOOPS_RESET_PASSWORD_TRANSACTION_ID;
-      if (!apiKey || !transactionalId) {
-        console.warn(`[Loops] Missing key or Transaction ID for password reset to ${user.email}`);
-        return;
-      }
+      const transactionalId = process.env.LOOPS_RESET_PASSWORD_TRANSACTION_ID?.trim() ?? "";
       try {
-        const res = await fetch("https://api.loops.so/v1/transactional", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
+        await sendLoopsTransactional({
+          transactionalId,
+          email: user.email,
+          dataVariables: {
+            firstName: user.name.split(" ")[0] || "Utilisateur",
+            resetUrl: url,
           },
-          body: JSON.stringify({
-            transactionalId,
-            email: user.email,
-            dataVariables: {
-              firstName: user.name.split(" ")[0] || "Utilisateur",
-              resetUrl: url,
-            },
-          }),
         });
-        if (!res.ok) {
-          console.error(`[Loops] Password reset mail error: ${res.status} - ${await res.text()}`);
-        }
-      } catch (err) {
-        console.error(`[Loops] Password reset exception:`, err);
+      } catch (error) {
+        console.error("[Loops] Password reset delivery failed", error);
+        throw error;
       }
     },
   },
@@ -236,36 +223,19 @@ export const auth = betterAuth({
     sendVerificationEmail: async ({ user, url }) => {
       if (internalAdminSeedActive) return;
 
-      const apiKey = process.env.LOOPS_API_KEY;
-      const transactionalId = process.env.LOOPS_SIGN_UP_TRANSACTION_ID;
-      if (!apiKey || !transactionalId) {
-        console.warn(`[Loops] Missing key or Transaction ID for sign up verification to ${user.email}`);
-        throw new Error("Sign-up verification email is not configured");
-      }
+      const transactionalId = process.env.LOOPS_SIGN_UP_TRANSACTION_ID?.trim() ?? "";
       try {
-        const res = await fetch("https://api.loops.so/v1/transactional", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
+        await sendLoopsTransactional({
+          transactionalId,
+          email: user.email,
+          dataVariables: {
+            firstName: user.name.split(" ")[0] || "Utilisateur",
+            verificationUrl: url,
           },
-          body: JSON.stringify({
-            transactionalId,
-            email: user.email,
-            dataVariables: {
-              firstName: user.name.split(" ")[0] || "Utilisateur",
-              verificationUrl: url,
-            },
-          }),
         });
-        if (!res.ok) {
-          const detail = await res.text();
-          console.error(`[Loops] Verification mail error: ${res.status} - ${detail}`);
-          throw new Error(`Verification email provider returned ${res.status}`);
-        }
-      } catch (err) {
-        console.error(`[Loops] Verification mail exception:`, err);
-        throw err;
+      } catch (error) {
+        console.error("[Loops] Verification delivery failed", error);
+        throw error;
       }
     },
   },
