@@ -312,22 +312,31 @@ export function useLogin() {
 }
 
 export function useSignup() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (payload: { name: string; email: string; password: string; turnstileToken?: string }) => {
-      const result = await authClient.signUp.email({
-        name: payload.name,
-        email: payload.email,
-        password: payload.password,
-        callbackURL: `${window.location.origin}/`,
-        fetchOptions: payload.turnstileToken
-          ? { headers: { "x-turnstile-token": payload.turnstileToken } }
-          : undefined,
-      });
-      if (result.error) {
-        throw createAuthError(normalizeAuthProviderError(result.error, "signup_failed"));
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (payload.turnstileToken) {
+        headers["x-turnstile-token"] = payload.turnstileToken;
       }
-      return result;
+      const response = await fetch(`${authBaseURL}/sign-up/email`, {
+        method: "POST",
+        headers,
+        credentials: "include",
+        body: JSON.stringify({
+          name: payload.name,
+          email: payload.email,
+          password: payload.password,
+          callbackURL: `${window.location.origin}/`,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw createAuthError(normalizeAuthProviderError(data, "signup_failed"));
+      }
+      return data;
     },
     onSuccess: () => {
       localStorage.setItem(AUTH_PROVIDER_KEY, "password");

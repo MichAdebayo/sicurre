@@ -286,43 +286,40 @@ export default function LoginRoute({
 
         {/* Form Container */}
         {verificationEmailSent ? (
-          <div className="w-full text-center space-y-6 py-2" role="status">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20 text-primary shadow-sm">
-              <Mail className="h-7 w-7 stroke-[1.75]" />
+          <div className="w-full text-center space-y-4 py-2" role="status">
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 text-primary">
+              <Mail className="h-5 w-5 stroke-[1.75]" />
             </div>
-            <div className="space-y-2">
-              <h3 className="text-xl font-bold text-white font-display tracking-tight">
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-white font-display">
                 Vérifiez votre boîte mail
               </h3>
-              <p className="text-sm leading-relaxed text-slate-300">
-                Nous avons envoyé un lien de confirmation à <br />
-                <strong className="text-white font-semibold text-base select-all">{email}</strong>
-              </p>
-              <p className="text-xs text-slate-400 max-w-xs mx-auto pt-1 leading-normal">
-                Cliquez sur le lien reçu par e-mail pour activer votre compte et vous connecter.
+              <p className="text-xs text-slate-300">
+                Un lien de confirmation a été envoyé à <strong className="text-white select-all">{email}</strong>.
               </p>
             </div>
 
             {authError && (
-              <div className="p-3 bg-red-950/30 border border-red-900/40 text-red-400 text-xs rounded-xl font-medium">
+              <div className="p-2.5 bg-red-950/30 border border-red-900/40 text-red-400 text-xs rounded-lg font-medium">
                 {authError}
               </div>
             )}
             {authNotice && (
-              <div className="rounded-xl border border-emerald-800/50 bg-emerald-950/35 p-3 text-xs font-medium text-emerald-200">
+              <div className="rounded-lg border border-emerald-800/50 bg-emerald-950/35 p-2.5 text-xs font-medium text-emerald-200">
                 {authNotice}
               </div>
             )}
 
-            <div className="pt-4 space-y-5 border-t border-white/10">
+            <div className="pt-3 space-y-3 border-t border-white/10">
               <Button
                 type="button"
+                size="sm"
                 fullWidth
                 disabled={isResendingVerification}
                 onClick={() => void handleResendVerification()}
-                className="!bg-primary hover:!bg-primary/90 !text-on-primary font-semibold text-sm !py-3 rounded-xl shadow-md shadow-primary/20 transition-all duration-200 cursor-pointer active:scale-[0.98]"
+                className="h-9 px-4 text-xs font-semibold rounded-lg bg-primary hover:bg-primary/90 text-on-primary shadow-sm shadow-primary/20 transition-colors cursor-pointer"
               >
-                {isResendingVerification ? "Envoi en cours…" : "Renvoyer l'e-mail de confirmation"}
+                {isResendingVerification ? "Envoi en cours…" : "Renvoyer l'e-mail"}
               </Button>
 
               <div>
@@ -334,9 +331,9 @@ export default function LoginRoute({
                     setAuthError("");
                     setAuthNotice("");
                   }}
-                  className="text-xs font-medium text-slate-400 hover:text-white transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                  className="text-xs font-medium text-slate-400 hover:text-white transition-colors cursor-pointer"
                 >
-                  <span>← Revenir à l'écran de connexion</span>
+                  ← Revenir à la connexion
                 </button>
               </div>
             </div>
