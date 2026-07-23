@@ -163,3 +163,6 @@ golden-set-draft.fr.jsonl
 
 scripts/README.md
 docs/architecture/issue-artifact.md
+scripts/certification/
+
+refresh.png
