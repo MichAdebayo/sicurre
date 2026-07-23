@@ -6,7 +6,7 @@ import httpx
 import pytest
 
 from core.config import Settings
-from core.loops import send_loops_transactional
+from core.loops import LOOPS_TRANSACTIONAL_URL, send_loops_transactional
 
 
 @pytest.mark.asyncio
@@ -45,6 +45,7 @@ async def test_loops_maps_provider_status(monkeypatch, status_code: int, expecte
     result = await send_loops_transactional("user@example.test", "template", {"name": "Ada"})
 
     assert result is expected
+    assert captured["url"] == LOOPS_TRANSACTIONAL_URL
     assert captured["json"]["transactionalId"] == "template"
     assert captured["headers"]["Authorization"] == "Bearer key"
 

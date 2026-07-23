@@ -24,6 +24,7 @@ import {
   useCloudflareList,
   useDomainShieldStatus,
 } from "../lib/api";
+import { countTrendVerdicts } from "../lib/dashboard-trends";
 
 const MotionDiv = motion.div as any;
 const LAST_ACTIVE_DOMAIN_KEY = "sicurre_last_active_domain";
@@ -125,11 +126,12 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
   const spamCount = kpis?.threats_spam_count ?? 0;
   const legitimateCount = kpis?.threats_legitimate_count ?? 0;
 
-  // Generate date-aware trend metrics split between safe (legitimate) and phishing using DB data only
+  // Generate date-aware trend metrics from the canonical model label.
   const getTrendData = () => {
     const lang = i18n.language;
     const labels: string[] = [];
     const safeCounts: number[] = [];
+    const spamCounts: number[] = [];
     const phishingCounts: number[] = [];
 
     const threatsList = threats || [];
@@ -148,11 +150,11 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
           return rDate >= startOfDay && rDate <= endOfDay;
         });
 
-        const safe = dailyThreats.filter((t) => t.verdict === "legitimate").length;
-        const phish = dailyThreats.filter((t) => t.verdict === "phishing" || t.verdict === "spam" || t.verdict === "quarantine").length;
+        const { legitimate: safe, spam, phishing: phish } = countTrendVerdicts(dailyThreats);
 
         labels.push(d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { weekday: "short", day: "numeric" }));
         safeCounts.push(safe);
+        spamCounts.push(spam);
         phishingCounts.push(phish);
       }
     } else if (dateRange === "30d") {
@@ -169,11 +171,11 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
           return rDate >= startOfDay && rDate <= endOfDay;
         });
 
-        const safe = dailyThreats.filter((t) => t.verdict === "legitimate").length;
-        const phish = dailyThreats.filter((t) => t.verdict === "phishing" || t.verdict === "spam" || t.verdict === "quarantine").length;
+        const { legitimate: safe, spam, phishing: phish } = countTrendVerdicts(dailyThreats);
 
         labels.push(d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short" }));
         safeCounts.push(safe);
+        spamCounts.push(spam);
         phishingCounts.push(phish);
       }
     } else {
@@ -190,24 +192,24 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
           return rDate >= startOfMonth && rDate <= endOfMonth;
         });
 
-        const safe = monthlyThreats.filter((t) => t.verdict === "legitimate").length;
-        const phish = monthlyThreats.filter((t) => t.verdict === "phishing" || t.verdict === "spam" || t.verdict === "quarantine").length;
+        const { legitimate: safe, spam, phishing: phish } = countTrendVerdicts(monthlyThreats);
 
         labels.push(d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "short", year: "2-digit" }));
         safeCounts.push(safe);
+        spamCounts.push(spam);
         phishingCounts.push(phish);
       }
     }
 
-    return { labels, safeCounts, phishingCounts };
+    return { labels, safeCounts, spamCounts, phishingCounts };
   };
 
   const trendData = getTrendData();
 
-  const getTrendMaxVal = (data: { safeCounts: number[], phishingCounts: number[] }) => {
+  const getTrendMaxVal = (data: { safeCounts: number[], spamCounts: number[], phishingCounts: number[] }) => {
     let max = 1;
     for (let i = 0; i < data.safeCounts.length; i++) {
-      const sum = data.safeCounts[i] + data.phishingCounts[i];
+      const sum = data.safeCounts[i] + data.spamCounts[i] + data.phishingCounts[i];
       if (sum > max) max = sum;
     }
     return max;
@@ -557,12 +559,14 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                   >
                     {trendData.labels.map((label, idx) => {
                       const safe = trendData.safeCounts[idx];
+                      const spam = trendData.spamCounts[idx];
                       const phish = trendData.phishingCounts[idx];
-                      const total = safe + phish;
+                      const total = safe + spam + phish;
 
                       // compute bar heights relative to max
                       const totalPct = maxTrendVal > 0 ? (total / maxTrendVal) * 100 : 0;
                       const safePct = total > 0 ? (safe / total) * 100 : 0;
+                      const spamPct = total > 0 ? (spam / total) * 100 : 0;
                       const phishPct = total > 0 ? (phish / total) * 100 : 0;
 
                       return (
@@ -587,6 +591,13 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                               <div
                                 className="bg-error w-full transition-all"
                                 style={{ height: `${phishPct}%` }}
+                              />
+                            )}
+                            {/* Spam stack (Middle) */}
+                            {spam > 0 && (
+                              <div
+                                className="bg-warning w-full transition-all"
+                                style={{ height: `${spamPct}%` }}
                               />
                             )}
                             {/* Legitimate stack (Bottom) */}
@@ -615,6 +626,13 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                         {t("threats.badge_legitimate")}
                       </span>
                       <span>{trendData.safeCounts[hoveredBarIndex]}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 font-bold text-warning border-b border-border-subtle/40 pb-1.5 mb-0.5">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-warning" />
+                        {t("threats.badge_spam")}
+                      </span>
+                      <span>{trendData.spamCounts[hoveredBarIndex]}</span>
                     </div>
                     <div className="flex items-center justify-between gap-2 font-bold text-error">
                       <span className="flex items-center gap-1.5">
