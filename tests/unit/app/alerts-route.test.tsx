@@ -67,8 +67,7 @@ describe("alerts route", () => {
     mocks.updatePreferences.mockResolvedValue({ status: "saved" });
     render(<AlertsRoute />);
 
-    const spamToggle = screen.getByRole("checkbox", { name: /alerts.notify_spam/i });
-    expect(spamToggle).toBeChecked();
+    expect(screen.queryByRole("checkbox", { name: /alerts.notify_spam/i })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "alerts.save_preferences" }));
 
     await waitFor(() => expect(mocks.updatePreferences).toHaveBeenCalledOnce());

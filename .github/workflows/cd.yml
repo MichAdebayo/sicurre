@@ -110,6 +110,8 @@ jobs:
           file: Dockerfile.app
           target: web
           push: true
+          build-args: |
+            VITE_SICURRE_REPORT_EMAIL=${{ vars.SICURRE_REPORT_EMAIL }}
           tags: |
             ${{ env.REGISTRY }}/${{ steps.image.outputs.owner }}/sicurre-app:${{ needs.release.outputs.image_tag }}
             ${{ env.REGISTRY }}/${{ steps.image.outputs.owner }}/sicurre-app:latest
