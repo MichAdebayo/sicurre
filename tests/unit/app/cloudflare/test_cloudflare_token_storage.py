@@ -251,6 +251,8 @@ async def test_phishing_scan_persists_only_a_redacted_quarantine_preview(monkeyp
     monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
     monkeypatch.setattr(integrations, "_async_query", query)
     monkeypatch.setattr(integrations, "send_loops_transactional", noop_notification)
+    clock = iter((10.0, 10.125))
+    monkeypatch.setattr(integrations, "perf_counter", lambda: next(clock))
 
     response = await scan_email(
         request,
@@ -264,10 +266,15 @@ async def test_phishing_scan_persists_only_a_redacted_quarantine_preview(monkeyp
     )
 
     assert response.verdict == "quarantine"
+    assert response.latency_ms == 125.0
     quarantine_insert = next(
         params for sql, params in writes if "INSERT INTO app_quarantine_item" in sql
     )
     assert quarantine_insert[5] == "Write to [EMAIL] using IBAN [IBAN]."
+    inference_insert = next(
+        params for sql, params in writes if "INSERT INTO app_inference_event" in sql
+    )
+    assert inference_insert[16] == 125.0
 
 
 @pytest.mark.asyncio

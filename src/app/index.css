@@ -81,7 +81,8 @@
   --color-safe-bg: #ecfdf5;
   --color-danger: #ef4444;
   --color-danger-bg: #fef2f2;
-  --color-warning: #f59e0b;
+  /* Deep foreground in light mode; bright amber is reserved for dark surfaces. */
+  --color-warning: #b45309;
   --color-warning-bg: #fffbeb;
 
   /* ── Spacing (4px base unit) ── */
@@ -451,6 +452,7 @@ html.dark {
   --color-safe: #34d399;
   --color-danger-bg: #3a1215;
   --color-warning-bg: #332508;
+  --color-warning: #f59e0b;
 }
 
 html.dark .bg-white {
