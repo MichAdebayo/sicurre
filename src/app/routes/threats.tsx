@@ -4,28 +4,19 @@ import { motion } from "framer-motion";
 import {
   Search,
   Download,
-  Inbox,
-  Flag,
+  Copy,
   AlertTriangle,
 } from "lucide-react";
-import {
-  useThreatLogs,
-  useCreateFeedback,
-} from "../lib/api";
+import { useThreatLogs } from "../lib/api";
 import { VerdictBadge } from "../components/threats/verdict-badge";
 import { Button } from "../components/ui/button";
 import { AppToast } from "../components/common/app-toast";
 
 const MotionDiv = motion.div as any;
 
-interface ThreatsRouteProps {
-  onOpenQuarantine: () => void;
-}
-
-export default function ThreatsRoute({ onOpenQuarantine }: ThreatsRouteProps) {
+export default function ThreatsRoute() {
   const { t, i18n } = useTranslation();
-  const { data: threats, isLoading, error, refetch } = useThreatLogs();
-  const feedbackMutation = useCreateFeedback();
+  const { data: threats, isLoading, error } = useThreatLogs();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterVerdict, setFilterVerdict] = useState<string>("all");
@@ -41,30 +32,12 @@ export default function ThreatsRoute({ onOpenQuarantine }: ThreatsRouteProps) {
   const itemsPerPage = 10;
 
   const [actionSuccess, setActionSuccess] = useState("");
-  const [actionError, setActionError] = useState("");
+  const reportAddress = import.meta.env.VITE_SICURRE_REPORT_EMAIL?.trim() || "";
 
-  const handleReportFalseNegative = async (id: string) => {
-    setActionSuccess("");
-    setActionError("");
-    try {
-      await feedbackMutation.mutateAsync({
-        event_id: id,
-        feedback_type: "false_negative",
-        corrected_verdict: "phishing",
-        reporter_note:
-          i18n.language === "fr"
-            ? "Signalé depuis le journal des menaces comme phishing non intercepté."
-            : "Reported from threat log as missed phishing.",
-      });
-      setActionSuccess(
-        i18n.language === "fr"
-          ? "Signalement reçu. Nous l'utiliserons pour améliorer la détection."
-          : "Report received. We will use it to improve detection."
-      );
-      refetch();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to submit feedback.");
-    }
+  const copyReportAddress = async () => {
+    if (!reportAddress) return;
+    await navigator.clipboard.writeText(reportAddress);
+    setActionSuccess(t("threats.report_address_copied"));
   };
 
   // Date filtering logic
@@ -149,13 +122,14 @@ export default function ThreatsRoute({ onOpenQuarantine }: ThreatsRouteProps) {
           return rDate >= startOfHour && rDate <= endOfHour;
         });
 
+        const measuredThreats = hourlyThreats.filter((threat) => (threat.latency_ms ?? 0) > 0);
         const emails_count = hourlyThreats.length;
-        const latency = emails_count > 0
-          ? Math.round(hourlyThreats.reduce((sum, t) => sum + (t.latency_ms || 0), 0) / emails_count)
+        const latency = measuredThreats.length > 0
+          ? Math.round(measuredThreats.reduce((sum, threat) => sum + (threat.latency_ms ?? 0), 0) / measuredThreats.length)
           : 0;
 
         const diffPct = latency > 0 ? Math.round(((latency - slaLimit) / slaLimit) * 100) : 0;
-        days.push({ label, latency, diffPct, emails_count });
+        days.push({ label, latency, diffPct, emails_count, measured_count: measuredThreats.length });
       }
     } else if (dateFilter === "7d") {
       for (let i = 6; i >= 0; i--) {
@@ -171,13 +145,14 @@ export default function ThreatsRoute({ onOpenQuarantine }: ThreatsRouteProps) {
           return rDate >= startOfDay && rDate <= endOfDay;
         });
 
+        const measuredThreats = dailyThreats.filter((threat) => (threat.latency_ms ?? 0) > 0);
         const emails_count = dailyThreats.length;
-        const latency = emails_count > 0
-          ? Math.round(dailyThreats.reduce((sum, t) => sum + (t.latency_ms || 0), 0) / emails_count)
+        const latency = measuredThreats.length > 0
+          ? Math.round(measuredThreats.reduce((sum, threat) => sum + (threat.latency_ms ?? 0), 0) / measuredThreats.length)
           : 0;
 
         const diffPct = latency > 0 ? Math.round(((latency - slaLimit) / slaLimit) * 100) : 0;
-        days.push({ label, latency, diffPct, emails_count });
+        days.push({ label, latency, diffPct, emails_count, measured_count: measuredThreats.length });
       }
     } else if (dateFilter === "month") {
       const currentDay = now.getDate();
@@ -194,13 +169,14 @@ export default function ThreatsRoute({ onOpenQuarantine }: ThreatsRouteProps) {
           return rDate >= startOfDay && rDate <= endOfDay;
         });
 
+        const measuredThreats = dailyThreats.filter((threat) => (threat.latency_ms ?? 0) > 0);
         const emails_count = dailyThreats.length;
-        const latency = emails_count > 0
-          ? Math.round(dailyThreats.reduce((sum, t) => sum + (t.latency_ms || 0), 0) / emails_count)
+        const latency = measuredThreats.length > 0
+          ? Math.round(measuredThreats.reduce((sum, threat) => sum + (threat.latency_ms ?? 0), 0) / measuredThreats.length)
           : 0;
 
         const diffPct = latency > 0 ? Math.round(((latency - slaLimit) / slaLimit) * 100) : 0;
-        days.push({ label, latency, diffPct, emails_count });
+        days.push({ label, latency, diffPct, emails_count, measured_count: measuredThreats.length });
       }
     } else {
       // last_month
@@ -219,28 +195,31 @@ export default function ThreatsRoute({ onOpenQuarantine }: ThreatsRouteProps) {
           return rDate >= startOfDay && rDate <= endOfDay;
         });
 
+        const measuredThreats = dailyThreats.filter((threat) => (threat.latency_ms ?? 0) > 0);
         const emails_count = dailyThreats.length;
-        const latency = emails_count > 0
-          ? Math.round(dailyThreats.reduce((sum, t) => sum + (t.latency_ms || 0), 0) / emails_count)
+        const latency = measuredThreats.length > 0
+          ? Math.round(measuredThreats.reduce((sum, threat) => sum + (threat.latency_ms ?? 0), 0) / measuredThreats.length)
           : 0;
 
         const diffPct = latency > 0 ? Math.round(((latency - slaLimit) / slaLimit) * 100) : 0;
-        days.push({ label, latency, diffPct, emails_count });
+        days.push({ label, latency, diffPct, emails_count, measured_count: measuredThreats.length });
       }
     }
     return days;
   };
 
   const latencyData = getLatencyData(slaMs);
-  const maxLatencyVal = Math.max(...latencyData.map((d) => d.latency), slaMs, 14000);
+  const measuredLatencyData = latencyData.filter((point) => point.measured_count > 0);
+  const maxLatencyVal = Math.max(...measuredLatencyData.map((d) => d.latency), slaMs, 14000);
 
   // SVG coordinates
-  const points = latencyData.map((d, idx) => {
-    const x = (idx / (latencyData.length - 1 || 1)) * 1000;
+  const points = measuredLatencyData.map((d) => {
+    const dataIndex = latencyData.indexOf(d);
+    const x = (dataIndex / (latencyData.length - 1 || 1)) * 1000;
     const y = 180 - (d.latency / maxLatencyVal) * 140;
-    return { x, y };
+    return { x, y, data: d };
   });
-  const pathD = `M ${points.map((p) => `${p.x} ${p.y}`).join(" L ")}`;
+  const pathD = points.length > 0 ? `M ${points.map((p) => `${p.x} ${p.y}`).join(" L ")}` : "";
   const slaY = 180 - (slaMs / maxLatencyVal) * 140;
 
   // Pagination bounds
@@ -266,13 +245,6 @@ export default function ThreatsRoute({ onOpenQuarantine }: ThreatsRouteProps) {
         visible={!!actionSuccess}
         onClose={() => setActionSuccess("")}
       />
-      <AppToast
-        tone="error"
-        message={actionError}
-        visible={!!actionError}
-        onClose={() => setActionError("")}
-      />
-
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border-subtle">
         <div>
@@ -318,27 +290,31 @@ export default function ThreatsRoute({ onOpenQuarantine }: ThreatsRouteProps) {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
           <div>
             <h3 className="font-display font-bold text-[17px] text-on-surface">
-              {i18n.language === "fr" ? "Analyse de la Latence" : "Latency Analysis"}
+              {t("threats.latency_title")}
             </h3>
-            <p className="text-[11px] text-on-surface-variant font-medium mt-0.5">
-              {i18n.language === "fr" ? "Temps de réponse moyen du moteur de classification IA" : "Average response time of the AI classification engine"}
+            <p className="text-sm text-on-surface-variant mt-1">
+              {t("threats.latency_description")}
             </p>
           </div>
           {/* Spacing gap set to gap-8 between SLA and Operations legend */}
           <div className="flex items-center gap-8 text-xs font-bold text-on-surface-variant">
             <div className="flex items-center gap-1.5">
               <span className="w-6 h-px border-t border-dashed border-primary" />
-              <span>SLA ({slaMs} ms)</span>
+              <span>{t("threats.latency_target")} ({slaMs} ms)</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-6 h-0.5 bg-primary rounded-full" />
-              <span>Operations</span>
+              <span>{t("threats.latency_measure")}</span>
             </div>
           </div>
         </div>
 
         {/* Unified Font X/Y Axis Chart */}
-        <div className="w-[96%] mx-auto h-56 pt-2 relative">
+        {points.length === 0 ? (
+          <div className="flex h-56 items-center justify-center border-y border-border-subtle/60 text-center">
+            <p className="max-w-md text-sm text-on-surface-variant">{t("threats.latency_empty")}</p>
+          </div>
+        ) : <div className="w-[96%] mx-auto h-56 pt-2 relative">
           <svg className="w-full h-full overflow-visible" viewBox="0 0 1000 220" preserveAspectRatio="none">
             {/* Grid */}
             {[35, 70, 105, 140, 175].map((y) => (
@@ -407,27 +383,27 @@ export default function ThreatsRoute({ onOpenQuarantine }: ThreatsRouteProps) {
               }}
             >
               <div className="text-center font-extrabold border-b border-border-subtle/60 pb-1 text-primary text-[11px] uppercase tracking-wider mb-0.5">
-                {latencyData[hoveredLatencyIndex].label}
+                {points[hoveredLatencyIndex].data.label}
               </div>
               <div className="flex justify-between text-on-surface-variant font-bold">
-                <span>Avg Latency:</span>
-                <span className="font-mono text-primary">{latencyData[hoveredLatencyIndex].latency} ms</span>
+                <span>{t("threats.latency_average")}:</span>
+                <span className="font-mono text-primary">{points[hoveredLatencyIndex].data.latency} ms</span>
               </div>
               <div className="flex justify-between text-on-surface-variant font-bold">
-                <span>Total Emails:</span>
-                <span className="font-mono text-primary">{latencyData[hoveredLatencyIndex].emails_count}</span>
+                <span>{t("threats.email_count")}:</span>
+                <span className="font-mono text-primary">{points[hoveredLatencyIndex].data.emails_count}</span>
               </div>
               <div className="flex justify-between font-bold mt-0.5">
-                <span>SLA Diff:</span>
-                {latencyData[hoveredLatencyIndex].diffPct > 0 ? (
-                  <span className="text-error">+{latencyData[hoveredLatencyIndex].diffPct}%</span>
+                <span>{t("threats.target_difference")}:</span>
+                {points[hoveredLatencyIndex].data.diffPct > 0 ? (
+                  <span className="text-error">+{points[hoveredLatencyIndex].data.diffPct}%</span>
                 ) : (
-                  <span className="text-safe">{latencyData[hoveredLatencyIndex].diffPct}%</span>
+                  <span className="text-safe">{points[hoveredLatencyIndex].data.diffPct}%</span>
                 )}
               </div>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* X-axis date labels */}
         <div className="relative w-[96%] mx-auto h-6 mt-2 pt-2.5 border-t border-border-subtle/50 text-[10px] font-bold text-on-surface-variant font-sans select-none">
@@ -446,6 +422,21 @@ export default function ThreatsRoute({ onOpenQuarantine }: ThreatsRouteProps) {
           })}
         </div>
       </div>
+
+      {reportAddress && (
+        <div className="flex flex-col gap-3 border-y border-border-subtle py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-on-surface">{t("threats.report_missed_title")}</p>
+            <p className="mt-1 text-sm text-on-surface-variant">
+              {t("threats.report_missed_description", { address: reportAddress })}
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => void copyReportAddress()} className="shrink-0">
+            <Copy className="h-4 w-4" />
+            <span>{t("threats.copy_address")}</span>
+          </Button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
@@ -512,7 +503,7 @@ export default function ThreatsRoute({ onOpenQuarantine }: ThreatsRouteProps) {
                   <th className="px-5 py-3 text-xs font-bold text-on-surface-variant tracking-wide w-[28%] min-w-[180px]">{t("threats.sender")}</th>
                   <th className="px-5 py-3 text-xs font-bold text-on-surface-variant tracking-wide w-[35%] min-w-[220px]">{t("threats.subject")}</th>
                   <th className="px-5 py-3 text-xs font-bold text-on-surface-variant tracking-wide w-[15%] min-w-[140px]">{t("threats.verdict")}</th>
-                  <th className="px-5 py-3 text-xs font-bold text-on-surface-variant tracking-wide min-w-[180px]">{t("threats.actions")}</th>
+                  <th className="px-5 py-3 text-xs font-bold text-on-surface-variant tracking-wide min-w-[130px]">{t("threats.phishing_risk")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-subtle">
@@ -550,33 +541,12 @@ export default function ThreatsRoute({ onOpenQuarantine }: ThreatsRouteProps) {
                         </span>
                       </td>
                       <td className="px-5 py-3.5">
-                        <VerdictBadge verdict={threat.verdict} confidence={threat.confidence} />
+                        <VerdictBadge verdict={threat.verdict} confidence={threat.confidence} showRisk={false} />
                       </td>
                       <td className="px-5 py-3.5">
-                        {threat.verdict === "phishing" || threat.verdict === "quarantine" ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={onOpenQuarantine}
-                            className="h-8 text-[11px]"
-                          >
-                            <Inbox className="w-3.5 h-3.5" />
-                            <span>
-                              {i18n.language === "fr" ? "Ouvrir la quarantaine" : "Open quarantine"}
-                            </span>
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={feedbackMutation.isPending}
-                            onClick={() => handleReportFalseNegative(threat.id)}
-                            className="h-8 text-[11px]"
-                          >
-                            <Flag className="w-3.5 h-3.5" />
-                            <span>{i18n.language === "fr" ? "Signaler phishing" : "Report phishing"}</span>
-                          </Button>
-                        )}
+                        <span className="font-mono text-sm font-semibold text-on-surface">
+                          {Math.round(threat.confidence * 100)} %
+                        </span>
                       </td>
                     </tr>
                   </MotionDiv>

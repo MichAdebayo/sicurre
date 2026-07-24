@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, Info, TriangleAlert, X, XCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
@@ -16,7 +16,7 @@ interface AppToastProps {
 const toneStyles: Record<AppToastTone, string> = {
   success: "bg-safe text-white",
   error: "bg-error text-on-error",
-  warning: "bg-warning text-slate-950",
+  warning: "bg-warning text-white dark:bg-[#F59E0B] dark:text-slate-950",
   info: "bg-primary text-on-primary",
 };
 
@@ -36,18 +36,23 @@ export function AppToast({
 }: AppToastProps) {
   const Icon = toneIcons[tone];
   const [paused, setPaused] = useState(false);
+  const onCloseRef = useRef(onClose);
 
   useEffect(() => {
-    if (!visible || !message || !onClose || paused || durationMs <= 0) return;
-    const timeoutId = window.setTimeout(onClose, durationMs);
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!visible || !message || !onCloseRef.current || paused || durationMs <= 0) return;
+    const timeoutId = window.setTimeout(() => onCloseRef.current?.(), durationMs);
     return () => window.clearTimeout(timeoutId);
-  }, [durationMs, message, onClose, paused, visible]);
+  }, [durationMs, message, paused, visible]);
 
   return (
     <AnimatePresence>
       {visible && message && (
         <motion.div
-          role="status"
+          role={tone === "error" ? "alert" : "status"}
           aria-live={tone === "error" ? "assertive" : "polite"}
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
@@ -58,7 +63,7 @@ export function AppToast({
           onFocusCapture={() => setPaused(true)}
           onBlurCapture={() => setPaused(false)}
           className={clsx(
-            "fixed bottom-6 left-4 right-4 z-50 flex min-h-12 items-center gap-3 overflow-hidden rounded-md px-4 py-3 text-[15px] font-semibold leading-5 shadow-lg md:left-[272px] md:right-12",
+            "fixed bottom-5 left-4 right-4 z-50 flex min-h-12 items-center gap-3 overflow-hidden rounded-md px-4 py-3 text-[15px] font-semibold leading-5 shadow-md md:left-auto md:right-8 md:w-[min(28rem,calc(100vw-2rem))]",
             toneStyles[tone],
           )}
         >

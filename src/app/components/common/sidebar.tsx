@@ -2,7 +2,7 @@ import { clsx } from "clsx";
 import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard,
-  ShieldAlert,
+  Activity,
   History,
   Settings,
   HelpCircle,
@@ -54,7 +54,7 @@ export function Sidebar({
 
   const baseNav = [
     { id: "dashboard", label: t("sidebar.nav_dashboard"), icon: LayoutDashboard },
-    { id: "threats", label: t("sidebar.nav_threats"), icon: ShieldAlert },
+    { id: "threats", label: t("sidebar.nav_threats"), icon: Activity },
     { id: "quarantine", label: t("sidebar.nav_quarantine"), icon: Inbox },
     { id: "alerts", label: t("sidebar.nav_alerts"), icon: Bell },
     { id: "domain-shield", label: t("sidebar.nav_domain_shield"), icon: Shield },
