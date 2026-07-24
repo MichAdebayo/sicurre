@@ -119,7 +119,7 @@ describe("application toast", () => {
     const onClose = vi.fn();
     render(<AppToast tone="error" message="Configuration impossible" onClose={onClose} />);
 
-    expect(screen.getByRole("status")).toHaveAttribute("aria-live", "assertive");
+    expect(screen.getByRole("alert")).toHaveAttribute("aria-live", "assertive");
     fireEvent.click(screen.getByRole("button", { name: "Fermer la notification" }));
     expect(onClose).toHaveBeenCalledOnce();
   });
@@ -140,7 +140,7 @@ describe("application toast", () => {
     vi.useFakeTimers();
     const onClose = vi.fn();
     render(<AppToast tone="error" message="Permission Cloudflare manquante" onClose={onClose} durationMs={1000} />);
-    const toast = screen.getByRole("status");
+    const toast = screen.getByRole("alert");
 
     fireEvent.mouseEnter(toast);
     vi.advanceTimersByTime(1500);

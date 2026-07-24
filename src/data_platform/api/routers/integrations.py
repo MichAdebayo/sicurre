@@ -25,6 +25,7 @@ import logging
 import secrets
 import sqlite3
 from datetime import datetime, timedelta, timezone
+from time import perf_counter
 from typing import Any
 from uuid import NAMESPACE_URL, uuid4, uuid5
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -335,6 +336,7 @@ class EmailScanResponse(BaseModel):
     score: float
     explanation: str = ""
     quarantine_id: str | None = None
+    latency_ms: float | None = None
 
 
 class CloudflareSetupRequest(BaseModel):
@@ -390,6 +392,7 @@ async def scan_email(
     Cloudflare Workers and authenticated exclusively through the per-integration
     shared secret header.
     """
+    request_started_at = perf_counter()
     _ = request
     _ensure_tables()
 
@@ -435,7 +438,7 @@ async def scan_email(
             quarantine_id=str(held["id"]),
         )
     existing_event = await _async_query(
-        "SELECT safety_verdict, label_verdict, composite_score, explanation "
+        "SELECT safety_verdict, label_verdict, composite_score, explanation, latency_ms "
         "FROM app_inference_event WHERE id = ? AND workspace_id = ? LIMIT 1",
         (event_id, workspace_id),
     )
@@ -447,6 +450,7 @@ async def scan_email(
             label=str(event["label_verdict"]),
             score=float(event["composite_score"]),
             explanation=str(event.get("explanation") or "Existing idempotent decision."),
+            latency_ms=float(event.get("latency_ms") or 0.0) or None,
         )
 
     # ── Check Whitelist / Blocklist Rules ──────────────────────────────────
@@ -524,6 +528,8 @@ async def scan_email(
                 detail="Inference service is temporarily unavailable",
             ) from exc
 
+    decision_latency_ms = round((perf_counter() - request_started_at) * 1000, 2)
+
     # ── Quarantine Handling ────────────────────────────────────────────────
     # If verdict is phishing, quarantine the email instead of bouncing
     quarantine_id: str | None = None
@@ -562,8 +568,8 @@ async def scan_email(
                 (
                     str(uuid4()),
                     workspace_id,
-                    "Email Quarantined",
-                    f"Email from {payload.sender} regarding '{payload.subject}' was quarantined.",
+                    "Email mis en quarantaine",
+                    "Un email suspect a été intercepté. Consultez la quarantaine pour décider de son sort.",
                     now,
                 ),
             )
@@ -644,7 +650,7 @@ async def scan_email(
                 0 if classified_as_phishing else 1,
                 "cloudflare_worker",
                 explanation[:500],
-                0.0,
+                decision_latency_ms,
                 1 if payload.use_llm else 0,
                 1 if payload.use_virustotal else 0,
                 "api",
@@ -670,6 +676,7 @@ async def scan_email(
         score=score,
         explanation=explanation,
         quarantine_id=quarantine_id,
+        latency_ms=decision_latency_ms,
     )
 
 

@@ -285,7 +285,7 @@ function AppContent() {
         <AnimatePresence mode="wait">
           {activePage === "dashboard" && !session.is_platform_admin && <DashboardRoute key="dashboard" session={session} onGoToSettings={handleGoToSettings} />}
           {activePage === "threats" && !session.is_platform_admin && (
-            <ThreatsRoute key="threats" onOpenQuarantine={() => setAuthenticatedPage("quarantine")} />
+            <ThreatsRoute key="threats" />
           )}
           {activePage === "quarantine" && !session.is_platform_admin && <QuarantineRoute key="quarantine" />}
           {activePage === "alerts" && !session.is_platform_admin && <AlertsRoute key="alerts" />}
