@@ -94,7 +94,6 @@ export function TopBar({
     title: string;
     desc: string;
     time: string;
-    badge: string;
     category: "Critical" | "Domain" | "System";
     page: SidebarPage;
     unread: boolean;
@@ -108,7 +107,6 @@ export function TopBar({
         ? "Ajoutez votre token pour activer le routage email."
         : "Add your token to enable email routing.",
       time: i18n.language === "fr" ? "maintenant" : "now",
-      badge: "Setup",
       category: "Domain" as const,
       page: "settings" as const,
       unread: true,
@@ -121,7 +119,6 @@ export function TopBar({
         title: alert.title,
         desc: alert.message,
         time: timeSince(alert.created_at),
-        badge: i18n.language === "fr" ? "Alertes" : "Alerts",
         category: "System" as const,
         page: "alerts" as const,
         unread: true,
@@ -131,14 +128,15 @@ export function TopBar({
 
   // 1. Phishing alerts
   const activePhishing = threats?.filter(t => t.verdict === "phishing" && t.status === "active") || [];
-  if (!onboardingRequired && activePhishing.length > 0) {
+  if (!onboardingRequired && recentAlertHistory.length === 0 && activePhishing.length > 0) {
     const latest = activePhishing[0];
     notificationsList.push({
       id: "phish_blocked_" + latest.id,
       title: i18n.language === "fr" ? "Email de phishing bloqué" : "Phishing email blocked",
-      desc: `${latest.sender} · ${latest.subject}`,
+      desc: i18n.language === "fr"
+        ? "Consultez le journal pour voir la décision."
+        : "Open the threat log to review the decision.",
       time: timeSince(latest.received_at),
-      badge: "Threat log",
       category: "Critical" as const,
       page: "threats" as const,
       unread: true,
@@ -154,7 +152,6 @@ export function TopBar({
         ? `${activeDomain} expire dans ${shieldStatus.ssl.days_remaining} jours`
         : `${activeDomain} certificate expires in ${shieldStatus.ssl.days_remaining} days`,
       time: shieldStatus.updated_at ? timeSince(shieldStatus.updated_at) : "",
-      badge: "Domain shield",
       category: "Domain" as const,
       page: "domain-shield" as const,
       unread: true,
@@ -170,7 +167,6 @@ export function TopBar({
         ? `@${activeDomain} peut être usurpé. Modifiez la politique.`
         : `@${activeDomain} can be spoofed. Change the policy.`,
       time: shieldStatus.updated_at ? timeSince(shieldStatus.updated_at) : "",
-      badge: "Domain shield",
       category: "Domain" as const,
       page: "domain-shield" as const,
       unread: true,
@@ -178,15 +174,20 @@ export function TopBar({
   }
 
   // 4. Quarantine waiting emails
-  if (!onboardingRequired && quarantineItems && quarantineItems.length > 0) {
+  if (
+    !onboardingRequired
+    && recentAlertHistory.length === 0
+    && activePhishing.length === 0
+    && quarantineItems
+    && quarantineItems.length > 0
+  ) {
     notificationsList.push({
       id: "quarantine_held",
       title: i18n.language === "fr" ? `${quarantineItems.length} emails en quarantaine` : `${quarantineItems.length} emails waiting in quarantine`,
       desc: i18n.language === "fr"
-        ? `Expéditeurs: ${quarantineItems.map(i => i.sender.split("@")[0]).slice(0, 2).join(", ")}`
-        : `Held from: ${quarantineItems.map(i => i.sender.split("@")[0]).slice(0, 2).join(", ")}`,
+        ? "Des messages attendent votre décision."
+        : "Messages are waiting for your decision.",
       time: quarantineItems && quarantineItems.length > 0 ? timeSince(quarantineItems[0].created_at) : i18n.language === "fr" ? "il y a 14 h" : "14h ago",
-      badge: "Quarantine",
       category: "System" as const,
       page: "quarantine" as const,
       unread: true,
@@ -203,41 +204,20 @@ export function TopBar({
     setReadIds(notificationsList.map(n => n.id));
   };
 
-  const getCategoryIconContainer = (badge: string) => {
-    let bg = "bg-error/10";
-    let icon = <ShieldAlert className="w-4 h-4 text-error" />;
-    if (badge === "Threat log") {
-      bg = "bg-error/10";
-      icon = <ShieldAlert className="w-4 h-4 text-error" />;
-    } else if (badge === "Domain shield") {
-      bg = "bg-amber-500/10";
-      icon = <Globe className="w-4 h-4 text-amber-700" />;
-    } else if (badge === "Quarantine") {
-      bg = "bg-primary/10";
-      icon = <Inbox className="w-4 h-4 text-primary" />;
-    } else if (badge === "Setup") {
-      bg = "bg-primary/10";
-      icon = <Globe className="w-4 h-4 text-primary" />;
-    } else if (badge === "Alertes" || badge === "Alerts") {
-      bg = "bg-primary/10";
-      icon = <Bell className="w-4 h-4 text-primary" />;
-    } else {
-      bg = "bg-surface-low";
-      icon = <Cpu className="w-4 h-4 text-on-surface-variant" />;
-    }
+  const getCategoryIconContainer = (category: "Critical" | "Domain" | "System") => {
+    const critical = category === "Critical";
+    const domain = category === "Domain";
+    const bg = critical ? "bg-error/10" : domain ? "bg-warning-bg" : "bg-primary/10";
+    const icon = critical
+      ? <ShieldAlert className="w-4 h-4 text-error" />
+      : domain
+        ? <Globe className="w-4 h-4 text-warning" />
+        : <Inbox className="w-4 h-4 text-primary" />;
     return (
       <div className={`p-2 rounded-lg shrink-0 ${bg}`}>
         {icon}
       </div>
     );
-  };
-
-  const getBadgeStyle = (badge: string) => {
-    if (badge === "Threat log") return "bg-error/10 text-error border border-error/20";
-    if (badge === "Domain shield") return "bg-amber-500/10 text-amber-700 border border-amber-500/20";
-    if (badge === "Setup") return "bg-primary/10 text-primary border border-primary/20";
-    if (badge === "Alertes" || badge === "Alerts") return "bg-primary/10 text-primary border border-primary/20";
-    return "bg-primary/10 text-primary border border-primary/20";
   };
 
   return (
@@ -346,29 +326,22 @@ export function TopBar({
                       className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-surface-low transition-colors cursor-pointer border border-transparent hover:border-border-subtle"
                     >
                       {/* Icon */}
-                      {getCategoryIconContainer(notif.badge)}
+                      {getCategoryIconContainer(notif.category)}
 
                       {/* Content */}
                       <div className="flex-1 min-w-0 space-y-0.5">
                         <div className="flex items-baseline justify-between gap-2">
-                          <span className="font-bold text-xs text-on-surface truncate block">
+                          <span className="block truncate text-sm font-semibold text-on-surface">
                             {notif.title}
                           </span>
-                          <span className="text-[10px] text-on-surface-variant/70 font-mono shrink-0">
+                          <span className="shrink-0 text-xs text-on-surface-variant/70">
                             {notif.time}
                           </span>
                         </div>
-                        <p className="text-[11px] text-on-surface-variant leading-normal truncate">
+                        <p className="text-[13px] text-on-surface-variant leading-5 line-clamp-2">
                           {notif.desc}
                         </p>
-                        <div className="flex items-center justify-between pt-1">
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${getBadgeStyle(notif.badge)}`}>
-                            {notif.badge}
-                          </span>
-                          {isUnread && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                          )}
-                        </div>
+                        {isUnread && <span className="mt-1 block h-1.5 w-1.5 rounded-full bg-primary" />}
                       </div>
                     </div>
                   );
