@@ -6,9 +6,6 @@ import {
   CheckCircle2,
   Trash2,
   Plus,
-  Shield,
-  Moon,
-  History,
   AlertCircle,
   AlertTriangle,
   HelpCircle,
@@ -48,13 +45,6 @@ function HistoryIcon({ tone }: { tone: AppToastTone }) {
   if (tone === "warning") return <AlertTriangle className="w-4 h-4 text-warning shrink-0" />;
   if (tone === "error") return <XCircle className="w-4 h-4 text-error shrink-0" />;
   return <Bell className="w-4 h-4 text-primary shrink-0" />;
-}
-
-function historyToneClass(tone: AppToastTone) {
-  if (tone === "success") return "border-safe/20 bg-safe-bg/80";
-  if (tone === "warning") return "border-warning/25 bg-warning-bg/80";
-  if (tone === "error") return "border-error/20 bg-error-container/35";
-  return "border-primary/15 bg-primary-fixed/50";
 }
 
 function QueryFailure({ onRetry }: { onRetry: () => void }) {
@@ -216,8 +206,7 @@ export default function AlertsRoute() {
         <div className="lg:col-span-7 space-y-6">
           {/* Email Notification Toggles */}
           <form onSubmit={handleSavePrefs} className="bg-white rounded-xl border border-border-subtle p-6 space-y-6 shadow-sm">
-            <div className="flex items-center gap-2.5 pb-4 border-b border-border-subtle">
-              <Bell className="w-5 h-5 text-primary" />
+            <div className="pb-4 border-b border-border-subtle">
               <h3 className="font-display font-semibold text-[17px] text-on-surface">
                 {t("alerts.section_preferences")}
               </h3>
@@ -240,28 +229,10 @@ export default function AlertsRoute() {
                     <span className="text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">
                       {t("alerts.notify_phishing")}
                     </span>
-                    <p className="text-xs text-on-surface-variant/70 mt-0.5">
+                    <p className="mt-1 text-sm text-on-surface-variant">
                       {i18n.language === "fr"
                         ? "Envoie un e-mail lorsqu’une menace est placée en quarantaine."
                         : "Sends an email when a threat is placed in quarantine."}
-                    </p>
-                  </div>
-                </label>
-                <label className="flex items-start gap-3 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={notifySpam}
-                    onChange={(e) => setNotifySpam(e.target.checked)}
-                    className="w-4 h-4 mt-1 rounded text-primary border-border-subtle focus:ring-primary/20 accent-primary"
-                  />
-                  <div>
-                    <span className="text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">
-                      {t("alerts.notify_spam")}
-                    </span>
-                    <p className="text-xs text-on-surface-variant/70 mt-0.5">
-                      {i18n.language === "fr"
-                        ? "Envoie un e-mail lorsqu’un message est classé comme spam."
-                        : "Sends an email when a message is classified as spam."}
                     </p>
                   </div>
                 </label>
@@ -270,8 +241,7 @@ export default function AlertsRoute() {
 
             {/* Quiet Hours */}
             <div className="space-y-4 pt-4 border-t border-border-subtle/50">
-              <div className="flex items-center gap-2">
-                <Moon className="w-4 h-4 text-primary" />
+              <div>
                 <h4 className="text-sm font-bold text-on-surface">
                   {t("alerts.section_quiet_hours")}
                 </h4>
@@ -293,7 +263,7 @@ export default function AlertsRoute() {
                 {quietEnabled && (
                   <div className="grid grid-cols-2 gap-4 pt-2">
                     <div>
-                      <label className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block mb-1">
+                      <label className="mb-1 block text-xs font-semibold text-on-surface-variant">
                         {t("alerts.quiet_hours_start")}
                       </label>
                       <input
@@ -304,7 +274,7 @@ export default function AlertsRoute() {
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block mb-1">
+                      <label className="mb-1 block text-xs font-semibold text-on-surface-variant">
                         {t("alerts.quiet_hours_end")}
                       </label>
                       <input
@@ -316,7 +286,7 @@ export default function AlertsRoute() {
                     </div>
                   </div>
                 )}
-                <p className="text-[11px] text-on-surface-variant/60 leading-relaxed">
+                <p className="text-[13px] leading-5 text-on-surface-variant">
                   {t("alerts.quiet_hours_desc")}
                 </p>
               </div>
@@ -331,8 +301,7 @@ export default function AlertsRoute() {
 
           {/* Filtering Rules list */}
           <div className="bg-white rounded-xl border border-border-subtle p-6 space-y-6 shadow-sm">
-            <div className="flex items-center gap-2.5 pb-4 border-b border-border-subtle">
-              <Shield className="w-5 h-5 text-primary" />
+            <div className="pb-4 border-b border-border-subtle">
               <h3 className="font-display font-semibold text-[17px] text-on-surface">
                 {t("alerts.section_rules")}
               </h3>
@@ -340,7 +309,7 @@ export default function AlertsRoute() {
 
             <form onSubmit={handleCreateRule} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end bg-surface-low/30 rounded-xl p-4 border border-border-subtle/50">
               <div className="sm:col-span-5">
-                <label className="text-[11px] font-bold text-on-surface-variant uppercase block mb-1.5">
+                <label className="mb-1.5 block text-xs font-semibold text-on-surface-variant">
                   {t("alerts.rule_type")}
                 </label>
                 <select
@@ -354,7 +323,7 @@ export default function AlertsRoute() {
               </div>
               <div className="sm:col-span-5">
                 <div className="mb-1.5 flex items-center gap-1.5">
-                  <label className="text-[12px] font-bold text-on-surface-variant uppercase">
+                  <label className="text-xs font-semibold text-on-surface-variant">
                     {t("alerts.pattern")}
                   </label>
                   <div className="relative group">
@@ -410,7 +379,7 @@ export default function AlertsRoute() {
                           {rule.pattern}
                         </span>
                       </div>
-                      <p className="text-[11px] text-on-surface-variant/50">
+                      <p className="text-[13px] text-on-surface-variant">
                         {rule.rule_type === "whitelist" ? t("alerts.whitelist_desc") : t("alerts.blocklist_desc")}
                       </p>
                     </div>
@@ -429,9 +398,8 @@ export default function AlertsRoute() {
         </div>
 
         {/* Right Hand: Alert History Log */}
-        <div className="lg:col-span-5 bg-white rounded-xl border border-border-subtle p-6 space-y-6 shadow-sm">
-          <div className="flex items-center gap-2.5 pb-4 border-b border-border-subtle">
-            <History className="w-5 h-5 text-primary" />
+        <div className="lg:col-span-5 space-y-4">
+          <div className="pb-4 border-b border-border-subtle">
             <h3 className="font-display font-semibold text-[17px] text-on-surface">
               {t("alerts.section_history")}
             </h3>
@@ -451,18 +419,18 @@ export default function AlertsRoute() {
               <p>{t("alerts.no_history")}</p>
             </div>
           ) : (
-            <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+            <div className="max-h-[600px] overflow-y-auto border-y border-border-subtle">
               {history.map((alert) => {
                 const tone = getHistoryTone(alert.title, alert.message);
                 return (
                   <div
                     key={alert.id}
-                    className={`p-4 rounded-xl border transition-colors flex items-start justify-between gap-3 ${historyToneClass(tone)}`}
+                    className="flex items-start justify-between gap-3 border-b border-border-subtle px-1 py-4 last:border-b-0"
                   >
                     <div className="space-y-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <HistoryIcon tone={tone} />
-                        <span className="font-mono text-[11px] text-on-surface-variant/75">
+                        <span className="text-xs text-on-surface-variant/75">
                           {new Date(alert.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
                         </span>
                       </div>
@@ -471,9 +439,11 @@ export default function AlertsRoute() {
                     </div>
                     <button
                       onClick={() => handleDismissAlert(alert.id)}
-                      className="text-[12px] font-bold text-primary hover:text-primary-hover px-2 py-1 rounded bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer shrink-0"
+                      className="rounded-md p-2 text-on-surface-variant transition-colors hover:bg-surface-low hover:text-error cursor-pointer shrink-0"
+                      aria-label={t("alerts.dismiss_alert")}
+                      title={t("alerts.dismiss_alert")}
                     >
-                      {t("alerts.dismiss_alert")}
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 );

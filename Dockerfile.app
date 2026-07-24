@@ -11,6 +11,9 @@ RUN npm ci
 
 FROM deps AS build
 
+ARG VITE_SICURRE_REPORT_EMAIL=""
+ENV VITE_SICURRE_REPORT_EMAIL=${VITE_SICURRE_REPORT_EMAIL}
+
 COPY index.html tsconfig.json vite.config.ts ./
 COPY src/app ./src/app
 RUN npm run build

@@ -429,12 +429,6 @@ export default function QuarantineRoute() {
         </div>
       )}
 
-      {/* footer text note */}
-      <div className="pt-8 border-t border-border-subtle select-none">
-        <p className="text-[12px] text-on-surface-variant font-medium leading-relaxed italic">
-          Note: {t("quarantine.daily_digest_active")}
-        </p>
-      </div>
     </MotionDiv>
   );
 }
