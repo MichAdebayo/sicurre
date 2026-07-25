@@ -37,6 +37,11 @@ def test_legacy_quarantine_table_receives_current_storage_columns(
 
     with sqlite3.connect(database_path) as connection:
         columns = auth._table_columns(connection, "app_quarantine_item")
+        reported_columns = auth._table_columns(connection, "app_reported_email")
+        reported_indexes = {
+            row[1]
+            for row in connection.execute("PRAGMA index_list(app_reported_email)").fetchall()
+        }
 
     assert {
         "raw_storage_uri",
@@ -46,3 +51,14 @@ def test_legacy_quarantine_table_receives_current_storage_columns(
         "delivered_at",
         "last_delivery_error",
     } <= columns
+    assert {
+        "id",
+        "workspace_id",
+        "workspace_member_user_id",
+        "storage_uri",
+        "content_hash",
+        "size_bytes",
+        "status",
+        "received_at",
+    } == reported_columns
+    assert "ix_app_reported_email_workspace_id" in reported_indexes
