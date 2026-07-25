@@ -281,6 +281,21 @@ def _ensure_legacy_sqlite_tables() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS ix_app_feedback_workspace_id ON app_feedback(workspace_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS ix_app_feedback_event_id ON app_feedback(event_id)")
 
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS app_reported_email (
+                id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                workspace_member_user_id TEXT NOT NULL,
+                storage_uri TEXT NOT NULL,
+                content_hash TEXT NOT NULL,
+                size_bytes INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'received',
+                received_at TEXT NOT NULL,
+                UNIQUE(workspace_id, content_hash)
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS ix_app_reported_email_workspace_id ON app_reported_email(workspace_id)")
+
         conn.commit()
     finally:
         conn.close()
