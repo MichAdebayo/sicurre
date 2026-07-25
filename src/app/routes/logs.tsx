@@ -202,7 +202,7 @@ export default function LogsRoute() {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <AdminMetric icon={<Users className="h-5 w-5" />} label="Workspaces" value={data.summary.workspaces_count} help="Espaces client connus par le runtime." />
             <AdminMetric icon={<Activity className="h-5 w-5" />} label="Événements" value={data.summary.threat_events_count} help="Verdicts enregistrés sans messages supprimés." />
-            <AdminMetric icon={<Flag className="h-5 w-5" />} label="Feedbacks" value={data.summary.feedback_count} help={`${data.summary.false_negative_count} false negatives signalés.`} />
+            <AdminMetric icon={<Flag className="h-5 w-5" />} label="Feedbacks" value={data.summary.feedback_count} help={`${data.summary.false_negative_count} faux négatifs, dont ${data.summary.reported_email_count} transférés.`} />
             <AdminMetric icon={<Cloud className="h-5 w-5" />} label="Domaines actifs" value={data.summary.cloudflare_active_count} help={`${data.summary.cloudflare_integrations_count} intégrations Cloudflare au total.`} />
             <AdminMetric icon={<LifeBuoy className="h-5 w-5" />} label="Support ouvert" value={data.summary.support_open_count} help="Demandes client à prendre en charge." />
           </div>

@@ -20,6 +20,7 @@ APP_TABLE_NAMES = (
     "app_domain_shield_history",
     "app_dmarc_report_summary",
     "app_feedback",
+    "app_reported_email",
     "app_support_request",
 )
 
@@ -291,6 +292,27 @@ app_feedback = _workspace_table(
         sa.UniqueConstraint("workspace_id", "event_id", "feedback_type"),
         sa.Index("ix_app_feedback_workspace_id", "workspace_id"),
         sa.Index("ix_app_feedback_event_id", "event_id"),
+    ),
+)
+
+app_reported_email = _workspace_table(
+    "app_reported_email",
+    _text_column("id", nullable=False),
+    _text_column("workspace_id", nullable=False),
+    _text_column("workspace_member_user_id", nullable=False),
+    _text_column("storage_uri", nullable=False),
+    _text_column("content_hash", nullable=False),
+    sa.Column("size_bytes", sa.Integer(), nullable=False),
+    _text_column("status", nullable=False, default="received"),
+    _text_column("received_at", nullable=False),
+    constraints=(
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint(
+            "workspace_id",
+            "content_hash",
+            name="uq_app_reported_email_workspace_hash",
+        ),
+        sa.Index("ix_app_reported_email_workspace_id", "workspace_id"),
     ),
 )
 
