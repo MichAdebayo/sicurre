@@ -7,7 +7,7 @@ import {
   Copy,
   AlertTriangle,
 } from "lucide-react";
-import { useThreatLogs } from "../lib/api";
+import { useReportAddress, useThreatLogs } from "../lib/api";
 import { VerdictBadge } from "../components/threats/verdict-badge";
 import { Button } from "../components/ui/button";
 import { AppToast } from "../components/common/app-toast";
@@ -17,6 +17,7 @@ const MotionDiv = motion.div as any;
 export default function ThreatsRoute() {
   const { t, i18n } = useTranslation();
   const { data: threats, isLoading, error } = useThreatLogs();
+  const { data: reportAddressData } = useReportAddress();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterVerdict, setFilterVerdict] = useState<string>("all");
@@ -32,7 +33,7 @@ export default function ThreatsRoute() {
   const itemsPerPage = 10;
 
   const [actionSuccess, setActionSuccess] = useState("");
-  const reportAddress = import.meta.env.VITE_SICURRE_REPORT_EMAIL?.trim() || "";
+  const reportAddress = reportAddressData?.address ?? "";
 
   const copyReportAddress = async () => {
     if (!reportAddress) return;
