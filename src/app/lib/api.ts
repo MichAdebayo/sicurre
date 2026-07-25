@@ -99,6 +99,7 @@ export interface AdminOverview {
     threat_events_count: number;
     feedback_count: number;
     false_negative_count: number;
+    reported_email_count: number;
     quarantine_held_count: number;
     cloudflare_integrations_count: number;
     cloudflare_active_count: number;
@@ -449,6 +450,14 @@ export function useCreateFeedback() {
       queryClient.invalidateQueries({ queryKey: ["threats"] });
       queryClient.invalidateQueries({ queryKey: ["kpis"] });
     },
+  });
+}
+
+export function useReportAddress() {
+  return useQuery<{ address: string }>({
+    queryKey: ["feedback-report-address"],
+    queryFn: () => fetchJson<{ address: string }>("/feedback/report-address"),
+    retry: false,
   });
 }
 

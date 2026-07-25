@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim AS deps
+FROM node:24-bookworm-slim AS deps
 
 WORKDIR /app
 
@@ -11,14 +11,12 @@ RUN npm ci
 
 FROM deps AS build
 
-ARG VITE_SICURRE_REPORT_EMAIL=""
-ENV VITE_SICURRE_REPORT_EMAIL=${VITE_SICURRE_REPORT_EMAIL}
 
 COPY index.html tsconfig.json vite.config.ts ./
 COPY src/app ./src/app
 RUN npm run build
 
-FROM node:22-bookworm-slim AS web
+FROM node:24-bookworm-slim AS web
 
 WORKDIR /app
 ENV NODE_ENV=production \
