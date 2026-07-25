@@ -442,6 +442,42 @@ paths:
         "413":
           description: MIME exceeds the configured custody limit
 
+  /v1/email/reports/{token}:
+    post:
+      tags: [internal]
+      summary: Ingest a missed threat forwarded to a signed workspace alias
+      description: >
+        The dedicated Sicurre Email Routing Worker authenticates this request.
+        The API verifies the signed workspace token, discards the outer
+        forwarding envelope, anonymizes personal identifiers, stores evidence
+        in private R2, and records a false-negative feedback event.
+      security:
+        - ReportWorkerAuth: []
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          message/rfc822:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "202":
+          description: Evidence accepted, including an idempotent replay
+        "400":
+          description: Empty message
+        "401":
+          description: Invalid Worker credential
+        "404":
+          description: Invalid or unknown workspace alias
+        "413":
+          description: Message exceeds the configured limit
+
   /v1/auth/session:
     get:
       tags: [app]
@@ -545,6 +581,27 @@ paths:
                 $ref: "#/components/schemas/FeedbackResponse"
         "409":
           description: Feedback already submitted for the same event/type
+
+  /v1/feedback/report-address:
+    get:
+      tags: [app]
+      summary: Get the signed false-negative forwarding alias for this workspace
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Workspace-scoped reporting address
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [address]
+                properties:
+                  address:
+                    type: string
+                    format: email
+        "503":
+          description: Report aliases are not configured
 
   /v1/support/requests:
     post:
@@ -1075,6 +1132,10 @@ components:
       type: apiKey
       in: header
       name: X-Sicurre-Secret
+    ReportWorkerAuth:
+      type: apiKey
+      in: header
+      name: X-Sicurre-Report-Key
     InternalServiceAuth:
       type: http
       scheme: bearer

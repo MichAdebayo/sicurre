@@ -946,6 +946,9 @@ async def get_admin_overview(current_user: AuthUser = Depends(get_current_user))
         "false_negative_count": await _admin_count(
             "SELECT COUNT(*) AS count FROM app_feedback WHERE feedback_type = 'false_negative'"
         ),
+        "reported_email_count": await _admin_count(
+            "SELECT COUNT(*) AS count FROM app_reported_email"
+        ),
         "quarantine_held_count": await _admin_count(
             "SELECT COUNT(*) AS count FROM app_quarantine_item WHERE status = 'held'"
         ),

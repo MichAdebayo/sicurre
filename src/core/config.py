@@ -66,6 +66,18 @@ class Settings(BaseSettings):
     quarantine_r2_bucket_name: str | None = None
     quarantine_r2_prefix: str = "quarantine"
     quarantine_max_message_bytes: int = 5 * 1024 * 1024
+    reported_email_address: str = "report@sicurre.com"
+    reported_email_alias_secret: str | None = Field(default=None, repr=False)
+    reported_email_ingest_key: str | None = Field(default=None, repr=False)
+    reported_email_storage_backend: str = "local"
+    reported_email_local_dir: Path = ROOT_DIR / "data" / "local" / "reported-email"
+    reported_email_r2_bucket_name: str | None = None
+    reported_email_r2_endpoint_url: str | None = None
+    reported_email_r2_access_key_id: str | None = None
+    reported_email_r2_secret_access_key: str | None = Field(default=None, repr=False)
+    reported_email_r2_region: str = "auto"
+    reported_email_r2_prefix: str = "reported-email"
+    reported_email_max_message_bytes: int = 5 * 1024 * 1024
     phishtank_api_key: str | None = None
     phishtank_user_agent: str = "phishtank/sicurre-research"
     phishtank_snapshot_storage_backend: str | None = None
