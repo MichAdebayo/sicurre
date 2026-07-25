@@ -1,0 +1,134 @@
+"""Workspace-scoped false-negative forwarding endpoints."""
+
+from __future__ import annotations
+
+import hashlib
+import hmac
+import uuid
+from datetime import UTC, datetime
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+
+from core.config import Settings, get_settings
+from core.rate_limit import limiter
+from data_platform.api.auth import AuthUser, get_current_user
+from data_platform.api.auth import async_query as auth_query
+from data_platform.services.reported_email import (
+    InvalidReportAlias,
+    ReportAliasCodec,
+    build_reported_email_store,
+    report_address,
+    sanitized_evidence,
+)
+
+router = APIRouter(tags=["reported-email"])
+
+
+def _codec(settings: Settings) -> ReportAliasCodec:
+    secret = settings.reported_email_alias_secret
+    if not secret:
+        raise HTTPException(status_code=503, detail="Reported-email aliases are not configured")
+    try:
+        return ReportAliasCodec(secret)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=503, detail="Reported-email aliases are not configured"
+        ) from exc
+
+
+@router.get("/v1/feedback/report-address")
+async def get_report_address(
+    current_user: AuthUser = Depends(get_current_user),  # noqa: B008
+) -> dict[str, str]:
+    """Return the signed forwarding alias for the authenticated workspace."""
+    settings = get_settings()
+    token = _codec(settings).encode(current_user.workspace_id)
+    return {"address": report_address(settings.reported_email_address, token)}
+
+
+@router.post("/v1/email/reports/{token}", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit("30/minute")
+async def ingest_reported_email(
+    request: Request,
+    token: str,
+    x_sicurre_report_key: str | None = Header(default=None),
+) -> dict[str, str | bool]:
+    """Accept one Worker-authenticated forwarded message as sanitized evidence."""
+    settings = get_settings()
+    expected_key = settings.reported_email_ingest_key
+    if (
+        not expected_key
+        or not x_sicurre_report_key
+        or not hmac.compare_digest(
+            x_sicurre_report_key,
+            expected_key,
+        )
+    ):
+        raise HTTPException(status_code=401, detail="Invalid reported-email credential")
+    try:
+        workspace_id = _codec(settings).decode(token)
+    except InvalidReportAlias as exc:
+        raise HTTPException(status_code=404, detail="Report alias not found") from exc
+
+    members = await auth_query(
+        "SELECT auth_user_id FROM app_workspace_membership WHERE workspace_id = ? "
+        "ORDER BY CASE WHEN role = 'owner' THEN 0 ELSE 1 END LIMIT 1",
+        (workspace_id,),
+    )
+    if not members:
+        raise HTTPException(status_code=404, detail="Report alias not found")
+
+    raw_message = await request.body()
+    if not raw_message:
+        raise HTTPException(status_code=400, detail="Empty reported email")
+    if len(raw_message) > settings.reported_email_max_message_bytes:
+        raise HTTPException(status_code=413, detail="Reported email is too large")
+
+    payload = sanitized_evidence(raw_message)
+    content_hash = hashlib.sha256(payload).hexdigest()
+    existing = await auth_query(
+        "SELECT id FROM app_reported_email WHERE workspace_id = ? AND content_hash = ? LIMIT 1",
+        (workspace_id, content_hash),
+    )
+    if existing:
+        return {"status": "accepted", "idempotent": True}
+    report_id = str(uuid.uuid4())
+    stored = await build_reported_email_store(settings).write(
+        workspace_id=workspace_id,
+        report_id=report_id,
+        payload=payload,
+    )
+    now = datetime.now(UTC).isoformat()
+    try:
+        await auth_query(
+            "INSERT INTO app_reported_email "
+            "(id, workspace_id, workspace_member_user_id, storage_uri, content_hash, "
+            "size_bytes, status, received_at) VALUES (?, ?, ?, ?, ?, ?, 'received', ?)",
+            (
+                report_id,
+                workspace_id,
+                members[0]["auth_user_id"],
+                stored.storage_uri,
+                stored.content_hash,
+                stored.size_bytes,
+                now,
+            ),
+        )
+        await auth_query(
+            "INSERT INTO app_feedback "
+            "(id, workspace_id, workspace_member_user_id, event_id, feedback_type, "
+            "original_verdict, corrected_verdict, reporter_note, created_at) "
+            "VALUES (?, ?, ?, NULL, 'false_negative', NULL, 'phishing', ?, ?)",
+            (
+                str(uuid.uuid4()),
+                workspace_id,
+                members[0]["auth_user_id"],
+                f"reported_email:{report_id}",
+                now,
+            ),
+        )
+    except Exception as exc:
+        if "unique" in str(exc).lower():
+            return {"status": "accepted", "idempotent": True}
+        raise
+    return {"status": "accepted", "idempotent": False}
