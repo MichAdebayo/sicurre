@@ -325,106 +325,108 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
         className="space-y-8 animate-in fade-in duration-200"
       >
         {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border-subtle">
-        <div>
-          <h1 className="app-h1">
-            {isFR ? "Bouclier du domaine" : "Domain Shield"}
-          </h1>
-          <p className="app-body-sub mt-1">
-            {isFR
-              ? "Vérifiez l'authentification DNS, le certificat TLS et les signaux de réputation disponibles."
-              : "Check DNS authentication, the TLS certificate, and available reputation signals."}
-          </p>
-        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border-subtle">
+          <div>
+            <h1 className="app-h1">
+              {isFR ? "Bouclier du domaine" : "Domain Shield"}
+            </h1>
+            <p className="app-body-sub mt-1">
+              {isFR
+                ? "Vérifiez l'authentification DNS, le certificat TLS et les signaux de réputation disponibles."
+                : "Check DNS authentication, the TLS certificate, and available reputation signals."}
+            </p>
+          </div>
 
-        {/* Domain Selection dropdown */}
-        <div className="flex items-center gap-3">
-          {domainsLoading ? (
-            <div className="h-10 w-48 bg-surface-low rounded-lg animate-pulse" />
-          ) : !domainsList || domainsList.length === 0 ? (
-            <span className="text-xs text-on-surface-variant/70 italic">
-              {isFR ? "Aucun domaine configuré" : "No domains configured"}
-            </span>
-          ) : (
-            <select
-              value={selectedDomain}
-              onChange={(e) => setSelectedDomain(e.target.value)}
-              className="px-3.5 py-2 bg-surface-lowest border border-border-subtle rounded-lg text-sm text-on-surface-variant font-bold focus:outline-none focus:border-primary transition-all cursor-pointer shadow-sm h-[38px]"
-            >
-              {domainsList.map((d) => (
-                <option key={d.id} value={d.zone_name}>
-                  {d.zone_name}
-                </option>
-              ))}
-            </select>
-          )}
+          {/* Domain Selection dropdown */}
+          <div className="flex items-center gap-3">
+            {domainsLoading ? (
+              <div className="h-10 w-48 bg-surface-low rounded-lg animate-pulse" />
+            ) : !domainsList || domainsList.length === 0 ? (
+              <span className="text-xs text-on-surface-variant/70 italic">
+                {isFR ? "Aucun domaine configuré" : "No domains configured"}
+              </span>
+            ) : (
+              <select
+                value={selectedDomain}
+                onChange={(e) => setSelectedDomain(e.target.value)}
+                className="px-3.5 py-2 bg-surface-lowest border border-border-subtle rounded-lg text-sm text-on-surface-variant font-bold focus:outline-none focus:border-primary transition-all cursor-pointer shadow-sm h-[38px]"
+              >
+                {domainsList.map((d) => (
+                  <option key={d.id} value={d.zone_name}>
+                    {d.zone_name}
+                  </option>
+                ))}
+              </select>
+            )}
 
-          {selectedDomain && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleManualRefresh}
-              disabled={isShieldLoading}
-              className="p-2 min-h-[38px] flex items-center justify-center cursor-pointer bg-white"
-            >
-              <RefreshCw className={`w-4 h-4 ${isShieldLoading ? "animate-spin text-primary" : ""}`} />
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {!selectedDomain ? (
-        <div className="bg-surface-lowest rounded-2xl border border-border-subtle p-12 text-center text-on-surface-variant/50 max-w-lg mx-auto flex flex-col items-center justify-center shadow-sm">
-          <Globe className="w-12 h-12 text-on-surface-variant/30 mb-3 animate-pulse" />
-          <p className="font-bold text-base text-on-surface">
-            {isFR ? "Aucun Bouclier de Domaine actif" : "No Domain Shield active"}
-          </p>
-          <p className="text-sm mt-1 text-on-surface-variant">
-            {isFR
-              ? "Intégrez un domaine via Cloudflare dans les paramètres pour lancer son premier audit."
-              : "Connect a domain through Cloudflare settings to run its first audit."}
-          </p>
-        </div>
-      ) : (shieldLoading && !shieldStatus) ? (
-        <div className="space-y-6">
-          <div className="h-44 bg-surface-low rounded-2xl animate-pulse" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="h-32 bg-surface-low rounded-2xl animate-pulse" />
-            <div className="h-32 bg-surface-low rounded-2xl animate-pulse" />
+            {selectedDomain && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleManualRefresh}
+                disabled={isShieldLoading}
+                className="p-2 min-h-[38px] flex items-center justify-center cursor-pointer bg-white"
+              >
+                <RefreshCw className={`w-4 h-4 ${isShieldLoading ? "animate-spin text-primary" : ""}`} />
+              </Button>
+            )}
           </div>
         </div>
-      ) : shieldError || !shieldStatus ? (
-        <div className="bg-surface-lowest rounded-2xl border border-border-subtle p-8 text-center text-on-surface flex flex-col items-center justify-center max-w-md mx-auto">
-          <ShieldAlert className="w-10 h-10 text-error mb-3" />
-          <p className="font-bold text-sm">{t("common.error_occurred")}</p>
-          <p className="text-xs text-on-surface-variant mt-1 font-semibold">
-            {isFR ? "Impossible de récupérer les balises de validation de sécurité DNS." : "Could not fetch DNS security validation tags."}
-          </p>
-        </div>
-      ) : (
-        <>
-          <section className="flex flex-col items-center justify-between gap-6 border-y border-border-subtle py-7 sm:flex-row">
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-safe" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-safe" />
-                </span>
-                <span className="text-xs font-semibold text-safe">
-                  {isFR ? "Protection active" : "Protection active"}
-                </span>
-              </div>
-              <h2 className="mt-2 text-xl font-bold text-on-surface">
-                {isFR ? "Intégrité du domaine" : "Domain integrity"}
-              </h2>
-              <p className="mt-1 max-w-xl text-sm text-on-surface-variant">
-                {isFR
-                  ? "Évaluation des enregistrements SPF, DKIM, DMARC, du certificat TLS et des contrôles de réputation disponibles."
-                  : "Evaluation of SPF, DKIM, DMARC, TLS certificate and available reputation checks."}
-              </p>
+
+        {!selectedDomain ? (
+          <div className="bg-surface-lowest rounded-2xl border border-border-subtle p-12 text-center text-on-surface-variant/50 max-w-lg mx-auto flex flex-col items-center justify-center shadow-sm">
+            <Globe className="w-12 h-12 text-on-surface-variant/30 mb-3 animate-pulse" />
+            <p className="font-bold text-base text-on-surface">
+              {isFR ? "Aucun Bouclier de Domaine actif" : "No Domain Shield active"}
+            </p>
+            <p className="text-sm mt-1 text-on-surface-variant">
+              {isFR
+                ? "Intégrez un domaine via Cloudflare dans les paramètres pour lancer son premier audit."
+                : "Connect a domain through Cloudflare settings to run its first audit."}
+            </p>
+          </div>
+        ) : (shieldLoading && !shieldStatus) ? (
+          <div className="space-y-6">
+            <div className="h-44 bg-surface-low rounded-2xl animate-pulse" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="h-32 bg-surface-low rounded-2xl animate-pulse" />
+              <div className="h-32 bg-surface-low rounded-2xl animate-pulse" />
             </div>
-            <div className="relative flex h-32 w-32 shrink-0 items-center justify-center">
-                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+          </div>
+        ) : shieldError || !shieldStatus ? (
+          <div className="bg-surface-lowest rounded-2xl border border-border-subtle p-8 text-center text-on-surface flex flex-col items-center justify-center max-w-md mx-auto">
+            <ShieldAlert className="w-10 h-10 text-error mb-3" />
+            <p className="font-bold text-sm">{t("common.error_occurred")}</p>
+            <p className="text-xs text-on-surface-variant mt-1 font-semibold">
+              {isFR ? "Impossible de récupérer les balises de validation de sécurité DNS." : "Could not fetch DNS security validation tags."}
+            </p>
+          </div>
+        ) : (
+          <>
+            <section className="flex flex-col items-center justify-between gap-6 border-b border-border-subtle py-7 sm:flex-row">
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-safe" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-safe" />
+                  </span>
+                  <span className="text-xs font-semibold text-safe">
+                    {isFR ? "Protection active" : "Protection active"}
+                  </span>
+                </div>
+                <h2 className="mt-2 text-xl font-bold text-on-surface">
+                  {isFR ? "Intégrité du domaine" : "Domain integrity"}
+                </h2>
+                <p className="mt-1 max-w-xl text-sm text-on-surface-variant">
+                  {isFR
+                    ? "Évaluation des enregistrements SPF, DKIM, DMARC, du certificat TLS et des contrôles de réputation disponibles."
+                    : "Evaluation of SPF, DKIM, DMARC, TLS certificate and available reputation checks."}
+                </p>
+              </div>
+              <div className="relative flex w-full shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border-subtle bg-surface-lowest p-3 shadow-sm sm:w-40">
+                <div className="absolute inset-x-5 top-0 h-[3px] rounded-b-md bg-primary" />
+                <div className="relative flex h-28 w-28 items-center justify-center">
+                  <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
                   <circle
                     cx="50"
                     cy="50"
@@ -445,756 +447,756 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     strokeLinecap="round"
                     className="transition-all duration-1000 ease-out"
                   />
-                </svg>
-                <div className="absolute flex flex-col items-center justify-center">
-                  <span className="font-display text-4xl font-extrabold text-on-surface">
-                    {shieldStatus.score_grade}
-                  </span>
-                  <span className="mt-1 font-mono text-[11px] font-bold text-on-surface-variant">
-                    {shieldStatus.reputation_score}/100
-                  </span>
-                </div>
-            </div>
-          </section>
-
-          {/* Row 2: Audit et Intégrité DNS (5 Cards side-by-side) */}
-          <div className="bg-surface-lowest rounded-2xl border border-border-subtle p-6 shadow-sm space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border-subtle/80">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-primary/10 rounded-lg text-[#2e6bb5]">
-                  <Activity className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-display font-bold text-[18px] text-on-surface">
-                    {isFR ? "Audit et Intégrité DNS" : "DNS Audit & Integrity Status"}
-                  </h3>
-                  <p className="text-xs text-on-surface-variant mt-0.5 font-medium">
-                    {isFR ? "État observé lors du dernier audit" : "State observed during the latest audit"}
-                  </p>
+                  </svg>
+                  <div className="absolute flex flex-col items-center justify-center">
+                    <span className="font-display text-4xl font-extrabold text-on-surface">
+                      {shieldStatus.score_grade}
+                    </span>
+                    <span className="mt-1 font-mono text-[11px] font-bold text-on-surface-variant">
+                      {shieldStatus.reputation_score}/100
+                    </span>
+                  </div>
                 </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (typeof window !== "undefined") {
-                    sessionStorage.removeItem(`diagnosed_${selectedDomain}`);
-                  }
-                  runStepDiagnostics();
-                }}
-                disabled={isTerminalRunning || isShieldLoading}
-                className="gap-2 cursor-pointer bg-white text-xs font-bold border-border-subtle hover:bg-surface-low/30 text-on-surface transition-all h-[36px]"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isTerminalRunning ? "animate-spin text-[#2e6bb5]" : "text-on-surface-variant"}`} />
-                {isFR ? "Relancer l'audit de sécurité" : "Re-diagnose Domain"}
-              </Button>
-            </div>
+            </section>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
-              {[
-                {
-                  id: "spf",
-                  labelFR: "Enregistrement SPF",
-                  labelEN: "SPF Record",
-                  descFR: "Serveurs autorisés",
-                  descEN: "Authorized relays",
-                  valid: shieldStatus?.spf?.valid,
-                },
-                {
-                  id: "dkim",
-                  labelFR: "Signature DKIM",
-                  labelEN: "DKIM Signature",
-                  descFR: "Clé d'authentification",
-                  descEN: "Auth signatures",
-                  valid: shieldStatus?.dkim?.valid,
-                },
-                {
-                  id: "dmarc",
-                  labelFR: "Politique DMARC",
-                  labelEN: "DMARC Policy",
-                  descFR: "Consignes de filtrage",
-                  descEN: "Filtering instructions",
-                  valid: isDmarcValid,
-                },
-                {
-                  id: "ssl",
-                  labelFR: "Certificat SSL",
-                  labelEN: "SSL Certificate",
-                  descFR: "Chiffrement HTTPS",
-                  descEN: "HTTPS encryption",
-                  valid: shieldStatus?.ssl?.valid,
-                },
-                {
-                  id: "reputation",
-                  labelFR: "Réputation",
-                  labelEN: "Reputation",
-                  descFR: "Contrôle externe",
-                  descEN: "External check",
-                  valid: !shieldStatus?.blacklists?.listed,
-                },
-              ].map((step, idx) => {
-                const isStepRunning = activeStepIndex === idx;
-                const isStepCompleted = activeStepIndex > idx;
-                const isStepIdle = activeStepIndex < idx;
+            {/* Row 2: Audit et Intégrité DNS (5 Cards side-by-side) */}
+            <div className="bg-surface-lowest rounded-2xl border border-border-subtle p-6 shadow-sm space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border-subtle/80">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-primary/10 rounded-lg text-[#2e6bb5]">
+                    <Activity className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-display font-bold text-[18px] text-on-surface">
+                      {isFR ? "Audit et Intégrité DNS" : "DNS Audit & Integrity Status"}
+                    </h3>
+                    <p className="text-xs text-on-surface-variant mt-0.5 font-medium">
+                      {isFR ? "État observé lors du dernier audit" : "State observed during the latest audit"}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      sessionStorage.removeItem(`diagnosed_${selectedDomain}`);
+                    }
+                    runStepDiagnostics();
+                  }}
+                  disabled={isTerminalRunning || isShieldLoading}
+                  className="gap-2 cursor-pointer bg-white text-xs font-bold border-border-subtle hover:bg-surface-low/30 text-on-surface transition-all h-[36px]"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isTerminalRunning ? "animate-spin text-[#2e6bb5]" : "text-on-surface-variant"}`} />
+                  {isFR ? "Relancer l'audit de sécurité" : "Re-diagnose Domain"}
+                </Button>
+              </div>
 
-                const severity = (() => {
-                  if (step.id === "dmarc") {
-                    if (!shieldStatus?.dmarc?.valid) return "error";
-                    if (shieldStatus?.dmarc?.policy === "none") return "warning";
-                    if (!hasRestrictiveDmarcPolicy) return "warning";
-                    if (!hasSicurreDmarcReporting) return "warning";
-                    return "success";
-                  }
-                  if (step.id === "reputation") {
-                    if (shieldStatus?.blacklists?.error) return "warning";
-                    return shieldStatus?.blacklists?.listed ? "error" : "success";
-                  }
-                  return step.valid ? "success" : "error";
-                })();
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+                {[
+                  {
+                    id: "spf",
+                    labelFR: "Enregistrement SPF",
+                    labelEN: "SPF Record",
+                    descFR: "Serveurs autorisés",
+                    descEN: "Authorized relays",
+                    valid: shieldStatus?.spf?.valid,
+                  },
+                  {
+                    id: "dkim",
+                    labelFR: "Signature DKIM",
+                    labelEN: "DKIM Signature",
+                    descFR: "Clé d'authentification",
+                    descEN: "Auth signatures",
+                    valid: shieldStatus?.dkim?.valid,
+                  },
+                  {
+                    id: "dmarc",
+                    labelFR: "Politique DMARC",
+                    labelEN: "DMARC Policy",
+                    descFR: "Consignes de filtrage",
+                    descEN: "Filtering instructions",
+                    valid: isDmarcValid,
+                  },
+                  {
+                    id: "ssl",
+                    labelFR: "Certificat SSL",
+                    labelEN: "SSL Certificate",
+                    descFR: "Chiffrement HTTPS",
+                    descEN: "HTTPS encryption",
+                    valid: shieldStatus?.ssl?.valid,
+                  },
+                  {
+                    id: "reputation",
+                    labelFR: "Réputation",
+                    labelEN: "Reputation",
+                    descFR: "Contrôle externe",
+                    descEN: "External check",
+                    valid: !shieldStatus?.blacklists?.listed,
+                  },
+                ].map((step, idx) => {
+                  const isStepRunning = activeStepIndex === idx;
+                  const isStepCompleted = activeStepIndex > idx;
+                  const isStepIdle = activeStepIndex < idx;
 
-                let cardClass = "border-border-subtle bg-surface-lowest opacity-75";
-                let statusBadge = null;
+                  const severity = (() => {
+                    if (step.id === "dmarc") {
+                      if (!shieldStatus?.dmarc?.valid) return "error";
+                      if (shieldStatus?.dmarc?.policy === "none") return "warning";
+                      if (!hasRestrictiveDmarcPolicy) return "warning";
+                      if (!hasSicurreDmarcReporting) return "warning";
+                      return "success";
+                    }
+                    if (step.id === "reputation") {
+                      if (shieldStatus?.blacklists?.error) return "warning";
+                      return shieldStatus?.blacklists?.listed ? "error" : "success";
+                    }
+                    return step.valid ? "success" : "error";
+                  })();
 
-                if (isStepRunning) {
-                  cardClass = "border-primary/35 bg-primary/[0.03] ring-1 ring-primary/15 opacity-100";
-                  statusBadge = (
-                    <span className="flex items-center gap-1.5 text-[11px] font-semibold text-primary">
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      {isFR ? "Analyse..." : "Analyzing..."}
-                    </span>
-                  );
-                } else if (isStepCompleted) {
-                  cardClass = "border-border-subtle bg-surface-lowest opacity-100";
-                  if (severity === "success") {
+                  let cardClass = "border-border-subtle bg-surface-lowest opacity-75";
+                  let statusBadge = null;
+
+                  if (isStepRunning) {
+                    cardClass = "border-primary/35 bg-primary/[0.03] ring-1 ring-primary/15 opacity-100";
                     statusBadge = (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-safe-bg px-2.5 py-0.5 text-[11px] font-semibold text-safe">
-                        <Check className="w-3.5 h-3.5" />
-                        {t("domain_shield.status_conform")}
+                      <span className="flex items-center gap-1.5 text-[11px] font-semibold text-primary">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        {isFR ? "Analyse..." : "Analyzing..."}
                       </span>
                     );
-                  } else if (severity === "warning") {
-                    statusBadge = (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-warning-bg px-2.5 py-0.5 text-[11px] font-semibold text-warning">
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                        {step.id === "reputation" && shieldStatus?.blacklists?.error
-                          ? (isFR ? "Non vérifiée" : "Not verified")
-                          : t("domain_shield.status_partial")}
-                      </span>
-                    );
+                  } else if (isStepCompleted) {
+                    cardClass = "border-border-subtle bg-surface-lowest opacity-100";
+                    if (severity === "success") {
+                      statusBadge = (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-safe-bg px-2.5 py-0.5 text-[11px] font-semibold text-safe">
+                          <Check className="w-3.5 h-3.5" />
+                          {t("domain_shield.status_conform")}
+                        </span>
+                      );
+                    } else if (severity === "warning") {
+                      statusBadge = (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-warning-bg px-2.5 py-0.5 text-[11px] font-semibold text-warning">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          {step.id === "reputation" && shieldStatus?.blacklists?.error
+                            ? (isFR ? "Non vérifiée" : "Not verified")
+                            : t("domain_shield.status_partial")}
+                        </span>
+                      );
+                    } else {
+                      statusBadge = (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-danger-bg px-2.5 py-0.5 text-[11px] font-semibold text-danger">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          {t("domain_shield.status_missing")}
+                        </span>
+                      );
+                    }
                   } else {
                     statusBadge = (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-danger-bg px-2.5 py-0.5 text-[11px] font-semibold text-danger">
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                        {t("domain_shield.status_missing")}
+                      <span className="text-[11px] font-semibold text-on-surface-variant/55">
+                        {isFR ? "En attente" : "Pending"}
                       </span>
                     );
                   }
-                } else {
-                  statusBadge = (
-                    <span className="text-[11px] font-semibold text-on-surface-variant/55">
-                      {isFR ? "En attente" : "Pending"}
-                    </span>
+
+                  return (
+                    <div
+                      key={step.id}
+                      className={`border rounded-xl p-4 flex flex-col justify-between min-h-[140px] transition-all duration-300 ${cardClass}`}
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold font-display text-on-surface">
+                            {isFR ? step.labelFR : step.labelEN}
+                          </span>
+                        </div>
+                        <p className="text-[10.5px] text-on-surface-variant font-semibold leading-snug">
+                          {isFR ? step.descFR : step.descEN}
+                        </p>
+                      </div>
+
+                      <div className="mt-4 pt-3 border-t border-border-subtle/50 flex items-center justify-between gap-1 overflow-hidden">
+                        {statusBadge}
+                      </div>
+                    </div>
                   );
-                }
-
-                return (
-                  <div
-                    key={step.id}
-                    className={`border rounded-xl p-4 flex flex-col justify-between min-h-[140px] transition-all duration-300 ${cardClass}`}
-                  >
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold font-display text-on-surface">
-                          {isFR ? step.labelFR : step.labelEN}
-                        </span>
-                      </div>
-                      <p className="text-[10.5px] text-on-surface-variant font-semibold leading-snug">
-                        {isFR ? step.descFR : step.descEN}
-                      </p>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-border-subtle/50 flex items-center justify-between gap-1 overflow-hidden">
-                      {statusBadge}
-                    </div>
-                  </div>
-                );
-              })}
+                })}
+              </div>
             </div>
-          </div>
 
-          {/* Row 3: Auto-Fix & Reputation Monitoring side-by-side */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-            {/* Left: Cloudflare Inline Auto-Fix Wizard */}
-            <div className="lg:col-span-6 bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm flex flex-col justify-between">
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Mouse className="w-5 h-5 text-[#2e6bb5] animate-pulse" />
-                  <h3 className="font-display font-bold text-[18px] text-on-surface">
-                    {isFR ? "Auto-Fix Cloudflare 1-Clic" : "1-Click Cloudflare Auto-Fix"}
-                  </h3>
-                </div>
-
-                <div>
-                  <p className="text-xs text-on-surface-variant leading-relaxed">
-                    {isFR
-                      ? "Corrigez et provisionnez automatiquement vos enregistrements DNS manquants (SPF, DKIM, DMARC) via l'API Cloudflare."
-                      : "Automatically generate and sync missing DNS records (SPF, DKIM, DMARC) directly using the Cloudflare token API wizard."}
-                  </p>
-                </div>
-
-                {!needsDnsSetup && (
-                  <div className="p-3 bg-safe/[0.04] border border-safe/20 rounded-xl flex items-start gap-2.5">
-                    <ShieldCheck className="w-4.5 h-4.5 text-safe shrink-0 mt-0.5" />
-                    <div className="text-[11.5px] text-safe font-semibold leading-relaxed">
-                      {isFR
-                        ? "Tous les protocoles SPF, DKIM, DMARC sont configurés de façon optimale."
-                        : "DNS configuration is fully optimized and secured against impersonators."}
-                    </div>
+            {/* Row 3: Auto-Fix & Reputation Monitoring side-by-side */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+              {/* Left: Cloudflare Inline Auto-Fix Wizard */}
+              <div className="lg:col-span-6 bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Mouse className="w-5 h-5 text-[#2e6bb5] animate-pulse" />
+                    <h3 className="font-display font-bold text-[18px] text-on-surface">
+                      {isFR ? "Auto-Fix Cloudflare 1-Clic" : "1-Click Cloudflare Auto-Fix"}
+                    </h3>
                   </div>
-                )}
 
-                {/* Target configuration breakdown list */}
-                {needsDnsSetup && (
-                  <div className="bg-surface-low border border-border-subtle rounded-xl p-3.5 space-y-2.5 text-xs">
-                    <div className="mb-1 flex items-center justify-between text-xs font-bold text-on-surface-variant">
-                      <div className="flex items-center gap-1.5">
-                        <span>{isFR ? "Enregistrements DNS" : "DNS Records Setup"}</span>
-                        
-                        {/* Tooltip safety info */}
-                        <div className="relative group">
-                          <Info className="w-3.5 h-3.5 text-[#2e6bb5] cursor-help hover:text-primary transition-colors" />
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-64 bg-white border border-border-subtle text-on-surface text-[10px] p-2.5 rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 z-50 normal-case leading-normal font-sans text-center font-bold">
-                            {isFR
-                              ? "La configuration correcte des protocoles SPF, DKIM et DMARC protège votre domaine contre l'usurpation d'identité et garantit que vos e-mails légitimes ne finissent pas dans le dossier Spam."
-                              : "Properly configuring SPF, DKIM, and DMARC protocols safeguards your domain from email spoofing and ensures your emails avoid spam folders."}
-                          </div>
-                        </div>
+                  <div>
+                    <p className="text-xs text-on-surface-variant leading-relaxed">
+                      {isFR
+                        ? "Corrigez et provisionnez automatiquement vos enregistrements DNS manquants (SPF, DKIM, DMARC) via l'API Cloudflare."
+                        : "Automatically generate and sync missing DNS records (SPF, DKIM, DMARC) directly using the Cloudflare token API wizard."}
+                    </p>
+                  </div>
+
+                  {!needsDnsSetup && (
+                    <div className="p-3 bg-safe/[0.04] border border-safe/20 rounded-xl flex items-start gap-2.5">
+                      <ShieldCheck className="w-4.5 h-4.5 text-safe shrink-0 mt-0.5" />
+                      <div className="text-[11.5px] text-safe font-semibold leading-relaxed">
+                        {isFR
+                          ? "Tous les protocoles SPF, DKIM, DMARC sont configurés de façon optimale."
+                          : "DNS configuration is fully optimized and secured against impersonators."}
                       </div>
-                      <span className="text-[9.5px] font-mono lowercase text-on-surface-variant/60 font-semibold">@{selectedDomain}</span>
                     </div>
-                    <div className="space-y-2.5 pt-0.5">
-                      {/* SPF Record */}
-                      {!shieldStatus.spf.valid && (
-                        <div className="flex items-center justify-between font-semibold border-b border-border-subtle/50 pb-2 last:border-b-0">
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={fixSpf}
-                              onChange={(e) => setFixSpf(e.target.checked)}
-                              className="w-4 h-4 text-primary bg-white border-border-subtle rounded cursor-pointer focus:ring-0"
-                            />
-                            <span className="text-on-surface">SPF (TXT @)</span>
-                          </div>
-                          <span className="text-error text-[11px] font-bold bg-error/[0.04] px-2 py-0.5 rounded border border-error/20">
-                            {t("domain_shield.status_missing_incorrect")}
-                          </span>
-                        </div>
-                      )}
+                  )}
 
-                      {/* DKIM Record */}
-                      {!shieldStatus.dkim.valid && (
-                        <div className="flex items-center justify-between font-semibold border-b border-border-subtle/50 pb-2 last:border-b-0">
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={fixDkim}
-                              onChange={(e) => setFixDkim(e.target.checked)}
-                              className="w-4 h-4 text-primary bg-white border-border-subtle rounded cursor-pointer focus:ring-0"
-                            />
-                            <span className="text-on-surface">DKIM (TXT cloudflare._domainkey)</span>
-                          </div>
-                          <span className="text-error text-[11px] font-bold bg-error/[0.04] px-2 py-0.5 rounded border border-error/20">
-                            {t("domain_shield.status_missing_incorrect")}
-                          </span>
-                        </div>
-                      )}
+                  {/* Target configuration breakdown list */}
+                  {needsDnsSetup && (
+                    <div className="bg-surface-low border border-border-subtle rounded-xl p-3.5 space-y-2.5 text-xs">
+                      <div className="mb-1 flex items-center justify-between text-xs font-bold text-on-surface-variant">
+                        <div className="flex items-center gap-1.5">
+                          <span>{isFR ? "Enregistrements DNS" : "DNS Records Setup"}</span>
 
-                      {/* DMARC Record */}
-                      {(!isDmarcValid || !hasSicurreDmarcReporting) && (
-                        <div className="flex items-center justify-between font-semibold last:border-b-0">
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={fixDmarc}
-                              onChange={(e) => setFixDmarc(e.target.checked)}
-                              className="w-4 h-4 text-primary bg-white border-border-subtle rounded cursor-pointer focus:ring-0"
-                            />
-                            <span className="text-on-surface">DMARC (TXT _dmarc)</span>
+                          {/* Tooltip safety info */}
+                          <div className="relative group">
+                            <Info className="w-3.5 h-3.5 text-[#2e6bb5] cursor-help hover:text-primary transition-colors" />
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-64 bg-white border border-border-subtle text-on-surface text-[10px] p-2.5 rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 z-50 normal-case leading-normal font-sans text-center font-bold">
+                              {isFR
+                                ? "La configuration correcte des protocoles SPF, DKIM et DMARC protège votre domaine contre l'usurpation d'identité et garantit que vos e-mails légitimes ne finissent pas dans le dossier Spam."
+                                : "Properly configuring SPF, DKIM, and DMARC protocols safeguards your domain from email spoofing and ensures your emails avoid spam folders."}
+                            </div>
                           </div>
-                          {!shieldStatus.dmarc.valid ? (
+                        </div>
+                        <span className="text-[9.5px] font-mono lowercase text-on-surface-variant/60 font-semibold">@{selectedDomain}</span>
+                      </div>
+                      <div className="space-y-2.5 pt-0.5">
+                        {/* SPF Record */}
+                        {!shieldStatus.spf.valid && (
+                          <div className="flex items-center justify-between font-semibold border-b border-border-subtle/50 pb-2 last:border-b-0">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={fixSpf}
+                                onChange={(e) => setFixSpf(e.target.checked)}
+                                className="w-4 h-4 text-primary bg-white border-border-subtle rounded cursor-pointer focus:ring-0"
+                              />
+                              <span className="text-on-surface">SPF (TXT @)</span>
+                            </div>
                             <span className="text-error text-[11px] font-bold bg-error/[0.04] px-2 py-0.5 rounded border border-error/20">
                               {t("domain_shield.status_missing_incorrect")}
                             </span>
-                          ) : isDmarcValid && !hasSicurreDmarcReporting ? (
-                            <span className="text-[#b45309] text-[11px] font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200/50">
-                              {t("domain_shield.reporting_missing")}
+                          </div>
+                        )}
+
+                        {/* DKIM Record */}
+                        {!shieldStatus.dkim.valid && (
+                          <div className="flex items-center justify-between font-semibold border-b border-border-subtle/50 pb-2 last:border-b-0">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={fixDkim}
+                                onChange={(e) => setFixDkim(e.target.checked)}
+                                className="w-4 h-4 text-primary bg-white border-border-subtle rounded cursor-pointer focus:ring-0"
+                              />
+                              <span className="text-on-surface">DKIM (TXT cloudflare._domainkey)</span>
+                            </div>
+                            <span className="text-error text-[11px] font-bold bg-error/[0.04] px-2 py-0.5 rounded border border-error/20">
+                              {t("domain_shield.status_missing_incorrect")}
                             </span>
-                          ) : (
-                            <span className="text-[#b45309] text-[11px] font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200/50">
-                              {t("domain_shield.status_partial")}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+                          </div>
+                        )}
 
-                {/* Cloudflare token warning alert shown inline only when token is missing */}
-                {!wsTokenData?.configured && (
-                  <div className="p-4 bg-error/5 border border-error/20 rounded-xl space-y-2 text-xs text-error select-none">
-                    <p className="font-bold flex items-center gap-1.5">
-                      <AlertTriangle className="w-4 h-4 shrink-0" />
-                      {isFR ? "Configuration Cloudflare requise" : "Cloudflare Integration Required"}
-                    </p>
-                    <p className="font-semibold text-on-surface-variant leading-normal">
-                      {isFR 
-                        ? "Veuillez d'abord configurer votre jeton API Cloudflare dans les Paramètres > onglet Intégrations avant de lancer l'auto-configuration." 
-                        : "Please configure your Cloudflare API token in Settings > Integrations first before launching auto-configuration."}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-5 border-t border-border-subtle/50 mt-4 flex justify-end gap-3 select-none">
-                {needsDnsSetup && (
-                  <button
-                    type="button"
-                    onClick={handleRunAutoFix}
-                    disabled={autoFixProgress !== "idle" || !wsTokenData?.configured}
-                    className={`inline-flex h-10 w-full min-w-[13rem] items-center justify-center gap-2 rounded-lg border px-4 text-xs font-bold transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${
-                      isAutoFixRunning
-                        ? "border-primary/25 bg-primary-container text-on-primary-container cursor-wait"
-                        : "border-transparent bg-[#2e6bb5] text-white hover:bg-[#255da0] cursor-pointer"
-                    }`}
-                  >
-                    {isAutoFixRunning ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-current" />
-                    ) : (
-                      <MousePointerClick className="w-3.5 h-3.5" />
-                    )}
-                    <span className="min-w-[8.5rem] text-center">{getAutoFixButtonText()}</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Right: Secondary Stats Panel: Row-Level Lists */}
-            <div className="lg:col-span-6 bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm flex flex-col justify-between">
-              <div>
-                <div className="flex items-center gap-2 mb-6">
-                  <Activity className="w-5 h-5 text-[#2e6bb5] animate-pulse" />
-                  <h3 className="font-display font-bold text-[18px] text-on-surface">
-                    {isFR ? "Surveillance & Sécurité du Domaine" : "Domain Security & Monitoring"}
-                  </h3>
-                </div>
-                
-                <div className="divide-y divide-border-subtle/50 flex flex-col justify-center">
-                  {/* Row 1: SSL Status */}
-                  <div className="py-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 first:pt-0">
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 bg-primary/[0.06] rounded-xl text-[#2e6bb5] shrink-0">
-                        <Lock className="w-5.5 h-5.5 stroke-[1.5]" />
+                        {/* DMARC Record */}
+                        {(!isDmarcValid || !hasSicurreDmarcReporting) && (
+                          <div className="flex items-center justify-between font-semibold last:border-b-0">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={fixDmarc}
+                                onChange={(e) => setFixDmarc(e.target.checked)}
+                                className="w-4 h-4 text-primary bg-white border-border-subtle rounded cursor-pointer focus:ring-0"
+                              />
+                              <span className="text-on-surface">DMARC (TXT _dmarc)</span>
+                            </div>
+                            {!shieldStatus.dmarc.valid ? (
+                              <span className="text-error text-[11px] font-bold bg-error/[0.04] px-2 py-0.5 rounded border border-error/20">
+                                {t("domain_shield.status_missing_incorrect")}
+                              </span>
+                            ) : isDmarcValid && !hasSicurreDmarcReporting ? (
+                              <span className="text-[#b45309] text-[11px] font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200/50">
+                                {t("domain_shield.reporting_missing")}
+                              </span>
+                            ) : (
+                              <span className="text-[#b45309] text-[11px] font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200/50">
+                                {t("domain_shield.status_partial")}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <h5 className="font-semibold text-[14.5px] text-on-surface">
-                          {t("domain_shield.ssl_expiry")}
-                        </h5>
-                        <div className="relative group">
-                          <Info className="w-3.5 h-3.5 text-[#2e6bb5] cursor-help hover:text-primary transition-colors" />
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-60 bg-white border border-border-subtle text-on-surface text-[10px] p-2.5 rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 z-50 normal-case leading-normal font-sans text-center font-bold">
-                            {isFR
-                              ? "Contrôle de validité et chiffrement actif du certificat SSL."
-                              : "Verifying validity and encryption status of your SSL certificate."}
+                    </div>
+                  )}
+
+                  {/* Cloudflare token warning alert shown inline only when token is missing */}
+                  {!wsTokenData?.configured && (
+                    <div className="p-4 bg-error/5 border border-error/20 rounded-xl space-y-2 text-xs text-error select-none">
+                      <p className="font-bold flex items-center gap-1.5">
+                        <AlertTriangle className="w-4 h-4 shrink-0" />
+                        {isFR ? "Configuration Cloudflare requise" : "Cloudflare Integration Required"}
+                      </p>
+                      <p className="font-semibold text-on-surface-variant leading-normal">
+                        {isFR
+                          ? "Veuillez d'abord configurer votre jeton API Cloudflare dans les Paramètres > onglet Intégrations avant de lancer l'auto-configuration."
+                          : "Please configure your Cloudflare API token in Settings > Integrations first before launching auto-configuration."}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-5 border-t border-border-subtle/50 mt-4 flex justify-end gap-3 select-none">
+                  {needsDnsSetup && (
+                    <button
+                      type="button"
+                      onClick={handleRunAutoFix}
+                      disabled={autoFixProgress !== "idle" || !wsTokenData?.configured}
+                      className={`inline-flex h-10 w-full min-w-[13rem] items-center justify-center gap-2 rounded-lg border px-4 text-xs font-bold transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${isAutoFixRunning
+                          ? "border-primary/25 bg-primary-container text-on-primary-container cursor-wait"
+                          : "border-transparent bg-[#2e6bb5] text-white hover:bg-[#255da0] cursor-pointer"
+                        }`}
+                    >
+                      {isAutoFixRunning ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-current" />
+                      ) : (
+                        <MousePointerClick className="w-3.5 h-3.5" />
+                      )}
+                      <span className="min-w-[8.5rem] text-center">{getAutoFixButtonText()}</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Right: Secondary Stats Panel: Row-Level Lists */}
+              <div className="lg:col-span-6 bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center gap-2 mb-6">
+                    <Activity className="w-5 h-5 text-[#2e6bb5] animate-pulse" />
+                    <h3 className="font-display font-bold text-[18px] text-on-surface">
+                      {isFR ? "Surveillance & Sécurité du Domaine" : "Domain Security & Monitoring"}
+                    </h3>
+                  </div>
+
+                  <div className="divide-y divide-border-subtle/50 flex flex-col justify-center">
+                    {/* Row 1: SSL Status */}
+                    <div className="py-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 first:pt-0">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-primary/[0.06] rounded-xl text-[#2e6bb5] shrink-0">
+                          <Lock className="w-5.5 h-5.5 stroke-[1.5]" />
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <h5 className="font-semibold text-[14.5px] text-on-surface">
+                            {t("domain_shield.ssl_expiry")}
+                          </h5>
+                          <div className="relative group">
+                            <Info className="w-3.5 h-3.5 text-[#2e6bb5] cursor-help hover:text-primary transition-colors" />
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-60 bg-white border border-border-subtle text-on-surface text-[10px] p-2.5 rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 z-50 normal-case leading-normal font-sans text-center font-bold">
+                              {isFR
+                                ? "Contrôle de validité et chiffrement actif du certificat SSL."
+                                : "Verifying validity and encryption status of your SSL certificate."}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex flex-col sm:items-end gap-1.5 min-w-[160px]">
-                      {shieldStatus.ssl.valid ? (
-                        <>
-                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#047857] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 w-fit">
-                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                            {t("domain_shield.ssl_countdown", { days: shieldStatus.ssl.days_remaining })}
+                      <div className="flex flex-col sm:items-end gap-1.5 min-w-[160px]">
+                        {shieldStatus.ssl.valid ? (
+                          <>
+                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#047857] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 w-fit">
+                              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                              {t("domain_shield.ssl_countdown", { days: shieldStatus.ssl.days_remaining })}
+                            </span>
+                            <span className="text-[10px] font-bold text-on-surface-variant">
+                              {isFR ? "Certificat public vérifié" : "Public certificate verified"}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-error bg-error-container/20 px-2.5 py-1 rounded-full border border-error-container w-fit">
+                            <AlertTriangle className="w-3.5 h-3.5 animate-pulse" />
+                            {isFR ? "Non résolu" : "Unresolved"}
                           </span>
-                          <span className="text-[10px] font-bold text-on-surface-variant">
-                            {isFR ? "Certificat public vérifié" : "Public certificate verified"}
-                          </span>
-                        </>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-error bg-error-container/20 px-2.5 py-1 rounded-full border border-error-container w-fit">
-                          <AlertTriangle className="w-3.5 h-3.5 animate-pulse" />
-                          {isFR ? "Non résolu" : "Unresolved"}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Row 2: Blacklist Status */}
-                  <div className="py-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 bg-primary/[0.06] rounded-xl text-[#2e6bb5] shrink-0">
-                        <Skull className="w-5.5 h-5.5 stroke-[1.5]" />
+                        )}
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <h5 className="font-semibold text-[14.5px] text-on-surface">
+                    </div>
+
+                    {/* Row 2: Blacklist Status */}
+                    <div className="py-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-primary/[0.06] rounded-xl text-[#2e6bb5] shrink-0">
+                          <Skull className="w-5.5 h-5.5 stroke-[1.5]" />
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <h5 className="font-semibold text-[14.5px] text-on-surface">
                             {isFR ? "Vérification de réputation" : "Reputation check"}
-                        </h5>
-                        <div className="relative group">
-                          <Info className="w-3.5 h-3.5 text-[#2e6bb5] cursor-help hover:text-primary transition-colors" />
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-60 bg-white border border-border-subtle text-on-surface text-[10px] p-2.5 rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 z-50 normal-case leading-normal font-sans text-center font-bold">
-                            {isFR
-                              ? "Interrogation ponctuelle de Spamhaus DBL et SURBL lors de l'audit du domaine."
-                              : "Point-in-time query of Spamhaus DBL and SURBL during the domain audit."}
+                          </h5>
+                          <div className="relative group">
+                            <Info className="w-3.5 h-3.5 text-[#2e6bb5] cursor-help hover:text-primary transition-colors" />
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-60 bg-white border border-border-subtle text-on-surface text-[10px] p-2.5 rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 z-50 normal-case leading-normal font-sans text-center font-bold">
+                              {isFR
+                                ? "Interrogation ponctuelle de Spamhaus DBL et SURBL lors de l'audit du domaine."
+                                : "Point-in-time query of Spamhaus DBL and SURBL during the domain audit."}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex flex-col sm:items-end gap-1.5 min-w-[160px]">
-                      {shieldStatus?.blacklists?.listed ? (
-                        <>
-                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-50 px-2.5 py-1 rounded-full border border-red-200 w-fit animate-pulse">
-                            <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
-                            {isFR ? "Listé / Bloqué" : "Listed / Blocked"}
-                          </span>
-                          <span className="text-[10px] font-bold text-red-600 text-left sm:text-right">
-                            {isFR 
-                              ? `Listes : ${shieldStatus.blacklists.matched.join(", ")}` 
-                              : `Feeds: ${shieldStatus.blacklists.matched.join(", ")}`}
-                          </span>
-                        </>
-                      ) : shieldStatus?.blacklists?.error ? (
-                        <>
-                          <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-warning/25 bg-warning-bg px-2.5 py-1 text-xs font-bold text-warning">
-                            <AlertTriangle className="h-3.5 w-3.5" />
-                            {t("domain_shield.reputation_unavailable")}
-                          </span>
-                          <span className="max-w-64 text-left text-[11px] font-semibold text-on-surface-variant sm:text-right">
-                            {t("domain_shield.reputation_unavailable_desc")}
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#047857] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 w-fit">
-                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                            {t("domain_shield.blacklist_clean")}
-                          </span>
-                          <span className="text-[10px] font-bold text-on-surface-variant text-left sm:text-right">
-                            {isFR ? "Aucun blocage" : "No blocks"}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Row 3: DMARC Reports Activity */}
-                  <div className="py-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 last:pb-0 border-b-0">
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 bg-primary/[0.06] rounded-xl text-[#2e6bb5] shrink-0">
-                        <Activity className="w-5.5 h-5.5 stroke-[1.5]" />
+                      <div className="flex flex-col sm:items-end gap-1.5 min-w-[160px]">
+                        {shieldStatus?.blacklists?.listed ? (
+                          <>
+                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-50 px-2.5 py-1 rounded-full border border-red-200 w-fit animate-pulse">
+                              <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                              {isFR ? "Listé / Bloqué" : "Listed / Blocked"}
+                            </span>
+                            <span className="text-[10px] font-bold text-red-600 text-left sm:text-right">
+                              {isFR
+                                ? `Listes : ${shieldStatus.blacklists.matched.join(", ")}`
+                                : `Feeds: ${shieldStatus.blacklists.matched.join(", ")}`}
+                            </span>
+                          </>
+                        ) : shieldStatus?.blacklists?.error ? (
+                          <>
+                            <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-warning/25 bg-warning-bg px-2.5 py-1 text-xs font-bold text-warning">
+                              <AlertTriangle className="h-3.5 w-3.5" />
+                              {t("domain_shield.reputation_unavailable")}
+                            </span>
+                            <span className="max-w-64 text-left text-[11px] font-semibold text-on-surface-variant sm:text-right">
+                              {t("domain_shield.reputation_unavailable_desc")}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#047857] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 w-fit">
+                              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                              {t("domain_shield.blacklist_clean")}
+                            </span>
+                            <span className="text-[10px] font-bold text-on-surface-variant text-left sm:text-right">
+                              {isFR ? "Aucun blocage" : "No blocks"}
+                            </span>
+                          </>
+                        )}
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <h5 className="font-semibold text-[14.5px] text-on-surface">
-                          {isFR ? "Échecs observés par DMARC" : "DMARC observed failures"}
-                        </h5>
-                        <div className="relative group">
-                          <Info className="w-3.5 h-3.5 text-[#2e6bb5] cursor-help hover:text-primary transition-colors" />
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-60 bg-white border border-border-subtle text-on-surface text-[10px] p-2.5 rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 z-50 normal-case leading-normal font-sans text-center font-bold">
-                            {isFR
-                              ? "Rapports d'activité des serveurs non autorisés ayant tenté d'usurper votre domaine."
-                              : "Activity reports from unauthorized mail servers attempting domain spoofing."}
+                    </div>
+
+                    {/* Row 3: DMARC Reports Activity */}
+                    <div className="py-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 last:pb-0 border-b-0">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-primary/[0.06] rounded-xl text-[#2e6bb5] shrink-0">
+                          <Activity className="w-5.5 h-5.5 stroke-[1.5]" />
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <h5 className="font-semibold text-[14.5px] text-on-surface">
+                            {isFR ? "Échecs observés par DMARC" : "DMARC observed failures"}
+                          </h5>
+                          <div className="relative group">
+                            <Info className="w-3.5 h-3.5 text-[#2e6bb5] cursor-help hover:text-primary transition-colors" />
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-60 bg-white border border-border-subtle text-on-surface text-[10px] p-2.5 rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 z-50 normal-case leading-normal font-sans text-center font-bold">
+                              {isFR
+                                ? "Rapports d'activité des serveurs non autorisés ayant tenté d'usurper votre domaine."
+                                : "Activity reports from unauthorized mail servers attempting domain spoofing."}
+                            </div>
                           </div>
                         </div>
                       </div>
+                      <div className="flex flex-col sm:items-end gap-1.5 min-w-[160px]">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#2e6bb5] bg-[#d0e4ff]/30 px-2.5 py-1 rounded-full border border-primary-container/20 w-fit">
+                          <Activity className="w-3.5 h-3.5" />
+                          {dmarcReports?.failed_messages ?? 0} {isFR ? "échoués" : "failed"}
+                        </span>
+                        <span className="text-[10px] font-bold text-[#2e6bb5]">
+                          {dmarcReports?.report_count
+                            ? (isFR ? `${dmarcReports.report_count} rapport(s) reçu(s)` : `${dmarcReports.report_count} report(s) received`)
+                            : (isFR ? "Aucun rapport reçu" : "No reports received")}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex flex-col sm:items-end gap-1.5 min-w-[160px]">
-                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#2e6bb5] bg-[#d0e4ff]/30 px-2.5 py-1 rounded-full border border-primary-container/20 w-fit">
-                        <Activity className="w-3.5 h-3.5" />
-                        {dmarcReports?.failed_messages ?? 0} {isFR ? "échoués" : "failed"}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+
+            {/* DNS Record Verification Matrix */}
+            <div className="space-y-6">
+              <h3 className="font-display font-bold text-xl text-on-surface">
+                {t("domain_shield.dns_validation_title")}
+              </h3>
+
+              {/* SPF Card Track */}
+              <div className="bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border-subtle/50">
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                    <span className="rounded bg-surface-low px-2 py-0.5 text-xs font-bold text-on-surface-variant">
+                      SPF
+                    </span>
+                    <span className="font-mono text-xs font-bold text-on-surface">Hostname: @</span>
+                  </div>
+                  <div>
+                    {shieldStatus.spf.valid ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-safe/10 px-2.5 py-0.5 text-xs font-bold text-safe">
+                        <ShieldCheck className="w-3.5 h-3.5" /> {t("domain_shield.status_conform")}
                       </span>
-                      <span className="text-[10px] font-bold text-[#2e6bb5]">
-                        {dmarcReports?.report_count
-                          ? (isFR ? `${dmarcReports.report_count} rapport(s) reçu(s)` : `${dmarcReports.report_count} report(s) received`)
-                          : (isFR ? "Aucun rapport reçu" : "No reports received")}
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2.5 py-0.5 text-xs font-bold text-warning">
+                        <AlertTriangle className="w-3.5 h-3.5" /> {t("domain_shield.status_missing")}
                       </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-1 text-xs">
+                  <div className="space-y-2">
+                    <span className="block text-xs font-bold text-on-surface-variant">
+                      {t("domain_shield.active_dns_entry")}
+                    </span>
+                    {shieldStatus.spf.record ? (
+                      <code className="block p-3.5 bg-surface-low/50 border border-border-subtle rounded-xl font-mono text-[11px] text-on-surface truncate select-all" title={shieldStatus.spf.record}>
+                        {shieldStatus.spf.record}
+                      </code>
+                    ) : (
+                      <p className="italic text-on-surface-variant/60 block p-3.5 bg-surface-low/30 rounded-xl">
+                        {t("domain_shield.no_spf_record")}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <span className="block text-xs font-bold text-on-surface-variant">
+                      {t("domain_shield.required_dns_setup")}
+                    </span>
+                    <div className="flex gap-2 items-center">
+                      <code className="flex-1 block p-3.5 bg-surface-low/50 border border-border-subtle text-on-surface rounded-xl font-mono text-[11px] truncate select-all">
+                        v=spf1 include:spf.cloudflare.com include:sicurre.com ~all
+                      </code>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleCopy("spf", "v=spf1 include:spf.cloudflare.com include:sicurre.com ~all")}
+                        className="px-3 h-10 cursor-pointer text-xs gap-1 font-bold rounded-xl bg-white"
+                      >
+                        {copiedKey === "spf" ? (
+                          <Check className="w-4 h-4 text-safe" />
+                        ) : (
+                          <Copy className="w-4 h-4 text-on-surface-variant" />
+                        )}
+                      </Button>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-
-          {/* DNS Record Verification Matrix */}
-          <div className="space-y-6">
-            <h3 className="font-display font-bold text-xl text-on-surface">
-              {t("domain_shield.dns_validation_title")}
-            </h3>
-
-            {/* SPF Card Track */}
-            <div className="bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border-subtle/50">
-                <div className="flex items-center gap-2 flex-wrap justify-end">
-                  <span className="rounded bg-surface-low px-2 py-0.5 text-xs font-bold text-on-surface-variant">
-                    SPF
-                  </span>
-                  <span className="font-mono text-xs font-bold text-on-surface">Hostname: @</span>
-                </div>
-                <div>
-                  {shieldStatus.spf.valid ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-safe/10 px-2.5 py-0.5 text-xs font-bold text-safe">
-                      <ShieldCheck className="w-3.5 h-3.5" /> {t("domain_shield.status_conform")}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2.5 py-0.5 text-xs font-bold text-warning">
-                      <AlertTriangle className="w-3.5 h-3.5" /> {t("domain_shield.status_missing")}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-1 text-xs">
-                <div className="space-y-2">
-                  <span className="block text-xs font-bold text-on-surface-variant">
-                    {t("domain_shield.active_dns_entry")}
-                  </span>
-                  {shieldStatus.spf.record ? (
-                    <code className="block p-3.5 bg-surface-low/50 border border-border-subtle rounded-xl font-mono text-[11px] text-on-surface truncate select-all" title={shieldStatus.spf.record}>
-                      {shieldStatus.spf.record}
-                    </code>
-                  ) : (
-                    <p className="italic text-on-surface-variant/60 block p-3.5 bg-surface-low/30 rounded-xl">
-                      {t("domain_shield.no_spf_record")}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <span className="block text-xs font-bold text-on-surface-variant">
-                    {t("domain_shield.required_dns_setup")}
-                  </span>
-                  <div className="flex gap-2 items-center">
-                    <code className="flex-1 block p-3.5 bg-surface-low/50 border border-border-subtle text-on-surface rounded-xl font-mono text-[11px] truncate select-all">
-                      v=spf1 include:spf.cloudflare.com include:sicurre.com ~all
-                    </code>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleCopy("spf", "v=spf1 include:spf.cloudflare.com include:sicurre.com ~all")}
-                      className="px-3 h-10 cursor-pointer text-xs gap-1 font-bold rounded-xl bg-white"
-                    >
-                      {copiedKey === "spf" ? (
-                        <Check className="w-4 h-4 text-safe" />
-                      ) : (
-                        <Copy className="w-4 h-4 text-on-surface-variant" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* DKIM Card Track */}
-            <div className="bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border-subtle/50">
-                <div className="flex items-center gap-2">
-                  <span className="rounded bg-surface-low px-2 py-0.5 text-xs font-bold text-on-surface-variant">
-                    DKIM
-                  </span>
-                  <span className="font-mono text-xs font-bold text-on-surface">Hostname: cloudflare._domainkey</span>
-                </div>
-                <div>
-                  {shieldStatus.dkim.valid ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-safe/10 px-2.5 py-0.5 text-xs font-bold text-safe">
-                      <ShieldCheck className="w-3.5 h-3.5" /> {t("domain_shield.status_conform")}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2.5 py-0.5 text-xs font-bold text-warning">
-                      <AlertTriangle className="w-3.5 h-3.5" /> {t("domain_shield.status_missing")}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-1 text-xs">
-                <div className="space-y-2">
-                  <span className="block text-xs font-bold text-on-surface-variant">
-                    {t("domain_shield.active_dns_entry")}
-                  </span>
-                  {shieldStatus.dkim.record ? (
-                    <code className="block p-3.5 bg-surface-low/50 border border-border-subtle rounded-xl font-mono text-[11px] text-on-surface truncate select-all" title={shieldStatus.dkim.record}>
-                      {shieldStatus.dkim.record}
-                    </code>
-                  ) : (
-                    <p className="italic text-on-surface-variant/60 block p-3.5 bg-surface-low/30 rounded-xl">
-                      {t("domain_shield.no_dkim_record")}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <span className="block text-xs font-bold text-on-surface-variant">
-                    {t("domain_shield.required_dns_setup")}
-                  </span>
-                  <div className="flex gap-2 items-center">
-                    <code className="flex-1 block p-3.5 bg-surface-low/50 border border-border-subtle text-on-surface rounded-xl font-mono text-[11px] truncate select-all">
-                      v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1+z7s...
-                    </code>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleCopy("dkim", "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1+z7s...")}
-                      className="px-3 h-10 cursor-pointer text-xs gap-1 font-bold rounded-xl bg-white"
-                    >
-                      {copiedKey === "dkim" ? (
-                        <Check className="w-4 h-4 text-safe" />
-                      ) : (
-                        <Copy className="w-4 h-4 text-on-surface-variant" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* DMARC Card Track */}
-            <div className="bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border-subtle/50">
-                <div className="flex items-center gap-2">
-                  <span className="rounded bg-surface-low px-2 py-0.5 text-xs font-bold text-on-surface-variant">
-                    DMARC
-                  </span>
-                  <span className="font-mono text-xs font-bold text-on-surface">Hostname: _dmarc</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`select-none rounded border px-2 py-0.5 font-mono text-xs font-bold ${getDmarcPolicyClass(shieldStatus.dmarc.policy)}`}>
-                    {isFR ? "Politique" : "Policy"} : {shieldStatus.dmarc.policy}
-                  </span>
-                  {isDmarcComplete ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-safe bg-safe/10 px-2.5 py-0.5 rounded-full">
-                      <ShieldCheck className="w-3.5 h-3.5" /> {t("domain_shield.status_conform")}
-                    </span>
-                  ) : shieldStatus.dmarc.valid || isDmarcValid ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-warning bg-warning/10 px-2.5 py-0.5 rounded-full">
-                      <AlertTriangle className="w-3.5 h-3.5" /> {t("domain_shield.status_partial")}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-error bg-error/10 px-2.5 py-0.5 rounded-full">
-                      <AlertTriangle className="w-3.5 h-3.5" /> {t("domain_shield.status_missing")}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-1 text-xs">
-                <div className="space-y-2">
-                  <span className="block text-xs font-bold text-on-surface-variant">
-                    {t("domain_shield.active_dns_entry")}
-                  </span>
-                  {shieldStatus.dmarc.record ? (
-                    <code className="block p-3.5 bg-surface-low/50 border border-border-subtle rounded-xl font-mono text-[11px] text-on-surface truncate select-all" title={shieldStatus.dmarc.record}>
-                      {shieldStatus.dmarc.record}
-                    </code>
-                  ) : (
-                    <p className="italic text-on-surface-variant/60 block p-3.5 bg-surface-low/30 rounded-xl">
-                      {t("domain_shield.no_dmarc_record")}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <span className="block text-xs font-bold text-on-surface-variant">
-                    {t("domain_shield.sicurre_recommendation")}
-                  </span>
-                  <div className="flex gap-2 items-center">
-                    <code className="flex-1 block p-3.5 bg-surface-low/50 border border-border-subtle text-on-surface rounded-xl font-mono text-[11px] truncate select-all" title={getRecommendedDmarcRecord()}>
-                      {getRecommendedDmarcRecord()}
-                    </code>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleCopy("dmarc", getRecommendedDmarcRecord())}
-                      className="px-3 h-10 cursor-pointer text-xs gap-1 font-bold rounded-xl bg-white"
-                    >
-                      {copiedKey === "dmarc" ? (
-                        <Check className="w-4 h-4 text-safe" />
-                      ) : (
-                        <Copy className="w-4 h-4 text-on-surface-variant" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* DMARC Aggregate Reports */}
-            <div className="bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="space-y-1">
+              {/* DKIM Card Track */}
+              <div className="bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border-subtle/50">
                   <div className="flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4 text-primary" />
-                    <p className="text-xs font-bold text-on-surface">{t("domain_shield.report_title")}</p>
+                    <span className="rounded bg-surface-low px-2 py-0.5 text-xs font-bold text-on-surface-variant">
+                      DKIM
+                    </span>
+                    <span className="font-mono text-xs font-bold text-on-surface">Hostname: cloudflare._domainkey</span>
                   </div>
-                  <p className="max-w-2xl text-[11px] leading-relaxed text-on-surface-variant">
-                    {hasSicurreDmarcReporting ? t("domain_shield.report_enabled_desc") : t("domain_shield.report_missing_desc")}
-                  </p>
-                </div>
-                <span className={`w-fit rounded-md border px-2.5 py-1 text-[11px] font-semibold ${dmarcReports?.report_count ? "border-safe/20 bg-safe/10 text-safe" : "border-warning/25 bg-warning/10 text-warning"}`}>
-                  {dmarcReports?.report_count
-                    ? t("domain_shield.reports_received")
-                    : hasSicurreDmarcReporting
-                      ? t("domain_shield.awaiting_report")
-                      : t("domain_shield.status_partial")}
-                </span>
-              </div>
-              {dmarcReportsLoading ? (
-                <div className="mt-4 h-20 animate-pulse rounded-lg bg-surface-low" />
-              ) : dmarcReportsFailed ? (
-                <div role="alert" className="mt-4 rounded-lg border border-error/25 bg-error-container/35 p-4 text-sm text-on-surface">
-                  <p className="font-semibold">{t("common.load_error")}</p>
-                  <button type="button" onClick={() => void refetchDmarcReports()} className="mt-2 font-bold text-primary hover:text-primary-hover">
-                    {t("common.retry")}
-                  </button>
-                </div>
-              ) : (
-              <><div className="mt-4 grid gap-3 sm:grid-cols-4">
-                {[
-                  { label: t("domain_shield.report_count"), value: dmarcReports?.report_count ?? 0 },
-                  { label: t("domain_shield.report_messages"), value: dmarcReports?.total_messages ?? 0 },
-                  { label: t("domain_shield.report_aligned"), value: dmarcReports?.aligned_messages ?? 0 },
-                  { label: t("domain_shield.report_failed"), value: dmarcReports?.failed_messages ?? 0 },
-                ].map((metric) => (
-                  <div key={metric.label} className="rounded-lg border border-border-subtle bg-surface-lowest p-3">
-                    <p className="text-xs font-bold text-on-surface-variant">{metric.label}</p>
-                    <p className="mt-1 font-mono text-lg font-extrabold text-on-surface">{metric.value}</p>
-                  </div>
-                ))}
-              </div>
-              {dmarcReports?.top_sources?.length ? (
-                <div className="mt-3 divide-y divide-border-subtle overflow-hidden rounded-lg border border-border-subtle bg-surface-lowest">
-                  {dmarcReports.top_sources.map((source) => (
-                    <div key={source.source_ip} className="grid grid-cols-[1fr_auto] gap-3 px-3 py-2 text-[11px]">
-                      <span className="font-mono text-on-surface">{source.source_ip}</span>
-                      <span className="font-semibold text-on-surface-variant">
-                        {source.message_count} · DKIM {source.dkim_result} · SPF {source.spf_result}
+                  <div>
+                    {shieldStatus.dkim.valid ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-safe/10 px-2.5 py-0.5 text-xs font-bold text-safe">
+                        <ShieldCheck className="w-3.5 h-3.5" /> {t("domain_shield.status_conform")}
                       </span>
-                    </div>
-                  ))}
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2.5 py-0.5 text-xs font-bold text-warning">
+                        <AlertTriangle className="w-3.5 h-3.5" /> {t("domain_shield.status_missing")}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              ) : (
-                <p className="mt-3 text-[11px] font-semibold text-on-surface-variant">
-                  {t("domain_shield.report_empty")}
-                </p>
-              )}
-              </>
-              )}
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-1 text-xs">
+                  <div className="space-y-2">
+                    <span className="block text-xs font-bold text-on-surface-variant">
+                      {t("domain_shield.active_dns_entry")}
+                    </span>
+                    {shieldStatus.dkim.record ? (
+                      <code className="block p-3.5 bg-surface-low/50 border border-border-subtle rounded-xl font-mono text-[11px] text-on-surface truncate select-all" title={shieldStatus.dkim.record}>
+                        {shieldStatus.dkim.record}
+                      </code>
+                    ) : (
+                      <p className="italic text-on-surface-variant/60 block p-3.5 bg-surface-low/30 rounded-xl">
+                        {t("domain_shield.no_dkim_record")}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <span className="block text-xs font-bold text-on-surface-variant">
+                      {t("domain_shield.required_dns_setup")}
+                    </span>
+                    <div className="flex gap-2 items-center">
+                      <code className="flex-1 block p-3.5 bg-surface-low/50 border border-border-subtle text-on-surface rounded-xl font-mono text-[11px] truncate select-all">
+                        v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1+z7s...
+                      </code>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleCopy("dkim", "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1+z7s...")}
+                        className="px-3 h-10 cursor-pointer text-xs gap-1 font-bold rounded-xl bg-white"
+                      >
+                        {copiedKey === "dkim" ? (
+                          <Check className="w-4 h-4 text-safe" />
+                        ) : (
+                          <Copy className="w-4 h-4 text-on-surface-variant" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* DMARC Card Track */}
+              <div className="bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border-subtle/50">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded bg-surface-low px-2 py-0.5 text-xs font-bold text-on-surface-variant">
+                      DMARC
+                    </span>
+                    <span className="font-mono text-xs font-bold text-on-surface">Hostname: _dmarc</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`select-none rounded border px-2 py-0.5 font-mono text-xs font-bold ${getDmarcPolicyClass(shieldStatus.dmarc.policy)}`}>
+                      {isFR ? "Politique" : "Policy"} : {shieldStatus.dmarc.policy}
+                    </span>
+                    {isDmarcComplete ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-safe bg-safe/10 px-2.5 py-0.5 rounded-full">
+                        <ShieldCheck className="w-3.5 h-3.5" /> {t("domain_shield.status_conform")}
+                      </span>
+                    ) : shieldStatus.dmarc.valid || isDmarcValid ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-warning bg-warning/10 px-2.5 py-0.5 rounded-full">
+                        <AlertTriangle className="w-3.5 h-3.5" /> {t("domain_shield.status_partial")}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-error bg-error/10 px-2.5 py-0.5 rounded-full">
+                        <AlertTriangle className="w-3.5 h-3.5" /> {t("domain_shield.status_missing")}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-1 text-xs">
+                  <div className="space-y-2">
+                    <span className="block text-xs font-bold text-on-surface-variant">
+                      {t("domain_shield.active_dns_entry")}
+                    </span>
+                    {shieldStatus.dmarc.record ? (
+                      <code className="block p-3.5 bg-surface-low/50 border border-border-subtle rounded-xl font-mono text-[11px] text-on-surface truncate select-all" title={shieldStatus.dmarc.record}>
+                        {shieldStatus.dmarc.record}
+                      </code>
+                    ) : (
+                      <p className="italic text-on-surface-variant/60 block p-3.5 bg-surface-low/30 rounded-xl">
+                        {t("domain_shield.no_dmarc_record")}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <span className="block text-xs font-bold text-on-surface-variant">
+                      {t("domain_shield.sicurre_recommendation")}
+                    </span>
+                    <div className="flex gap-2 items-center">
+                      <code className="flex-1 block p-3.5 bg-surface-low/50 border border-border-subtle text-on-surface rounded-xl font-mono text-[11px] truncate select-all" title={getRecommendedDmarcRecord()}>
+                        {getRecommendedDmarcRecord()}
+                      </code>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleCopy("dmarc", getRecommendedDmarcRecord())}
+                        className="px-3 h-10 cursor-pointer text-xs gap-1 font-bold rounded-xl bg-white"
+                      >
+                        {copiedKey === "dmarc" ? (
+                          <Check className="w-4 h-4 text-safe" />
+                        ) : (
+                          <Copy className="w-4 h-4 text-on-surface-variant" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* DMARC Aggregate Reports */}
+              <div className="bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4 text-primary" />
+                      <p className="text-xs font-bold text-on-surface">{t("domain_shield.report_title")}</p>
+                    </div>
+                    <p className="max-w-2xl text-[11px] leading-relaxed text-on-surface-variant">
+                      {hasSicurreDmarcReporting ? t("domain_shield.report_enabled_desc") : t("domain_shield.report_missing_desc")}
+                    </p>
+                  </div>
+                  <span className={`w-fit rounded-md border px-2.5 py-1 text-[11px] font-semibold ${dmarcReports?.report_count ? "border-safe/20 bg-safe/10 text-safe" : "border-warning/25 bg-warning/10 text-warning"}`}>
+                    {dmarcReports?.report_count
+                      ? t("domain_shield.reports_received")
+                      : hasSicurreDmarcReporting
+                        ? t("domain_shield.awaiting_report")
+                        : t("domain_shield.status_partial")}
+                  </span>
+                </div>
+                {dmarcReportsLoading ? (
+                  <div className="mt-4 h-20 animate-pulse rounded-lg bg-surface-low" />
+                ) : dmarcReportsFailed ? (
+                  <div role="alert" className="mt-4 rounded-lg border border-error/25 bg-error-container/35 p-4 text-sm text-on-surface">
+                    <p className="font-semibold">{t("common.load_error")}</p>
+                    <button type="button" onClick={() => void refetchDmarcReports()} className="mt-2 font-bold text-primary hover:text-primary-hover">
+                      {t("common.retry")}
+                    </button>
+                  </div>
+                ) : (
+                  <><div className="mt-4 grid gap-3 sm:grid-cols-4">
+                    {[
+                      { label: t("domain_shield.report_count"), value: dmarcReports?.report_count ?? 0 },
+                      { label: t("domain_shield.report_messages"), value: dmarcReports?.total_messages ?? 0 },
+                      { label: t("domain_shield.report_aligned"), value: dmarcReports?.aligned_messages ?? 0 },
+                      { label: t("domain_shield.report_failed"), value: dmarcReports?.failed_messages ?? 0 },
+                    ].map((metric) => (
+                      <div key={metric.label} className="rounded-lg border border-border-subtle bg-surface-lowest p-3">
+                        <p className="text-xs font-bold text-on-surface-variant">{metric.label}</p>
+                        <p className="mt-1 font-mono text-lg font-extrabold text-on-surface">{metric.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                    {dmarcReports?.top_sources?.length ? (
+                      <div className="mt-3 divide-y divide-border-subtle overflow-hidden rounded-lg border border-border-subtle bg-surface-lowest">
+                        {dmarcReports.top_sources.map((source) => (
+                          <div key={source.source_ip} className="grid grid-cols-[1fr_auto] gap-3 px-3 py-2 text-[11px]">
+                            <span className="font-mono text-on-surface">{source.source_ip}</span>
+                            <span className="font-semibold text-on-surface-variant">
+                              {source.message_count} · DKIM {source.dkim_result} · SPF {source.spf_result}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-[11px] font-semibold text-on-surface-variant">
+                        {t("domain_shield.report_empty")}
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
-          </div>
 
 
-        </>
-      )}
-    </MotionDiv>
+          </>
+        )}
+      </MotionDiv>
     </>
   );
 }

@@ -84,7 +84,7 @@ export default function SupportRoute({ session }: SupportRouteProps) {
 
       {/* Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-        
+
         {/* Left: Contact Form Card (8 Columns) */}
         <div className="lg:col-span-8 bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm flex flex-col justify-between animate-in fade-in duration-300">
           {submittedTicket ? (

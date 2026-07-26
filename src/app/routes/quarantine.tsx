@@ -36,7 +36,7 @@ export default function QuarantineRoute() {
   // Selected item for the Zoom Modal
   const [selectedItem, setSelectedItem] = useState<QuarantineItem | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  
+
   // Page pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 9; // 3 columns x 3 rows
@@ -56,11 +56,11 @@ export default function QuarantineRoute() {
 
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    
+
     if (isNaN(days) || isNaN(hours)) {
       return "14 d";
     }
-    
+
     return `${days} d ${hours} h`;
   };
 
@@ -194,7 +194,7 @@ export default function QuarantineRoute() {
                       Phishing
                     </span>
                   </div>
-                  
+
                   <h3 className="font-bold text-sm text-on-surface mt-2.5 line-clamp-2 select-text" title={item.subject}>
                     {item.subject || t("threats.no_subject")}
                   </h3>
@@ -205,14 +205,13 @@ export default function QuarantineRoute() {
                     <Calendar className="w-3.5 h-3.5 text-on-surface-variant/50" />
                     {getRemainingTime(item.expires_at)}
                   </span>
-                  
+
                   {/* Eyeball icon color changes only when the modal is open or active */}
                   <Button
                     variant={selectedItem?.id === item.id ? "primary" : "outline"}
                     size="sm"
-                    className={`text-xs px-2.5 cursor-pointer h-8 transition-colors ${
-                      selectedItem?.id === item.id ? "" : "text-on-surface-variant hover:text-primary hover:border-primary"
-                    }`}
+                    className={`text-xs px-2.5 cursor-pointer h-8 transition-colors ${selectedItem?.id === item.id ? "" : "text-on-surface-variant hover:text-primary hover:border-primary"
+                      }`}
                     onClick={() => setSelectedItem(item)}
                   >
                     <Eye className="w-4 h-4" />
@@ -365,7 +364,7 @@ export default function QuarantineRoute() {
                     {t("quarantine.delete")}
                   </Button>
                 </div>
-                
+
                 <p className="text-[11px] text-on-surface-variant/70 mt-3.5 leading-normal italic text-center select-none">
                   {isFR
                     ? "Note : Libérer transfère l'e-mail dans votre boîte. Autoriser l'expéditeur l'ajoute à votre liste blanche pour contourner les prochains scans."

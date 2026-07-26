@@ -402,12 +402,6 @@ export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
 
         {/* Right Hand: Alert History Log */}
         {mode === "history" && <div className="space-y-4">
-          <div className="pb-4 border-b border-border-subtle">
-            <h3 className="font-display font-semibold text-[17px] text-on-surface">
-              {t("alerts.section_history")}
-            </h3>
-          </div>
-
           {historyLoading ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
@@ -422,7 +416,7 @@ export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
               <p>{t("alerts.no_history")}</p>
             </div>
           ) : (
-            <div className="max-h-[600px] overflow-y-auto border-y border-border-subtle">
+            <div className="max-h-[600px] overflow-y-auto border-b border-border-subtle">
               {history.map((alert) => {
                 const tone = getHistoryTone(alert.title, alert.message);
                 return (
