@@ -74,8 +74,6 @@ export interface KPIStats {
 export interface ThreatLog {
   id: string;
   message_id: string;
-  privacy_reference: string;
-  content_redacted: boolean;
   subject: string;
   sender: string;
   body_preview: string;
@@ -85,6 +83,8 @@ export interface ThreatLog {
   received_at: string;
   latency_ms?: number;
   explanation?: string;
+  privacy_reference: string;
+  content_redacted: boolean;
 }
 
 export interface FeedbackPayload {
@@ -219,7 +219,6 @@ export function clearStoredSession(): void {
   localStorage.removeItem(USER_EMAIL_KEY);
   localStorage.removeItem(USER_ROLE_KEY);
   localStorage.removeItem(AUTH_PROVIDER_KEY);
-  sessionStorage.removeItem("sicurre:last-kpis");
 }
 
 async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
@@ -308,7 +307,7 @@ export function useLogin() {
       queryClient.invalidateQueries({ queryKey: ["auth-session"] });
       const session = await queryClient.fetchQuery({
         queryKey: ["auth-session"],
-        queryFn: () => fetchJson<AuthSession>("/v1/auth/session"),
+        queryFn: () => fetchJson<AuthSession>("/auth/session"),
       });
       persistSession(session, "password");
     },
@@ -366,7 +365,7 @@ export function useUpdateProfile() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: { display_name: string }) =>
-      fetchJson<AuthSession>("/v1/auth/profile", {
+      fetchJson<AuthSession>("/auth/profile", {
         method: "PATCH",
         body: JSON.stringify(payload),
       }),
@@ -396,25 +395,8 @@ export function useChangePassword() {
 export function useKPIStats() {
   return useQuery<KPIStats>({
     queryKey: ["kpis"],
-    queryFn: async () => {
-      const stats = await fetchJson<KPIStats>("/stats/kpi");
-      if (typeof window !== "undefined") {
-        window.sessionStorage.setItem("sicurre:last-kpis", JSON.stringify(stats));
-      }
-      return stats;
-    },
-    initialData: () => {
-      if (typeof window === "undefined") return undefined;
-      try {
-        return JSON.parse(window.sessionStorage.getItem("sicurre:last-kpis") || "") as KPIStats;
-      } catch {
-        return undefined;
-      }
-    },
-    staleTime: 15000,
-    refetchInterval: 15000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
+    queryFn: () => fetchJson<KPIStats>("/stats/kpi"),
+    refetchInterval: 10000,
   });
 }
 
@@ -439,11 +421,15 @@ export function useThreatLogs() {
   return useQuery<ThreatLog[]>({
     queryKey: ["threats"],
     queryFn: () => fetchJson<ThreatLog[]>("/threats"),
-    staleTime: 10000,
     refetchInterval: 10000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    placeholderData: (previous) => previous,
+  });
+}
+
+export function useReportAddress() {
+  return useQuery<{ address: string }>({
+    queryKey: ["feedback-report-address"],
+    queryFn: () => fetchJson<{ address: string }>("/feedback/report-address"),
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -474,14 +460,6 @@ export function useCreateFeedback() {
       queryClient.invalidateQueries({ queryKey: ["threats"] });
       queryClient.invalidateQueries({ queryKey: ["kpis"] });
     },
-  });
-}
-
-export function useReportAddress() {
-  return useQuery<{ address: string }>({
-    queryKey: ["feedback-report-address"],
-    queryFn: () => fetchJson<{ address: string }>("/feedback/report-address"),
-    retry: false,
   });
 }
 

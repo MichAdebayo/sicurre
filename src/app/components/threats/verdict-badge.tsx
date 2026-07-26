@@ -17,7 +17,7 @@ export function VerdictBadge({ verdict, confidence, showRisk = true }: VerdictBa
     Icon = ShieldAlert;
     label = "Phishing";
   } else if (verdict === "spam") {
-    badgeStyles = "bg-warning-bg text-warning border-warning/20";
+    badgeStyles = "bg-warning-bg text-spam-text border-warning/20";
     Icon = MailWarning;
     label = "Spam";
   }

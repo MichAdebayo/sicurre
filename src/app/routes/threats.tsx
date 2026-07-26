@@ -21,13 +21,13 @@ export default function ThreatsRoute() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterVerdict, setFilterVerdict] = useState<string>("all");
-  
+
   // Date range filters ("all", "today", "7d", "month")
   const [dateFilter, setDateFilter] = useState<"today" | "7d" | "month" | "last_month">("7d");
-  
+
   // Latency chart hover state
   const [hoveredLatencyIndex, setHoveredLatencyIndex] = useState<number | null>(null);
-  
+
   // Table pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -69,18 +69,18 @@ export default function ThreatsRoute() {
 
   const filteredThreats = threats
     ? threats.filter((threat) => {
-        const query = searchQuery.toLowerCase();
-        const matchesSearch =
-          threat.subject?.toLowerCase().includes(query) ||
-          threat.sender?.toLowerCase().includes(query) ||
-          threat.privacy_reference.toLowerCase().includes(query);
-        const matchesFilter =
-          filterVerdict === "all" ||
-          threat.verdict === filterVerdict ||
-          (filterVerdict === "phishing" && threat.verdict === "quarantine");
-        const matchesDate = matchesDateFilter(threat.received_at);
-        return matchesSearch && matchesFilter && matchesDate;
-      })
+      const query = searchQuery.toLowerCase();
+      const matchesSearch =
+        threat.subject?.toLowerCase().includes(query) ||
+        threat.sender?.toLowerCase().includes(query) ||
+        threat.privacy_reference.toLowerCase().includes(query);
+      const matchesFilter =
+        filterVerdict === "all" ||
+        threat.verdict === filterVerdict ||
+        (filterVerdict === "phishing" && threat.verdict === "quarantine");
+      const matchesDate = matchesDateFilter(threat.received_at);
+      return matchesSearch && matchesFilter && matchesDate;
+    })
     : [];
 
   const handleExportCSV = () => {
@@ -95,7 +95,7 @@ export default function ThreatsRoute() {
     const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", `sicurre_historical_report_${new Date().toISOString().slice(0,10)}.csv`);
+    link.setAttribute("download", `sicurre_historical_report_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -105,14 +105,14 @@ export default function ThreatsRoute() {
     const threatsList = threats || [];
     const days = [];
     const now = new Date();
-    
+
     if (dateFilter === "today") {
       // 24 hourly points (from 23 hours ago to current hour)
       for (let i = 23; i >= 0; i--) {
         const d = new Date();
         d.setHours(d.getHours() - i, 0, 0, 0);
         const label = d.toLocaleTimeString(i18n.language === "fr" ? "fr-FR" : "en-US", { hour: "2-digit", minute: "2-digit" });
-        
+
         const startOfHour = d;
         const endOfHour = new Date(d.getTime() + 59 * 60 * 1000 + 59 * 1000 + 999);
 
@@ -134,7 +134,7 @@ export default function ThreatsRoute() {
         const d = new Date();
         d.setDate(d.getDate() - i);
         const label = d.toLocaleDateString(i18n.language === "fr" ? "fr-FR" : "en-US", { weekday: "short", day: "numeric" });
-        
+
         const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
         const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
 
@@ -157,7 +157,7 @@ export default function ThreatsRoute() {
         const d = new Date();
         d.setDate(d.getDate() - i);
         const label = d.toLocaleDateString(i18n.language === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric" });
-        
+
         const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
         const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
 
@@ -182,7 +182,7 @@ export default function ThreatsRoute() {
       for (let i = daysInPrevMonth - 1; i >= 0; i--) {
         const d = new Date(y, m - 1, daysInPrevMonth - i);
         const label = d.toLocaleDateString(i18n.language === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric" });
-        
+
         const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
         const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
 
@@ -249,7 +249,7 @@ export default function ThreatsRoute() {
             </h1>
           </div>
           <p className="app-body-sub mt-1">
-            {i18n.language === "fr" 
+            {i18n.language === "fr"
               ? "Historique global des classifications d'e-mails"
               : "Global historical log of analyzed email classifications"}
           </p>
@@ -280,7 +280,7 @@ export default function ThreatsRoute() {
         </div>
       </div>
 
-      <section className="relative min-h-[320px] border-y border-border-subtle py-6">
+      <section className="relative min-h-[320px] border-b border-border-subtle py-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
           <div>
             <h3 className="font-display font-bold text-[17px] text-on-surface">
@@ -425,11 +425,10 @@ export default function ThreatsRoute() {
                 setFilterVerdict(v);
                 setCurrentPage(1);
               }}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                filterVerdict === v
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${filterVerdict === v
                   ? "bg-primary text-on-primary border-primary shadow-sm"
                   : "bg-white text-on-surface-variant hover:bg-surface-low border-border-subtle"
-              }`}
+                }`}
             >
               {v === "all" ? (i18n.language === "fr" ? "Tous" : "All") : t(`threats.badge_${v}`)}
             </button>
@@ -513,7 +512,7 @@ export default function ThreatsRoute() {
         {totalPages > 1 && (
           <div className="flex flex-col gap-3 border-t border-border-subtle bg-surface-low/10 px-5 py-4 font-sans sm:flex-row sm:items-center sm:justify-between">
             <span className="text-xs text-on-surface-variant font-bold">
-              {i18n.language === "fr" 
+              {i18n.language === "fr"
                 ? `Page ${activePage} sur ${totalPages} (${totalItems} éléments)`
                 : `Page ${activePage} of ${totalPages} (${totalItems} items)`}
             </span>
