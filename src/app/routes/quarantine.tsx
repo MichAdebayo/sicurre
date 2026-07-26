@@ -24,8 +24,7 @@ import {
 const MotionDiv = motion.div as any;
 
 export default function QuarantineRoute() {
-  const { t, i18n } = useTranslation();
-  const isFR = i18n.language === "fr";
+  const { t } = useTranslation();
 
   // Queries & Mutations
   const { data: items, isLoading, error, refetch } = useQuarantineItems();
@@ -36,7 +35,7 @@ export default function QuarantineRoute() {
   // Selected item for the Zoom Modal
   const [selectedItem, setSelectedItem] = useState<QuarantineItem | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  
+
   // Page pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 9; // 3 columns x 3 rows
@@ -56,11 +55,11 @@ export default function QuarantineRoute() {
 
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    
+
     if (isNaN(days) || isNaN(hours)) {
       return "14 d";
     }
-    
+
     return `${days} d ${hours} h`;
   };
 
@@ -69,13 +68,11 @@ export default function QuarantineRoute() {
     setActionSuccess("");
     try {
       await releaseMutation.mutateAsync(id);
-      setActionSuccess(
-        i18n.language === "fr" ? "Email délivré." : "Email delivered."
-      );
+      setActionSuccess(t("quarantine.release_short_success"));
       setSelectedItem(null);
       refetch();
     } catch (err) {
-      setActionError(quarantineActionError(err, isFR));
+      setActionError(t(quarantineActionErrorKey(err)));
     }
   };
 
@@ -88,15 +85,11 @@ export default function QuarantineRoute() {
     setActionSuccess("");
     try {
       await whitelistMutation.mutateAsync(id);
-      setActionSuccess(
-        i18n.language === "fr"
-          ? "Email délivré et expéditeur autorisé."
-          : "Email delivered and sender allowed."
-      );
+      setActionSuccess(t("quarantine.whitelist_short_success"));
       setSelectedItem(null);
       refetch();
     } catch (err) {
-      setActionError(quarantineActionError(err, isFR));
+      setActionError(t(quarantineActionErrorKey(err)));
     }
   };
 
@@ -126,7 +119,7 @@ export default function QuarantineRoute() {
 
   return (
     <MotionDiv
-      initial={{ opacity: 0, y: 12 }}
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.3 }}
@@ -151,7 +144,7 @@ export default function QuarantineRoute() {
           {t("quarantine.title")}
           {phishingItems.length > 0 && (
             <span className="inline-flex items-center bg-error/10 text-error text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
-              {phishingItems.length} {i18n.language === "fr" ? "Menaces en quarantaine" : "Threats Quarantined"}
+              {t("quarantine.header_count", { count: phishingItems.length })}
             </span>
           )}
         </h1>
@@ -194,7 +187,7 @@ export default function QuarantineRoute() {
                       Phishing
                     </span>
                   </div>
-                  
+
                   <h3 className="font-bold text-sm text-on-surface mt-2.5 line-clamp-2 select-text" title={item.subject}>
                     {item.subject || t("threats.no_subject")}
                   </h3>
@@ -205,14 +198,13 @@ export default function QuarantineRoute() {
                     <Calendar className="w-3.5 h-3.5 text-on-surface-variant/50" />
                     {getRemainingTime(item.expires_at)}
                   </span>
-                  
+
                   {/* Eyeball icon color changes only when the modal is open or active */}
                   <Button
                     variant={selectedItem?.id === item.id ? "primary" : "outline"}
                     size="sm"
-                    className={`text-xs px-2.5 cursor-pointer h-8 transition-colors ${
-                      selectedItem?.id === item.id ? "" : "text-on-surface-variant hover:text-primary hover:border-primary"
-                    }`}
+                    className={`text-xs px-2.5 cursor-pointer h-8 transition-colors ${selectedItem?.id === item.id ? "" : "text-on-surface-variant hover:text-primary hover:border-primary"
+                      }`}
                     onClick={() => setSelectedItem(item)}
                   >
                     <Eye className="w-4 h-4" />
@@ -226,9 +218,11 @@ export default function QuarantineRoute() {
           {totalPages >= 1 && (
             <div className="flex items-center justify-between px-2 py-4 border-t border-border-subtle/50 font-sans select-none pt-6 mt-2">
               <span className="text-xs text-on-surface-variant font-bold">
-                {i18n.language === "fr"
-                  ? `Page ${activePage} sur ${totalPages} (${totalItems} éléments)`
-                  : `Page ${activePage} of ${totalPages} (${totalItems} items)`}
+                {t("threats.pagination", {
+                  page: activePage,
+                  pages: totalPages,
+                  count: totalItems,
+                })}
               </span>
               <div className="flex gap-2">
                 <Button
@@ -241,7 +235,7 @@ export default function QuarantineRoute() {
                   }}
                   className="text-xs py-1 px-3.5 cursor-pointer font-bold h-8"
                 >
-                  {i18n.language === "fr" ? "Précédent" : "Previous"}
+                  {t("common.previous")}
                 </Button>
                 <Button
                   variant="outline"
@@ -253,7 +247,7 @@ export default function QuarantineRoute() {
                   }}
                   className="text-xs py-1 px-3.5 cursor-pointer font-bold h-8"
                 >
-                  {i18n.language === "fr" ? "Suivant" : "Next"}
+                  {t("common.next")}
                 </Button>
               </div>
             </div>
@@ -365,11 +359,9 @@ export default function QuarantineRoute() {
                     {t("quarantine.delete")}
                   </Button>
                 </div>
-                
+
                 <p className="text-[11px] text-on-surface-variant/70 mt-3.5 leading-normal italic text-center select-none">
-                  {isFR
-                    ? "Note : Libérer transfère l'e-mail dans votre boîte. Autoriser l'expéditeur l'ajoute à votre liste blanche pour contourner les prochains scans."
-                    : "Note: Release forwards the email to your inbox. Whitelist adds the sender to your allowlist to bypass future scans."}
+                  {t("quarantine.action_note")}
                 </p>
               </div>
             </MotionDiv>
@@ -386,13 +378,11 @@ export default function QuarantineRoute() {
                 <AlertCircle className="w-5 h-5" />
               </div>
               <h4 className="font-display font-bold text-base text-on-surface">
-                {isFR ? "Confirmer la suppression" : "Confirm Deletion"}
+                {t("quarantine.confirm_delete")}
               </h4>
             </div>
             <p className="text-xs font-semibold text-on-surface-variant leading-relaxed">
-              {isFR
-                ? "Cette action est irréversible. L'e-mail en quarantaine sera définitivement effacé."
-                : "This action is irreversible. The quarantined email will be permanently deleted."}
+              {t("quarantine.confirm_delete_desc")}
             </p>
             <div className="flex justify-end gap-2.5">
               <Button
@@ -401,7 +391,7 @@ export default function QuarantineRoute() {
                 onClick={() => setConfirmDeleteId(null)}
                 className="font-bold text-xs"
               >
-                {isFR ? "Annuler" : "Cancel"}
+                {t("common.cancel")}
               </Button>
               <Button
                 variant="danger"
@@ -422,7 +412,7 @@ export default function QuarantineRoute() {
                 }}
                 className="font-bold text-xs"
               >
-                {isFR ? "Supprimer" : "Delete"}
+                {t("quarantine.delete")}
               </Button>
             </div>
           </div>
@@ -433,29 +423,19 @@ export default function QuarantineRoute() {
   );
 }
 
-function quarantineActionError(error: unknown, isFrench: boolean): string {
+function quarantineActionErrorKey(error: unknown): string {
   const message = error instanceof Error ? error.message : "";
   if (message.includes("Email Sending")) {
-    return isFrench
-      ? "Cloudflare refuse l’envoi. Vérifiez la destination Email Routing et la permission « Email Sending: Edit » du compte."
-      : "Cloudflare denied sending. Verify the Email Routing destination and account-level Email Sending: Edit permission.";
+    return "quarantine.errors.email_sending";
   }
   if (message.includes("destination") || message.includes("Routing Addresses")) {
-    return isFrench
-      ? "Vérifiez l’adresse de destination dans Cloudflare Email Routing avant de délivrer ce message."
-      : "Verify the destination address in Cloudflare Email Routing before delivering this message.";
+    return "quarantine.errors.destination";
   }
   if (message.includes("Original email content is unavailable")) {
-    return isFrench
-      ? "Ce message historique ne contient pas l’original nécessaire à la délivrance."
-      : "This historical item has no original email available for delivery.";
+    return "quarantine.errors.original_unavailable";
   }
   if (message.includes("Active Cloudflare integration required")) {
-    return isFrench
-      ? "Reconnectez Cloudflare avant de délivrer ce message."
-      : "Reconnect Cloudflare before delivering this message.";
+    return "quarantine.errors.integration_required";
   }
-  return isFrench
-    ? "Délivrance impossible. L’email reste en quarantaine."
-    : "Delivery failed. The email remains quarantined.";
+  return "quarantine.errors.delivery_failed";
 }
