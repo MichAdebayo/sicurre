@@ -47,8 +47,6 @@ export function AppShell({
         onPageChange={changePage}
         onLogout={onLogout}
         onLockdown={onLockdown}
-        userName={userName}
-        userEmail={userEmail}
         userRole={userRole}
         onboardingRequired={onboardingRequired}
         className="hidden md:flex"
@@ -67,8 +65,6 @@ export function AppShell({
             onPageChange={changePage}
             onLogout={onLogout}
             onLockdown={onLockdown}
-            userName={userName}
-            userEmail={userEmail}
             userRole={userRole}
             onboardingRequired={onboardingRequired}
             className="relative z-10 flex shadow-2xl"

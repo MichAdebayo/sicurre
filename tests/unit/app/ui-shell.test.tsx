@@ -112,6 +112,16 @@ describe("application navigation", () => {
     fireEvent.click(screen.getByRole("button", { name: /sidebar.nav_support/i }));
     expect(onPageChange).toHaveBeenCalledWith("support");
   });
+
+  it("exposes logout as a direct navigation action", () => {
+    const onLogout = vi.fn();
+    render(
+      <Sidebar currentPage="dashboard" onPageChange={vi.fn()} onLogout={onLogout} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "common.logout" }));
+    expect(onLogout).toHaveBeenCalledOnce();
+  });
 });
 
 describe("application toast", () => {
