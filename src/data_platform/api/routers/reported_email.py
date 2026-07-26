@@ -5,7 +5,10 @@ from __future__ import annotations
 import hashlib
 import hmac
 import uuid
+import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
+from email import policy
+from email.parser import BytesParser
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 
@@ -13,6 +16,10 @@ from core.config import Settings, get_settings
 from core.rate_limit import limiter
 from data_platform.api.auth import AuthUser, get_current_user
 from data_platform.api.auth import async_query as auth_query
+from data_platform.api.routers.app_routes import (
+    _extract_dmarc_xml_payload,
+    persist_dmarc_report,
+)
 from data_platform.services.reported_email import (
     InvalidReportAlias,
     ReportAliasCodec,
@@ -22,6 +29,31 @@ from data_platform.services.reported_email import (
 )
 
 router = APIRouter(tags=["reported-email"])
+
+
+def _dmarc_attachment(raw_message: bytes) -> tuple[str, bytes]:
+    """Extract the first valid aggregate DMARC attachment and its domain."""
+    message = BytesParser(policy=policy.default).parsebytes(raw_message)
+    for part in message.walk():
+        if part.is_multipart():
+            continue
+        payload = part.get_payload(decode=True) or b""
+        filename = (part.get_filename() or "").lower()
+        if not payload or not (
+            filename.endswith((".xml", ".xml.gz", ".gz", ".zip"))
+            or part.get_content_type()
+            in {"application/xml", "text/xml", "application/zip", "application/gzip"}
+        ):
+            continue
+        try:
+            xml_payload = _extract_dmarc_xml_payload(payload)
+            root = ET.fromstring(xml_payload)
+        except (HTTPException, ET.ParseError, OSError):
+            continue
+        domain = root.findtext("policy_published/domain", "").strip().lower()
+        if domain:
+            return domain, xml_payload
+    raise HTTPException(status_code=400, detail="DMARC report attachment not found")
 
 
 def _codec(settings: Settings) -> ReportAliasCodec:
@@ -132,3 +164,38 @@ async def ingest_reported_email(
             return {"status": "accepted", "idempotent": True}
         raise
     return {"status": "accepted", "idempotent": False}
+
+
+@router.post("/v1/email/dmarc-reports", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit("30/minute")
+async def ingest_dmarc_email(
+    request: Request,
+    x_sicurre_report_key: str | None = Header(default=None),
+) -> dict[str, str | int]:
+    """Accept one Worker-authenticated aggregate DMARC report email."""
+    settings = get_settings()
+    expected_key = settings.reported_email_ingest_key
+    if (
+        not expected_key
+        or not x_sicurre_report_key
+        or not hmac.compare_digest(x_sicurre_report_key, expected_key)
+    ):
+        raise HTTPException(status_code=401, detail="Invalid reported-email credential")
+    raw_message = await request.body()
+    if not raw_message:
+        raise HTTPException(status_code=400, detail="Empty DMARC report email")
+    if len(raw_message) > settings.reported_email_max_message_bytes:
+        raise HTTPException(status_code=413, detail="DMARC report email is too large")
+    domain, xml_payload = _dmarc_attachment(raw_message)
+    integrations = await auth_query(
+        "SELECT workspace_id FROM cloudflare_integration "
+        "WHERE lower(zone_name) = ? AND status = 'active' LIMIT 1",
+        (domain,),
+    )
+    if not integrations:
+        raise HTTPException(status_code=404, detail="DMARC report domain is not onboarded")
+    return await persist_dmarc_report(
+        str(integrations[0]["workspace_id"]),
+        domain,
+        xml_payload,
+    )

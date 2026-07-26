@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import sys
 import uuid
@@ -391,3 +392,126 @@ async def test_ingestion_persists_evidence_and_feedback(
     assert result == {"status": "accepted", "idempotent": False}
     assert any("INSERT INTO app_reported_email" in sql for sql, _ in queries)
     assert any("INSERT INTO app_feedback" in sql for sql, _ in queries)
+
+
+def _dmarc_message(domain: str = "example.test") -> bytes:
+    xml = (
+        "<feedback><policy_published><domain>"
+        f"{domain}"
+        "</domain></policy_published><report_metadata><org_name>Google</org_name>"
+        "<report_id>report-1</report_id></report_metadata></feedback>"
+    )
+    return (
+        "From: reports@example.test\r\n"
+        "To: dmarc@sicurre.com\r\n"
+        "MIME-Version: 1.0\r\n"
+        'Content-Type: application/xml; name="report.xml"\r\n'
+        'Content-Disposition: attachment; filename="report.xml"\r\n'
+        "Content-Transfer-Encoding: base64\r\n\r\n"
+        f"{base64.b64encode(xml.encode()).decode()}\r\n"
+    ).encode()
+
+
+def test_extracts_dmarc_attachment_and_domain() -> None:
+    domain, payload = router._dmarc_attachment(_dmarc_message())
+
+    assert domain == "example.test"
+    assert b"<feedback>" in payload
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        b"Content-Type: multipart/mixed; boundary=x\r\n\r\n--x--\r\n",
+        (
+            b'Content-Type: application/xml; name="bad.xml"\r\n'
+            b'Content-Disposition: attachment; filename="bad.xml"\r\n\r\n'
+            b"<not-dmarc>"
+        ),
+        (
+            b'Content-Type: application/xml; name="empty.xml"\r\n'
+            b'Content-Disposition: attachment; filename="empty.xml"\r\n\r\n'
+            b"<feedback><policy_published /></feedback>"
+        ),
+    ],
+)
+def test_rejects_messages_without_valid_dmarc_attachment(message: bytes) -> None:
+    with pytest.raises(HTTPException) as exc_info:
+        router._dmarc_attachment(message)
+
+    assert exc_info.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_dmarc_ingestion_maps_domain_and_persists(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(router, "get_settings", lambda: _settings(tmp_path))
+
+    async def query(sql: str, _params: tuple = ()) -> list[dict]:
+        if "FROM cloudflare_integration" in sql:
+            return [{"workspace_id": WORKSPACE_ID}]
+        return []
+
+    persisted: list[tuple[str, str, bytes]] = []
+
+    async def persist(workspace_id: str, domain: str, payload: bytes) -> dict[str, str | int]:
+        persisted.append((workspace_id, domain, payload))
+        return {"status": "imported", "record_count": 1}
+
+    monkeypatch.setattr(router, "auth_query", query)
+    monkeypatch.setattr(router, "persist_dmarc_report", persist)
+
+    result = await router.ingest_dmarc_email(
+        _request(_dmarc_message()),
+        "worker-secret",
+    )
+
+    assert result == {"status": "imported", "record_count": 1}
+    assert persisted[0][:2] == (WORKSPACE_ID, "example.test")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("key", "message", "max_bytes", "expected_status"),
+    [
+        (None, b"message", 1024, 401),
+        ("worker-secret", b"", 1024, 400),
+        ("worker-secret", b"too large", 2, 413),
+    ],
+)
+async def test_dmarc_ingestion_rejects_invalid_requests(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    key: str | None,
+    message: bytes,
+    max_bytes: int,
+    expected_status: int,
+) -> None:
+    settings = _settings(tmp_path)
+    settings.reported_email_max_message_bytes = max_bytes
+    monkeypatch.setattr(router, "get_settings", lambda: settings)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await router.ingest_dmarc_email(_request(message), key)
+
+    assert exc_info.value.status_code == expected_status
+
+
+@pytest.mark.asyncio
+async def test_dmarc_ingestion_rejects_unknown_domain(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(router, "get_settings", lambda: _settings(tmp_path))
+
+    async def query(_sql: str, _params: tuple = ()) -> list[dict]:
+        return []
+
+    monkeypatch.setattr(router, "auth_query", query)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await router.ingest_dmarc_email(_request(_dmarc_message()), "worker-secret")
+
+    assert exc_info.value.status_code == 404

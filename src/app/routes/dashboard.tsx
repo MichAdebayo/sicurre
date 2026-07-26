@@ -223,6 +223,8 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
         subject: alertItem.subject || t("threats.no_subject"),
         sender: alertItem.sender,
         content: alertItem.body_preview || "",
+        privacyReference: alertItem.privacy_reference,
+        contentRedacted: alertItem.content_redacted,
         verdict: alertItem.verdict,
         confidence: alertItem.confidence,
       }))
@@ -239,7 +241,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
   if (session.is_platform_admin) {
     return (
       <MotionDiv
-        initial={{ opacity: 0, y: 12 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -12 }}
         transition={{ duration: 0.3 }}
@@ -382,7 +384,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
   // General tenant dashboard
   return (
     <MotionDiv
-      initial={{ opacity: 0, y: 12 }}
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.3 }}
@@ -650,7 +652,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
           {/* Expanded full-width Recent Emails Scanned live feed */}
           <div className="grid grid-cols-1 gap-6">
             <div className="bg-white rounded-xl border border-border-subtle p-6 shadow-sm">
-              <div className="flex items-center justify-between mb-5 pb-4 border-b border-border-subtle">
+              <div className="flex flex-col gap-3 border-b border-border-subtle pb-4 mb-5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2.5">
                   {/* Live pulsing green node blinker when active, static amber when suspended */}
                   {hasActiveDomain ? (
@@ -692,26 +694,22 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                   {recentAlerts.map((alert) => (
                     <div
                       key={alert.id}
-                      className="p-4 rounded-xl border border-border-subtle bg-surface-low/30 hover:bg-surface-low/60 transition-colors flex items-center justify-between gap-4"
+                      className="flex flex-col gap-3 rounded-lg border border-border-subtle bg-surface-low/30 p-4 transition-colors hover:bg-surface-low/60 sm:flex-row sm:items-center sm:justify-between"
                     >
-                      {/* Left/Middle Content */}
-                      <div className="flex-1 min-w-0 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-[11px] text-on-surface-variant font-medium">{alert.time}</span>
-                          <span className="text-xs font-bold text-on-surface truncate max-w-[200px]" title={alert.sender}>
-                            {alert.verdict !== "phishing" && alert.verdict !== "quarantine" ? "[Masqué par Sicurre]" : alert.sender}
-                          </span>
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <span className="font-mono text-[12px] font-medium text-on-surface-variant">{alert.time}</span>
+                        <div className="min-w-0">
+                          <h4 className="truncate text-sm font-semibold text-on-surface">
+                            {alert.contentRedacted ? `E-mail traité #${alert.privacyReference.replace("MSG-", "")}` : alert.subject}
+                          </h4>
+                          <p className="mt-0.5 truncate text-[12px] text-on-surface-variant">
+                            {alert.contentRedacted ? "Contenu supprimé après analyse" : alert.sender}
+                          </p>
                         </div>
-                        <h4 className="font-bold text-sm text-on-surface truncate">
-                          {alert.verdict !== "phishing" && alert.verdict !== "quarantine" ? "[Masqué par Sicurre]" : alert.subject}
-                        </h4>
-                        <p className="text-[12px] text-on-surface-variant font-medium truncate max-w-3xl">
-                          {alert.verdict !== "phishing" && alert.verdict !== "quarantine" ? "[Masqué par Sicurre]" : alert.content}
-                        </p>
                       </div>
 
                       {/* Right Classification Badge */}
-                      <div className="shrink-0 pl-2">
+                      <div className="shrink-0 sm:pl-2">
                         <VerdictBadge
                           verdict={alert.verdict}
                           confidence={alert.confidence}

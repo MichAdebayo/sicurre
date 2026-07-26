@@ -10,6 +10,7 @@ from starlette.requests import Request
 
 from core.config import Settings
 from core.security import (
+    AuthenticatedPrincipal,
     _principal_from_better_auth_payload,
     _validate_with_better_auth,
     extract_bearer_token,
@@ -17,6 +18,7 @@ from core.security import (
     require_authenticated_principal,
     require_internal_key,
 )
+from data_platform.api import auth as app_auth
 
 TEST_SECRET_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
@@ -67,6 +69,38 @@ def test_principal_parses_supported_better_auth_payloads(
 
 def test_principal_rejects_payload_without_identity() -> None:
     assert _principal_from_better_auth_payload({"session": {}}) is None
+
+
+@pytest.mark.asyncio
+async def test_workspace_bootstrap_accepts_validated_external_auth_user() -> None:
+    """Local auth storage does not need to be duplicated in the app database."""
+    principal = AuthenticatedPrincipal(
+        subject="auth-user-1",
+        email="owner@example.test",
+        display_name="Owner",
+        auth_provider="better-auth",
+    )
+
+    user = await app_auth._get_better_auth_user(principal)
+
+    assert user == {
+        "id": "auth-user-1",
+        "name": "Owner",
+        "email": "owner@example.test",
+    }
+
+
+@pytest.mark.asyncio
+async def test_workspace_bootstrap_rejects_principal_without_email() -> None:
+    principal = AuthenticatedPrincipal(
+        subject="auth-user-1",
+        auth_provider="better-auth",
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await app_auth._get_better_auth_user(principal)
+
+    assert exc_info.value.status_code == 401
 
 
 @pytest.mark.asyncio
