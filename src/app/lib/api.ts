@@ -83,6 +83,8 @@ export interface ThreatLog {
   received_at: string;
   latency_ms?: number;
   explanation?: string;
+  privacy_reference: string;
+  content_redacted: boolean;
 }
 
 export interface FeedbackPayload {
@@ -423,6 +425,14 @@ export function useThreatLogs() {
   });
 }
 
+export function useReportAddress() {
+  return useQuery<{ address: string }>({
+    queryKey: ["feedback-report-address"],
+    queryFn: () => fetchJson<{ address: string }>("/feedback/report-address"),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useUpdateThreatStatus() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -450,14 +460,6 @@ export function useCreateFeedback() {
       queryClient.invalidateQueries({ queryKey: ["threats"] });
       queryClient.invalidateQueries({ queryKey: ["kpis"] });
     },
-  });
-}
-
-export function useReportAddress() {
-  return useQuery<{ address: string }>({
-    queryKey: ["feedback-report-address"],
-    queryFn: () => fetchJson<{ address: string }>("/feedback/report-address"),
-    retry: false,
   });
 }
 

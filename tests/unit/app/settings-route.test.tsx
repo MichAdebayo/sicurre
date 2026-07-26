@@ -81,11 +81,11 @@ describe("connected domain recovery", () => {
       />,
     );
 
-    expect(screen.getByText(/Relancez la configuration de vinse\.app/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Réessayer la configuration de vinse\.app/ })).toBeInTheDocument();
+    expect(screen.getByText("settings.onboarding_retry")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "settings.retry_domain" })).toBeInTheDocument();
     expect(screen.getByText("settings.add_another_domain")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Réessayer la configuration de vinse\.app/ }));
+    fireEvent.click(screen.getByRole("button", { name: "settings.retry_domain" }));
 
     await waitFor(() => expect(mocks.retrySetup).toHaveBeenCalledWith({
       zone_name: "vinse.app",

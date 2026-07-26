@@ -332,6 +332,8 @@ async def get_threats(current_user: AuthUser = Depends(get_current_user)):
             {
                 "id": row["id"],
                 "message_id": row["message_id"],
+                "privacy_reference": f"MSG-{str(row['id']).replace('-', '')[:8].upper()}",
+                "content_redacted": is_anonymized,
                 "subject": "[Masqué par Sicurre]" if is_anonymized else row["subject"],
                 "sender": "[Masqué par Sicurre]" if is_anonymized else row["sender"],
                 "body_preview": "[Masqué par Sicurre]" if is_anonymized else row["body_preview"],
@@ -382,6 +384,8 @@ async def update_threat_status(
         return {
             "id": row["id"],
             "message_id": row["message_id"],
+            "privacy_reference": f"MSG-{str(row['id']).replace('-', '')[:8].upper()}",
+            "content_redacted": is_anonymized,
             "subject": "[Masqué par Sicurre]" if is_anonymized else row["subject"],
             "sender": "[Masqué par Sicurre]" if is_anonymized else row["sender"],
             "body_preview": "[Masqué par Sicurre]" if is_anonymized else row["body_preview"],
@@ -1542,9 +1546,7 @@ def _get_ssl_expiry_days(domain: str) -> int:
     return -1
 
 
-def _classify_blocklist_response(
-    provider: str, addresses: list[str]
-) -> tuple[bool, str | None]:
+def _classify_blocklist_response(provider: str, addresses: list[str]) -> tuple[bool, str | None]:
     """Distinguish a real listing from a DNSBL access/error response."""
     parsed = []
     for address in addresses:
@@ -1574,9 +1576,7 @@ async def _check_domain_blacklists(domain: str) -> tuple[list[str], list[str]]:
         try:
             query_host = f"{domain}.{rbl}"
             answers = await asyncio.to_thread(dns.resolver.resolve, query_host, "A")
-            listed, error = _classify_blocklist_response(
-                name, [str(answer) for answer in answers]
-            )
+            listed, error = _classify_blocklist_response(name, [str(answer) for answer in answers])
             if listed:
                 listed_on.append(name)
             elif error:
@@ -1604,6 +1604,13 @@ async def check_domain_shield_status(
         if cached_rows:
             row = cached_rows[0]
             score = int(row["reputation_score"])
+            cached_ssl_days = int(row["ssl_days_remaining"])
+            with suppress(TypeError, ValueError):
+                updated_at = datetime.fromisoformat(str(row["updated_at"]).rstrip("Z"))
+                if updated_at.tzinfo is None:
+                    updated_at = updated_at.replace(tzinfo=timezone.utc)
+                elapsed_days = max(0, (datetime.now(timezone.utc) - updated_at).days)
+                cached_ssl_days = max(0, cached_ssl_days - elapsed_days)
             if blacklists_listed:
                 score = max(30, score - 30 * len(blacklists_listed))
 
@@ -1638,8 +1645,8 @@ async def check_domain_shield_status(
                     "error": None if row["dmarc_valid"] else "Not configured",
                 },
                 "ssl": {
-                    "valid": bool(row["ssl_valid"]),
-                    "days_remaining": int(row["ssl_days_remaining"]),
+                    "valid": bool(row["ssl_valid"]) and cached_ssl_days > 0,
+                    "days_remaining": cached_ssl_days,
                     "auto_renew": True,
                     "error": None,
                 },
@@ -1808,10 +1815,10 @@ async def check_domain_shield_status(
         status["ssl"]["auto_renew"] = True
         status["ssl"]["error"] = None
     else:
-        status["ssl"]["valid"] = True
-        status["ssl"]["days_remaining"] = 85
-        status["ssl"]["auto_renew"] = True
-        status["ssl"]["error"] = None
+        status["ssl"]["valid"] = False
+        status["ssl"]["days_remaining"] = 0
+        status["ssl"]["auto_renew"] = False
+        status["ssl"]["error"] = "Unable to inspect the public certificate"
 
     if blacklists_listed:
         status["reputation_score"] -= 30 * len(blacklists_listed)
@@ -2014,7 +2021,21 @@ async def import_dmarc_report(
 ):
     await _require_workspace_domain(domain, current_user.workspace_id)
     _ensure_app_runtime_tables()
-    xml_payload = _extract_dmarc_xml_payload(await request.body())
+    return await persist_dmarc_report(
+        current_user.workspace_id,
+        domain,
+        await request.body(),
+    )
+
+
+async def persist_dmarc_report(
+    workspace_id: str,
+    domain: str,
+    payload: bytes,
+) -> dict[str, str | int]:
+    """Persist one aggregate DMARC report with fingerprint idempotency."""
+    _ensure_app_runtime_tables()
+    xml_payload = _extract_dmarc_xml_payload(payload)
     records = _parse_dmarc_report(xml_payload, domain)
     now = datetime.now(timezone.utc).isoformat()
     imported_count = 0
@@ -2033,7 +2054,7 @@ async def import_dmarc_report(
             """,
             (
                 str(uuid.uuid4()),
-                current_user.workspace_id,
+                workspace_id,
                 domain,
                 record["report_org"],
                 record["report_id"],
