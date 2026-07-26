@@ -31,8 +31,6 @@ interface SidebarProps {
   onPageChange: (page: SidebarPage) => void;
   onLogout: () => void;
   onLockdown?: () => void;
-  userName?: string;
-  userEmail?: string;
   userRole?: string;
   onboardingRequired?: boolean;
   className?: string;
@@ -43,8 +41,6 @@ export function Sidebar({
   onPageChange,
   onLogout,
   onLockdown,
-  userName = "Utilisateur",
-  userEmail = "",
   userRole = "owner",
   onboardingRequired = false,
   className,
@@ -162,27 +158,14 @@ export function Sidebar({
           </button>
         )}
 
-        {/* User Profile */}
-        <div className="flex items-center justify-between p-2.5 rounded-lg bg-surface-low/70 border border-border-subtle/50 dark:bg-surface">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-full bg-primary/[0.08] text-primary flex items-center justify-center font-display font-bold text-[12px] shrink-0">
-              {userName.substring(0, 2).toUpperCase()}
-            </div>
-            <div className="flex flex-col min-w-0">
-              <span className="text-[13px] font-bold text-on-surface truncate leading-tight">
-                {userName}
-              </span>
-              <span className="text-[10px] text-on-surface-variant/60 truncate leading-tight">
-                {userEmail}
-              </span>
-            </div>
-          </div>
+        <div className="border-t border-border-subtle pt-3">
           <button
+            type="button"
             onClick={onLogout}
-            title={t("common.logout")}
-            className="p-1.5 rounded-md text-on-surface-variant/50 hover:bg-surface-container hover:text-error transition-colors cursor-pointer"
+            className="flex w-full cursor-pointer items-center gap-3 rounded-lg px-3.5 py-2.5 text-[13px] font-semibold text-on-surface-variant transition-colors hover:bg-error/5 hover:text-error"
           >
-            <LogOut className="w-4 h-4 stroke-[1.5]" />
+            <LogOut className="h-[18px] w-[18px] stroke-[1.5]" />
+            <span>{t("common.logout")}</span>
           </button>
         </div>
       </div>
