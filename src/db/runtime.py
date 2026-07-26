@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from functools import lru_cache
+from threading import Lock
 from typing import Any
 
 from sqlalchemy import create_engine, text
@@ -12,6 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from core.config import get_settings
 from core.database import Base
 from db.models import app_runtime  # noqa: F401
+
+_runtime_table_lock = Lock()
+_initialized_runtime_urls: set[str] = set()
 
 
 def _bind_qmark_parameters(sql: str, params: Sequence[Any]) -> tuple[str, dict[str, Any]]:
@@ -47,11 +51,16 @@ def ensure_local_runtime_tables() -> None:
     settings = get_settings()
     if settings.environment.strip().lower() == "production":
         return
-    engine = create_engine(settings.sync_database_url)
-    try:
-        Base.metadata.create_all(engine)
-    finally:
-        engine.dispose()
+    database_url = settings.sync_database_url
+    with _runtime_table_lock:
+        if database_url in _initialized_runtime_urls:
+            return
+        engine = create_engine(database_url)
+        try:
+            Base.metadata.create_all(engine)
+        finally:
+            engine.dispose()
+        _initialized_runtime_urls.add(database_url)
 
 
 async def execute_runtime_query(

@@ -1,5 +1,6 @@
 import { ShieldCheck, ShieldAlert, MailWarning } from "lucide-react";
 import { clsx } from "clsx";
+import { useTranslation } from "react-i18next";
 
 interface VerdictBadgeProps {
   verdict: "phishing" | "spam" | "legitimate" | "quarantine";
@@ -8,21 +9,24 @@ interface VerdictBadgeProps {
 }
 
 export function VerdictBadge({ verdict, confidence, showRisk = true }: VerdictBadgeProps) {
+  const { t } = useTranslation();
   let badgeStyles = "bg-safe-bg text-safe border-safe/20";
   let Icon = ShieldCheck;
-  let label = "Légitime";
+  let label = t("threats.badge_legitimate");
 
   if (verdict === "phishing" || verdict === "quarantine") {
     badgeStyles = "bg-error/10 text-error border-error/20";
     Icon = ShieldAlert;
-    label = "Phishing";
+    label = t("threats.badge_phishing");
   } else if (verdict === "spam") {
-    badgeStyles = "bg-warning-bg text-warning border-warning/20";
+    badgeStyles = "bg-warning-bg text-spam-text border-warning/20";
     Icon = MailWarning;
-    label = "Spam";
+    label = t("threats.badge_spam");
   }
 
-  const formattedRisk = `Risque ${Math.round(confidence * 100)} %`;
+  const formattedRisk = t("threats.risk_value", {
+    value: Math.round(confidence * 100),
+  });
 
   return (
     <div
