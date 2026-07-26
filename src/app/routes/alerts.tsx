@@ -64,7 +64,7 @@ interface AlertsRouteProps {
 }
 
 export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
 
   // Queries & Mutations
   const {
@@ -233,9 +233,7 @@ export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
                       {t("alerts.notify_phishing")}
                     </span>
                     <p className="mt-1 text-sm text-on-surface-variant">
-                      {i18n.language === "fr"
-                        ? "Envoie un e-mail lorsqu’une menace est placée en quarantaine."
-                        : "Sends an email when a threat is placed in quarantine."}
+                      {t("alerts.notify_phishing_desc")}
                     </p>
                   </div>
                 </label>
@@ -332,15 +330,13 @@ export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
                   <div className="relative group">
                     <HelpCircle className="h-3.5 w-3.5 cursor-help text-on-surface-variant/60" />
                     <div className="absolute bottom-full left-1/2 z-40 mb-2 w-56 -translate-x-1/2 rounded-lg border border-border-subtle bg-surface-lowest p-2.5 text-[12px] font-semibold leading-5 text-on-surface-variant opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                      {i18n.language === "fr"
-                        ? "Saisissez une adresse complète ou un domaine, par exemple client@entreprise.fr ou entreprise.fr."
-                        : "Enter a full email address or a domain, for example client@company.com or company.com."}
+                      {t("alerts.pattern_help")}
                     </div>
                   </div>
                 </div>
                 <Input
                   type="text"
-                  placeholder={i18n.language === "fr" ? "client@entreprise.fr ou entreprise.fr" : "client@company.com or company.com"}
+                  placeholder={t("alerts.pattern_placeholder")}
                   value={rulePattern}
                   onChange={(e) => setRulePattern(e.target.value)}
                   className="bg-white"
@@ -375,8 +371,8 @@ export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${rule.rule_type === "whitelist" ? "bg-safe/10 text-safe" : "bg-error/10 text-error"
                           }`}>
                           {rule.rule_type === "whitelist"
-                            ? (i18n.language === "fr" ? "Autoriser" : "Allow")
-                            : (i18n.language === "fr" ? "Bloquer" : "Block")}
+                            ? t("alerts.allow")
+                            : t("alerts.block")}
                         </span>
                         <span className="text-sm font-semibold text-on-surface select-all">
                           {rule.pattern}
@@ -465,13 +461,11 @@ export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
                 <AlertCircle className="w-5 h-5" />
               </div>
               <h4 className="font-display font-bold text-base text-on-surface">
-                {i18n.language === "fr" ? "Confirmer la suppression" : "Confirm Deletion"}
+                {t("alerts.confirm_delete")}
               </h4>
             </div>
             <p className="text-xs font-semibold text-on-surface-variant leading-relaxed">
-              {i18n.language === "fr"
-                ? "Êtes-vous sûr de vouloir supprimer cette adresse mail/domaine?"
-                : "Are you sure you want to delete this email/domain?"}
+              {t("alerts.confirm_delete_desc")}
             </p>
             <div className="flex justify-end gap-2.5 pt-2">
               <Button
@@ -480,7 +474,7 @@ export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
                 onClick={() => setConfirmDeleteId(null)}
                 className="font-bold text-xs"
               >
-                {i18n.language === "fr" ? "Annuler" : "Cancel"}
+                {t("common.cancel")}
               </Button>
               <Button
                 variant="danger"
@@ -497,7 +491,7 @@ export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
                 }}
                 className="font-bold text-xs"
               >
-                {i18n.language === "fr" ? "Supprimer" : "Delete"}
+                {t("alerts.delete")}
               </Button>
             </div>
           </MotionDiv>

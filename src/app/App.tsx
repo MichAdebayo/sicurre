@@ -12,6 +12,7 @@ import {
   resolveAuthorizedPage,
   sidebarPagePaths,
 } from "./lib/navigation";
+import { useTranslation } from "react-i18next";
 
 const LandingRoute = lazy(() => import("./routes/landing"));
 const LoginRoute = lazy(() => import("./routes/login"));
@@ -81,17 +82,19 @@ const getInitialViewState = (): ViewState => {
 };
 
 function RouteFallback() {
+  const { t } = useTranslation();
   return (
     <div className="min-h-screen w-screen flex items-center justify-center bg-surface-low text-on-surface">
-      <div className="text-sm font-semibold">Chargement…</div>
+      <div className="text-sm font-semibold">{t("common.loading")}</div>
     </div>
   );
 }
 
 function PageRouteFallback() {
+  const { t } = useTranslation();
   return (
     <div className="flex min-h-48 items-center justify-center text-sm font-semibold text-on-surface-variant">
-      Chargement…
+      {t("common.loading")}
     </div>
   );
 }

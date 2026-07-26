@@ -407,12 +407,10 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
             </div>
             <div>
               <h3 className="font-bold text-sm text-on-surface">
-                {i18n.language === "fr" ? "Surveillance en temps réel suspendue" : "Real-time monitoring suspended"}
+                {t("dashboard.monitoring_suspended")}
               </h3>
               <p className="text-xs text-on-surface-variant mt-0.5 font-medium leading-relaxed">
-                {i18n.language === "fr"
-                  ? "Votre domaine a été déconnecté. Vos données historiques sont conservées ci-dessous, mais aucun nouvel email n'est actuellement intercepté."
-                  : "Your domain is disconnected. Your historical scan logs are preserved below, but no incoming emails are currently intercepted."}
+                {t("dashboard.monitoring_suspended_desc")}
               </p>
             </div>
           </div>
@@ -421,7 +419,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
             size="sm"
             className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shrink-0 cursor-pointer h-9 px-4 rounded-lg shadow-sm"
           >
-            {i18n.language === "fr" ? "Reconnecter mon domaine" : "Reconnect Domain"}
+            {t("dashboard.reconnect_domain")}
           </Button>
         </div>
       )}
@@ -434,12 +432,10 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
             </div>
             <div>
               <h3 className="font-bold text-sm text-on-surface">
-                {i18n.language === "fr" ? "Bienvenue sur Sicurre ! Protégez votre domaine" : "Welcome to Sicurre! Protect your domain"}
+                {t("dashboard.onboarding_title")}
               </h3>
               <p className="text-xs text-on-surface-variant mt-0.5 font-medium leading-relaxed">
-                {i18n.language === "fr"
-                  ? "Connectez votre domaine via Cloudflare pour activer l'interception automatique et sécuriser vos e-mails."
-                  : "Connect your domain via Cloudflare to enable automatic interception and secure your email gateway."}
+                {t("dashboard.onboarding_desc")}
               </p>
             </div>
           </div>
@@ -448,7 +444,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
             size="sm"
             className="bg-primary hover:bg-primary/90 text-on-primary font-bold text-xs shrink-0 cursor-pointer h-9 px-4 rounded-lg shadow-sm"
           >
-            {i18n.language === "fr" ? "Connecter mon domaine" : "Connect Domain"}
+            {t("dashboard.connect_domain")}
           </Button>
         </div>
       )}
@@ -465,8 +461,8 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
             {/* Tooltip trigger with high z-index and border styling */}
             <div className="relative group">
               <Info className="w-3.5 h-3.5 text-on-surface-variant/50 cursor-help hover:text-primary transition-colors" />
-              <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-44 bg-white border border-border-subtle text-on-surface text-[10px] p-2.5 rounded-xl shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 z-50 normal-case leading-normal font-sans text-center font-bold">
-                Overall status of your email gateway
+              <div className="absolute bottom-full right-0 z-50 mb-2 w-44 max-w-[calc(100vw-3rem)] rounded-xl border border-border-subtle bg-white p-2.5 text-center font-sans text-[10px] font-bold normal-case leading-normal text-on-surface opacity-0 shadow-xl transition-opacity duration-200 pointer-events-none group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
+                {t("dashboard.security_score_desc")}
               </div>
             </div>
           </div>
@@ -496,7 +492,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                   {t("dashboard.verdict_distribution")}
                 </h3>
                 <p className="text-[13px] text-on-surface-variant font-medium leading-5">
-                  {i18n.language === "fr" ? "Répartition des emails par classification IA" : "Distribution of emails by AI safety classification"}
+                  {t("dashboard.verdict_distribution_desc")}
                 </p>
               </div>
             </div>
@@ -513,12 +509,12 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
         {/* Trend Analysis chart trend (Height Increased, Title renamed, light-adapted tooltip breakdown only) */}
         <div className="lg:col-span-7 bg-white rounded-xl border border-border-subtle p-6 shadow-sm flex flex-col justify-between relative min-h-[350px]">
           <div>
-            <div className="flex items-center justify-between pb-4 border-b border-border-subtle mb-4">
+            <div className="mb-4 flex flex-col items-start gap-3 border-b border-border-subtle pb-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-primary" />
                 <div>
                   <h3 className="font-display font-semibold text-[17px] text-on-surface">
-                    {i18n.language === "fr" ? "Analyse des Tendances" : "Trend Analysis"}
+                    {t("dashboard.trend_analysis")}
                   </h3>
                   <p className="text-[13px] text-on-surface-variant font-medium leading-5">
                     {t("dashboard.scans_over_time")}
@@ -527,7 +523,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
               </div>
 
               {/* Range Switcher */}
-              <div className="flex gap-1 bg-surface-low p-1 rounded-lg">
+              <div className="flex w-full gap-1 rounded-lg bg-surface-low p-1 sm:w-auto">
                 {(["7d", "30d", "12m"] as const).map((r) => (
                   <button
                     key={r}
@@ -535,16 +531,12 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                       setDateRange(r);
                       setHoveredBarIndex(null);
                     }}
-                    className={`px-2.5 py-1 text-[12px] font-bold rounded transition-all cursor-pointer ${dateRange === r
+                    className={`flex-1 rounded px-2.5 py-1 text-[12px] font-bold transition-all cursor-pointer sm:flex-none ${dateRange === r
                         ? "bg-white text-primary shadow-sm"
                         : "text-on-surface-variant hover:text-on-surface"
                       }`}
                   >
-                    {r === "7d"
-                      ? (i18n.language === "fr" ? "7 Jours" : "7 Days")
-                      : r === "30d"
-                        ? (i18n.language === "fr" ? "30 Jours" : "30 Days")
-                        : (i18n.language === "fr" ? "12 Mois" : "12 Months")}
+                    {t(`dashboard.range_${r}`)}
                   </button>
                 ))}
               </div>
@@ -664,15 +656,15 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
               )}
               {/* Text size increased to match Live Feed titles */}
               <h3 className="font-display font-bold text-[19px] text-on-surface">
-                {i18n.language === "fr" ? "Emails Récemment Scannés" : "Recent Emails Scanned"}
+                {t("dashboard.recent_scans")}
               </h3>
             </div>
             <div className={`inline-flex items-center gap-2 text-[12px] font-bold ${hasActiveDomain ? "text-primary" : "text-amber-600"}`}>
               <Mail className="w-4 h-4" />
               <span>
                 {hasActiveDomain
-                  ? (i18n.language === "fr" ? "Flux Live" : "Recent Scans")
-                  : (i18n.language === "fr" ? "Interception Suspendue" : "Interception Suspended")}
+                  ? t("dashboard.live_feed")
+                  : t("dashboard.interception_suspended")}
               </span>
             </div>
           </div>
@@ -697,10 +689,14 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                     <span className="font-mono text-[12px] font-medium text-on-surface-variant">{alert.time}</span>
                     <div className="min-w-0">
                       <h4 className="truncate text-sm font-semibold text-on-surface">
-                        {alert.contentRedacted ? `E-mail traité #${alert.privacyReference.replace("MSG-", "")}` : alert.subject}
+                        {alert.contentRedacted
+                          ? t("threats.processed_reference", {
+                              reference: alert.privacyReference.replace("MSG-", ""),
+                            })
+                          : alert.subject}
                       </h4>
                       <p className="mt-0.5 truncate text-[12px] text-on-surface-variant">
-                        {alert.contentRedacted ? "Contenu supprimé après analyse" : alert.sender}
+                        {alert.contentRedacted ? t("threats.content_discarded") : alert.sender}
                       </p>
                     </div>
                   </div>
