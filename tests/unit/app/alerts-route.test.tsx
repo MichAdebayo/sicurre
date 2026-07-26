@@ -65,7 +65,7 @@ afterEach(() => {
 describe("alerts route", () => {
   it("preserves the loaded spam preference when another preference is saved", async () => {
     mocks.updatePreferences.mockResolvedValue({ status: "saved" });
-    render(<AlertsRoute />);
+    render(<AlertsRoute mode="settings" />);
 
     expect(screen.queryByRole("checkbox", { name: /alerts.notify_spam/i })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "alerts.save_preferences" }));
@@ -81,15 +81,17 @@ describe("alerts route", () => {
     mocks.queryState.preferencesFailed = true;
     mocks.queryState.rulesFailed = true;
     mocks.queryState.historyFailed = true;
-    render(<AlertsRoute />);
+    const { rerender } = render(<AlertsRoute />);
 
-    expect(screen.getAllByRole("alert")).toHaveLength(3);
-    const retryButtons = screen.getAllByRole("button", { name: "common.retry" });
-    expect(retryButtons).toHaveLength(3);
-    retryButtons.forEach((button) => fireEvent.click(button));
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "common.retry" }));
+    expect(mocks.retryHistory).toHaveBeenCalledOnce();
+
+    rerender(<AlertsRoute mode="settings" />);
+    expect(screen.getAllByRole("alert")).toHaveLength(2);
+    screen.getAllByRole("button", { name: "common.retry" }).forEach((button) => fireEvent.click(button));
     expect(mocks.retryPreferences).toHaveBeenCalledOnce();
     expect(mocks.retryRules).toHaveBeenCalledOnce();
-    expect(mocks.retryHistory).toHaveBeenCalledOnce();
     expect(screen.queryByText("alerts.no_rules")).not.toBeInTheDocument();
     expect(screen.queryByText("alerts.no_history")).not.toBeInTheDocument();
   });

@@ -59,8 +59,12 @@ function QueryFailure({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-export default function AlertsRoute() {
-  const { t, i18n } = useTranslation();
+interface AlertsRouteProps {
+  mode?: "history" | "settings";
+}
+
+export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
+  const { t } = useTranslation();
 
   // Queries & Mutations
   const {
@@ -167,7 +171,7 @@ export default function AlertsRoute() {
 
   return (
     <MotionDiv
-      initial={{ opacity: 0, y: 12 }}
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.3 }}
@@ -189,8 +193,7 @@ export default function AlertsRoute() {
         }}
       />
 
-      {/* Header */}
-      <div className="pb-6 border-b border-border-subtle">
+      {mode === "history" && <div className="pb-6 border-b border-border-subtle">
         <div>
           <h1 className="app-h1">
             {t("alerts.title")}
@@ -199,11 +202,11 @@ export default function AlertsRoute() {
             {t("alerts.subtitle")}
           </p>
         </div>
-      </div>
+      </div>}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <div className={mode === "settings" ? "space-y-6" : "space-y-4"}>
         {/* Left Hand: Preference Controls */}
-        <div className="lg:col-span-7 space-y-6">
+        {mode === "settings" && <div className="space-y-6">
           {/* Email Notification Toggles */}
           <form onSubmit={handleSavePrefs} className="bg-white rounded-xl border border-border-subtle p-6 space-y-6 shadow-sm">
             <div className="pb-4 border-b border-border-subtle">
@@ -230,9 +233,7 @@ export default function AlertsRoute() {
                       {t("alerts.notify_phishing")}
                     </span>
                     <p className="mt-1 text-sm text-on-surface-variant">
-                      {i18n.language === "fr"
-                        ? "Envoie un e-mail lorsqu’une menace est placée en quarantaine."
-                        : "Sends an email when a threat is placed in quarantine."}
+                      {t("alerts.notify_phishing_desc")}
                     </p>
                   </div>
                 </label>
@@ -329,15 +330,13 @@ export default function AlertsRoute() {
                   <div className="relative group">
                     <HelpCircle className="h-3.5 w-3.5 cursor-help text-on-surface-variant/60" />
                     <div className="absolute bottom-full left-1/2 z-40 mb-2 w-56 -translate-x-1/2 rounded-lg border border-border-subtle bg-surface-lowest p-2.5 text-[12px] font-semibold leading-5 text-on-surface-variant opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                      {i18n.language === "fr"
-                        ? "Saisissez une adresse complète ou un domaine, par exemple client@entreprise.fr ou entreprise.fr."
-                        : "Enter a full email address or a domain, for example client@company.com or company.com."}
+                      {t("alerts.pattern_help")}
                     </div>
                   </div>
                 </div>
                 <Input
                   type="text"
-                  placeholder={i18n.language === "fr" ? "client@entreprise.fr ou entreprise.fr" : "client@company.com or company.com"}
+                  placeholder={t("alerts.pattern_placeholder")}
                   value={rulePattern}
                   onChange={(e) => setRulePattern(e.target.value)}
                   className="bg-white"
@@ -372,8 +371,8 @@ export default function AlertsRoute() {
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${rule.rule_type === "whitelist" ? "bg-safe/10 text-safe" : "bg-error/10 text-error"
                           }`}>
                           {rule.rule_type === "whitelist"
-                            ? (i18n.language === "fr" ? "Autoriser" : "Allow")
-                            : (i18n.language === "fr" ? "Bloquer" : "Block")}
+                            ? t("alerts.allow")
+                            : t("alerts.block")}
                         </span>
                         <span className="text-sm font-semibold text-on-surface select-all">
                           {rule.pattern}
@@ -395,16 +394,10 @@ export default function AlertsRoute() {
               )}
             </div>
           </div>
-        </div>
+        </div>}
 
         {/* Right Hand: Alert History Log */}
-        <div className="lg:col-span-5 space-y-4">
-          <div className="pb-4 border-b border-border-subtle">
-            <h3 className="font-display font-semibold text-[17px] text-on-surface">
-              {t("alerts.section_history")}
-            </h3>
-          </div>
-
+        {mode === "history" && <div className="space-y-4">
           {historyLoading ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
@@ -419,7 +412,7 @@ export default function AlertsRoute() {
               <p>{t("alerts.no_history")}</p>
             </div>
           ) : (
-            <div className="max-h-[600px] overflow-y-auto border-y border-border-subtle">
+            <div className="max-h-[600px] overflow-y-auto border-b border-border-subtle">
               {history.map((alert) => {
                 const tone = getHistoryTone(alert.title, alert.message);
                 return (
@@ -450,11 +443,11 @@ export default function AlertsRoute() {
               })}
             </div>
           )}
-        </div>
+        </div>}
       </div>
 
       {/* Theme-Aware Confirmation Modal Overlay for Rule Deletion */}
-      {confirmDeleteId && (
+      {mode === "settings" && confirmDeleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm select-none p-4">
           <MotionDiv
             initial={{ opacity: 0, scale: 0.95 }}
@@ -468,13 +461,11 @@ export default function AlertsRoute() {
                 <AlertCircle className="w-5 h-5" />
               </div>
               <h4 className="font-display font-bold text-base text-on-surface">
-                {i18n.language === "fr" ? "Confirmer la suppression" : "Confirm Deletion"}
+                {t("alerts.confirm_delete")}
               </h4>
             </div>
             <p className="text-xs font-semibold text-on-surface-variant leading-relaxed">
-              {i18n.language === "fr"
-                ? "Êtes-vous sûr de vouloir supprimer cette adresse mail/domaine?"
-                : "Are you sure you want to delete this email/domain?"}
+              {t("alerts.confirm_delete_desc")}
             </p>
             <div className="flex justify-end gap-2.5 pt-2">
               <Button
@@ -483,7 +474,7 @@ export default function AlertsRoute() {
                 onClick={() => setConfirmDeleteId(null)}
                 className="font-bold text-xs"
               >
-                {i18n.language === "fr" ? "Annuler" : "Cancel"}
+                {t("common.cancel")}
               </Button>
               <Button
                 variant="danger"
@@ -500,7 +491,7 @@ export default function AlertsRoute() {
                 }}
                 className="font-bold text-xs"
               >
-                {i18n.language === "fr" ? "Supprimer" : "Delete"}
+                {t("alerts.delete")}
               </Button>
             </div>
           </MotionDiv>

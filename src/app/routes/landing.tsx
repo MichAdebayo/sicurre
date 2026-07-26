@@ -70,6 +70,7 @@ function LanguageSwitcher({ scrolled }: { scrolled: boolean }) {
   const changeLanguage = (lang: string) => {
     i18n.changeLanguage(lang);
     localStorage.setItem("sicurre_lang", lang);
+    document.documentElement.lang = lang;
     setIsOpen(false);
   };
 
@@ -232,13 +233,13 @@ export default function LandingRoute({
           <div className="flex items-center justify-between text-white font-medium">
             <span className="flex items-center gap-1.5 text-white/90">
               <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-              Verdict: Phishing
+              {t("landing.preview_verdict")}
             </span>
             <span className="px-2.5 py-0.5 rounded-md bg-rose-500/20 text-rose-300 font-semibold border border-rose-500/30 text-[12px]">
-              Score 0.98
+              {t("landing.preview_score")}
             </span>
           </div>
-          <div className="text-[12px] text-slate-400">Action: Retenu en quarantaine</div>
+          <div className="text-[12px] text-slate-400">{t("landing.preview_action")}</div>
         </div>
       ),
     },
@@ -250,9 +251,9 @@ export default function LandingRoute({
       desc: t("landing.feat_remediation_desc"),
       preview: (
         <div className="mt-5 p-3.5 rounded-xl bg-white/[0.03] border border-white/10 text-[13px] flex items-center justify-between text-white/80 font-sans">
-          <span className="text-slate-300 font-normal">Rétention 14 jours</span>
+          <span className="text-slate-300 font-normal">{t("landing.preview_retention")}</span>
           <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30 text-[12px]">
-            Actif
+            {t("landing.preview_active")}
           </span>
         </div>
       ),
@@ -286,7 +287,7 @@ export default function LandingRoute({
             : "bg-transparent border-b border-transparent"
         }`}
       >
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img src={sicurreLogo} alt="Sicurre Logo" className="w-9 h-9" />
             <span className="font-display font-bold text-xl tracking-tight text-white">
@@ -294,7 +295,7 @@ export default function LandingRoute({
             </span>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <LanguageSwitcher scrolled={scrolled} />
             <button
               onClick={onNavigateToLogin}
@@ -304,7 +305,7 @@ export default function LandingRoute({
             </button>
             <button
               onClick={onNavigateToSignUp}
-              className="px-4.5 py-2 rounded-xl text-[13px] font-semibold transition-all active:scale-[0.97] cursor-pointer text-white border border-white/15 bg-white/[0.06] hover:bg-primary hover:text-white hover:border-primary shadow-sm"
+              className="px-3 py-2 sm:px-4.5 rounded-lg text-[12px] sm:text-[13px] font-semibold transition-all active:scale-[0.97] cursor-pointer text-white border border-white/15 bg-white/[0.06] hover:bg-primary hover:text-white hover:border-primary shadow-sm"
             >
               {t("landing.nav_cta")}
             </button>
@@ -327,7 +328,7 @@ export default function LandingRoute({
           <div className="lg:col-span-6 space-y-7 flex flex-col justify-center">
             <MotionDiv initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}>
               <h1 className="font-display font-extrabold text-[clamp(2.5rem,5.2vw,4.25rem)] leading-[1.08] tracking-[-0.03em] text-white">
-                <span className="block whitespace-nowrap">{t("landing.hero_title_line1")}</span>
+                <span className="block">{t("landing.hero_title_line1")}</span>
                 {t("landing.hero_title_line2") && <span className="block text-white/50 font-semibold mt-1">{t("landing.hero_title_line2")}</span>}
               </h1>
             </MotionDiv>
@@ -335,7 +336,7 @@ export default function LandingRoute({
               {t("landing.hero_desc")}
             </MotionDiv>
             <MotionDiv initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.3 }} className="flex items-center gap-4 pt-2">
-              <button onClick={onNavigateToSignUp} className="flex items-center gap-2.5 px-7 py-4 rounded-xl text-[16px] font-semibold transition-all active:scale-[0.97] cursor-pointer text-white border border-white/15 bg-white/[0.08] hover:bg-primary hover:text-white hover:border-primary hover:shadow-[0_0_25px_rgba(74,144,217,0.4)] duration-200">
+              <button onClick={onNavigateToSignUp} className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-white/15 bg-white/[0.08] px-5 py-3.5 text-[15px] font-semibold text-white transition-all duration-200 active:scale-[0.97] hover:border-primary hover:bg-primary sm:w-auto sm:px-7 sm:py-4 sm:text-[16px]">
                 <span>{t("landing.hero_cta_primary")}</span>
                 <ArrowRight className="w-4.5 h-4.5" />
               </button>
@@ -376,7 +377,7 @@ export default function LandingRoute({
             <h2 className="font-display font-medium text-[clamp(2.15rem,4.2vw,3.25rem)] leading-[1.12] tracking-[-0.02em] text-slate-100">
               {t("landing.features_title")}
             </h2>
-            <p className="text-[16px] sm:text-[18px] lg:text-[19px] leading-[1.65] max-w-4xl mx-auto font-normal text-slate-400 md:whitespace-nowrap">
+            <p className="text-[16px] sm:text-[18px] lg:text-[19px] leading-[1.65] max-w-4xl mx-auto font-normal text-slate-400">
               {t("landing.features_desc")}
             </p>
           </FadeInSection>

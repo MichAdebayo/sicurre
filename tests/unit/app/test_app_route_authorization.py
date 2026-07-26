@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 
@@ -121,6 +122,80 @@ async def test_dmarc_import_is_idempotent(monkeypatch) -> None:
 
     assert first == {"status": "imported", "record_count": 1}
     assert replay == {"status": "already_imported", "record_count": 0}
+
+
+@pytest.mark.asyncio
+async def test_domain_shield_cache_ages_ssl_days(monkeypatch) -> None:
+    """Cached certificate validity reflects elapsed days without a fresh scan."""
+
+    async def allow_domain(_domain: str, _workspace_id: str) -> None:
+        return None
+
+    async def blocklists(_domain: str) -> tuple[list[str], list[str]]:
+        return [], []
+
+    updated_at = (datetime.now(UTC) - timedelta(days=3)).isoformat()
+
+    async def query(_sql: str, _params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        return [{
+            "reputation_score": 100,
+            "ssl_days_remaining": 10,
+            "updated_at": updated_at,
+            "spf_valid": 1,
+            "spf_record": "v=spf1 ~all",
+            "dkim_valid": 1,
+            "dkim_record": "v=DKIM1",
+            "dmarc_valid": 1,
+            "dmarc_record": "v=DMARC1; p=reject; rua=mailto:dmarc@sicurre.com",
+            "dmarc_policy": "reject",
+            "ssl_valid": 1,
+        }]
+
+    monkeypatch.setattr(app_routes, "_require_workspace_domain", allow_domain)
+    monkeypatch.setattr(app_routes, "_check_domain_blacklists", blocklists)
+    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+
+    result = await app_routes.check_domain_shield_status(
+        "example.test", refresh=False, current_user=_user(platform_admin=False)
+    )
+
+    assert result["ssl"]["days_remaining"] == 7
+    assert result["ssl"]["valid"] is True
+
+
+@pytest.mark.asyncio
+async def test_domain_shield_marks_uninspectable_certificate_unavailable(monkeypatch) -> None:
+    """A failed public TLS inspection is never replaced by a fabricated lifetime."""
+
+    async def allow_domain(_domain: str, _workspace_id: str) -> None:
+        return None
+
+    async def blocklists(_domain: str) -> tuple[list[str], list[str]]:
+        return [], []
+
+    async def query(_sql: str, _params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        return []
+
+    async def to_thread(function: Any, *_args: Any) -> Any:
+        if function is app_routes._get_ssl_expiry_days:
+            return -1
+        raise RuntimeError("DNS unavailable")
+
+    monkeypatch.setattr(app_routes, "_require_workspace_domain", allow_domain)
+    monkeypatch.setattr(app_routes, "_check_domain_blacklists", blocklists)
+    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+    monkeypatch.setattr(app_routes.asyncio, "to_thread", to_thread)
+
+    result = await app_routes.check_domain_shield_status(
+        "example.test", refresh=True, current_user=_user(platform_admin=False)
+    )
+
+    assert result["ssl"] == {
+        "valid": False,
+        "days_remaining": 0,
+        "auto_renew": False,
+        "error": "Unable to inspect the public certificate",
+    }
 
 
 @pytest.mark.asyncio

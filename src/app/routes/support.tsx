@@ -20,8 +20,7 @@ interface SupportRouteProps {
 }
 
 export default function SupportRoute({ session }: SupportRouteProps) {
-  const { t, i18n } = useTranslation();
-  const isFR = i18n.language === "fr";
+  const { t } = useTranslation();
 
   // Form states
   const [name, setName] = useState(session?.display_name || "");
@@ -49,16 +48,14 @@ export default function SupportRoute({ session }: SupportRouteProps) {
       setSubmitError(
         error instanceof Error
           ? error.message
-          : isFR
-            ? "Impossible d’enregistrer la demande."
-            : "Could not record the request.",
+          : t("support.submit_error"),
       );
     }
   };
 
   return (
     <MotionDiv
-      initial={{ opacity: 0, y: 12 }}
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.3 }}
@@ -73,18 +70,16 @@ export default function SupportRoute({ session }: SupportRouteProps) {
       {/* Header */}
       <div className="pb-6 border-b border-border-subtle">
         <h1 className="app-h1">
-          {isFR ? "Support & Assistance Technique" : "Technical Support & Help"}
+          {t("support.title")}
         </h1>
         <p className="app-body-sub mt-1">
-          {isFR
-            ? "Transmettez votre demande d'assistance directement à notre équipe technique"
-            : "Submit your technical support request directly to our security response team"}
+          {t("support.subtitle")}
         </p>
       </div>
 
       {/* Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-        
+
         {/* Left: Contact Form Card (8 Columns) */}
         <div className="lg:col-span-8 bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm flex flex-col justify-between animate-in fade-in duration-300">
           {submittedTicket ? (
@@ -94,19 +89,17 @@ export default function SupportRoute({ session }: SupportRouteProps) {
               </div>
               <div className="space-y-2">
                 <h3 className="app-h2">
-                  {isFR ? "Demande enregistrée" : "Support request recorded"}
+                  {t("support.recorded")}
                 </h3>
                 <p className="app-body-normal text-on-surface-variant/80 leading-relaxed font-medium">
-                  {isFR
-                    ? `Ticket ${submittedTicket.slice(0, 8)}. Votre demande est visible par l’équipe Sicurre.`
-                    : `Ticket ${submittedTicket.slice(0, 8)}. Your request is now visible to the Sicurre team.`}
+                  {t("support.recorded_detail", { ticket: submittedTicket.slice(0, 8) })}
                 </p>
               </div>
               <Button
                 onClick={() => setSubmittedTicket("")}
                 className="mt-6 px-5 py-2 font-bold text-xs bg-surface-low border border-border-subtle text-on-surface hover:bg-surface-container"
               >
-                {isFR ? "Envoyer un autre message" : "Send another message"}
+                {t("support.send_another")}
               </Button>
             </div>
           ) : (
@@ -114,7 +107,7 @@ export default function SupportRoute({ session }: SupportRouteProps) {
               <div className="flex items-center gap-2 pb-2 border-b border-border-subtle/50 mb-3">
                 <MessageSquare className="w-5 h-5 text-primary" />
                 <h3 className="app-h2">
-                  {isFR ? "Formulaire de Contact" : "Contact Support Form"}
+                  {t("support.form_title")}
                 </h3>
               </div>
 
@@ -122,20 +115,20 @@ export default function SupportRoute({ session }: SupportRouteProps) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="app-label-tiny">
-                    {isFR ? "Nom complet" : "Full Name"}
+                    {t("support.full_name")}
                   </label>
                   <Input
                     type="text"
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder={isFR ? "Ex: Jean Dupont" : "e.g. John Doe"}
+                    placeholder={t("support.full_name_placeholder")}
                     className="bg-white border-border-subtle"
                   />
                 </div>
                 <div className="space-y-2">
                   <label className="app-label-tiny">
-                    {isFR ? "Adresse e-mail" : "Email Address"}
+                    {t("support.email")}
                   </label>
                   <Input
                     type="email"
@@ -151,7 +144,7 @@ export default function SupportRoute({ session }: SupportRouteProps) {
               {/* Purpose Category Dropdown */}
               <div className="space-y-2">
                 <label className="app-label-tiny">
-                  {isFR ? "Motif de la demande" : "Request Category"}
+                  {t("support.category")}
                 </label>
                 <div className="relative">
                   <select
@@ -160,19 +153,19 @@ export default function SupportRoute({ session }: SupportRouteProps) {
                     className="w-full pl-3.5 pr-10 py-2 bg-white border border-border-subtle rounded-lg text-xs font-semibold text-on-surface focus:outline-none focus:border-primary cursor-pointer shadow-sm h-10 appearance-none"
                   >
                     <option value="incident">
-                      {isFR ? "Incident de sécurité / Phishing suspect" : "Security Incident / Phishing Suspicion"}
+                      {t("support.category_incident")}
                     </option>
                     <option value="dns">
-                      {isFR ? "Configuration DNS & Cloudflare" : "DNS & Cloudflare Setup"}
+                      {t("support.category_dns")}
                     </option>
                     <option value="billing">
-                      {isFR ? "Facturation et abonnements" : "Billing & Subscription"}
+                      {t("support.category_billing")}
                     </option>
                     <option value="feedback">
-                      {isFR ? "Suggestions / Retour d'expérience" : "Feedback & Suggestions"}
+                      {t("support.category_feedback")}
                     </option>
                     <option value="other">
-                      {isFR ? "Autre demande d'assistance" : "Other Support Inquiry"}
+                      {t("support.category_other")}
                     </option>
                   </select>
                   <ChevronDown className="w-4 h-4 text-on-surface-variant pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2" />
@@ -182,14 +175,14 @@ export default function SupportRoute({ session }: SupportRouteProps) {
               {/* Message Content */}
               <div className="space-y-2">
                 <label className="app-label-tiny">
-                  {isFR ? "Votre Message" : "Your Message"}
+                  {t("support.message")}
                 </label>
                 <textarea
                   required
                   rows={5}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder={isFR ? "Décrivez précisément votre problème technique..." : "Describe your technical issue in detail..."}
+                  placeholder={t("support.message_placeholder")}
                   className="w-full px-3.5 py-2.5 bg-white border border-border-subtle rounded-xl text-xs text-on-surface font-medium placeholder:text-on-surface-variant/40 focus:outline-none focus:border-primary shadow-sm min-h-[120px]"
                 />
               </div>
@@ -206,7 +199,7 @@ export default function SupportRoute({ session }: SupportRouteProps) {
                   ) : (
                     <Send className="w-3.5 h-3.5" />
                   )}
-                  <span>{isFR ? "Envoyer le message" : "Send Support Request"}</span>
+                  <span>{t("support.submit")}</span>
                 </Button>
               </div>
             </form>
@@ -220,11 +213,9 @@ export default function SupportRoute({ session }: SupportRouteProps) {
             <div className="p-3 bg-primary/[0.06] text-primary border border-primary/10 rounded-xl w-fit">
               <Mail className="w-5 h-5" />
             </div>
-            <h3 className="app-h3">{isFR ? "Adresse Directe" : "Direct Contact"}</h3>
+            <h3 className="app-h3">{t("support.direct_contact")}</h3>
             <p className="app-body-sub leading-relaxed">
-              {isFR
-                ? "Vous pouvez également envoyer un email directement à support@sicurre.com à tout moment."
-                : "You can also reach us directly via email at support@sicurre.com."}
+              {t("support.direct_contact_desc")}
             </p>
           </div>
         </div>
