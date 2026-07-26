@@ -226,7 +226,11 @@ jobs:
               rm -rf "$anonymous_docker_config"
             fi
 
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            if ! docker compose -f docker-compose.prod.yml up -d --remove-orphans; then
+              docker compose -f docker-compose.prod.yml ps
+              docker compose -f docker-compose.prod.yml logs --tail=200 auth-service sicurre-api
+              exit 1
+            fi
             # Bind-mounted Alloy configuration changes do not alter Compose's service hash.
             docker compose -f docker-compose.prod.yml up -d --force-recreate alloy
 
