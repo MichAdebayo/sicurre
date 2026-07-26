@@ -6,6 +6,7 @@ import {
   ShieldAlert,
   Copy,
   Check,
+  BadgeCheck,
   RefreshCw,
   AlertTriangle,
   Globe,
@@ -45,8 +46,7 @@ interface DomainShieldRouteProps {
 }
 
 export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
-  const { t, i18n } = useTranslation();
-  const isFR = i18n.language === "fr";
+  const { t } = useTranslation();
 
   // Load configured cloudflare domains
   const { data: domainsList, isLoading: domainsLoading } = useCloudflareList();
@@ -98,9 +98,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
       setErrorNotification(
         err instanceof Error && err.message
           ? err.message
-          : isFR
-            ? "Actualisation du domaine impossible."
-            : "Could not refresh the domain."
+          : t("domain_shield.refresh_failed")
       );
     }
   };
@@ -205,31 +203,27 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
 
   const getAutoFixButtonText = () => {
     if (autoFixProgress === "verify") {
-      return isFR ? "Vérification" : "Verifying";
+      return t("domain_shield.autofix_verifying");
     }
     if (autoFixProgress === "dns") {
-      return isFR ? "Écriture DNS" : "Writing DNS";
+      return t("domain_shield.autofix_writing_dns");
     }
     if (autoFixProgress === "routing") {
-      return isFR ? "Routage email" : "Email routing";
+      return t("domain_shield.autofix_routing");
     }
     if (autoFixProgress === "success") {
-      return isFR ? "Appliqué" : "Applied";
+      return t("domain_shield.autofix_applied");
     }
     if (autoFixProgress === "error") {
-      return isFR ? "Échec de la configuration" : "Configuration failed";
+      return t("domain_shield.autofix_failed");
     }
-    return isFR ? "Lancer l'Auto-Configuration" : "Launch Auto-Configuration";
+    return t("domain_shield.autofix_launch");
   };
 
   const handleRunAutoFix = async () => {
     if (!wsTokenData?.configured) {
       setSuccessNotification(null);
-      setErrorNotification(
-        isFR
-          ? "Configuration Cloudflare requise : Veuillez d'abord ajouter votre jeton API Cloudflare dans les Paramètres > onglet Intégrations."
-          : "Cloudflare Integration Required: Please configure your Cloudflare API token in Settings > Integrations first."
-      );
+      setErrorNotification(t("domain_shield.cloudflare_required"));
       return;
     }
 
@@ -255,8 +249,8 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
 
       setSuccessNotification(
         result.status === "provisioning"
-          ? (isFR ? "Configuration lancée" : "Setup started")
-          : (isFR ? "Configuration appliquée" : "Setup applied")
+          ? t("domain_shield.setup_started")
+          : t("domain_shield.setup_applied")
       );
 
       let finalStatus = result.status;
@@ -265,17 +259,17 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
         const statusResult = await refetchCloudflareStatus();
         finalStatus = statusResult.data?.status || finalStatus;
         if (finalStatus === "error") {
-          throw new Error(statusResult.data?.error_message || (isFR ? "Échec de la configuration Cloudflare." : "Cloudflare setup failed."));
+          throw new Error(statusResult.data?.error_message || t("cloudflare.final_setup_failed"));
         }
       }
 
       if (finalStatus === "active" || finalStatus === "pending_verification") {
         setAutoFixProgress("success");
         await refreshShieldMutation.mutateAsync(selectedDomain);
-        setSuccessNotification(isFR ? "Configuration appliquée" : "Setup applied");
+        setSuccessNotification(t("domain_shield.setup_applied"));
       } else {
         setAutoFixProgress("routing");
-        setSuccessNotification(isFR ? "Configuration en cours" : "Setup in progress");
+        setSuccessNotification(t("domain_shield.setup_in_progress"));
       }
 
     } catch (err: any) {
@@ -283,7 +277,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
       const rawMsg = err.message || "";
       const msg = rawMsg.includes("Authentication error") || rawMsg.includes("Cloudflare DNS update failed")
         ? t("domain_shield.cloudflare_dns_permission_error")
-        : rawMsg || (isFR ? "Échec de l'initialisation." : "Failed to initialize setup.");
+        : rawMsg || t("domain_shield.setup_initialization_failed");
       setAutoFixErrorMsg(msg);
       setSuccessNotification(null);
       setErrorNotification(msg);
@@ -328,12 +322,10 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border-subtle">
           <div>
             <h1 className="app-h1">
-              {isFR ? "Bouclier du domaine" : "Domain Shield"}
+              {t("domain_shield.title")}
             </h1>
             <p className="app-body-sub mt-1">
-              {isFR
-                ? "Vérifiez l'authentification DNS, le certificat TLS et les signaux de réputation disponibles."
-                : "Check DNS authentication, the TLS certificate, and available reputation signals."}
+              {t("domain_shield.subtitle")}
             </p>
           </div>
 
@@ -343,7 +335,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
               <div className="h-10 w-48 bg-surface-low rounded-lg animate-pulse" />
             ) : !domainsList || domainsList.length === 0 ? (
               <span className="text-xs text-on-surface-variant/70 italic">
-                {isFR ? "Aucun domaine configuré" : "No domains configured"}
+                {t("domain_shield.no_domains")}
               </span>
             ) : (
               <select
@@ -377,12 +369,10 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
           <div className="bg-surface-lowest rounded-2xl border border-border-subtle p-12 text-center text-on-surface-variant/50 max-w-lg mx-auto flex flex-col items-center justify-center shadow-sm">
             <Globe className="w-12 h-12 text-on-surface-variant/30 mb-3 animate-pulse" />
             <p className="font-bold text-base text-on-surface">
-              {isFR ? "Aucun Bouclier de Domaine actif" : "No Domain Shield active"}
+              {t("domain_shield.no_active_shield")}
             </p>
             <p className="text-sm mt-1 text-on-surface-variant">
-              {isFR
-                ? "Intégrez un domaine via Cloudflare dans les paramètres pour lancer son premier audit."
-                : "Connect a domain through Cloudflare settings to run its first audit."}
+              {t("domain_shield.no_active_shield_desc")}
             </p>
           </div>
         ) : (shieldLoading && !shieldStatus) ? (
@@ -398,7 +388,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
             <ShieldAlert className="w-10 h-10 text-error mb-3" />
             <p className="font-bold text-sm">{t("common.error_occurred")}</p>
             <p className="text-xs text-on-surface-variant mt-1 font-semibold">
-              {isFR ? "Impossible de récupérer les balises de validation de sécurité DNS." : "Could not fetch DNS security validation tags."}
+              {t("domain_shield.fetch_failed")}
             </p>
           </div>
         ) : (
@@ -411,16 +401,14 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-safe" />
                   </span>
                   <span className="text-xs font-semibold text-safe">
-                    {isFR ? "Protection active" : "Protection active"}
+                    {t("domain_shield.protection_active")}
                   </span>
                 </div>
                 <h2 className="mt-2 text-xl font-bold text-on-surface">
-                  {isFR ? "Intégrité du domaine" : "Domain integrity"}
+                  {t("domain_shield.integrity_title")}
                 </h2>
                 <p className="mt-1 max-w-xl text-sm text-on-surface-variant">
-                  {isFR
-                    ? "Évaluation des enregistrements SPF, DKIM, DMARC, du certificat TLS et des contrôles de réputation disponibles."
-                    : "Evaluation of SPF, DKIM, DMARC, TLS certificate and available reputation checks."}
+                  {t("domain_shield.integrity_desc")}
                 </p>
               </div>
               <div className="relative flex w-full shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border-subtle bg-surface-lowest p-3 shadow-sm sm:w-40">
@@ -469,10 +457,10 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   </div>
                   <div>
                     <h3 className="font-display font-bold text-[18px] text-on-surface">
-                      {isFR ? "Audit et Intégrité DNS" : "DNS Audit & Integrity Status"}
+                      {t("domain_shield.audit_title")}
                     </h3>
                     <p className="text-xs text-on-surface-variant mt-0.5 font-medium">
-                      {isFR ? "État observé lors du dernier audit" : "State observed during the latest audit"}
+                      {t("domain_shield.audit_desc")}
                     </p>
                   </div>
                 </div>
@@ -489,7 +477,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   className="gap-2 cursor-pointer bg-white text-xs font-bold border-border-subtle hover:bg-surface-low/30 text-on-surface transition-all h-[36px]"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isTerminalRunning ? "animate-spin text-[#2e6bb5]" : "text-on-surface-variant"}`} />
-                  {isFR ? "Relancer l'audit de sécurité" : "Re-diagnose Domain"}
+                  {t("domain_shield.rerun_audit")}
                 </Button>
               </div>
 
@@ -497,42 +485,32 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                 {[
                   {
                     id: "spf",
-                    labelFR: "Enregistrement SPF",
-                    labelEN: "SPF Record",
-                    descFR: "Serveurs autorisés",
-                    descEN: "Authorized relays",
+                    labelKey: "domain_shield.audit_spf",
+                    descriptionKey: "domain_shield.audit_spf_desc",
                     valid: shieldStatus?.spf?.valid,
                   },
                   {
                     id: "dkim",
-                    labelFR: "Signature DKIM",
-                    labelEN: "DKIM Signature",
-                    descFR: "Clé d'authentification",
-                    descEN: "Auth signatures",
+                    labelKey: "domain_shield.audit_dkim",
+                    descriptionKey: "domain_shield.audit_dkim_desc",
                     valid: shieldStatus?.dkim?.valid,
                   },
                   {
                     id: "dmarc",
-                    labelFR: "Politique DMARC",
-                    labelEN: "DMARC Policy",
-                    descFR: "Consignes de filtrage",
-                    descEN: "Filtering instructions",
+                    labelKey: "domain_shield.audit_dmarc",
+                    descriptionKey: "domain_shield.audit_dmarc_desc",
                     valid: isDmarcValid,
                   },
                   {
                     id: "ssl",
-                    labelFR: "Certificat SSL",
-                    labelEN: "SSL Certificate",
-                    descFR: "Chiffrement HTTPS",
-                    descEN: "HTTPS encryption",
+                    labelKey: "domain_shield.audit_ssl",
+                    descriptionKey: "domain_shield.audit_ssl_desc",
                     valid: shieldStatus?.ssl?.valid,
                   },
                   {
                     id: "reputation",
-                    labelFR: "Réputation",
-                    labelEN: "Reputation",
-                    descFR: "Contrôle externe",
-                    descEN: "External check",
+                    labelKey: "domain_shield.audit_reputation",
+                    descriptionKey: "domain_shield.audit_reputation_desc",
                     valid: !shieldStatus?.blacklists?.listed,
                   },
                 ].map((step, idx) => {
@@ -563,7 +541,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     statusBadge = (
                       <span className="flex items-center gap-1.5 text-[11px] font-semibold text-primary">
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        {isFR ? "Analyse..." : "Analyzing..."}
+                        {t("domain_shield.analyzing")}
                       </span>
                     );
                   } else if (isStepCompleted) {
@@ -580,7 +558,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                         <span className="inline-flex items-center gap-1 rounded-md bg-warning-bg px-2.5 py-0.5 text-[11px] font-semibold text-warning">
                           <AlertTriangle className="w-3.5 h-3.5" />
                           {step.id === "reputation" && shieldStatus?.blacklists?.error
-                            ? (isFR ? "Non vérifiée" : "Not verified")
+                            ? t("domain_shield.not_verified")
                             : t("domain_shield.status_partial")}
                         </span>
                       );
@@ -595,7 +573,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   } else {
                     statusBadge = (
                       <span className="text-[11px] font-semibold text-on-surface-variant/55">
-                        {isFR ? "En attente" : "Pending"}
+                        {t("domain_shield.pending")}
                       </span>
                     );
                   }
@@ -608,11 +586,11 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold font-display text-on-surface">
-                            {isFR ? step.labelFR : step.labelEN}
+                            {t(step.labelKey)}
                           </span>
                         </div>
                         <p className="text-[10.5px] text-on-surface-variant font-semibold leading-snug">
-                          {isFR ? step.descFR : step.descEN}
+                          {t(step.descriptionKey)}
                         </p>
                       </div>
 
@@ -633,15 +611,13 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   <div className="flex items-center gap-2">
                     <Mouse className="w-5 h-5 text-[#2e6bb5] animate-pulse" />
                     <h3 className="font-display font-bold text-[18px] text-on-surface">
-                      {isFR ? "Auto-Fix Cloudflare 1-Clic" : "1-Click Cloudflare Auto-Fix"}
+                      {t("domain_shield.autofix_title")}
                     </h3>
                   </div>
 
                   <div>
                     <p className="text-xs text-on-surface-variant leading-relaxed">
-                      {isFR
-                        ? "Corrigez et provisionnez automatiquement vos enregistrements DNS manquants (SPF, DKIM, DMARC) via l'API Cloudflare."
-                        : "Automatically generate and sync missing DNS records (SPF, DKIM, DMARC) directly using the Cloudflare token API wizard."}
+                      {t("domain_shield.autofix_desc")}
                     </p>
                   </div>
 
@@ -649,9 +625,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     <div className="p-3 bg-safe/[0.04] border border-safe/20 rounded-xl flex items-start gap-2.5">
                       <ShieldCheck className="w-4.5 h-4.5 text-safe shrink-0 mt-0.5" />
                       <div className="text-[11.5px] text-safe font-semibold leading-relaxed">
-                        {isFR
-                          ? "Tous les protocoles SPF, DKIM, DMARC sont configurés de façon optimale."
-                          : "DNS configuration is fully optimized and secured against impersonators."}
+                        {t("domain_shield.autofix_complete")}
                       </div>
                     </div>
                   )}
@@ -661,15 +635,13 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     <div className="bg-surface-low border border-border-subtle rounded-xl p-3.5 space-y-2.5 text-xs">
                       <div className="mb-1 flex items-center justify-between text-xs font-bold text-on-surface-variant">
                         <div className="flex items-center gap-1.5">
-                          <span>{isFR ? "Enregistrements DNS" : "DNS Records Setup"}</span>
+                          <span>{t("domain_shield.dns_records")}</span>
 
                           {/* Tooltip safety info */}
                           <div className="relative group">
                             <Info className="w-3.5 h-3.5 text-[#2e6bb5] cursor-help hover:text-primary transition-colors" />
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-64 bg-white border border-border-subtle text-on-surface text-[10px] p-2.5 rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 z-50 normal-case leading-normal font-sans text-center font-bold">
-                              {isFR
-                                ? "La configuration correcte des protocoles SPF, DKIM et DMARC protège votre domaine contre l'usurpation d'identité et garantit que vos e-mails légitimes ne finissent pas dans le dossier Spam."
-                                : "Properly configuring SPF, DKIM, and DMARC protocols safeguards your domain from email spoofing and ensures your emails avoid spam folders."}
+                            <div className="absolute bottom-full right-0 mb-1.5 w-64 max-w-[calc(100vw-3rem)] rounded-lg border border-border-subtle bg-white p-2.5 text-center font-sans text-[10px] font-bold normal-case leading-normal text-on-surface opacity-0 shadow-xl transition-opacity duration-200 pointer-events-none group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50">
+                              {t("domain_shield.dns_records_help")}
                             </div>
                           </div>
                         </div>
@@ -748,12 +720,10 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     <div className="p-4 bg-error/5 border border-error/20 rounded-xl space-y-2 text-xs text-error select-none">
                       <p className="font-bold flex items-center gap-1.5">
                         <AlertTriangle className="w-4 h-4 shrink-0" />
-                        {isFR ? "Configuration Cloudflare requise" : "Cloudflare Integration Required"}
+                        {t("domain_shield.cloudflare_required_title")}
                       </p>
                       <p className="font-semibold text-on-surface-variant leading-normal">
-                        {isFR
-                          ? "Veuillez d'abord configurer votre jeton API Cloudflare dans les Paramètres > onglet Intégrations avant de lancer l'auto-configuration."
-                          : "Please configure your Cloudflare API token in Settings > Integrations first before launching auto-configuration."}
+                        {t("domain_shield.cloudflare_required_desc")}
                       </p>
                     </div>
                   )}
@@ -787,7 +757,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   <div className="flex items-center gap-2 mb-6">
                     <Activity className="w-5 h-5 text-[#2e6bb5] animate-pulse" />
                     <h3 className="font-display font-bold text-[18px] text-on-surface">
-                      {isFR ? "Surveillance & Sécurité du Domaine" : "Domain Security & Monitoring"}
+                      {t("domain_shield.monitoring_title")}
                     </h3>
                   </div>
 
@@ -804,29 +774,22 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                           </h5>
                           <div className="relative group">
                             <Info className="w-3.5 h-3.5 text-[#2e6bb5] cursor-help hover:text-primary transition-colors" />
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-60 bg-white border border-border-subtle text-on-surface text-[10px] p-2.5 rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 z-50 normal-case leading-normal font-sans text-center font-bold">
-                              {isFR
-                                ? "Contrôle de validité et chiffrement actif du certificat SSL."
-                                : "Verifying validity and encryption status of your SSL certificate."}
+                            <div className="absolute bottom-full right-0 mb-1.5 w-60 max-w-[calc(100vw-3rem)] rounded-lg border border-border-subtle bg-white p-2.5 text-center font-sans text-[10px] font-bold normal-case leading-normal text-on-surface opacity-0 shadow-xl transition-opacity duration-200 pointer-events-none group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50">
+                              {t("domain_shield.ssl_help")}
                             </div>
                           </div>
                         </div>
                       </div>
                       <div className="flex flex-col sm:items-end gap-1.5 min-w-[160px]">
                         {shieldStatus.ssl.valid ? (
-                          <>
-                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#047857] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 w-fit">
-                              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                              {t("domain_shield.ssl_countdown", { days: shieldStatus.ssl.days_remaining })}
-                            </span>
-                            <span className="text-[10px] font-bold text-on-surface-variant">
-                              {isFR ? "Certificat public vérifié" : "Public certificate verified"}
-                            </span>
-                          </>
+                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#047857] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 w-fit">
+                            <BadgeCheck className="w-4 h-4 stroke-[2]" />
+                            {t("domain_shield.ssl_countdown", { days: shieldStatus.ssl.days_remaining })}
+                          </span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 text-xs font-bold text-error bg-error-container/20 px-2.5 py-1 rounded-full border border-error-container w-fit">
                             <AlertTriangle className="w-3.5 h-3.5 animate-pulse" />
-                            {isFR ? "Non résolu" : "Unresolved"}
+                            {t("domain_shield.unresolved")}
                           </span>
                         )}
                       </div>
@@ -840,14 +803,12 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                         </div>
                         <div className="flex items-center gap-1.5">
                           <h5 className="font-semibold text-[14.5px] text-on-surface">
-                            {isFR ? "Vérification de réputation" : "Reputation check"}
+                            {t("domain_shield.reputation_check")}
                           </h5>
                           <div className="relative group">
                             <Info className="w-3.5 h-3.5 text-[#2e6bb5] cursor-help hover:text-primary transition-colors" />
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-60 bg-white border border-border-subtle text-on-surface text-[10px] p-2.5 rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 z-50 normal-case leading-normal font-sans text-center font-bold">
-                              {isFR
-                                ? "Interrogation ponctuelle de Spamhaus DBL et SURBL lors de l'audit du domaine."
-                                : "Point-in-time query of Spamhaus DBL and SURBL during the domain audit."}
+                            <div className="absolute bottom-full right-0 mb-1.5 w-60 max-w-[calc(100vw-3rem)] rounded-lg border border-border-subtle bg-white p-2.5 text-center font-sans text-[10px] font-bold normal-case leading-normal text-on-surface opacity-0 shadow-xl transition-opacity duration-200 pointer-events-none group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50">
+                              {t("domain_shield.reputation_help")}
                             </div>
                           </div>
                         </div>
@@ -857,12 +818,10 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                           <>
                             <span className="inline-flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-50 px-2.5 py-1 rounded-full border border-red-200 w-fit animate-pulse">
                               <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
-                              {isFR ? "Listé / Bloqué" : "Listed / Blocked"}
+                              {t("domain_shield.listed")}
                             </span>
                             <span className="text-[10px] font-bold text-red-600 text-left sm:text-right">
-                              {isFR
-                                ? `Listes : ${shieldStatus.blacklists.matched.join(", ")}`
-                                : `Feeds: ${shieldStatus.blacklists.matched.join(", ")}`}
+                              {t("domain_shield.matched_feeds", { feeds: shieldStatus.blacklists.matched.join(", ") })}
                             </span>
                           </>
                         ) : shieldStatus?.blacklists?.error ? (
@@ -876,15 +835,10 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                             </span>
                           </>
                         ) : (
-                          <>
-                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#047857] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 w-fit">
-                              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                              {t("domain_shield.blacklist_clean")}
-                            </span>
-                            <span className="text-[10px] font-bold text-on-surface-variant text-left sm:text-right">
-                              {isFR ? "Aucun blocage" : "No blocks"}
-                            </span>
-                          </>
+                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#047857] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 w-fit">
+                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                            {t("domain_shield.blacklist_clean")}
+                          </span>
                         )}
                       </div>
                     </div>
@@ -897,14 +851,12 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                         </div>
                         <div className="flex items-center gap-1.5">
                           <h5 className="font-semibold text-[14.5px] text-on-surface">
-                            {isFR ? "Échecs observés par DMARC" : "DMARC observed failures"}
+                            {t("domain_shield.dmarc_failures")}
                           </h5>
                           <div className="relative group">
                             <Info className="w-3.5 h-3.5 text-[#2e6bb5] cursor-help hover:text-primary transition-colors" />
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-60 bg-white border border-border-subtle text-on-surface text-[10px] p-2.5 rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 z-50 normal-case leading-normal font-sans text-center font-bold">
-                              {isFR
-                                ? "Rapports d'activité des serveurs non autorisés ayant tenté d'usurper votre domaine."
-                                : "Activity reports from unauthorized mail servers attempting domain spoofing."}
+                            <div className="absolute bottom-full right-0 mb-1.5 w-60 max-w-[calc(100vw-3rem)] rounded-lg border border-border-subtle bg-white p-2.5 text-center font-sans text-[10px] font-bold normal-case leading-normal text-on-surface opacity-0 shadow-xl transition-opacity duration-200 pointer-events-none group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50">
+                              {t("domain_shield.dmarc_failures_help")}
                             </div>
                           </div>
                         </div>
@@ -912,12 +864,12 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                       <div className="flex flex-col sm:items-end gap-1.5 min-w-[160px]">
                         <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#2e6bb5] bg-[#d0e4ff]/30 px-2.5 py-1 rounded-full border border-primary-container/20 w-fit">
                           <Activity className="w-3.5 h-3.5" />
-                          {dmarcReports?.failed_messages ?? 0} {isFR ? "échoués" : "failed"}
+                          {t("domain_shield.failed_count", { count: dmarcReports?.failed_messages ?? 0 })}
                         </span>
                         <span className="text-[10px] font-bold text-[#2e6bb5]">
                           {dmarcReports?.report_count
-                            ? (isFR ? `${dmarcReports.report_count} rapport(s) reçu(s)` : `${dmarcReports.report_count} report(s) received`)
-                            : (isFR ? "Aucun rapport reçu" : "No reports received")}
+                            ? t("domain_shield.report_count_received", { count: dmarcReports.report_count })
+                            : t("domain_shield.no_reports_received")}
                         </span>
                       </div>
                     </div>
@@ -1070,7 +1022,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`select-none rounded border px-2 py-0.5 font-mono text-xs font-bold ${getDmarcPolicyClass(shieldStatus.dmarc.policy)}`}>
-                      {isFR ? "Politique" : "Policy"} : {shieldStatus.dmarc.policy}
+                      {t("domain_shield.policy")} : {shieldStatus.dmarc.policy}
                     </span>
                     {isDmarcComplete ? (
                       <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-safe bg-safe/10 px-2.5 py-0.5 rounded-full">

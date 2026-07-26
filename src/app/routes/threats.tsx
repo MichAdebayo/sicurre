@@ -249,9 +249,7 @@ export default function ThreatsRoute() {
             </h1>
           </div>
           <p className="app-body-sub mt-1">
-            {i18n.language === "fr"
-              ? "Historique global des classifications d'e-mails"
-              : "Global historical log of analyzed email classifications"}
+            {t("threats.subtitle")}
           </p>
         </div>
         <div className="flex w-full flex-wrap items-center gap-3 self-start sm:w-auto sm:self-center">
@@ -264,10 +262,10 @@ export default function ThreatsRoute() {
             }}
             className="px-3 py-2 bg-white border border-border-subtle rounded-lg text-xs font-bold text-on-surface focus:outline-none focus:border-primary cursor-pointer shadow-sm h-9"
           >
-            <option value="today">{i18n.language === "fr" ? "Aujourd'hui" : "Today"}</option>
-            <option value="7d">{i18n.language === "fr" ? "7 derniers jours" : "Last 7 Days"}</option>
-            <option value="month">{i18n.language === "fr" ? "Ce mois-ci" : "This Month"}</option>
-            <option value="last_month">{i18n.language === "fr" ? "Le mois dernier" : "Last Month"}</option>
+            <option value="today">{t("threats.range_today")}</option>
+            <option value="7d">{t("threats.range_7d")}</option>
+            <option value="month">{t("threats.range_month")}</option>
+            <option value="last_month">{t("threats.range_last_month")}</option>
           </select>
 
           <button
@@ -430,7 +428,7 @@ export default function ThreatsRoute() {
                   : "bg-white text-on-surface-variant hover:bg-surface-low border-border-subtle"
                 }`}
             >
-              {v === "all" ? (i18n.language === "fr" ? "Tous" : "All") : t(`threats.badge_${v}`)}
+              {v === "all" ? t("threats.all") : t(`threats.badge_${v}`)}
             </button>
           ))}
         </div>
@@ -451,7 +449,7 @@ export default function ThreatsRoute() {
           </div>
         ) : paginatedThreats.length === 0 ? (
           <div className="py-16 text-center text-on-surface-variant/50 text-sm">
-            {i18n.language === "fr" ? "Aucune menace répertoriée." : "No threat records found."}
+            {t("threats.no_records")}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -512,9 +510,11 @@ export default function ThreatsRoute() {
         {totalPages > 1 && (
           <div className="flex flex-col gap-3 border-t border-border-subtle bg-surface-low/10 px-5 py-4 font-sans sm:flex-row sm:items-center sm:justify-between">
             <span className="text-xs text-on-surface-variant font-bold">
-              {i18n.language === "fr"
-                ? `Page ${activePage} sur ${totalPages} (${totalItems} éléments)`
-                : `Page ${activePage} of ${totalPages} (${totalItems} items)`}
+              {t("threats.pagination", {
+                page: activePage,
+                pages: totalPages,
+                count: totalItems,
+              })}
             </span>
             <div className="flex gap-2">
               <Button
@@ -524,7 +524,7 @@ export default function ThreatsRoute() {
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 className="text-xs py-1 px-3.5 cursor-pointer font-bold h-8"
               >
-                {i18n.language === "fr" ? "Précédent" : "Previous"}
+                {t("common.previous")}
               </Button>
               <Button
                 variant="outline"
@@ -533,7 +533,7 @@ export default function ThreatsRoute() {
                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                 className="text-xs py-1 px-3.5 cursor-pointer font-bold h-8"
               >
-                {i18n.language === "fr" ? "Suivant" : "Next"}
+                {t("common.next")}
               </Button>
             </div>
           </div>
