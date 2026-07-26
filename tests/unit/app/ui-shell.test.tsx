@@ -78,12 +78,12 @@ describe("application navigation", () => {
       </AppShell>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Ouvrir la navigation" }));
+    fireEvent.click(screen.getByRole("button", { name: "common.open_navigation" }));
     expect(screen.getAllByRole("button", { name: /sidebar.nav_settings/i })).toHaveLength(2);
 
     fireEvent.click(screen.getAllByRole("button", { name: /sidebar.nav_settings/i })[1]);
     expect(onPageChange).toHaveBeenCalledWith("settings");
-    expect(screen.queryByRole("button", { name: "Fermer la navigation" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "common.close_navigation" })).not.toBeInTheDocument();
   });
 
   it("closes mobile navigation from both the backdrop and close control", () => {
@@ -93,14 +93,14 @@ describe("application navigation", () => {
       </AppShell>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Ouvrir la navigation" }));
-    const closeButtons = screen.getAllByRole("button", { name: "Fermer la navigation" });
+    fireEvent.click(screen.getByRole("button", { name: "common.open_navigation" }));
+    const closeButtons = screen.getAllByRole("button", { name: "common.close_navigation" });
     fireEvent.click(closeButtons[0]);
-    expect(screen.queryByRole("button", { name: "Fermer la navigation" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "common.close_navigation" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Ouvrir la navigation" }));
-    fireEvent.click(screen.getAllByRole("button", { name: "Fermer la navigation" })[1]);
-    expect(screen.queryByRole("button", { name: "Fermer la navigation" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "common.open_navigation" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "common.close_navigation" })[1]);
+    expect(screen.queryByRole("button", { name: "common.close_navigation" })).not.toBeInTheDocument();
   });
 
   it("routes the sidebar support command", () => {

@@ -20,7 +20,7 @@
 		poc-replay-frozen poc-inference \
 		poc-cron-demo poc-release-preview poc-staging-publish \
         pipeline-push run-pipeline demo-v1 demo-v2 \
-        poc db-seed r2-freeze-proof dev-app dev
+        poc db-seed r2-freeze-proof dev-api dev-app dev-stop dev
 
 NORMALIZE_ARGS ?=
 GENERATE_ARGS ?=
@@ -101,12 +101,37 @@ test-integration:
 	uv run pytest tests/integration
 
 dev-api:
+	@pids="$$(pgrep -f 'uvicorn data_platform.api.main:app --reload --port 8001' 2>/dev/null) $$(lsof -tiTCP:8001 -sTCP:LISTEN 2>/dev/null)"; \
+	if [ -n "$$pids" ]; then \
+		echo "Stopping existing local Sicurre API on port 8001..."; \
+		kill $$pids 2>/dev/null || true; \
+		for attempt in 1 2 3 4 5; do \
+			lsof -tiTCP:8001 -sTCP:LISTEN >/dev/null 2>&1 || break; \
+			sleep 0.2; \
+		done; \
+		remaining=$$(lsof -tiTCP:8001 -sTCP:LISTEN 2>/dev/null); \
+		[ -z "$$remaining" ] || kill -KILL $$remaining 2>/dev/null || true; \
+	fi
 	PYTHONPATH=src uv run uvicorn data_platform.api.main:app --reload --port 8001
 
 dev-app:
 	npm run dev
 
-dev:
+dev-stop:
+	@for port in 3005 5173 5174 8001; do \
+		pids=$$(lsof -tiTCP:$$port -sTCP:LISTEN 2>/dev/null); \
+		if [ -n "$$pids" ]; then \
+			echo "Stopping existing Sicurre development service on port $$port..."; \
+			kill $$pids 2>/dev/null || true; \
+		fi; \
+	done
+	@sleep 0.5
+	@for port in 3005 5173 5174 8001; do \
+		pids=$$(lsof -tiTCP:$$port -sTCP:LISTEN 2>/dev/null); \
+		[ -z "$$pids" ] || kill -KILL $$pids 2>/dev/null || true; \
+	done
+
+dev: dev-stop
 	npx --yes concurrently --kill-others "make dev-api" "make dev-app" "npm run auth:dev"
 
 data-platform-staging-smoke:

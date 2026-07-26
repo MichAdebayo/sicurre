@@ -52,10 +52,10 @@ function formatCloudflareError(t: TFunction, message?: string | null): string {
     return t("domain_shield.cloudflare_scope_error");
   }
   if (lower.includes("zone") && lower.includes("not found")) {
-    return "Le domaine est introuvable sur ce compte Cloudflare ou le token n'a pas accès à cette zone.";
+    return t("cloudflare.errors.zone_not_found");
   }
   if (lower.includes("token") && (lower.includes("failed") || lower.includes("invalid"))) {
-    return "Le token Cloudflare est invalide ou expiré. Créez un nouveau token puis réessayez.";
+    return t("cloudflare.errors.invalid_token");
   }
   return message;
 }
@@ -63,12 +63,13 @@ function formatCloudflareError(t: TFunction, message?: string | null): string {
 // ── Status badge ─────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation();
   const map: Record<string, { label: string; className: string; icon: React.ReactNode }> = {
-    not_configured:       { label: "Non configuré",          className: "text-on-surface-variant bg-surface-container border-border-subtle", icon: <Cloud className="w-3 h-3" /> },
-    provisioning:         { label: "Provisionnement…",       className: "text-amber-600 bg-amber-50 border-amber-200",    icon: <Loader2 className="w-3 h-3 animate-spin" /> },
-    pending_verification: { label: "Vérification en attente",className: "text-amber-600 bg-amber-50 border-amber-200",    icon: <Mail className="w-3 h-3" /> },
-    active:               { label: "Actif",                   className: "text-safe bg-safe/[0.08] border-safe/20",        icon: <Zap className="w-3 h-3" /> },
-    error:                { label: "Erreur",                  className: "text-error bg-error/[0.06] border-error/20",     icon: <XCircle className="w-3 h-3" /> },
+    not_configured:       { label: t("cloudflare.status_not_configured"), className: "text-on-surface-variant bg-surface-container border-border-subtle", icon: <Cloud className="w-3 h-3" /> },
+    provisioning:         { label: t("cloudflare.status_provisioning"), className: "text-amber-600 bg-amber-50 border-amber-200", icon: <Loader2 className="w-3 h-3 animate-spin" /> },
+    pending_verification: { label: t("cloudflare.status_pending"), className: "text-amber-600 bg-amber-50 border-amber-200", icon: <Mail className="w-3 h-3" /> },
+    active:               { label: t("cloudflare.status_active"), className: "text-safe bg-safe/[0.08] border-safe/20", icon: <Zap className="w-3 h-3" /> },
+    error:                { label: t("cloudflare.status_error"), className: "text-error bg-error/[0.06] border-error/20", icon: <XCircle className="w-3 h-3" /> },
   };
   const cfg = map[status] ?? map.not_configured;
   return (
@@ -94,10 +95,22 @@ interface CloudflareIntegratorProps {
   onSuccess?: () => void;
 }
 
+function integrationStages(
+  t: TFunction,
+  statuses: IntegrationStage["status"][],
+): IntegrationStage[] {
+  return (["verify", "dns", "worker", "routing"] as const).map((id, index) => ({
+    id,
+    label: t(`cloudflare.stage_${id}`),
+    description: t(`cloudflare.stage_${id}_desc`),
+    status: statuses[index] ?? "idle",
+  }));
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegratorProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { data: cfStatus, isLoading: statusLoading, refetch } = useCloudflareStatus();
   const verifyMutation = useVerifyCloudflareToken();
   const setupMutation  = useSetupCloudflare();
@@ -111,12 +124,9 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
 
   // Integration progress state
   const [isIntegrating, setIsIntegrating] = useState(false);
-  const [stages, setStages] = useState<IntegrationStage[]>([
-    { id: "verify", label: "Vérification des informations d'identification", description: "Vérification du token API Cloudflare et de l'accès au domaine.", status: "idle" },
-    { id: "dns", label: "Configuration des enregistrements DNS", description: "Configuration des enregistrements MX nécessaires pour l'acheminement des e-mails.", status: "idle" },
-    { id: "worker", label: "Déploiement du Worker", description: "Déploiement du Worker Sicurre pour analyser chaque e-mail entrant en temps réel.", status: "idle" },
-    { id: "routing", label: "Liaison du routage & validation finale", description: "Création de la règle catch-all et test final de connectivité de la passerelle.", status: "idle" }
-  ]);
+  const [stages, setStages] = useState<IntegrationStage[]>(() =>
+    integrationStages(t, ["idle", "idle", "idle", "idle"]),
+  );
 
   // Teardown state
   const [showTeardown, setShowTeardown] = useState(false);
@@ -125,14 +135,9 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
   useEffect(() => {
     if (cfStatus?.status === "provisioning" && !isIntegrating) {
       setIsIntegrating(true);
-      setStages([
-        { id: "verify", label: "Vérification des informations d'identification", description: "Vérification du token API Cloudflare et de l'accès au domaine.", status: "success" },
-        { id: "dns", label: "Configuration des enregistrements DNS", description: "Configuration des enregistrements MX nécessaires pour l'acheminement des e-mails.", status: "success" },
-        { id: "worker", label: "Déploiement du Worker", description: "Déploiement du Worker Sicurre pour analyser chaque e-mail entrant en temps réel.", status: "success" },
-        { id: "routing", label: "Liaison du routage & validation finale", description: "Création de la règle catch-all et test final de connectivité de la passerelle.", status: "loading" }
-      ]);
+      setStages(integrationStages(t, ["success", "success", "success", "loading"]));
     }
-  }, [cfStatus?.status, isIntegrating]);
+  }, [cfStatus?.status, isIntegrating, t]);
 
   // React to status completion updates during routing step
   useEffect(() => {
@@ -145,13 +150,13 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
           onSuccess?.();
         }, 1500);
       } else if (cfStatus?.status === "error") {
-        setStages(prev => prev.map(s => s.id === "routing" ? { ...s, status: "error", errorMsg: formatCloudflareError(t, cfStatus.error_message || "Échec de la configuration finale.") } : s));
+        setStages(prev => prev.map(s => s.id === "routing" ? { ...s, status: "error", errorMsg: formatCloudflareError(t, cfStatus.error_message || t("cloudflare.final_setup_failed")) } : s));
       }
     }
     return () => {
       if (timerId) clearTimeout(timerId);
     };
-  }, [cfStatus?.status, isIntegrating, stages, onSuccess]);
+  }, [cfStatus?.status, isIntegrating, stages, onSuccess, t]);
 
   // Poll status ONLY when integrating or provisioning in the background
   useEffect(() => {
@@ -166,12 +171,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
     if (!cfToken.trim() || !zoneName.trim()) return;
 
     setIsIntegrating(true);
-    setStages([
-      { id: "verify", label: "Vérification des informations d'identification", description: "Vérification du token API Cloudflare et de l'accès au domaine.", status: "loading" },
-      { id: "dns", label: "Configuration des enregistrements DNS", description: "Configuration des enregistrements MX nécessaires pour l'acheminement des e-mails.", status: "idle" },
-      { id: "worker", label: "Déploiement du Worker", description: "Déploiement du Worker Sicurre pour analyser chaque e-mail entrant en temps réel.", status: "idle" },
-      { id: "routing", label: "Liaison du routage & validation finale", description: "Création de la règle catch-all et test final de connectivité de la passerelle.", status: "idle" }
-    ]);
+    setStages(integrationStages(t, ["loading", "idle", "idle", "idle"]));
 
     try {
       // Step 1: Verify token
@@ -181,7 +181,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
       });
 
       if (!result.valid) {
-        setStages(prev => prev.map(s => s.id === "verify" ? { ...s, status: "error", errorMsg: formatCloudflareError(t, result.error || "Token ou domaine invalide.") } : s));
+        setStages(prev => prev.map(s => s.id === "verify" ? { ...s, status: "error", errorMsg: formatCloudflareError(t, result.error || t("cloudflare.invalid_token_or_domain")) } : s));
         return;
       }
 
@@ -213,7 +213,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
     } catch (err: any) {
       setStages(prev => prev.map(s => {
         if (s.status === "loading") {
-          return { ...s, status: "error", errorMsg: formatCloudflareError(t, err.message || "Une erreur est survenue lors de cette étape.") };
+          return { ...s, status: "error", errorMsg: formatCloudflareError(t, err.message || t("cloudflare.stage_failed")) };
         }
         return s;
       }));
@@ -242,12 +242,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
       });
       await refetch();
       setIsIntegrating(true);
-      setStages([
-        { id: "verify", label: "Vérification des informations d'identification", description: "Vérification du token API Cloudflare et de l'accès au domaine.", status: "success" },
-        { id: "dns", label: "Configuration des enregistrements DNS", description: "Configuration des enregistrements MX nécessaires pour l'acheminement des e-mails.", status: "success" },
-        { id: "worker", label: "Déploiement du Worker", description: "Déploiement du Worker Sicurre pour analyser chaque e-mail entrant en temps réel.", status: "success" },
-        { id: "routing", label: "Liaison du routage & validation finale", description: "Création de la règle catch-all et test final de connectivité de la passerelle.", status: "loading" },
-      ]);
+      setStages(integrationStages(t, ["success", "success", "success", "loading"]));
     } catch {
       await refetch();
     }
@@ -285,9 +280,9 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
       <MotionDiv initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
         <div className="bg-surface-low/30 border border-border-subtle rounded-xl p-5 space-y-5">
           <div>
-            <h4 className="font-display font-semibold text-[15px] text-on-surface">Configuration de l'Intégration</h4>
+            <h4 className="font-display font-semibold text-[15px] text-on-surface">{t("cloudflare.progress_title")}</h4>
             <p className="text-xs text-on-surface-variant mt-0.5">
-              Suivi en direct des étapes de provisionnement sur votre compte Cloudflare.
+              {t("cloudflare.progress_desc")}
             </p>
           </div>
 
@@ -337,7 +332,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
                 onClick={() => setIsIntegrating(false)}
                 className="text-[11px]"
               >
-                Retourner à la configuration
+                {t("cloudflare.back_to_setup")}
               </Button>
             </div>
           )}
@@ -361,7 +356,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
                 <StatusBadge status="active" />
               </div>
               <p className="text-xs text-on-surface-variant">
-                Emails transférés vers <strong>{intStatus.destination_email}</strong> après scan
+                {t("cloudflare.forwarding_to")} <strong>{intStatus.destination_email}</strong>
               </p>
               <p className="text-[10px] text-on-surface-variant/50 font-mono mt-0.5">
                 Worker: {intStatus.worker_name}
@@ -372,16 +367,16 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
           <div className="p-3 bg-surface-low border border-border-subtle rounded-lg text-center">
-            <div className="font-bold text-on-surface text-sm mb-0.5">Phishing</div>
-            <div className="text-on-surface-variant">Rejeté automatiquement</div>
+            <div className="font-bold text-on-surface text-sm mb-0.5">{t("threats.badge_phishing")}</div>
+            <div className="text-on-surface-variant">{t("cloudflare.phishing_action")}</div>
           </div>
           <div className="p-3 bg-surface-low border border-border-subtle rounded-lg text-center">
-            <div className="font-bold text-on-surface text-sm mb-0.5">Spam</div>
-            <div className="text-on-surface-variant">Transféré + marqué</div>
+            <div className="font-bold text-on-surface text-sm mb-0.5">{t("threats.badge_spam")}</div>
+            <div className="text-on-surface-variant">{t("cloudflare.spam_action")}</div>
           </div>
           <div className="p-3 bg-surface-low border border-border-subtle rounded-lg text-center">
-            <div className="font-bold text-on-surface text-sm mb-0.5">Légitime</div>
-            <div className="text-on-surface-variant">Transféré intact</div>
+            <div className="font-bold text-on-surface text-sm mb-0.5">{t("threats.badge_legitimate")}</div>
+            <div className="text-on-surface-variant">{t("cloudflare.legitimate_action")}</div>
           </div>
         </div>
 
@@ -392,12 +387,12 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
             className="flex items-center gap-1.5 text-xs text-error/70 hover:text-error transition-colors cursor-pointer"
           >
             <Trash2 className="w-3.5 h-3.5" />
-            Désactiver l'intégration
+            {t("cloudflare.disable")}
           </button>
         ) : (
           <div className="p-4 border border-error/20 bg-error/[0.03] rounded-xl space-y-3">
             <p className="text-xs font-semibold text-error">
-              Le Worker et la règle de routage Cloudflare seront supprimés avant la dissociation locale.
+              {t("cloudflare.disable_desc")}
             </p>
             {teardownMutation.isError && (
               <p className="text-xs text-error">{(teardownMutation.error as Error)?.message}</p>
@@ -411,10 +406,10 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
                 className="gap-1.5 text-[11px]"
               >
                 {teardownMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                Confirmer la désactivation
+                {t("cloudflare.confirm_disable")}
               </Button>
               <Button variant="outline" size="sm" onClick={() => setShowTeardown(false)} className="text-[11px]">
-                Annuler
+                {t("common.cancel")}
               </Button>
             </div>
           </div>
@@ -430,17 +425,16 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
         <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
           <Mail className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
           <div>
-            <p className="font-bold text-sm text-amber-800 mb-1">Vérifiez votre boîte email</p>
+            <p className="font-bold text-sm text-amber-800 mb-1">{t("cloudflare.verify_email")}</p>
             <p className="text-xs text-amber-700">
-              Cloudflare a envoyé un email de vérification à{" "}
-              <strong>{intStatus.destination_email}</strong>. Cliquez sur le lien dans cet email pour
-              activer le transfert. L'intégration deviendra active automatiquement dès le premier email reçu.
+              {t("cloudflare.verify_email_desc")}{" "}
+              <strong>{intStatus.destination_email}</strong>.
             </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-xs text-on-surface-variant">
-            Zone : <strong>{intStatus.zone_name}</strong> · Worker : <code className="font-mono text-[10px] bg-surface-container px-1 rounded">{intStatus.worker_name}</code>
+            {t("cloudflare.zone")} <strong>{intStatus.zone_name}</strong> · Worker: <code className="font-mono text-[10px] bg-surface-container px-1 rounded">{intStatus.worker_name}</code>
           </div>
           <StatusBadge status="pending_verification" />
         </div>
@@ -449,23 +443,23 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
           className="flex items-center gap-1.5 text-xs text-primary hover:text-primary-dark transition-colors cursor-pointer"
         >
           <RefreshCw className="w-3.5 h-3.5" />
-          Actualiser le statut
+          {t("cloudflare.refresh_status")}
         </button>
         {!showTeardown ? (
           <button onClick={() => setShowTeardown(true)} className="flex items-center gap-1.5 text-xs text-error/70 hover:text-error transition-colors cursor-pointer">
-            <Trash2 className="w-3.5 h-3.5" /> Annuler et supprimer
+            <Trash2 className="w-3.5 h-3.5" /> {t("cloudflare.cancel_and_delete")}
           </button>
         ) : (
           <div className="p-4 border border-error/20 bg-error/[0.03] rounded-xl space-y-3">
             <p className="text-xs font-semibold text-error">
-              Le Worker et la règle de routage Cloudflare seront supprimés avant la dissociation locale.
+              {t("cloudflare.disable_desc")}
             </p>
             <div className="flex gap-2">
               <Button variant="danger" size="sm" onClick={handleTeardown} disabled={!intStatus.id || teardownMutation.isPending} className="gap-1.5 text-[11px]">
                 {teardownMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                Supprimer
+                {t("cloudflare.delete")}
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowTeardown(false)} className="text-[11px]">Annuler</Button>
+              <Button variant="outline" size="sm" onClick={() => setShowTeardown(false)} className="text-[11px]">{t("common.cancel")}</Button>
             </div>
           </div>
         )}
@@ -480,11 +474,11 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
         <div className="flex items-start gap-3 p-4 bg-error/[0.04] border border-error/20 rounded-xl">
           <AlertTriangle className="w-5 h-5 text-error shrink-0 mt-0.5" />
           <div>
-            <p className="font-bold text-sm text-error mb-1">Échec du provisionnement</p>
+            <p className="font-bold text-sm text-error mb-1">{t("cloudflare.provisioning_failed")}</p>
             <p className="text-[13px] leading-5 text-on-error-container">{formatCloudflareError(t, intStatus.error_message)}</p>
           </div>
         </div>
-        <p className="text-[13px] text-on-surface-variant">Vérifiez le token et les permissions, puis réessayez.</p>
+        <p className="text-[13px] text-on-surface-variant">{t("cloudflare.check_permissions")}</p>
         <Button
           variant="outline"
           size="sm"
@@ -492,7 +486,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
           disabled={setupMutation.isPending}
           className="gap-1.5 text-[11px]"
         >
-          {setupMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Réessayer
+          {setupMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} {t("common.retry")}
         </Button>
       </MotionDiv>
     );
@@ -505,7 +499,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
     <MotionDiv initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       <div className="bg-surface-low/30 border border-border-subtle rounded-xl p-5 space-y-4">
         <div className="flex items-center gap-2 relative">
-          <h4 className="font-display font-semibold text-[15px] text-on-surface">Configurer l'Intégration</h4>
+          <h4 className="font-display font-semibold text-[15px] text-on-surface">{t("cloudflare.configure")}</h4>
           <div
             className="relative inline-block"
             onMouseEnter={() => setShowHelp(true)}
@@ -515,7 +509,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
               type="button"
               onClick={() => setShowHelp(v => !v)}
               className="text-on-surface-variant/50 hover:text-primary transition-colors cursor-help p-0.5 rounded-full hover:bg-surface-low/50 flex items-center justify-center outline-none"
-              aria-label="Aide à la configuration"
+              aria-label={t("cloudflare.setup_help")}
             >
               <HelpCircle className="w-3.5 h-3.5" />
             </button>
@@ -528,13 +522,13 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
                   transition={{ duration: 0.15 }}
                   className="absolute left-6 -top-2 z-30 w-72 bg-white border border-border-subtle p-4 rounded-xl shadow-lg text-[11px] text-on-surface-variant/80 space-y-1.5 leading-normal"
                 >
-                  <p className="font-bold text-on-surface">Instructions pour générer le token Cloudflare :</p>
-                  <p>1. Connectez-vous à votre compte sur <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noreferrer" className="text-primary underline inline-flex items-center gap-0.5 font-semibold">dash.cloudflare.com <ExternalLink className="w-3 h-3" /></a>.</p>
-                  <p>2. Créez un jeton personnalisé avec les droits d'écriture (Edit) suivants :</p>
+                  <p className="font-bold text-on-surface">{t("cloudflare.token_help_title")}</p>
+                  <p>1. {t("cloudflare.token_help_login")} <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noreferrer" className="text-primary underline inline-flex items-center gap-0.5 font-semibold">dash.cloudflare.com <ExternalLink className="w-3 h-3" /></a>.</p>
+                  <p>2. {t("cloudflare.token_help_permissions")}</p>
                   <ul className="list-disc pl-4 space-y-0.5 mt-1 font-medium text-on-surface">
-                    <li>Zone › DNS › Modifier</li>
-                    <li>Workers Scripts › Modifier</li>
-                    <li>Email Routing › Modifier</li>
+                    <li>Zone › DNS › Edit</li>
+                    <li>Workers Scripts › Edit</li>
+                    <li>Email Routing › Edit</li>
                   </ul>
                 </MotionDiv>
               )}
@@ -545,11 +539,11 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
         <div className="grid grid-cols-1 gap-4 pt-2">
           <div>
             <Input
-              label="Token Cloudflare API"
+              label={t("cloudflare.api_token")}
               type={showToken ? "text" : "password"}
               value={cfToken}
               onChange={e => setCfToken(e.target.value)}
-              placeholder="Ex: d784a3b8cd9a98ef12..."
+              placeholder={t("cloudflare.api_token_placeholder")}
               suffix={
                 <button type="button" onClick={() => setShowToken(v => !v)} className="text-on-surface-variant/60 hover:text-on-surface transition-colors cursor-pointer">
                   {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -560,11 +554,11 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
 
           <div>
             <Input
-              label="Domaine à protéger"
+              label={t("cloudflare.domain")}
               type="text"
               value={zoneName}
               onChange={e => setZoneName(e.target.value.trim().toLowerCase())}
-              placeholder="Ex: mon-entreprise.fr"
+              placeholder={t("cloudflare.domain_placeholder")}
             />
           </div>
         </div>
@@ -577,8 +571,8 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
           className="w-full sm:w-auto text-xs font-bold cursor-pointer"
         >
           {verifyMutation.isPending || setupMutation.isPending
-            ? (i18n.language === "fr" ? "Intégration en cours…" : "Integrating…")
-            : (i18n.language === "fr" ? "Intégrer le domaine" : "Integrate domain")}
+            ? t("cloudflare.integrating")
+            : t("cloudflare.integrate")}
         </Button>
       </div>
     </MotionDiv>

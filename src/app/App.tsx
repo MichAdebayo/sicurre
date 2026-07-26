@@ -1,5 +1,4 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { AnimatePresence } from "framer-motion";
 import { AppShell } from "./components/common/app-shell";
 import { SidebarPage } from "./components/common/sidebar";
 import {
@@ -13,6 +12,7 @@ import {
   resolveAuthorizedPage,
   sidebarPagePaths,
 } from "./lib/navigation";
+import { useTranslation } from "react-i18next";
 
 const LandingRoute = lazy(() => import("./routes/landing"));
 const LoginRoute = lazy(() => import("./routes/login"));
@@ -82,17 +82,19 @@ const getInitialViewState = (): ViewState => {
 };
 
 function RouteFallback() {
+  const { t } = useTranslation();
   return (
     <div className="min-h-screen w-screen flex items-center justify-center bg-surface-low text-on-surface">
-      <div className="text-sm font-semibold">Chargement…</div>
+      <div className="text-sm font-semibold">{t("common.loading")}</div>
     </div>
   );
 }
 
 function PageRouteFallback() {
+  const { t } = useTranslation();
   return (
     <div className="flex min-h-48 items-center justify-center text-sm font-semibold text-on-surface-variant">
-      Chargement…
+      {t("common.loading")}
     </div>
   );
 }
@@ -282,18 +284,16 @@ function AppContent() {
       onboardingRequired={session.onboarding_required}
     >
       <Suspense fallback={<PageRouteFallback />}>
-        <AnimatePresence mode="wait">
-          {activePage === "dashboard" && !session.is_platform_admin && <DashboardRoute key="dashboard" session={session} onGoToSettings={handleGoToSettings} />}
+          {activePage === "dashboard" && !session.is_platform_admin && <DashboardRoute session={session} onGoToSettings={handleGoToSettings} />}
           {activePage === "threats" && !session.is_platform_admin && (
-            <ThreatsRoute key="threats" />
+            <ThreatsRoute />
           )}
-          {activePage === "quarantine" && !session.is_platform_admin && <QuarantineRoute key="quarantine" />}
-          {activePage === "alerts" && !session.is_platform_admin && <AlertsRoute key="alerts" />}
-          {activePage === "domain-shield" && !session.is_platform_admin && <DomainShieldRoute key="domain-shield" session={session} />}
-          {activePage === "logs" && session.is_platform_admin && <LogsRoute key="logs" />}
-          {activePage === "settings" && <SettingsRoute key="settings" session={session} initialTab={settingsTab} />}
-          {activePage === "support" && <SupportRoute key="support" session={session} />}
-        </AnimatePresence>
+          {activePage === "quarantine" && !session.is_platform_admin && <QuarantineRoute />}
+          {activePage === "alerts" && !session.is_platform_admin && <AlertsRoute />}
+          {activePage === "domain-shield" && !session.is_platform_admin && <DomainShieldRoute session={session} />}
+          {activePage === "logs" && session.is_platform_admin && <LogsRoute />}
+          {activePage === "settings" && <SettingsRoute session={session} initialTab={settingsTab} />}
+          {activePage === "support" && <SupportRoute session={session} />}
       </Suspense>
     </AppShell>
   );

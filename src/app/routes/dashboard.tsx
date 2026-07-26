@@ -52,7 +52,7 @@ function KPIBlock({
     default: "border-border-subtle bg-white text-on-surface",
     primary: "border-primary/30 bg-primary/[0.02] text-primary shadow-sm",
     phishing: "border-error/30 bg-error/[0.02] text-error shadow-sm",
-    spam: "border-warning/25 bg-warning-bg/70 text-warning shadow-sm",
+    spam: "border-warning/25 bg-warning-bg/70 text-spam-text shadow-sm",
     legitimate: "border-safe/30 bg-safe/[0.02] text-safe shadow-sm",
   };
 
@@ -60,7 +60,7 @@ function KPIBlock({
     default: "text-on-surface",
     primary: "text-primary",
     phishing: "text-error",
-    spam: "text-warning",
+    spam: "text-spam-text",
     legitimate: "text-safe",
   };
 
@@ -141,7 +141,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
       for (let i = 6; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
-        
+
         const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
         const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
 
@@ -162,7 +162,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
       for (let i = 29; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
-        
+
         const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
         const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
 
@@ -183,7 +183,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
       for (let i = 11; i >= 0; i--) {
         const d = new Date();
         d.setMonth(d.getMonth() - i);
-        
+
         const startOfMonth = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
         const endOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
 
@@ -218,14 +218,16 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
 
   const recentAlerts = threats
     ? threats.slice(0, 5).map((alertItem) => ({
-        id: alertItem.id,
-        time: new Date(alertItem.received_at).toLocaleTimeString(i18n.language === "fr" ? "fr-FR" : "en-US", { hour: "2-digit", minute: "2-digit" }),
-        subject: alertItem.subject || t("threats.no_subject"),
-        sender: alertItem.sender,
-        content: alertItem.body_preview || "",
-        verdict: alertItem.verdict,
-        confidence: alertItem.confidence,
-      }))
+      id: alertItem.id,
+      time: new Date(alertItem.received_at).toLocaleTimeString(i18n.language === "fr" ? "fr-FR" : "en-US", { hour: "2-digit", minute: "2-digit" }),
+      subject: alertItem.subject || t("threats.no_subject"),
+      sender: alertItem.sender,
+      content: alertItem.body_preview || "",
+      privacyReference: alertItem.privacy_reference,
+      contentRedacted: alertItem.content_redacted,
+      verdict: alertItem.verdict,
+      confidence: alertItem.confidence,
+    }))
     : [];
 
   const securityScoreGrade = () => {
@@ -239,7 +241,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
   if (session.is_platform_admin) {
     return (
       <MotionDiv
-        initial={{ opacity: 0, y: 12 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -12 }}
         transition={{ duration: 0.3 }}
@@ -284,7 +286,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                 Déclenchez manuellement le cycle de normalisation, d'annotation et d'export du dataset vers Cloudflare R2 et Kaggle pour ré-entraîner le modèle CamemBERTav2.
               </p>
             </div>
-            
+
             <div className="space-y-4">
               {runPipelineMutation.isPending ? (
                 <Button disabled className="w-full flex items-center justify-center gap-2">
@@ -350,9 +352,8 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                       <td className="py-3.5 pl-2 font-semibold text-on-surface text-xs">{ds.version_tag}</td>
                       <td className="py-3.5 text-xs font-semibold text-on-surface">{ds.item_count.toLocaleString("fr-FR")}</td>
                       <td className="py-3.5">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                          ds.status === "frozen" ? "bg-safe/10 text-safe" : "bg-warning/10 text-warning"
-                        }`}>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${ds.status === "frozen" ? "bg-safe/10 text-safe" : "bg-warning/10 text-warning"
+                          }`}>
                           {ds.status}
                         </span>
                       </td>
@@ -382,7 +383,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
   // General tenant dashboard
   return (
     <MotionDiv
-      initial={{ opacity: 0, y: 12 }}
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.3 }}
@@ -406,12 +407,10 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
             </div>
             <div>
               <h3 className="font-bold text-sm text-on-surface">
-                {i18n.language === "fr" ? "Surveillance en temps réel suspendue" : "Real-time monitoring suspended"}
+                {t("dashboard.monitoring_suspended")}
               </h3>
               <p className="text-xs text-on-surface-variant mt-0.5 font-medium leading-relaxed">
-                {i18n.language === "fr"
-                  ? "Votre domaine a été déconnecté. Vos données historiques sont conservées ci-dessous, mais aucun nouvel email n'est actuellement intercepté."
-                  : "Your domain is disconnected. Your historical scan logs are preserved below, but no incoming emails are currently intercepted."}
+                {t("dashboard.monitoring_suspended_desc")}
               </p>
             </div>
           </div>
@@ -420,7 +419,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
             size="sm"
             className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shrink-0 cursor-pointer h-9 px-4 rounded-lg shadow-sm"
           >
-            {i18n.language === "fr" ? "Reconnecter mon domaine" : "Reconnect Domain"}
+            {t("dashboard.reconnect_domain")}
           </Button>
         </div>
       )}
@@ -433,12 +432,10 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
             </div>
             <div>
               <h3 className="font-bold text-sm text-on-surface">
-                {i18n.language === "fr" ? "Bienvenue sur Sicurre ! Protégez votre domaine" : "Welcome to Sicurre! Protect your domain"}
+                {t("dashboard.onboarding_title")}
               </h3>
               <p className="text-xs text-on-surface-variant mt-0.5 font-medium leading-relaxed">
-                {i18n.language === "fr"
-                  ? "Connectez votre domaine via Cloudflare pour activer l'interception automatique et sécuriser vos e-mails."
-                  : "Connect your domain via Cloudflare to enable automatic interception and secure your email gateway."}
+                {t("dashboard.onboarding_desc")}
               </p>
             </div>
           </div>
@@ -447,283 +444,277 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
             size="sm"
             className="bg-primary hover:bg-primary/90 text-on-primary font-bold text-xs shrink-0 cursor-pointer h-9 px-4 rounded-lg shadow-sm"
           >
-            {i18n.language === "fr" ? "Connecter mon domaine" : "Connect Domain"}
+            {t("dashboard.connect_domain")}
           </Button>
         </div>
       )}
 
       {/* Hero Row: KPI blocks + Security Score Grade */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
-            {/* Security Grade Hero (Reduced circle, overflow-visible for z-index tooltip popup) */}
-            <div className="md:col-span-4 bg-white rounded-xl border border-border-subtle p-6 flex flex-col items-center justify-center text-center shadow-sm relative overflow-visible">
-              <div className="absolute top-0 left-6 right-6 h-[3px] bg-primary rounded-b-md" />
-              <div className="text-[12px] font-extrabold uppercase tracking-wider text-on-surface-variant mb-5 flex items-center justify-center gap-1.5 w-full">
-                <Award className="w-4 h-4 text-primary" />
-                <span>{t("dashboard.security_score")}</span>
-                
-                {/* Tooltip trigger with high z-index and border styling */}
-                <div className="relative group">
-                  <Info className="w-3.5 h-3.5 text-on-surface-variant/50 cursor-help hover:text-primary transition-colors" />
-                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-44 bg-white border border-border-subtle text-on-surface text-[10px] p-2.5 rounded-xl shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 z-50 normal-case leading-normal font-sans text-center font-bold">
-                    Overall status of your email gateway
-                  </div>
-                </div>
-              </div>
-              <div className="w-28 h-28 rounded-full bg-primary/[0.04] border border-primary/10 flex items-center justify-center font-display font-extrabold text-5xl text-primary shadow-inner">
-                {grade}
-              </div>
-            </div>
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
+        {/* Security Grade Hero (Reduced circle, overflow-visible for z-index tooltip popup) */}
+        <div className="md:col-span-4 bg-white rounded-xl border border-border-subtle p-6 flex flex-col items-center justify-center text-center shadow-sm relative overflow-visible">
+          <div className="absolute top-0 left-6 right-6 h-[3px] bg-primary rounded-b-md" />
+          <div className="text-[12px] font-extrabold uppercase tracking-wider text-on-surface-variant mb-5 flex items-center justify-center gap-1.5 w-full">
+            <Award className="w-4 h-4 text-primary" />
+            <span>{t("dashboard.security_score")}</span>
 
-            {/* General KPI blocks */}
-            <div className="md:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <KPIBlock label={t("dashboard.kpi_raw")} value={kpisLoading ? "—" : totalScans.toLocaleString()} variant="primary" />
-              <KPIBlock label={t("threats.badge_phishing")} value={kpisLoading ? "—" : phishingCount.toLocaleString()} variant="phishing" />
-              <KPIBlock label={t("threats.badge_spam")} value={kpisLoading ? "—" : spamCount.toLocaleString()} variant="spam" />
-              <KPIBlock label={t("threats.badge_legitimate")} value={kpisLoading ? "—" : legitimateCount.toLocaleString()} variant="legitimate" />
+            {/* Tooltip trigger with high z-index and border styling */}
+            <div className="relative group">
+              <Info className="w-3.5 h-3.5 text-on-surface-variant/50 cursor-help hover:text-primary transition-colors" />
+              <div className="absolute bottom-full right-0 z-50 mb-2 w-44 max-w-[calc(100vw-3rem)] rounded-xl border border-border-subtle bg-white p-2.5 text-center font-sans text-[10px] font-bold normal-case leading-normal text-on-surface opacity-0 shadow-xl transition-opacity duration-200 pointer-events-none group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
+                {t("dashboard.security_score_desc")}
+              </div>
             </div>
           </div>
+          <div className="w-28 h-28 rounded-full bg-primary/[0.04] border border-primary/10 flex items-center justify-center font-display font-extrabold text-5xl text-primary shadow-inner">
+            {grade}
+          </div>
+        </div>
 
-          {/* Verdict Distribution & Trend Analysis chart */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Verdict Distribution */}
-            <div className="lg:col-span-5 bg-white rounded-xl border border-border-subtle p-6 shadow-sm flex flex-col justify-between">
+        {/* General KPI blocks */}
+        <div className="md:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <KPIBlock label={t("dashboard.kpi_raw")} value={kpisLoading ? "—" : totalScans.toLocaleString()} variant="primary" />
+          <KPIBlock label={t("threats.badge_phishing")} value={kpisLoading ? "—" : phishingCount.toLocaleString()} variant="phishing" />
+          <KPIBlock label={t("threats.badge_spam")} value={kpisLoading ? "—" : spamCount.toLocaleString()} variant="spam" />
+          <KPIBlock label={t("threats.badge_legitimate")} value={kpisLoading ? "—" : legitimateCount.toLocaleString()} variant="legitimate" />
+        </div>
+      </div>
+
+      {/* Verdict Distribution & Trend Analysis chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Verdict Distribution */}
+        <div className="lg:col-span-5 bg-white rounded-xl border border-border-subtle p-6 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-2 pb-4 border-b border-border-subtle mb-4">
+              <Cpu className="w-5 h-5 text-primary" />
               <div>
-                <div className="flex items-center gap-2 pb-4 border-b border-border-subtle mb-4">
-                  <Cpu className="w-5 h-5 text-primary" />
-                  <div>
-                    <h3 className="font-display font-semibold text-[17px] text-on-surface">
-                      {t("dashboard.verdict_distribution")}
-                    </h3>
-                    <p className="text-[13px] text-on-surface-variant font-medium leading-5">
-                      {i18n.language === "fr" ? "Répartition des emails par classification IA" : "Distribution of emails by AI safety classification"}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Vertical gaps spacing expanded to distribute elements more evenly in space */}
-                <div className="space-y-7 pt-4 pb-2">
-                  <DistributionRow label={t("threats.badge_legitimate")} count={legitimateCount} total={Math.max(totalScans, 1)} colorClass="bg-safe" />
-                  <DistributionRow label={t("threats.badge_spam")} count={spamCount} total={Math.max(totalScans, 1)} colorClass="bg-warning" />
-                  <DistributionRow label={t("threats.badge_phishing")} count={phishingCount} total={Math.max(totalScans, 1)} colorClass="bg-error" />
-                </div>
+                <h3 className="font-display font-semibold text-[17px] text-on-surface">
+                  {t("dashboard.verdict_distribution")}
+                </h3>
+                <p className="text-[13px] text-on-surface-variant font-medium leading-5">
+                  {t("dashboard.verdict_distribution_desc")}
+                </p>
               </div>
             </div>
 
-            {/* Trend Analysis chart trend (Height Increased, Title renamed, light-adapted tooltip breakdown only) */}
-            <div className="lg:col-span-7 bg-white rounded-xl border border-border-subtle p-6 shadow-sm flex flex-col justify-between relative min-h-[350px]">
-              <div>
-                <div className="flex items-center justify-between pb-4 border-b border-border-subtle mb-4">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-primary" />
-                    <div>
-                      <h3 className="font-display font-semibold text-[17px] text-on-surface">
-                        {i18n.language === "fr" ? "Analyse des Tendances" : "Trend Analysis"}
-                      </h3>
-                      <p className="text-[13px] text-on-surface-variant font-medium leading-5">
-                        {t("dashboard.scans_over_time")}
+            {/* Vertical gaps spacing expanded to distribute elements more evenly in space */}
+            <div className="space-y-7 pt-4 pb-2">
+              <DistributionRow label={t("threats.badge_legitimate")} count={legitimateCount} total={Math.max(totalScans, 1)} colorClass="bg-safe" />
+              <DistributionRow label={t("threats.badge_spam")} count={spamCount} total={Math.max(totalScans, 1)} colorClass="bg-warning" />
+              <DistributionRow label={t("threats.badge_phishing")} count={phishingCount} total={Math.max(totalScans, 1)} colorClass="bg-error" />
+            </div>
+          </div>
+        </div>
+
+        {/* Trend Analysis chart trend (Height Increased, Title renamed, light-adapted tooltip breakdown only) */}
+        <div className="lg:col-span-7 bg-white rounded-xl border border-border-subtle p-6 shadow-sm flex flex-col justify-between relative min-h-[350px]">
+          <div>
+            <div className="mb-4 flex flex-col items-start gap-3 border-b border-border-subtle pb-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-primary" />
+                <div>
+                  <h3 className="font-display font-semibold text-[17px] text-on-surface">
+                    {t("dashboard.trend_analysis")}
+                  </h3>
+                  <p className="text-[13px] text-on-surface-variant font-medium leading-5">
+                    {t("dashboard.scans_over_time")}
+                  </p>
+                </div>
+              </div>
+
+              {/* Range Switcher */}
+              <div className="flex w-full gap-1 rounded-lg bg-surface-low p-1 sm:w-auto">
+                {(["7d", "30d", "12m"] as const).map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => {
+                      setDateRange(r);
+                      setHoveredBarIndex(null);
+                    }}
+                    className={`flex-1 rounded px-2.5 py-1 text-[12px] font-bold transition-all cursor-pointer sm:flex-none ${dateRange === r
+                        ? "bg-white text-primary shadow-sm"
+                        : "text-on-surface-variant hover:text-on-surface"
+                      }`}
+                  >
+                    {t(`dashboard.range_${r}`)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Stacked interactive bars chart wrapped in overflow container (Height increased to h-56) */}
+            <div className="w-full overflow-x-auto select-none scrollbar-none pb-1">
+              <div
+                className={`h-56 pt-2 flex items-end justify-between gap-2.5 w-full font-sans text-[12px] font-bold text-on-surface-variant select-none ${dateRange !== "7d" ? "min-w-[650px]" : ""
+                  }`}
+              >
+                {trendData.labels.map((label, idx) => {
+                  const safe = trendData.safeCounts[idx];
+                  const spam = trendData.spamCounts[idx];
+                  const phish = trendData.phishingCounts[idx];
+                  const total = safe + spam + phish;
+
+                  // compute bar heights relative to max
+                  const totalPct = maxTrendVal > 0 ? (total / maxTrendVal) * 100 : 0;
+                  const safePct = total > 0 ? (safe / total) * 100 : 0;
+                  const spamPct = total > 0 ? (spam / total) * 100 : 0;
+                  const phishPct = total > 0 ? (phish / total) * 100 : 0;
+
+                  return (
+                    <div
+                      key={idx}
+                      className="flex-1 flex flex-col items-center gap-1 h-full justify-end group cursor-pointer relative"
+                      onMouseEnter={() => setHoveredBarIndex(idx)}
+                      onMouseLeave={() => setHoveredBarIndex(null)}
+                    >
+                      {/* Daily total value displayed above the bar */}
+                      <span className="font-extrabold text-[13px] text-primary/85 mb-0.5 group-hover:text-primary transition-colors tabular-nums">
+                        {total}
+                      </span>
+
+                      {/* Removed standard HTML browser titles */}
+                      <div
+                        className="w-full flex flex-col justify-end rounded-t-md overflow-hidden bg-surface-low border border-border-subtle/50 transition-all duration-300 group-hover:scale-y-105"
+                        style={{ height: `${Math.max(6, totalPct * 0.78)}%` }}
+                      >
+                        {/* Phishing stack (Top) */}
+                        {phish > 0 && (
+                          <div
+                            className="bg-error w-full transition-all"
+                            style={{ height: `${phishPct}%` }}
+                          />
+                        )}
+                        {/* Spam stack (Middle) */}
+                        {spam > 0 && (
+                          <div
+                            className="bg-warning w-full transition-all"
+                            style={{ height: `${spamPct}%` }}
+                          />
+                        )}
+                        {/* Legitimate stack (Bottom) */}
+                        {safe > 0 && (
+                          <div
+                            className="bg-safe w-full transition-all"
+                            style={{ height: `${safePct}%` }}
+                          />
+                        )}
+                      </div>
+                      <span className="text-[12px] text-on-surface-variant truncate w-full text-center font-bold">
+                        {label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Absolute Floating Tooltip Card (Only displays breakdown counts, no date/totals) */}
+            {hoveredBarIndex !== null && (
+              <div className="absolute top-16 right-6 z-35 p-3 bg-white border border-border-subtle text-on-surface rounded-xl text-[13px] shadow-xl flex flex-col gap-1.5 w-48 font-sans select-none pointer-events-none animate-in fade-in duration-100">
+                <div className="flex items-center justify-between gap-2 font-bold text-safe border-b border-border-subtle/40 pb-1.5 mb-0.5">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-safe" />
+                    {t("threats.badge_legitimate")}
+                  </span>
+                  <span>{trendData.safeCounts[hoveredBarIndex]}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2 border-b border-border-subtle/40 pb-1.5 mb-0.5 font-bold text-spam-text">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-warning" />
+                    {t("threats.badge_spam")}
+                  </span>
+                  <span>{trendData.spamCounts[hoveredBarIndex]}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2 font-bold text-error">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-error" />
+                    {t("threats.badge_phishing")}
+                  </span>
+                  <span>{trendData.phishingCounts[hoveredBarIndex]}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Expanded full-width Recent Emails Scanned live feed */}
+      <div className="grid grid-cols-1 gap-6">
+        <div className="bg-white rounded-xl border border-border-subtle p-6 shadow-sm">
+          <div className="flex flex-col gap-3 border-b border-border-subtle pb-4 mb-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2.5">
+              {/* Live pulsing green node blinker when active, static amber when suspended */}
+              {hasActiveDomain ? (
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-safe" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-safe" />
+                </span>
+              ) : (
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
+                </span>
+              )}
+              {/* Text size increased to match Live Feed titles */}
+              <h3 className="font-display font-bold text-[19px] text-on-surface">
+                {t("dashboard.recent_scans")}
+              </h3>
+            </div>
+            <div className={`inline-flex items-center gap-2 text-[12px] font-bold ${hasActiveDomain ? "text-primary" : "text-amber-600"}`}>
+              <Mail className="w-4 h-4" />
+              <span>
+                {hasActiveDomain
+                  ? t("dashboard.live_feed")
+                  : t("dashboard.interception_suspended")}
+              </span>
+            </div>
+          </div>
+          {threatsLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-16 bg-surface-low rounded-xl animate-pulse" />
+              ))}
+            </div>
+          ) : recentAlerts.length === 0 ? (
+            <div className="py-8 text-center text-on-surface-variant text-sm font-medium">
+              {t("dashboard.no_threats")}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {recentAlerts.map((alert) => (
+                <div
+                  key={alert.id}
+                  className="flex flex-col gap-3 rounded-lg border border-border-subtle bg-surface-low/30 p-4 transition-colors hover:bg-surface-low/60 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <span className="font-mono text-[12px] font-medium text-on-surface-variant">{alert.time}</span>
+                    <div className="min-w-0">
+                      <h4 className="truncate text-sm font-semibold text-on-surface">
+                        {alert.contentRedacted
+                          ? t("threats.processed_reference", {
+                              reference: alert.privacyReference.replace("MSG-", ""),
+                            })
+                          : alert.subject}
+                      </h4>
+                      <p className="mt-0.5 truncate text-[12px] text-on-surface-variant">
+                        {alert.contentRedacted ? t("threats.content_discarded") : alert.sender}
                       </p>
                     </div>
                   </div>
 
-                  {/* Range Switcher */}
-                  <div className="flex gap-1 bg-surface-low p-1 rounded-lg">
-                    {(["7d", "30d", "12m"] as const).map((r) => (
-                      <button
-                        key={r}
-                        onClick={() => {
-                          setDateRange(r);
-                          setHoveredBarIndex(null);
-                        }}
-                      className={`px-2.5 py-1 text-[12px] font-bold rounded transition-all cursor-pointer ${
-                          dateRange === r
-                            ? "bg-white text-primary shadow-sm"
-                            : "text-on-surface-variant hover:text-on-surface"
-                        }`}
-                      >
-                        {r === "7d"
-                          ? (i18n.language === "fr" ? "7 Jours" : "7 Days")
-                          : r === "30d"
-                          ? (i18n.language === "fr" ? "30 Jours" : "30 Days")
-                          : (i18n.language === "fr" ? "12 Mois" : "12 Months")}
-                      </button>
-                    ))}
+                  {/* Right Classification Badge */}
+                  <div className="shrink-0 sm:pl-2">
+                    <VerdictBadge
+                      verdict={alert.verdict}
+                      confidence={alert.confidence}
+                      showRisk={false}
+                    />
                   </div>
                 </div>
-
-                {/* Stacked interactive bars chart wrapped in overflow container (Height increased to h-56) */}
-                <div className="w-full overflow-x-auto select-none scrollbar-none pb-1">
-                  <div 
-                    className={`h-56 pt-2 flex items-end justify-between gap-2.5 w-full font-sans text-[12px] font-bold text-on-surface-variant select-none ${
-                      dateRange !== "7d" ? "min-w-[650px]" : ""
-                    }`}
-                  >
-                    {trendData.labels.map((label, idx) => {
-                      const safe = trendData.safeCounts[idx];
-                      const spam = trendData.spamCounts[idx];
-                      const phish = trendData.phishingCounts[idx];
-                      const total = safe + spam + phish;
-
-                      // compute bar heights relative to max
-                      const totalPct = maxTrendVal > 0 ? (total / maxTrendVal) * 100 : 0;
-                      const safePct = total > 0 ? (safe / total) * 100 : 0;
-                      const spamPct = total > 0 ? (spam / total) * 100 : 0;
-                      const phishPct = total > 0 ? (phish / total) * 100 : 0;
-
-                      return (
-                        <div
-                          key={idx}
-                          className="flex-1 flex flex-col items-center gap-1 h-full justify-end group cursor-pointer relative"
-                          onMouseEnter={() => setHoveredBarIndex(idx)}
-                          onMouseLeave={() => setHoveredBarIndex(null)}
-                        >
-                          {/* Daily total value displayed above the bar */}
-                          <span className="font-extrabold text-[13px] text-primary/85 mb-0.5 group-hover:text-primary transition-colors tabular-nums">
-                            {total}
-                          </span>
-
-                          {/* Removed standard HTML browser titles */}
-                          <div
-                            className="w-full flex flex-col justify-end rounded-t-md overflow-hidden bg-surface-low border border-border-subtle/50 transition-all duration-300 group-hover:scale-y-105"
-                            style={{ height: `${Math.max(6, totalPct * 0.78)}%` }}
-                          >
-                            {/* Phishing stack (Top) */}
-                            {phish > 0 && (
-                              <div
-                                className="bg-error w-full transition-all"
-                                style={{ height: `${phishPct}%` }}
-                              />
-                            )}
-                            {/* Spam stack (Middle) */}
-                            {spam > 0 && (
-                              <div
-                                className="bg-warning w-full transition-all"
-                                style={{ height: `${spamPct}%` }}
-                              />
-                            )}
-                            {/* Legitimate stack (Bottom) */}
-                            {safe > 0 && (
-                              <div
-                                className="bg-safe w-full transition-all"
-                                style={{ height: `${safePct}%` }}
-                              />
-                            )}
-                          </div>
-                          <span className="text-[12px] text-on-surface-variant truncate w-full text-center font-bold">
-                            {label}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Absolute Floating Tooltip Card (Only displays breakdown counts, no date/totals) */}
-                {hoveredBarIndex !== null && (
-                  <div className="absolute top-16 right-6 z-35 p-3 bg-white border border-border-subtle text-on-surface rounded-xl text-[13px] shadow-xl flex flex-col gap-1.5 w-48 font-sans select-none pointer-events-none animate-in fade-in duration-100">
-                    <div className="flex items-center justify-between gap-2 font-bold text-safe border-b border-border-subtle/40 pb-1.5 mb-0.5">
-                      <span className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-safe" />
-                        {t("threats.badge_legitimate")}
-                      </span>
-                      <span>{trendData.safeCounts[hoveredBarIndex]}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2 font-bold text-warning border-b border-border-subtle/40 pb-1.5 mb-0.5">
-                      <span className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-warning" />
-                        {t("threats.badge_spam")}
-                      </span>
-                      <span>{trendData.spamCounts[hoveredBarIndex]}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2 font-bold text-error">
-                      <span className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-error" />
-                        {t("threats.badge_phishing")}
-                      </span>
-                      <span>{trendData.phishingCounts[hoveredBarIndex]}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
+              ))}
             </div>
-          </div>
-
-          {/* Expanded full-width Recent Emails Scanned live feed */}
-          <div className="grid grid-cols-1 gap-6">
-            <div className="bg-white rounded-xl border border-border-subtle p-6 shadow-sm">
-              <div className="flex items-center justify-between mb-5 pb-4 border-b border-border-subtle">
-                <div className="flex items-center gap-2.5">
-                  {/* Live pulsing green node blinker when active, static amber when suspended */}
-                  {hasActiveDomain ? (
-                    <span className="relative flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-safe" />
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-safe" />
-                    </span>
-                  ) : (
-                    <span className="relative flex h-2.5 w-2.5">
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
-                    </span>
-                  )}
-                  {/* Text size increased to match Live Feed titles */}
-                  <h3 className="font-display font-bold text-[19px] text-on-surface">
-                    {i18n.language === "fr" ? "Emails Récemment Scannés" : "Recent Emails Scanned"}
-                  </h3>
-                </div>
-                <div className={`inline-flex items-center gap-2 text-[12px] font-bold ${hasActiveDomain ? "text-primary" : "text-amber-600"}`}>
-                  <Mail className="w-4 h-4" />
-                  <span>
-                    {hasActiveDomain
-                      ? (i18n.language === "fr" ? "Flux Live" : "Recent Scans")
-                      : (i18n.language === "fr" ? "Interception Suspendue" : "Interception Suspended")}
-                  </span>
-                </div>
-              </div>
-              {threatsLoading ? (
-                <div className="space-y-3">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="h-16 bg-surface-low rounded-xl animate-pulse" />
-                  ))}
-                </div>
-              ) : recentAlerts.length === 0 ? (
-                <div className="py-8 text-center text-on-surface-variant text-sm font-medium">
-                  {t("dashboard.no_threats")}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {recentAlerts.map((alert) => (
-                    <div
-                      key={alert.id}
-                      className="p-4 rounded-xl border border-border-subtle bg-surface-low/30 hover:bg-surface-low/60 transition-colors flex items-center justify-between gap-4"
-                    >
-                      {/* Left/Middle Content */}
-                      <div className="flex-1 min-w-0 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-[11px] text-on-surface-variant font-medium">{alert.time}</span>
-                          <span className="text-xs font-bold text-on-surface truncate max-w-[200px]" title={alert.sender}>
-                            {alert.verdict !== "phishing" && alert.verdict !== "quarantine" ? "[Masqué par Sicurre]" : alert.sender}
-                          </span>
-                        </div>
-                        <h4 className="font-bold text-sm text-on-surface truncate">
-                          {alert.verdict !== "phishing" && alert.verdict !== "quarantine" ? "[Masqué par Sicurre]" : alert.subject}
-                        </h4>
-                        <p className="text-[12px] text-on-surface-variant font-medium truncate max-w-3xl">
-                          {alert.verdict !== "phishing" && alert.verdict !== "quarantine" ? "[Masqué par Sicurre]" : alert.content}
-                        </p>
-                      </div>
-
-                      {/* Right Classification Badge */}
-                      <div className="shrink-0 pl-2">
-                        <VerdictBadge
-                          verdict={alert.verdict}
-                          confidence={alert.confidence}
-                          showRisk={false}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          )}
+        </div>
+      </div>
     </MotionDiv>
   );
 }

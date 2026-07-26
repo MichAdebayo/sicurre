@@ -17,11 +17,13 @@ import {
   Info,
   Loader2,
   RefreshCw,
+  Bell,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { CloudflareIntegrator } from "../components/common/cloudflare-integrator";
 import { AppToast } from "../components/common/app-toast";
+import AlertsRoute from "./alerts";
 import cloudflareLogo from "../assets/cloudflare-svgrepo-com.svg";
 import {
   AuthSession,
@@ -45,7 +47,7 @@ interface SettingsRouteProps {
 
 export default function SettingsRoute({ session, initialTab }: SettingsRouteProps) {
   const { t, i18n } = useTranslation();
-  const [activeTab, setActiveTab] = useState<"profile" | "security" | "preferences" | "domains" | "integrations">(
+  const [activeTab, setActiveTab] = useState<"profile" | "security" | "preferences" | "notifications" | "domains" | "integrations">(
     (initialTab as any) || (session.onboarding_required ? "domains" : "profile")
   );
 
@@ -144,15 +146,15 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
     setPasswordSuccess(false);
 
     if (!currentPassword || !newPassword || !confirmPassword) {
-      setPasswordError(lang === "fr" ? "Tous les champs sont obligatoires." : "All fields are required.");
+      setPasswordError(t("settings.password_required"));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setPasswordError(lang === "fr" ? "Les nouveaux mots de passe ne correspondent pas." : "New passwords do not match.");
+      setPasswordError(t("settings.password_mismatch"));
       return;
     }
     if (newPassword.length < 8) {
-      setPasswordError(lang === "fr" ? "Le mot de passe doit faire au moins 8 caractères." : "Password must be at least 8 characters.");
+      setPasswordError(t("settings.password_minimum"));
       return;
     }
 
@@ -166,7 +168,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
       setNewPassword("");
       setConfirmPassword("");
     } catch (error) {
-      setPasswordError(error instanceof Error ? error.message : "Failed to update password.");
+      setPasswordError(error instanceof Error ? error.message : t("settings.password_update_failed"));
     }
   };
 
@@ -185,7 +187,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
       setSaveStatus(true);
       setTimeout(() => setSaveStatus(false), 3000);
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : "Failed to save profile.");
+      setSaveError(error instanceof Error ? error.message : t("settings.profile_save_failed"));
     }
   };
 
@@ -200,18 +202,12 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
     try {
       await teardownMutation.mutateAsync({ integration_id: id });
       await refetchDomains();
-      setIntegrationSuccess(
-        lang === "fr"
-          ? "Domaine dissocié."
-          : "Domain disconnected.",
-      );
+      setIntegrationSuccess(t("settings.domain_disconnected"));
     } catch (error) {
       setIntegrationError(
         error instanceof Error
           ? error.message
-          : lang === "fr"
-            ? "Impossible de dissocier ce domaine."
-            : "Unable to disconnect this domain.",
+          : t("settings.domain_disconnect_failed"),
       );
     }
   };
@@ -227,16 +223,12 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
         destination_email: domain.destination_email,
       });
       await refetchDomains();
-      setIntegrationSuccess(
-        lang === "fr" ? "Nouvelle tentative lancée." : "Retry started.",
-      );
+      setIntegrationSuccess(t("settings.retry_started"));
     } catch (error) {
       setIntegrationError(
         error instanceof Error
           ? error.message
-          : lang === "fr"
-            ? "Impossible de relancer la configuration."
-            : "Unable to retry configuration.",
+          : t("settings.retry_failed"),
       );
     } finally {
       setRetryingDomainId(null);
@@ -248,18 +240,18 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
     setIntegrationsError("");
     setIntegrationsSuccess("");
     if (!cfTokenInput.trim()) {
-      setIntegrationsError(lang === "fr" ? "Veuillez entrer un jeton API." : "Please enter an API token.");
+      setIntegrationsError(t("settings.token_required"));
       return;
     }
     try {
       await saveWsTokenMutation.mutateAsync(cfTokenInput.trim());
-      setIntegrationsSuccess(lang === "fr" ? "Jeton API enregistré avec succès." : "API token saved successfully.");
+      setIntegrationsSuccess(t("settings.token_saved"));
       setIsEditingToken(false);
       setCfTokenInput("");
       refetchWsToken();
       refetchDomains();
     } catch (err: any) {
-      setIntegrationsError(err?.message || "Failed to verify or save Cloudflare API token.");
+      setIntegrationsError(err?.message || t("settings.token_save_failed"));
     }
   };
 
@@ -273,11 +265,11 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
     setIntegrationsSuccess("");
     try {
       await deleteWsTokenMutation.mutateAsync();
-      setIntegrationsSuccess(lang === "fr" ? "Jeton API supprimé avec succès." : "API token deleted successfully.");
+      setIntegrationsSuccess(t("settings.token_deleted"));
       refetchWsToken();
       refetchDomains();
     } catch (err: any) {
-      setIntegrationsError(err?.message || "Failed to delete API token.");
+      setIntegrationsError(err?.message || t("settings.token_delete_failed"));
     }
   };
 
@@ -285,8 +277,9 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
     { id: "profile", label: t("settings.tab_profile"), icon: User },
     { id: "security", label: t("settings.tab_security"), icon: ShieldCheck },
     { id: "preferences", label: t("settings.tab_preferences"), icon: Settings },
+    { id: "notifications", label: t("settings.tab_notifications"), icon: Bell },
     { id: "domains", label: t("settings.tab_domains"), icon: Globe },
-    { id: "integrations", label: lang === "fr" ? "Intégrations" : "Integrations", icon: Puzzle },
+    { id: "integrations", label: t("settings.tab_integrations"), icon: Puzzle },
   ] as const;
   const toastError = saveError || integrationError || integrationsError;
   const toastSuccess = saveStatus
@@ -305,7 +298,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
 
   return (
     <MotionDiv
-      initial={{ opacity: 0, y: 12 }}
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.3 }}
@@ -324,7 +317,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
       {/* Two-Column Split Layout */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
         {/* Left Column: Navigation Sidebar */}
-        <div className="col-span-12 md:col-span-3 space-y-1.5 bg-surface-lowest border border-border-subtle rounded-xl p-3.5 shadow-sm">
+        <div className="col-span-12 flex gap-1.5 overflow-x-auto border-b border-border-subtle pb-3 md:col-span-3 md:block md:space-y-1.5 md:overflow-visible md:rounded-xl md:border md:bg-surface-lowest md:p-3.5 md:shadow-sm">
           {tabs.map((tab) => {
             const IconComp = tab.icon;
             const isActive = activeTab === tab.id;
@@ -335,7 +328,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                   setActiveTab(tab.id as any);
                   setShowIntegrator(false);
                 }}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-bold transition-all cursor-pointer text-left border-l-2 outline-none ${isActive
+                className={`flex shrink-0 items-center gap-2 rounded-lg border-b-2 px-3 py-2.5 text-left text-sm font-bold transition-all md:w-full md:gap-3 md:border-b-0 md:border-l-2 md:px-4 ${isActive
                   ? "bg-primary/[0.04] text-primary border-primary"
                   : "text-on-surface-variant hover:bg-surface-low hover:text-on-surface border-transparent"
                   }`}
@@ -360,20 +353,20 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
               </div>
               <form onSubmit={saveSettings} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Input label={lang === "fr" ? "Prénom" : "First Name"} type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-                  <Input label={lang === "fr" ? "Nom" : "Last Name"} type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+                  <Input label={t("settings.first_name")} type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+                  <Input label={t("settings.last_name")} type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Input label={lang === "fr" ? "Titre / Fonction" : "Current Title"} type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
-                  <Input label={lang === "fr" ? "Nom de l'entreprise" : "Company Name"} type="text" value={company} onChange={(e) => setCompany(e.target.value)} />
+                  <Input label={t("settings.job_title")} type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
+                  <Input label={t("settings.company")} type="text" value={company} onChange={(e) => setCompany(e.target.value)} />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Input label={lang === "fr" ? "Adresse e-mail" : "Email Address"} type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled />
+                  <Input label={t("settings.email")} type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled />
 
                   {/* Default User Role Dropdown */}
                   <div className="flex flex-col gap-1.5">
                     <label className="text-label-caps text-on-surface-variant font-semibold">
-                      {lang === "fr" ? "Rôle de l'utilisateur" : "User Role"}
+                      {t("settings.user_role")}
                     </label>
                     <select
                       value={role}
@@ -410,32 +403,30 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
               {authProvider === "google" ? (
                 <div className="p-4 bg-primary/[0.04] border border-primary/10 rounded-xl space-y-2">
                   <p className="text-sm font-semibold text-primary">
-                    {lang === "fr" ? "Connexion Google Workspace active" : "Google Workspace login active"}
+                    {t("settings.google_login_active")}
                   </p>
                   <p className="text-xs text-on-surface-variant font-medium leading-relaxed">
-                    {lang === "fr"
-                      ? "La gestion de votre mot de passe et MFA s'effectue directement au sein de votre console Google."
-                      : "Your credentials and two-factor authentication are verified directly through Google Workspace OAuth."}
+                    {t("settings.google_login_desc")}
                   </p>
                 </div>
               ) : (
                 <form onSubmit={handlePasswordChange} className="space-y-4">
                   <Input
-                    label={lang === "fr" ? "Mot de passe actuel" : "Current password"}
+                    label={t("settings.current_password")}
                     type="password"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
                     placeholder="••••••••"
                   />
                   <Input
-                    label={lang === "fr" ? "Nouveau mot de passe" : "New password"}
+                    label={t("settings.new_password")}
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="••••••••"
                   />
                   <Input
-                    label={lang === "fr" ? "Confirmer le nouveau mot de passe" : "Confirm new password"}
+                    label={t("settings.confirm_password")}
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
@@ -448,13 +439,13 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                     <div className="p-3 bg-safe/[0.06] border border-safe/15 text-safe text-xs rounded-lg font-medium flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 shrink-0" />
                       <span>
-                        {lang === "fr" ? "Mot de passe mis à jour." : "Password updated successfully."}
+                        {t("settings.password_updated")}
                       </span>
                     </div>
                   )}
                   <div className="flex justify-end pt-2">
                     <Button type="submit" className="text-xs font-bold cursor-pointer" disabled={changePasswordMutation.isPending}>
-                      {lang === "fr" ? "Mettre à jour" : "Update Password"}
+                      {t("settings.update_password")}
                     </Button>
                   </div>
                 </form>
@@ -475,10 +466,10 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                 <div className="flex items-center justify-between py-2 border-b border-border-subtle/50">
                   <div className="flex flex-col gap-0.5">
                     <span className="text-sm font-bold text-on-surface">
-                      {lang === "fr" ? "Langue de l'interface" : "Interface Language"}
+                      {t("settings.interface_language")}
                     </span>
                     <span className="text-xs font-semibold text-on-surface-variant">
-                      {lang === "fr" ? "Sélectionnez la langue d'affichage des menus." : "Choose language toggle for client dashboard."}
+                      {t("settings.interface_language_desc")}
                     </span>
                   </div>
                   <select
@@ -494,10 +485,10 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                 <div className="flex items-center justify-between py-2">
                   <div className="flex flex-col gap-0.5">
                     <span className="text-sm font-bold text-on-surface">
-                      {lang === "fr" ? "Thème visuel" : "Visual Theme"}
+                      {t("settings.visual_theme")}
                     </span>
                     <span className="text-xs font-semibold text-on-surface-variant">
-                      {lang === "fr" ? "Basculez entre l'interface claire et l'interface sombre." : "Switch between light and dark console modes."}
+                      {t("settings.visual_theme_desc")}
                     </span>
                   </div>
                   <select
@@ -505,13 +496,15 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                     onChange={(e) => handleThemeChange(e.target.value)}
                     className="px-3.5 py-2 bg-surface-lowest border border-border-subtle rounded-lg text-sm text-on-surface focus:outline-none focus:border-primary outline-none cursor-pointer font-semibold"
                   >
-                    <option value="light">{lang === "fr" ? "Mode Clair" : "Light"}</option>
-                    <option value="dark">{lang === "fr" ? "Mode Sombre" : "Dark"}</option>
+                    <option value="light">{t("settings.theme_light")}</option>
+                    <option value="dark">{t("settings.theme_dark")}</option>
                   </select>
                 </div>
               </div>
             </div>
           )}
+
+          {activeTab === "notifications" && <AlertsRoute mode="settings" />}
 
           {/* Connected Domains Tab */}
           {activeTab === "domains" && (
@@ -520,15 +513,11 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                 <div className="flex gap-2 rounded-xl border border-warning/25 bg-warning-bg p-4 text-xs font-semibold text-on-surface">
                   <AlertTriangle className="w-4.5 h-4.5 shrink-0 text-warning" />
                   <div>
-                    <p className="text-on-surface">{lang === "fr" ? "Configuration requise" : "Onboarding required"}</p>
+                    <p className="text-on-surface">{t("settings.onboarding_required")}</p>
                     <p className="mt-0.5 text-on-surface-variant font-normal">
-                      {lang === "fr"
-                        ? failedDomain
-                          ? `Relancez la configuration de ${failedDomain.zone_name} pour déverrouiller l’app.`
-                          : "Ajoutez un domaine Cloudflare pour déverrouiller l’app et commencer le routage e-mail."
-                        : failedDomain
-                          ? `Retry ${failedDomain.zone_name} configuration to unlock the app.`
-                          : "Add a Cloudflare domain to unlock the app and start email routing."}
+                      {failedDomain
+                        ? t("settings.onboarding_retry", { domain: failedDomain.zone_name })
+                        : t("settings.onboarding_add_domain")}
                     </p>
                   </div>
                 </div>
@@ -560,13 +549,13 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                   <div className="space-y-4">
                     <div className="flex justify-between items-center bg-surface-low/50 p-3 rounded-lg border border-border-subtle/50">
                       <span className="font-display font-semibold text-sm text-on-surface">
-                        {lang === "fr" ? "Nouveau domaine Cloudflare" : "New Cloudflare Integration"}
+                        {t("settings.new_cloudflare_domain")}
                       </span>
                       <button
                         onClick={() => setShowIntegrator(false)}
                         className="text-xs font-bold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white cursor-pointer transition-colors duration-200"
                       >
-                        {lang === "fr" ? "Annuler" : "Cancel"}
+                        {t("common.cancel")}
                       </button>
                     </div>
                     <div className="border border-border-subtle rounded-xl p-4 bg-surface-lowest">
@@ -574,7 +563,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                         userEmail={session.email}
                         onSuccess={() => {
                           setShowIntegrator(false);
-                          setIntegrationSuccess(lang === "fr" ? "Domaine ajouté avec succès !" : "Domain added successfully!");
+                          setIntegrationSuccess(t("settings.domain_added"));
                           refetchDomains();
                         }}
                       />
@@ -627,20 +616,20 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                                         onClick={() => void handleRetryDomain(dom)}
                                         disabled={retrySetupMutation.isPending}
                                         className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-50 transition-colors cursor-pointer"
-                                        title={lang === "fr" ? "Réessayer la configuration" : "Retry configuration"}
-                                        aria-label={lang === "fr" ? `Réessayer la configuration de ${dom.zone_name}` : `Retry ${dom.zone_name} configuration`}
+                                        title={t("settings.retry_configuration")}
+                                        aria-label={t("settings.retry_domain", { domain: dom.zone_name })}
                                       >
                                         {retrySetupMutation.isPending && retryingDomainId === dom.id
                                           ? <Loader2 className="w-4 h-4 animate-spin" />
                                           : <RefreshCw className="w-4 h-4" />}
-                                        <span>{lang === "fr" ? "Réessayer" : "Retry"}</span>
+                                        <span>{t("common.retry")}</span>
                                       </button>
                                     )}
                                     <button
                                       onClick={() => dom.id && handleRemoveDomain(dom.id)}
                                       className="p-2 rounded-md hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error text-on-surface-variant transition-colors cursor-pointer"
-                                      title={lang === "fr" ? "Dissocier" : "Disconnect"}
-                                      aria-label={lang === "fr" ? `Dissocier ${dom.zone_name}` : `Disconnect ${dom.zone_name}`}
+                                      title={t("settings.disconnect")}
+                                      aria-label={t("settings.disconnect_domain_named", { domain: dom.zone_name })}
                                     >
                                       <Trash2 className="w-4 h-4" />
                                     </button>
@@ -668,12 +657,10 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                     <Puzzle className="w-5 h-5 text-primary shrink-0" />
                     <div>
                       <h3 className="font-display font-semibold text-[17px] text-on-surface">
-                        {lang === "fr" ? "Gestion des Intégrations" : "Integrations Management"}
+                        {t("settings.integrations_title")}
                       </h3>
                       <p className="text-xs font-semibold text-on-surface-variant">
-                        {lang === "fr"
-                          ? "Configurez vos clés API tierces pour piloter la protection automatique."
-                          : "Configure third-party API tokens to power automatic domain security."}
+                        {t("settings.integrations_desc")}
                       </p>
                     </div>
                   </div>
@@ -682,7 +669,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                   {!domainsLoading && domains && domains.length > 0 && (
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-xs font-semibold text-on-surface-variant">
-                        {lang === "fr" ? "Domaine :" : "Domain :"}
+                        {t("settings.domain_label")}
                       </span>
                       <select
                         value={selectedIntegrationDomainId}
@@ -704,7 +691,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                   <form onSubmit={handleSaveToken} className="space-y-4 max-w-xl">
                     <div className="space-y-2">
                       <label className="text-xs font-bold uppercase text-on-surface-variant tracking-wider">
-                        {lang === "fr" ? "Jeton API Cloudflare" : "Cloudflare API Token"}
+                        {t("settings.cloudflare_token")}
                       </label>
                       <div className="relative">
                         <Input
@@ -727,9 +714,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                         </button>
                       </div>
                       <p className="text-[11px] text-on-surface-variant font-semibold leading-normal">
-                        {lang === "fr"
-                          ? "Requis pour modifier automatiquement les configurations DNS manquantes et configurer les routeurs d'e-mails."
-                          : "Required to edit missing DNS configurations automatically and configure email worker routes."}
+                        {t("settings.cloudflare_token_desc")}
                       </p>
                     </div>
 
@@ -740,8 +725,8 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                         className="bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold px-4 py-2 rounded-lg cursor-pointer h-9 transition-all"
                       >
                         {saveWsTokenMutation.isPending
-                          ? (lang === "fr" ? "Vérification..." : "Verifying...")
-                          : (lang === "fr" ? "Enregistrer l'intégration" : "Save Integration")}
+                          ? t("settings.verifying")
+                          : t("settings.save_integration")}
                       </Button>
 
                       <button
@@ -752,7 +737,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                         }}
                         className="bg-surface-low border border-border-subtle text-on-surface hover:bg-surface-low/80 text-xs font-bold px-4 py-2 rounded-lg cursor-pointer h-9 transition-all"
                       >
-                        {lang === "fr" ? "Annuler" : "Cancel"}
+                        {t("common.cancel")}
                       </button>
                     </div>
                   </form>
@@ -768,17 +753,17 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                           <h4 className="font-bold text-sm text-on-surface flex items-center gap-2">
                             <span>Cloudflare Integration</span>
                             <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-emerald-50 text-[#047857] border border-emerald-200">
-                              {lang === "fr" ? "Connecté" : "Connected"}
+                              {t("settings.connected")}
                             </span>
                           </h4>
 
                           {/* Provider credentials are write-only in the browser. */}
                           <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border-subtle/50 text-xs w-full">
                             <span className="font-bold text-on-surface-variant shrink-0">
-                              {lang === "fr" ? "Identifiant :" : "Credential:"}
+                              {t("settings.credential")}
                             </span>
                             <span className="bg-surface-low px-3 py-1 rounded text-xs font-semibold grow max-w-xs md:max-w-md block overflow-hidden text-ellipsis whitespace-nowrap">
-                              {lang === "fr" ? "Stocké de façon sécurisée" : "Stored securely"}
+                              {t("settings.stored_securely")}
                             </span>
                           </div>
                         </div>
@@ -794,7 +779,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                           }}
                           className="font-bold text-xs h-9 cursor-pointer"
                         >
-                          {lang === "fr" ? "Modifier le jeton" : "Edit Token"}
+                          {t("settings.edit_token")}
                         </Button>
                         <Button
                           variant="danger"
@@ -802,16 +787,14 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                           onClick={handleDeleteToken}
                           className="font-bold text-xs h-9 cursor-pointer"
                         >
-                          {lang === "fr" ? "Révoquer l'accès" : "Revoke Credentials"}
+                          {t("settings.revoke_access")}
                         </Button>
                       </div>
                     </div>
                   </div>
                 ) : (
                   <div className="py-6 text-center text-xs font-semibold text-on-surface-variant w-full">
-                    {lang === "fr"
-                      ? "Aucune intégration active. Veuillez d'abord connecter un domaine dans l'onglet Domaines Connectés."
-                      : "No active integration. Please connect a domain under Connected Domains."}
+                    {t("settings.no_active_integration")}
                   </div>
                 )}
               </div>
@@ -830,13 +813,11 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                 <AlertTriangle className="w-5 h-5" />
               </div>
               <h4 className="font-display font-bold text-base text-on-surface">
-                {lang === "fr" ? "Révoquer l'accès API" : "Revoke API Credentials"}
+                {t("settings.revoke_api_title")}
               </h4>
             </div>
             <p className="text-xs font-semibold text-on-surface-variant leading-relaxed">
-              {lang === "fr"
-                ? "Veuillez confirmer la suppression de votre jeton API Cloudflare global. Cette suppression désactivera également la configuration automatique de vos domaines."
-                : "Confirm removing your global Cloudflare API token. This will disable auto-configuration capabilities."}
+              {t("settings.revoke_api_desc")}
             </p>
             <div className="flex justify-end gap-2.5">
               <Button
@@ -845,7 +826,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                 onClick={() => setDeleteTokenConfirmVisible(false)}
                 className="font-bold text-xs"
               >
-                {lang === "fr" ? "Annuler" : "Cancel"}
+                {t("common.cancel")}
               </Button>
               <Button
                 variant="danger"
@@ -853,7 +834,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                 onClick={executeDeleteToken}
                 className="font-bold text-xs"
               >
-                {lang === "fr" ? "Révoquer" : "Revoke"}
+                {t("settings.revoke")}
               </Button>
             </div>
           </div>
@@ -869,13 +850,11 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                 <AlertTriangle className="w-5 h-5" />
               </div>
               <h4 className="font-display font-bold text-base text-on-surface">
-                {lang === "fr" ? "Dissocier le domaine" : "Disconnect Domain"}
+                {t("settings.disconnect_domain")}
               </h4>
             </div>
             <p className="text-xs font-semibold text-on-surface-variant leading-relaxed">
-              {lang === "fr"
-                ? "Êtes-vous sûr de vouloir dissocier et supprimer ce domaine ? Cette action arrêtera l'interception et la classification des emails."
-                : "Are you sure you want to disconnect and remove this domain? This will stop email interception and classification."}
+              {t("settings.disconnect_domain_desc")}
             </p>
             <div className="flex justify-end gap-2.5">
               <Button
@@ -884,7 +863,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                 onClick={() => setRemoveDomainConfirmId(null)}
                 className="font-bold text-xs"
               >
-                {lang === "fr" ? "Annuler" : "Cancel"}
+                {t("common.cancel")}
               </Button>
               <Button
                 variant="danger"
@@ -892,7 +871,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                 onClick={() => executeRemoveDomain(removeDomainConfirmId)}
                 className="font-bold text-xs"
               >
-                {lang === "fr" ? "Supprimer" : "Remove"}
+                {t("settings.remove")}
               </Button>
             </div>
           </div>

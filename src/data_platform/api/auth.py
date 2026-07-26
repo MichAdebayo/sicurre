@@ -4,14 +4,14 @@ import re
 import sqlite3
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import Depends, HTTPException, Request, status
 
 from core.config import get_settings
 from core.security import AuthenticatedPrincipal, require_authenticated_principal
-from db.runtime import execute_runtime_query, ensure_local_runtime_tables
+from db.runtime import ensure_local_runtime_tables, execute_runtime_query
 
 PLATFORM_ADMIN_ROLE = "admin"
 WORKSPACE_OWNER_ROLE = "owner"
@@ -336,21 +336,16 @@ def _workspace_name(display_name: str, email: str) -> str:
 
 
 async def _get_better_auth_user(principal: AuthenticatedPrincipal) -> dict[str, Any]:
-    rows = await async_query(
-        'SELECT id, name, email FROM "user" WHERE id = ? LIMIT 1',
-        (principal.subject,),
+    if principal.email:
+        return {
+            "id": principal.subject,
+            "name": principal.display_name or "",
+            "email": principal.email,
+        }
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Authenticated user email missing",
     )
-    if not rows and principal.email:
-        rows = await async_query(
-            'SELECT id, name, email FROM "user" WHERE email = ? LIMIT 1',
-            (principal.email.lower(),),
-        )
-    if not rows:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authenticated user record not found",
-        )
-    return rows[0]
 
 
 async def _backfill_workspace_owned_rows(
@@ -397,7 +392,7 @@ async def _ensure_workspace_membership(
         (auth_user_id,),
     )
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     if not membership_rows:
         workspace_id = str(uuid.uuid4())
         membership_id = str(uuid.uuid4())

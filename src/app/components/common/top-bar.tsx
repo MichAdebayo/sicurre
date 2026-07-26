@@ -55,16 +55,16 @@ export function TopBar({
   }, [readIds]);
 
   const timeSince = (dateStr: string) => {
-    if (!dateStr) return i18n.language === "fr" ? "maintenant" : "now";
+    if (!dateStr) return t("topbar.now");
     const now = new Date();
     const diff = now.getTime() - new Date(dateStr).getTime();
-    if (isNaN(diff) || diff < 0) return i18n.language === "fr" ? "maintenant" : "now";
+    if (isNaN(diff) || diff < 0) return t("topbar.now");
     
     const mins = Math.floor(diff / 60000);
-    if (mins < 1) return i18n.language === "fr" ? "< 1 min" : "< 1m";
-    if (mins < 60) return i18n.language === "fr" ? `il y a ${mins} min` : `${mins}m ago`;
+    if (mins < 1) return t("topbar.less_than_minute");
+    if (mins < 60) return t("topbar.minutes_ago", { count: mins });
     const hours = Math.floor(mins / 60);
-    if (hours < 24) return i18n.language === "fr" ? `il y a ${hours} h` : `${hours}h ago`;
+    if (hours < 24) return t("topbar.hours_ago", { count: hours });
     return new Date(dateStr).toLocaleDateString(i18n.language === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short" });
   };
 
@@ -102,11 +102,9 @@ export function TopBar({
   if (onboardingRequired && userRole !== "admin") {
     notificationsList.push({
       id: "onboarding_cloudflare_required",
-      title: i18n.language === "fr" ? "Connectez Cloudflare" : "Connect Cloudflare",
-      desc: i18n.language === "fr"
-        ? "Ajoutez votre token pour activer le routage email."
-        : "Add your token to enable email routing.",
-      time: i18n.language === "fr" ? "maintenant" : "now",
+      title: t("topbar.connect_cloudflare"),
+      desc: t("topbar.connect_cloudflare_desc"),
+      time: t("topbar.now"),
       category: "Domain" as const,
       page: "settings" as const,
       unread: true,
@@ -132,10 +130,8 @@ export function TopBar({
     const latest = activePhishing[0];
     notificationsList.push({
       id: "phish_blocked_" + latest.id,
-      title: i18n.language === "fr" ? "Email de phishing bloqué" : "Phishing email blocked",
-      desc: i18n.language === "fr"
-        ? "Consultez le journal pour voir la décision."
-        : "Open the threat log to review the decision.",
+      title: t("topbar.phishing_blocked"),
+      desc: t("topbar.phishing_blocked_desc"),
       time: timeSince(latest.received_at),
       category: "Critical" as const,
       page: "threats" as const,
@@ -147,10 +143,11 @@ export function TopBar({
   if (!onboardingRequired && shieldStatus && shieldStatus.ssl.valid && shieldStatus.ssl.days_remaining < 30) {
     notificationsList.push({
       id: "ssl_expiring",
-      title: i18n.language === "fr" ? "Certificat SSL expirant bientôt" : "SSL certificate expiring soon",
-      desc: i18n.language === "fr"
-        ? `${activeDomain} expire dans ${shieldStatus.ssl.days_remaining} jours`
-        : `${activeDomain} certificate expires in ${shieldStatus.ssl.days_remaining} days`,
+      title: t("topbar.ssl_expiring"),
+      desc: t("topbar.ssl_expiring_desc", {
+        domain: activeDomain,
+        count: shieldStatus.ssl.days_remaining,
+      }),
       time: shieldStatus.updated_at ? timeSince(shieldStatus.updated_at) : "",
       category: "Domain" as const,
       page: "domain-shield" as const,
@@ -162,10 +159,8 @@ export function TopBar({
   if (!onboardingRequired && shieldStatus && (!shieldStatus.dmarc.valid || shieldStatus.dmarc.policy === "none")) {
     notificationsList.push({
       id: "dmarc_none",
-      title: i18n.language === "fr" ? 'Politique DMARC définie sur "none"' : 'DMARC policy is set to "none"',
-      desc: i18n.language === "fr"
-        ? `@${activeDomain} peut être usurpé. Modifiez la politique.`
-        : `@${activeDomain} can be spoofed. Change the policy.`,
+      title: t("topbar.dmarc_none"),
+      desc: t("topbar.dmarc_none_desc", { domain: activeDomain }),
       time: shieldStatus.updated_at ? timeSince(shieldStatus.updated_at) : "",
       category: "Domain" as const,
       page: "domain-shield" as const,
@@ -183,11 +178,11 @@ export function TopBar({
   ) {
     notificationsList.push({
       id: "quarantine_held",
-      title: i18n.language === "fr" ? `${quarantineItems.length} emails en quarantaine` : `${quarantineItems.length} emails waiting in quarantine`,
-      desc: i18n.language === "fr"
-        ? "Des messages attendent votre décision."
-        : "Messages are waiting for your decision.",
-      time: quarantineItems && quarantineItems.length > 0 ? timeSince(quarantineItems[0].created_at) : i18n.language === "fr" ? "il y a 14 h" : "14h ago",
+      title: t("topbar.quarantine_waiting", { count: quarantineItems.length }),
+      desc: t("topbar.quarantine_waiting_desc"),
+      time: quarantineItems.length > 0
+        ? timeSince(quarantineItems[0].created_at)
+        : t("topbar.hours_ago", { count: 14 }),
       category: "System" as const,
       page: "quarantine" as const,
       unread: true,
@@ -224,7 +219,9 @@ export function TopBar({
     <header className="h-14 min-w-0 flex-1 bg-transparent px-0 flex items-center justify-between shrink-0 relative z-40">
       {/* Title Placeholder / Brand Space to balance the header layout */}
       <div className="truncate font-display font-semibold text-sm text-on-surface-variant opacity-80">
-        {activeDomain ? `${activeDomain} Workspace` : "Sicurre Console"}
+        {activeDomain
+          ? t("topbar.workspace_name", { domain: activeDomain })
+          : t("topbar.console_name")}
       </div>
 
       {/* Right Actions */}
@@ -249,12 +246,12 @@ export function TopBar({
             <span className="text-[9px] font-bold text-on-surface-variant/80 uppercase flex items-center gap-1">
               <Cpu className="w-3 h-3 text-primary" />
               {runtimeHealth.data?.status === "down"
-                ? (i18n.language === "fr" ? "Incident Runtime" : "Runtime Incident")
+                ? t("topbar.runtime_incident")
                 : runtimeHealth.data?.status === "degraded"
-                ? (i18n.language === "fr" ? "Runtime Dégradé" : "Runtime Degraded")
+                ? t("topbar.runtime_degraded")
                 : runtimeHealth.isLoading
-                ? (i18n.language === "fr" ? "Vérification" : "Checking")
-                : (i18n.language === "fr" ? "Système Actif" : "System Operational")}
+                ? t("topbar.checking")
+                : t("topbar.system_operational")}
             </span>
           </div>
         )}
@@ -266,7 +263,7 @@ export function TopBar({
             setIsOpen(!isOpen);
           }}
           className="relative rounded-lg border border-border-subtle bg-surface-lowest/80 p-2 text-on-surface-variant transition-[background-color,border-color,transform] duration-200 hover:border-primary/35 hover:bg-primary-fixed hover:text-primary active:scale-[0.98] dark:bg-surface-low dark:hover:bg-primary-container dark:hover:text-on-primary-container"
-          aria-label={i18n.language === "fr" ? "Ouvrir les notifications" : "Open notifications"}
+          aria-label={t("topbar.open_notifications")}
         >
           <Bell className="w-[22px] h-[22px] stroke-[1.5]" />
           {unreadCount > 0 && (
@@ -283,10 +280,10 @@ export function TopBar({
             {/* Popover Header */}
             <div className="flex items-center justify-between pb-3.5 border-b border-border-subtle">
               <div className="flex items-center gap-2">
-                <span className="font-bold text-sm text-on-surface">Notifications</span>
+                <span className="font-bold text-sm text-on-surface">{t("topbar.notifications")}</span>
                 {unreadCount > 0 && (
                   <span className="text-[10px] font-bold bg-error/10 text-error px-2 py-0.5 rounded-full">
-                    {unreadCount} {i18n.language === "fr" ? "non lues" : "unread"}
+                    {t("topbar.unread", { count: unreadCount })}
                   </span>
                 )}
               </div>
@@ -294,7 +291,7 @@ export function TopBar({
                 onClick={markAllRead}
                 className="text-[11px] font-bold text-primary hover:text-navy-dark transition-colors cursor-pointer"
               >
-                {i18n.language === "fr" ? "Tout marquer lu" : "Mark all read"}
+                {t("topbar.mark_all_read")}
               </button>
             </div>
 
@@ -304,10 +301,10 @@ export function TopBar({
                 <div className="py-8 text-center">
                   <CheckCircle2 className="mx-auto mb-2 h-7 w-7 text-safe/60" />
                   <p className="text-xs font-semibold text-on-surface">
-                    {i18n.language === "fr" ? "Aucune alerte active" : "No active alerts"}
+                    {t("topbar.no_active_alerts")}
                   </p>
                   <p className="mt-1 text-[11px] text-on-surface-variant">
-                    {i18n.language === "fr" ? "Les nouvelles alertes apparaîtront ici." : "New alerts will appear here."}
+                    {t("topbar.no_active_alerts_desc")}
                   </p>
                 </div>
               ) : (
@@ -360,8 +357,8 @@ export function TopBar({
               >
                 <span>
                   {onboardingRequired
-                    ? i18n.language === "fr" ? "Ouvrir la configuration" : "Open setup"
-                    : i18n.language === "fr" ? "Voir toutes les alertes" : "View all alerts"}
+                    ? t("topbar.open_setup")
+                    : t("topbar.view_all_alerts")}
                 </span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
