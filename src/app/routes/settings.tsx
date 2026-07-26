@@ -17,11 +17,13 @@ import {
   Info,
   Loader2,
   RefreshCw,
+  Bell,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { CloudflareIntegrator } from "../components/common/cloudflare-integrator";
 import { AppToast } from "../components/common/app-toast";
+import AlertsRoute from "./alerts";
 import cloudflareLogo from "../assets/cloudflare-svgrepo-com.svg";
 import {
   AuthSession,
@@ -45,7 +47,7 @@ interface SettingsRouteProps {
 
 export default function SettingsRoute({ session, initialTab }: SettingsRouteProps) {
   const { t, i18n } = useTranslation();
-  const [activeTab, setActiveTab] = useState<"profile" | "security" | "preferences" | "domains" | "integrations">(
+  const [activeTab, setActiveTab] = useState<"profile" | "security" | "preferences" | "notifications" | "domains" | "integrations">(
     (initialTab as any) || (session.onboarding_required ? "domains" : "profile")
   );
 
@@ -126,6 +128,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
     setLang(newLang);
     localStorage.setItem("sicurre_lang", newLang);
     i18n.changeLanguage(newLang);
+    document.documentElement.lang = newLang;
   };
 
   const handleThemeChange = (newTheme: string) => {
@@ -285,6 +288,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
     { id: "profile", label: t("settings.tab_profile"), icon: User },
     { id: "security", label: t("settings.tab_security"), icon: ShieldCheck },
     { id: "preferences", label: t("settings.tab_preferences"), icon: Settings },
+    { id: "notifications", label: lang === "fr" ? "Alertes et règles" : "Alerts and rules", icon: Bell },
     { id: "domains", label: t("settings.tab_domains"), icon: Globe },
     { id: "integrations", label: lang === "fr" ? "Intégrations" : "Integrations", icon: Puzzle },
   ] as const;
@@ -305,7 +309,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
 
   return (
     <MotionDiv
-      initial={{ opacity: 0, y: 12 }}
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.3 }}
@@ -324,7 +328,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
       {/* Two-Column Split Layout */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
         {/* Left Column: Navigation Sidebar */}
-        <div className="col-span-12 md:col-span-3 space-y-1.5 bg-surface-lowest border border-border-subtle rounded-xl p-3.5 shadow-sm">
+        <div className="col-span-12 flex gap-1.5 overflow-x-auto border-b border-border-subtle pb-3 md:col-span-3 md:block md:space-y-1.5 md:overflow-visible md:rounded-xl md:border md:bg-surface-lowest md:p-3.5 md:shadow-sm">
           {tabs.map((tab) => {
             const IconComp = tab.icon;
             const isActive = activeTab === tab.id;
@@ -335,7 +339,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                   setActiveTab(tab.id as any);
                   setShowIntegrator(false);
                 }}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-bold transition-all cursor-pointer text-left border-l-2 outline-none ${isActive
+                className={`flex shrink-0 items-center gap-2 rounded-lg border-b-2 px-3 py-2.5 text-left text-sm font-bold transition-all md:w-full md:gap-3 md:border-b-0 md:border-l-2 md:px-4 ${isActive
                   ? "bg-primary/[0.04] text-primary border-primary"
                   : "text-on-surface-variant hover:bg-surface-low hover:text-on-surface border-transparent"
                   }`}
@@ -512,6 +516,8 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
               </div>
             </div>
           )}
+
+          {activeTab === "notifications" && <AlertsRoute mode="settings" />}
 
           {/* Connected Domains Tab */}
           {activeTab === "domains" && (

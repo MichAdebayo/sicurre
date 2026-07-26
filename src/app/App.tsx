@@ -1,5 +1,4 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { AnimatePresence } from "framer-motion";
 import { AppShell } from "./components/common/app-shell";
 import { SidebarPage } from "./components/common/sidebar";
 import {
@@ -282,18 +281,16 @@ function AppContent() {
       onboardingRequired={session.onboarding_required}
     >
       <Suspense fallback={<PageRouteFallback />}>
-        <AnimatePresence mode="wait">
-          {activePage === "dashboard" && !session.is_platform_admin && <DashboardRoute key="dashboard" session={session} onGoToSettings={handleGoToSettings} />}
+          {activePage === "dashboard" && !session.is_platform_admin && <DashboardRoute session={session} onGoToSettings={handleGoToSettings} />}
           {activePage === "threats" && !session.is_platform_admin && (
-            <ThreatsRoute key="threats" />
+            <ThreatsRoute />
           )}
-          {activePage === "quarantine" && !session.is_platform_admin && <QuarantineRoute key="quarantine" />}
-          {activePage === "alerts" && !session.is_platform_admin && <AlertsRoute key="alerts" />}
-          {activePage === "domain-shield" && !session.is_platform_admin && <DomainShieldRoute key="domain-shield" session={session} />}
-          {activePage === "logs" && session.is_platform_admin && <LogsRoute key="logs" />}
-          {activePage === "settings" && <SettingsRoute key="settings" session={session} initialTab={settingsTab} />}
-          {activePage === "support" && <SupportRoute key="support" session={session} />}
-        </AnimatePresence>
+          {activePage === "quarantine" && !session.is_platform_admin && <QuarantineRoute />}
+          {activePage === "alerts" && !session.is_platform_admin && <AlertsRoute />}
+          {activePage === "domain-shield" && !session.is_platform_admin && <DomainShieldRoute session={session} />}
+          {activePage === "logs" && session.is_platform_admin && <LogsRoute />}
+          {activePage === "settings" && <SettingsRoute session={session} initialTab={settingsTab} />}
+          {activePage === "support" && <SupportRoute session={session} />}
       </Suspense>
     </AppShell>
   );

@@ -6,7 +6,12 @@ from unittest.mock import MagicMock
 import pytest
 
 from core.config import Settings
-from db.runtime import _bind_qmark_parameters, _qualify_auth_tables, ensure_local_runtime_tables
+from db.runtime import (
+    _bind_qmark_parameters,
+    _initialized_runtime_urls,
+    _qualify_auth_tables,
+    ensure_local_runtime_tables,
+)
 
 TEST_SECRET_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
@@ -42,6 +47,7 @@ def test_auth_table_qualification_is_environment_specific(monkeypatch) -> None:
 
 
 def test_local_runtime_table_creation_disposes_engine(monkeypatch) -> None:
+    _initialized_runtime_urls.clear()
     engine = SimpleNamespace(dispose=MagicMock())
     create_all = MagicMock()
     monkeypatch.setattr(
@@ -50,6 +56,7 @@ def test_local_runtime_table_creation_disposes_engine(monkeypatch) -> None:
     monkeypatch.setattr("db.runtime.create_engine", lambda _: engine)
     monkeypatch.setattr("db.runtime.Base.metadata.create_all", create_all)
 
+    ensure_local_runtime_tables()
     ensure_local_runtime_tables()
 
     create_all.assert_called_once_with(engine)

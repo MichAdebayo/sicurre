@@ -21,6 +21,7 @@ i18n.use(initReactI18next).init({
     escapeValue: false,
   },
 });
+document.documentElement.lang = i18n.language;
 
 const queryClient = new QueryClient({
   defaultOptions: {

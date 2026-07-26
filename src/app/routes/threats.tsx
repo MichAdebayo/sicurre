@@ -72,7 +72,8 @@ export default function ThreatsRoute() {
         const query = searchQuery.toLowerCase();
         const matchesSearch =
           threat.subject?.toLowerCase().includes(query) ||
-          threat.sender?.toLowerCase().includes(query);
+          threat.sender?.toLowerCase().includes(query) ||
+          threat.privacy_reference.toLowerCase().includes(query);
         const matchesFilter =
           filterVerdict === "all" ||
           threat.verdict === filterVerdict ||
@@ -100,10 +101,7 @@ export default function ThreatsRoute() {
     document.body.removeChild(link);
   };
 
-  // Dynamic SLA limit config
-  const slaMs = 10000;
-
-  const getLatencyData = (slaLimit: number) => {
+  const getLatencyData = () => {
     const threatsList = threats || [];
     const days = [];
     const now = new Date();
@@ -129,8 +127,7 @@ export default function ThreatsRoute() {
           ? Math.round(measuredThreats.reduce((sum, threat) => sum + (threat.latency_ms ?? 0), 0) / measuredThreats.length)
           : 0;
 
-        const diffPct = latency > 0 ? Math.round(((latency - slaLimit) / slaLimit) * 100) : 0;
-        days.push({ label, latency, diffPct, emails_count, measured_count: measuredThreats.length });
+        days.push({ label, latency, emails_count, measured_count: measuredThreats.length });
       }
     } else if (dateFilter === "7d") {
       for (let i = 6; i >= 0; i--) {
@@ -152,8 +149,7 @@ export default function ThreatsRoute() {
           ? Math.round(measuredThreats.reduce((sum, threat) => sum + (threat.latency_ms ?? 0), 0) / measuredThreats.length)
           : 0;
 
-        const diffPct = latency > 0 ? Math.round(((latency - slaLimit) / slaLimit) * 100) : 0;
-        days.push({ label, latency, diffPct, emails_count, measured_count: measuredThreats.length });
+        days.push({ label, latency, emails_count, measured_count: measuredThreats.length });
       }
     } else if (dateFilter === "month") {
       const currentDay = now.getDate();
@@ -176,8 +172,7 @@ export default function ThreatsRoute() {
           ? Math.round(measuredThreats.reduce((sum, threat) => sum + (threat.latency_ms ?? 0), 0) / measuredThreats.length)
           : 0;
 
-        const diffPct = latency > 0 ? Math.round(((latency - slaLimit) / slaLimit) * 100) : 0;
-        days.push({ label, latency, diffPct, emails_count, measured_count: measuredThreats.length });
+        days.push({ label, latency, emails_count, measured_count: measuredThreats.length });
       }
     } else {
       // last_month
@@ -202,26 +197,25 @@ export default function ThreatsRoute() {
           ? Math.round(measuredThreats.reduce((sum, threat) => sum + (threat.latency_ms ?? 0), 0) / measuredThreats.length)
           : 0;
 
-        const diffPct = latency > 0 ? Math.round(((latency - slaLimit) / slaLimit) * 100) : 0;
-        days.push({ label, latency, diffPct, emails_count, measured_count: measuredThreats.length });
+        days.push({ label, latency, emails_count, measured_count: measuredThreats.length });
       }
     }
     return days;
   };
 
-  const latencyData = getLatencyData(slaMs);
+  const latencyData = getLatencyData();
   const measuredLatencyData = latencyData.filter((point) => point.measured_count > 0);
-  const maxLatencyVal = Math.max(...measuredLatencyData.map((d) => d.latency), slaMs, 14000);
+  const maxLatencyVal = Math.max(...measuredLatencyData.map((d) => d.latency), 1);
+  const chartMax = Math.ceil((maxLatencyVal * 1.15) / 100) * 100 || 100;
 
   // SVG coordinates
   const points = measuredLatencyData.map((d) => {
     const dataIndex = latencyData.indexOf(d);
-    const x = (dataIndex / (latencyData.length - 1 || 1)) * 1000;
-    const y = 180 - (d.latency / maxLatencyVal) * 140;
+    const x = 64 + (dataIndex / (latencyData.length - 1 || 1)) * 916;
+    const y = 180 - (d.latency / chartMax) * 150;
     return { x, y, data: d };
   });
   const pathD = points.length > 0 ? `M ${points.map((p) => `${p.x} ${p.y}`).join(" L ")}` : "";
-  const slaY = 180 - (slaMs / maxLatencyVal) * 140;
 
   // Pagination bounds
   const totalItems = filteredThreats.length;
@@ -234,7 +228,7 @@ export default function ThreatsRoute() {
 
   return (
     <MotionDiv
-      initial={{ opacity: 0, y: 12 }}
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.3 }}
@@ -260,7 +254,7 @@ export default function ThreatsRoute() {
               : "Global historical log of analyzed email classifications"}
           </p>
         </div>
-        <div className="flex items-center gap-3 self-start sm:self-center">
+        <div className="flex w-full flex-wrap items-center gap-3 self-start sm:w-auto sm:self-center">
           {/* Date range filter dropdown */}
           <select
             value={dateFilter}
@@ -278,7 +272,7 @@ export default function ThreatsRoute() {
 
           <button
             onClick={handleExportCSV}
-            className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-surface-low border border-border-subtle text-[13px] font-semibold rounded-lg transition-colors cursor-pointer shadow-sm h-9"
+            className="flex h-9 items-center gap-2 rounded-lg border border-border-subtle bg-white px-4 py-2 text-[13px] font-semibold transition-colors hover:bg-surface-low"
           >
             <Download className="w-4 h-4 text-on-surface-variant" />
             <span>{t("threats.export_report")}</span>
@@ -286,8 +280,7 @@ export default function ThreatsRoute() {
         </div>
       </div>
 
-      {/* Latency Analysis Card */}
-      <div className="bg-white rounded-xl border border-border-subtle p-6 shadow-sm relative min-h-[320px]">
+      <section className="relative min-h-[320px] border-y border-border-subtle py-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
           <div>
             <h3 className="font-display font-bold text-[17px] text-on-surface">
@@ -297,146 +290,112 @@ export default function ThreatsRoute() {
               {t("threats.latency_description")}
             </p>
           </div>
-          {/* Spacing gap set to gap-8 between SLA and Operations legend */}
-          <div className="flex items-center gap-8 text-xs font-bold text-on-surface-variant">
-            <div className="flex items-center gap-1.5">
-              <span className="w-6 h-px border-t border-dashed border-primary" />
-              <span>{t("threats.latency_target")} ({slaMs} ms)</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-6 h-0.5 bg-primary rounded-full" />
-              <span>{t("threats.latency_measure")}</span>
-            </div>
+          <div className="flex items-center gap-2 text-xs font-semibold text-on-surface-variant">
+            <span className="h-0.5 w-6 rounded-full bg-primary" />
+            <span>{t("threats.latency_measure")}</span>
           </div>
         </div>
 
-        {/* Unified Font X/Y Axis Chart */}
         {points.length === 0 ? (
           <div className="flex h-56 items-center justify-center border-y border-border-subtle/60 text-center">
             <p className="max-w-md text-sm text-on-surface-variant">{t("threats.latency_empty")}</p>
           </div>
-        ) : <div className="w-[96%] mx-auto h-56 pt-2 relative">
-          <svg className="w-full h-full overflow-visible" viewBox="0 0 1000 220" preserveAspectRatio="none">
-            {/* Grid */}
-            {[35, 70, 105, 140, 175].map((y) => (
-              <line key={y} x1="0" y1={y} x2="1000" y2={y} className="stroke-border-subtle" strokeWidth="0.5" />
-            ))}
-            {/* SLA Target Line */}
-            <line x1="0" y1={slaY} x2="1000" y2={slaY} className="stroke-primary" strokeWidth="1.5" strokeDasharray="6 4" />
-            
-            {/* Vertical Tracker dashed line snapping to hover sector */}
-            {hoveredLatencyIndex !== null && (
-              <line
-                x1={points[hoveredLatencyIndex].x}
-                y1="10"
-                x2={points[hoveredLatencyIndex].x}
-                y2="200"
-                className="stroke-primary/30"
-                strokeWidth="1.5"
-                strokeDasharray="4 4"
-              />
-            )}
-
-            {/* Operations Line */}
-            <path d={pathD} fill="none" className="stroke-primary" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-            
-            {/* Point node indicators */}
-            {points.map((p, idx) => (
-              <circle
-                key={`dot-${idx}`}
-                cx={p.x}
-                cy={p.y}
-                r={hoveredLatencyIndex === idx ? "7" : "5"}
-                className={`fill-white stroke-primary transition-all duration-150 ${
-                  hoveredLatencyIndex === idx ? "stroke-[3px]" : "stroke-[2.5px]"
-                }`}
-              />
-            ))}
-
-            {/* Horizontal tracking hover sectors */}
-            {points.map((p, idx) => {
-              const half = 1000 / 12;
-              const startX = idx === 0 ? 0 : p.x - half;
-              const width = idx === 0 ? half : (idx === 6 ? half : half * 2);
-              return (
-                <rect
-                  key={`sector-${idx}`}
-                  x={startX}
-                  y="0"
-                  width={width}
-                  height="220"
-                  fill="transparent"
-                  className="cursor-pointer"
-                  onMouseEnter={() => setHoveredLatencyIndex(idx)}
-                  onMouseLeave={() => setHoveredLatencyIndex(null)}
-                />
+        ) : (
+          <div
+            className="relative h-64 w-full overflow-hidden"
+            onMouseMove={(event) => {
+              const rect = event.currentTarget.getBoundingClientRect();
+              const cursorX = ((event.clientX - rect.left) / rect.width) * 1040;
+              const closest = points.reduce(
+                (best, point, index) =>
+                  Math.abs(point.x - cursorX) < best.distance
+                    ? { index, distance: Math.abs(point.x - cursorX) }
+                    : best,
+                { index: 0, distance: Number.POSITIVE_INFINITY },
               );
-            })}
-          </svg>
-
-          {/* Absolute Floating Tooltip Card (Rendered in-place snapping above the hovered point, displays Total Emails) */}
-          {hoveredLatencyIndex !== null && (
-            <div
-              className="absolute z-30 p-3 bg-white border border-border-subtle text-on-surface rounded-xl text-xs shadow-xl flex flex-col gap-1.5 w-48 font-sans select-none pointer-events-none animate-in fade-in duration-100 -translate-x-1/2"
-              style={{
-                left: `${points[hoveredLatencyIndex].x / 10}%`,
-                top: `${points[hoveredLatencyIndex].y - 95}px`,
-              }}
-            >
-              <div className="text-center font-extrabold border-b border-border-subtle/60 pb-1 text-primary text-[11px] uppercase tracking-wider mb-0.5">
-                {points[hoveredLatencyIndex].data.label}
-              </div>
-              <div className="flex justify-between text-on-surface-variant font-bold">
-                <span>{t("threats.latency_average")}:</span>
-                <span className="font-mono text-primary">{points[hoveredLatencyIndex].data.latency} ms</span>
-              </div>
-              <div className="flex justify-between text-on-surface-variant font-bold">
-                <span>{t("threats.email_count")}:</span>
-                <span className="font-mono text-primary">{points[hoveredLatencyIndex].data.emails_count}</span>
-              </div>
-              <div className="flex justify-between font-bold mt-0.5">
-                <span>{t("threats.target_difference")}:</span>
-                {points[hoveredLatencyIndex].data.diffPct > 0 ? (
-                  <span className="text-error">+{points[hoveredLatencyIndex].data.diffPct}%</span>
-                ) : (
-                  <span className="text-safe">{points[hoveredLatencyIndex].data.diffPct}%</span>
-                )}
-              </div>
-            </div>
-          )}
-        </div>}
-
-        {/* X-axis date labels */}
-        <div className="relative w-[96%] mx-auto h-6 mt-2 pt-2.5 border-t border-border-subtle/50 text-[10px] font-bold text-on-surface-variant font-sans select-none">
-          {latencyData.map((d, idx) => {
-            const shouldShowLabel = latencyData.length <= 7 || idx % 5 === 0 || idx === latencyData.length - 1;
-            if (!shouldShowLabel) return null;
-            return (
+              setHoveredLatencyIndex(closest.index);
+            }}
+            onMouseLeave={() => setHoveredLatencyIndex(null)}
+          >
+            <svg className="h-[220px] w-full" viewBox="0 0 1040 220" preserveAspectRatio="none" role="img">
+              <title>{t("threats.latency_title")}</title>
+              {[30, 67.5, 105, 142.5, 180].map((y, index) => (
+                <g key={y}>
+                  <line x1="64" y1={y} x2="980" y2={y} className="stroke-border-subtle" strokeWidth="0.7" />
+                  <text x="54" y={y + 4} textAnchor="end" className="fill-on-surface-variant text-[10px]">
+                    {Math.round(chartMax * (1 - index / 4))}
+                  </text>
+                </g>
+              ))}
+              <text x="12" y="105" transform="rotate(-90 12 105)" textAnchor="middle" className="fill-on-surface-variant text-[10px]">
+                ms
+              </text>
+              {hoveredLatencyIndex !== null && (
+                <line
+                  x1={points[hoveredLatencyIndex].x}
+                  y1="20"
+                  x2={points[hoveredLatencyIndex].x}
+                  y2="180"
+                  className="stroke-primary/50"
+                  strokeWidth="1.5"
+                  strokeDasharray="4 4"
+                />
+              )}
+              <path d={pathD} fill="none" className="stroke-primary" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              {points.map((point, index) => (
+                <circle
+                  key={point.data.label}
+                  cx={point.x}
+                  cy={point.y}
+                  r={hoveredLatencyIndex === index ? 6 : 4}
+                  className="fill-white stroke-primary"
+                  strokeWidth="2.5"
+                />
+              ))}
+            </svg>
+            {hoveredLatencyIndex !== null && (
               <div
-                key={idx}
-                className="absolute text-center uppercase tracking-wider font-extrabold -translate-x-1/2"
-                style={{ left: `${(idx / (latencyData.length - 1 || 1)) * 100}%` }}
+                className="pointer-events-none absolute top-3 z-30 w-44 -translate-x-1/2 rounded-lg border border-border-subtle bg-white p-3 text-xs text-on-surface shadow-md"
+                style={{ left: `${Math.min(90, Math.max(12, points[hoveredLatencyIndex].x / 10.4))}%` }}
               >
-                {d.label}
+                <p className="mb-2 font-semibold text-on-surface">{points[hoveredLatencyIndex].data.label}</p>
+                <div className="flex justify-between gap-3 text-on-surface-variant">
+                  <span>{t("threats.latency_average")}</span>
+                  <strong className="font-mono text-on-surface">{points[hoveredLatencyIndex].data.latency} ms</strong>
+                </div>
+                <div className="mt-1 flex justify-between gap-3 text-on-surface-variant">
+                  <span>{t("threats.email_count")}</span>
+                  <strong className="font-mono text-on-surface">{points[hoveredLatencyIndex].data.emails_count}</strong>
+                </div>
               </div>
-            );
-          })}
-        </div>
-      </div>
+            )}
+            <div className="absolute bottom-0 left-16 right-4 flex justify-between border-t border-border-subtle pt-2 text-[10px] font-semibold text-on-surface-variant">
+              {latencyData
+                .filter((_, index) => latencyData.length <= 7 || index === 0 || index === latencyData.length - 1 || index % 5 === 0)
+                .map((point) => <span key={point.label}>{point.label}</span>)}
+            </div>
+          </div>
+        )}
+      </section>
 
       {reportAddress && (
-        <div className="flex flex-col gap-3 border-y border-border-subtle py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-semibold text-on-surface">{t("threats.report_missed_title")}</p>
-            <p className="mt-1 text-sm text-on-surface-variant">
+        <details className="group border-y border-border-subtle py-4">
+          <summary className="cursor-pointer list-none text-sm font-semibold text-on-surface marker:hidden">
+            <span className="inline-flex items-center gap-2">
+              {t("threats.report_missed_title")}
+              <span aria-hidden="true" className="text-on-surface-variant transition-transform group-open:rotate-180">⌄</span>
+            </span>
+          </summary>
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="max-w-3xl break-words text-sm text-on-surface-variant">
               {t("threats.report_missed_description", { address: reportAddress })}
             </p>
+            <Button variant="outline" size="sm" onClick={() => void copyReportAddress()} className="shrink-0">
+              <Copy className="h-4 w-4" />
+              <span>{t("threats.copy_address")}</span>
+            </Button>
           </div>
-          <Button variant="outline" size="sm" onClick={() => void copyReportAddress()} className="shrink-0">
-            <Copy className="h-4 w-4" />
-            <span>{t("threats.copy_address")}</span>
-          </Button>
-        </div>
+        </details>
       )}
 
       {/* Filters */}
@@ -458,7 +417,7 @@ export default function ThreatsRoute() {
           </div>
         </div>
 
-        <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto">
           {(["all", "phishing", "spam", "legitimate"] as const).map((v) => (
             <button
               key={v}
@@ -500,11 +459,10 @@ export default function ThreatsRoute() {
             <table className="w-full text-left border-collapse font-sans">
               <thead>
                 <tr className="border-b border-border-subtle bg-surface-low/40">
-                  <th className="px-5 py-3 text-xs font-bold text-on-surface-variant tracking-wide w-[22%] min-w-[170px]">{t("threats.timestamp")}</th>
-                  <th className="px-5 py-3 text-xs font-bold text-on-surface-variant tracking-wide w-[28%] min-w-[180px]">{t("threats.sender")}</th>
-                  <th className="px-5 py-3 text-xs font-bold text-on-surface-variant tracking-wide w-[35%] min-w-[220px]">{t("threats.subject")}</th>
-                  <th className="px-5 py-3 text-xs font-bold text-on-surface-variant tracking-wide w-[15%] min-w-[140px]">{t("threats.verdict")}</th>
-                  <th className="px-5 py-3 text-xs font-bold text-on-surface-variant tracking-wide min-w-[130px]">{t("threats.phishing_risk")}</th>
+                  <th className="min-w-[210px] px-5 py-3 text-xs font-bold text-on-surface-variant">{t("threats.processed_item")}</th>
+                  <th className="min-w-[150px] px-5 py-3 text-xs font-bold text-on-surface-variant">{t("threats.timestamp")}</th>
+                  <th className="min-w-[140px] px-5 py-3 text-xs font-bold text-on-surface-variant">{t("threats.verdict")}</th>
+                  <th className="whitespace-nowrap px-5 py-3 text-xs font-bold text-on-surface-variant">{t("threats.phishing_risk")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-subtle">
@@ -518,6 +476,14 @@ export default function ThreatsRoute() {
                   >
                     <tr className="hover:bg-surface-low/20 transition-all text-xs">
                       <td className="px-5 py-3.5">
+                        <span className="block font-semibold text-on-surface">
+                          {t("threats.processed_reference", { reference: threat.privacy_reference.replace("MSG-", "") })}
+                        </span>
+                        <span className="mt-0.5 block text-[11px] text-on-surface-variant">
+                          {threat.content_redacted ? t("threats.content_discarded") : t("threats.content_quarantined")}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5">
                         <span className="text-xs text-on-surface-variant font-medium">
                           {new Date(threat.received_at).toLocaleString(i18n.language === "fr" ? "fr-FR" : "en-US", {
                             day: "numeric",
@@ -525,20 +491,6 @@ export default function ThreatsRoute() {
                             hour: "2-digit",
                             minute: "2-digit",
                           })}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <span className="font-bold text-on-surface truncate max-w-[180px] block select-all">
-                          {threat.verdict !== "phishing" && threat.verdict !== "quarantine"
-                            ? "[Masqué par Sicurre]"
-                            : (threat.sender || t("threats.unknown_sender"))}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <span className="text-on-surface truncate block max-w-[220px] select-all font-semibold" title={threat.subject}>
-                          {threat.verdict !== "phishing" && threat.verdict !== "quarantine"
-                            ? "[Masqué par Sicurre]"
-                            : (threat.subject || t("threats.no_subject"))}
                         </span>
                       </td>
                       <td className="px-5 py-3.5">
@@ -559,7 +511,7 @@ export default function ThreatsRoute() {
 
         {/* Log table pagination controls */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-4 border-t border-border-subtle bg-surface-low/10 select-none font-sans">
+          <div className="flex flex-col gap-3 border-t border-border-subtle bg-surface-low/10 px-5 py-4 font-sans sm:flex-row sm:items-center sm:justify-between">
             <span className="text-xs text-on-surface-variant font-bold">
               {i18n.language === "fr" 
                 ? `Page ${activePage} sur ${totalPages} (${totalItems} éléments)`

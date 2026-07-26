@@ -59,7 +59,11 @@ function QueryFailure({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-export default function AlertsRoute() {
+interface AlertsRouteProps {
+  mode?: "history" | "settings";
+}
+
+export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
   const { t, i18n } = useTranslation();
 
   // Queries & Mutations
@@ -167,7 +171,7 @@ export default function AlertsRoute() {
 
   return (
     <MotionDiv
-      initial={{ opacity: 0, y: 12 }}
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.3 }}
@@ -189,8 +193,7 @@ export default function AlertsRoute() {
         }}
       />
 
-      {/* Header */}
-      <div className="pb-6 border-b border-border-subtle">
+      {mode === "history" && <div className="pb-6 border-b border-border-subtle">
         <div>
           <h1 className="app-h1">
             {t("alerts.title")}
@@ -199,11 +202,11 @@ export default function AlertsRoute() {
             {t("alerts.subtitle")}
           </p>
         </div>
-      </div>
+      </div>}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <div className={mode === "settings" ? "space-y-6" : "space-y-4"}>
         {/* Left Hand: Preference Controls */}
-        <div className="lg:col-span-7 space-y-6">
+        {mode === "settings" && <div className="space-y-6">
           {/* Email Notification Toggles */}
           <form onSubmit={handleSavePrefs} className="bg-white rounded-xl border border-border-subtle p-6 space-y-6 shadow-sm">
             <div className="pb-4 border-b border-border-subtle">
@@ -395,10 +398,10 @@ export default function AlertsRoute() {
               )}
             </div>
           </div>
-        </div>
+        </div>}
 
         {/* Right Hand: Alert History Log */}
-        <div className="lg:col-span-5 space-y-4">
+        {mode === "history" && <div className="space-y-4">
           <div className="pb-4 border-b border-border-subtle">
             <h3 className="font-display font-semibold text-[17px] text-on-surface">
               {t("alerts.section_history")}
@@ -450,11 +453,11 @@ export default function AlertsRoute() {
               })}
             </div>
           )}
-        </div>
+        </div>}
       </div>
 
       {/* Theme-Aware Confirmation Modal Overlay for Rule Deletion */}
-      {confirmDeleteId && (
+      {mode === "settings" && confirmDeleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm select-none p-4">
           <MotionDiv
             initial={{ opacity: 0, scale: 0.95 }}

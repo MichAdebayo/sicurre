@@ -478,6 +478,36 @@ paths:
         "413":
           description: Message exceeds the configured limit
 
+  /v1/email/dmarc-reports:
+    post:
+      tags: [internal]
+      summary: Ingest an aggregate DMARC report delivered by Email Routing
+      description: >
+        The Sicurre Email Routing Worker forwards the original RFC 822 message.
+        The API extracts an XML, GZIP, or ZIP aggregate report, resolves the
+        onboarded workspace from policy_published.domain, and stores each record
+        with fingerprint idempotency.
+      security:
+        - ReportWorkerAuth: []
+      requestBody:
+        required: true
+        content:
+          message/rfc822:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "202":
+          description: Report imported or already imported
+        "400":
+          description: Empty message or missing/invalid DMARC attachment
+        "401":
+          description: Invalid Worker credential
+        "404":
+          description: Report domain is not an active Sicurre integration
+        "413":
+          description: Message exceeds the configured limit
+
   /v1/auth/session:
     get:
       tags: [app]

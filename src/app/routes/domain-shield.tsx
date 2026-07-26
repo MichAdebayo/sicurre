@@ -11,13 +11,10 @@ import {
   Globe,
   Lock,
   Skull,
-  Award,
   ArrowRight,
   Info,
   Terminal,
   Zap,
-  Play,
-  Send,
   HelpCircle,
   FileCheck,
   BarChart3,
@@ -39,10 +36,9 @@ import {
   useCloudflareStatus,
   AuthSession,
 } from "../lib/api";
-import { AppToast, type AppToastTone } from "../components/common/app-toast";
+import { AppToast } from "../components/common/app-toast";
 
 const MotionDiv = motion.div as any;
-type SpoofResult = { tone: AppToastTone; message: string };
 
 interface DomainShieldRouteProps {
   session?: AuthSession;
@@ -192,78 +188,6 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
     }
   }, [shieldStatus, selectedDomain, isShieldLoading]);
 
-  // State for Email Spoofing Simulator Sandbox
-  const [spoofStep, setSpoofStep] = useState<"idle" | "sending" | "analyzing" | "result">("idle");
-  const [spoofProgress, setSpoofProgress] = useState(0);
-  const [spoofLogs, setSpoofLogs] = useState<string[]>([]);
-  const [spoofResult, setSpoofResult] = useState<SpoofResult | null>(null);
-
-  useEffect(() => {
-    if (!spoofResult) return;
-    const timeoutId = window.setTimeout(() => setSpoofResult(null), 6500);
-    return () => window.clearTimeout(timeoutId);
-  }, [spoofResult]);
-
-  const startSpoofSimulation = () => {
-    if (spoofStep !== "idle") return;
-    setSpoofStep("sending");
-    setSpoofProgress(0);
-    setSpoofLogs([]);
-    setSpoofResult(null);
-
-    const steps = [
-      isFR 
-        ? "Envoi du mail d'imposture simulé depuis le serveur non autorisé (185.220.101.5)..." 
-        : "Sending simulated impersonation email from unauthorized relay IP (185.220.101.5)...",
-      isFR 
-        ? "Réception par la passerelle de messagerie destinataire..." 
-        : "Received by target destination mail server...",
-      isFR
-        ? "Analyse SPF : IP 185.220.101.5 est-elle dans l'enregistrement SPF ? ➔ ÉCHEC"
-        : "SPF Audit: Is IP 185.220.101.5 included in SPF records? ➔ FAIL",
-      isFR
-        ? "Analyse DKIM : Signature cryptographique valide présente ? ➔ ÉCHEC (Non signé)"
-        : "DKIM Audit: Is a valid cryptographic signature present? ➔ FAIL (Unsigned)",
-      isFR
-        ? `Évaluation DMARC : SPF & DKIM ont échoué. Application de la politique DMARC : "${shieldStatus?.dmarc.policy || 'none'}"`
-        : `DMARC Evaluation: Both SPF & DKIM failed. Applying domain policy: "${shieldStatus?.dmarc.policy || 'none'}"`
-    ];
-
-    let current = 0;
-    const interval = setInterval(() => {
-      if (current < steps.length) {
-        setSpoofLogs((prev) => [...prev, steps[current]]);
-        setSpoofProgress(((current + 1) / steps.length) * 100);
-        current++;
-      } else {
-        clearInterval(interval);
-        setSpoofStep("result");
-        if (shieldStatus?.dmarc.policy === "reject") {
-          setSpoofResult({
-            tone: "success",
-            message: isFR
-              ? "Attaque bloquée par DMARC reject."
-              : "Attack blocked by DMARC reject.",
-          });
-        } else if (shieldStatus?.dmarc.policy === "quarantine") {
-          setSpoofResult({
-            tone: "warning",
-            message: isFR
-              ? "Attaque isolée par DMARC quarantine."
-              : "Attack isolated by DMARC quarantine.",
-          });
-        } else {
-          setSpoofResult({
-            tone: "error",
-            message: isFR
-              ? "Domaine vulnérable : DMARC non restrictif."
-              : "Domain vulnerable: DMARC is not restrictive.",
-          });
-        }
-      }
-    }, 1200);
-  };
-
   // Workspace Cloudflare API token query
   const { data: wsTokenData } = useWorkspaceCloudflareToken();
 
@@ -372,12 +296,6 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
     return "text-warning bg-warning/10 border-warning/25";
   };
 
-  const getSpoofResultClass = (tone: AppToastTone) => {
-    if (tone === "success") return "bg-safe-bg border-safe/25 text-safe";
-    if (tone === "error") return "bg-error/10 border-error/25 text-error";
-    return "bg-warning-bg border-warning/25 text-warning";
-  };
-
   return (
     <>
       <AppToast
@@ -400,7 +318,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
       />
 
       <MotionDiv
-        initial={{ opacity: 0, y: 12 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -12 }}
         transition={{ duration: 0.3 }}
@@ -410,12 +328,12 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border-subtle">
         <div>
           <h1 className="app-h1">
-            {isFR ? "Commandement du Bouclier" : "Domain Shield Command Center"}
+            {isFR ? "Bouclier du domaine" : "Domain Shield"}
           </h1>
           <p className="app-body-sub mt-1">
             {isFR
-              ? "Supervision de la légitimité DNS, de l'authentification et de la réputation de livraison"
-              : "Continuous audit of DNS authentication, deliverability reputation, and outgoing spoofing protection"}
+              ? "Vérifiez l'authentification DNS, le certificat TLS et les signaux de réputation disponibles."
+              : "Check DNS authentication, the TLS certificate, and available reputation signals."}
           </p>
         </div>
 
@@ -463,8 +381,8 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
           </p>
           <p className="text-sm mt-1 text-on-surface-variant">
             {isFR
-              ? "Veuillez intégrer un domaine via Cloudflare dans les paramètres pour activer l'audit continu de santé de votre domaine."
-              : "Please integrate a domain via Cloudflare in the settings section to enable continuous domain health auditing."}
+              ? "Intégrez un domaine via Cloudflare dans les paramètres pour lancer son premier audit."
+              : "Connect a domain through Cloudflare settings to run its first audit."}
           </p>
         </div>
       ) : (shieldLoading && !shieldStatus) ? (
@@ -485,27 +403,27 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
         </div>
       ) : (
         <>
-          {/* Main Layout Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-            
-            {/* Left: Interactive Radar Dome & Score */}
-            <div className="lg:col-span-5 bg-surface-lowest rounded-2xl border border-border-subtle p-8 flex flex-col items-center justify-center text-center shadow-sm relative overflow-hidden">
-              <div className="absolute top-4 right-4 flex items-center gap-1.5 select-none">
+          <section className="flex flex-col items-center justify-between gap-6 border-y border-border-subtle py-7 sm:flex-row">
+            <div>
+              <div className="flex items-center gap-1.5">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-safe" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-safe" />
                 </span>
-                <span className="text-[10px] font-extrabold text-safe uppercase tracking-wider">
-                  {isFR ? "Actif & Protégé" : "Active & Hardened"}
+                <span className="text-xs font-semibold text-safe">
+                  {isFR ? "Protection active" : "Protection active"}
                 </span>
               </div>
-
-              <p className="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-6 flex items-center gap-1.5 select-none">
-                <Award className="w-4 h-4 text-primary" />
-                {isFR ? "Indice d'Intégrité DNS" : "DNS Integrity Rating"}
+              <h2 className="mt-2 text-xl font-bold text-on-surface">
+                {isFR ? "Intégrité du domaine" : "Domain integrity"}
+              </h2>
+              <p className="mt-1 max-w-xl text-sm text-on-surface-variant">
+                {isFR
+                  ? "Évaluation des enregistrements SPF, DKIM, DMARC, du certificat TLS et des contrôles de réputation disponibles."
+                  : "Evaluation of SPF, DKIM, DMARC, TLS certificate and available reputation checks."}
               </p>
-
-              <div className="relative w-44 h-44 flex items-center justify-center select-none">
+            </div>
+            <div className="relative flex h-32 w-32 shrink-0 items-center justify-center">
                 <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
                   <circle
                     cx="50"
@@ -529,102 +447,15 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   />
                 </svg>
                 <div className="absolute flex flex-col items-center justify-center">
-                  <span className="font-display font-extrabold text-5xl text-on-surface tracking-tighter">
+                  <span className="font-display text-4xl font-extrabold text-on-surface">
                     {shieldStatus.score_grade}
                   </span>
-                  <span className="text-[11px] font-bold font-mono text-on-surface-variant mt-1">
-                    {shieldStatus.reputation_score}/100 Rating
+                  <span className="mt-1 font-mono text-[11px] font-bold text-on-surface-variant">
+                    {shieldStatus.reputation_score}/100
                   </span>
                 </div>
-              </div>
-
             </div>
-
-            {/* Right: Interactive Spoof Simulator Sandbox */}
-            <div className="lg:col-span-7 bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden">
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Play className="w-5 h-5 text-primary" />
-                  <h3 className="font-display font-bold text-[18px] text-on-surface">
-                    {isFR ? "Simulateur d'usurpation (Sandbox)" : "Impersonation Simulator Sandbox"}
-                  </h3>
-                </div>
-                
-                <p className="text-xs text-on-surface-variant leading-relaxed">
-                  {isFR
-                    ? "Testez la résilience de votre domaine en simulant une tentative d'usurpation d'identité pour vérifier les barrières de protection."
-                    : "Test your domain's defensive posture by launching a simulated phishing email forgery check."}
-                </p>
-
-                {spoofStep === "idle" && (
-                  <div className="bg-surface-low border border-border-subtle rounded-xl p-4 space-y-2">
-                    <div className="flex justify-between text-[11px] text-on-surface-variant font-bold uppercase">
-                      <span>{isFR ? "Enveloppe du Mail Test" : "Simulated Mail Envelope"}</span>
-                      <span className="text-error font-extrabold">{isFR ? "En-tête Falsifié" : "Forged Header"}</span>
-                    </div>
-                    <div className="text-xs space-y-1 font-mono">
-                      <div><span className="text-on-surface-variant">From:</span> info@{selectedDomain}</div>
-                      <div><span className="text-on-surface-variant">Source IP:</span> 185.220.101.5 (unauthorized)</div>
-                      <div><span className="text-on-surface-variant">To:</span> client@partnerdomain.com</div>
-                    </div>
-                  </div>
-                )}
-
-                {spoofStep !== "idle" && (
-                  <div className="space-y-3">
-                    {/* Progress Bar */}
-                    <div className="w-full bg-surface-low h-1.5 rounded-full overflow-hidden">
-                      <div className="h-full bg-primary transition-all duration-300" style={{ width: `${spoofProgress}%` }} />
-                    </div>
-
-                    <div className="bg-slate-950 p-4 rounded-xl border border-white/5 font-mono text-[11px] text-white/70 space-y-2 min-h-[100px]">
-                      {spoofLogs.map((log, idx) => (
-                        <div key={idx} className={log?.includes("ÉCHEC") || log?.includes("FAIL") ? "text-amber-400" : "text-white/60"}>
-                          {log}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-5 border-t border-border-subtle/50 mt-4 flex items-center justify-between">
-                {spoofStep === "result" ? (
-                  <div className="flex flex-col gap-2 w-full">
-                    {spoofResult && (
-                      <div className={`p-3 rounded-lg border text-[13px] font-semibold leading-5 transition-opacity ${getSpoofResultClass(spoofResult.tone)}`}>
-                        {spoofResult.message}
-                      </div>
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setSpoofStep("idle");
-                        setSpoofResult(null);
-                      }}
-                      className="w-fit self-end cursor-pointer bg-white text-xs font-bold"
-                    >
-                      {isFR ? "Recommencer" : "Reset Test"}
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    onClick={startSpoofSimulation}
-                    disabled={spoofStep === "sending"}
-                    className="w-full flex items-center justify-center gap-2 cursor-pointer bg-[#2e6bb5] text-white hover:bg-[#23589b] border-none text-xs font-bold rounded-lg transition-all h-[38px] shadow-sm"
-                  >
-                    <Send className="w-4 h-4" />
-                    <span>
-                      {spoofStep === "sending" 
-                        ? (isFR ? "Simulation en cours..." : "Simulating...") 
-                        : (isFR ? "Lancer le test d'usurpation" : "Launch Spoof simulation")}
-                    </span>
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
+          </section>
 
           {/* Row 2: Audit et Intégrité DNS (5 Cards side-by-side) */}
           <div className="bg-surface-lowest rounded-2xl border border-border-subtle p-6 shadow-sm space-y-6">
@@ -638,7 +469,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     {isFR ? "Audit et Intégrité DNS" : "DNS Audit & Integrity Status"}
                   </h3>
                   <p className="text-xs text-on-surface-variant mt-0.5 font-medium">
-                    {isFR ? "Vérification en temps réel de vos configurations de messagerie" : "Real-time verification of email security records"}
+                    {isFR ? "État observé lors du dernier audit" : "State observed during the latest audit"}
                   </p>
                 </div>
               </div>
@@ -695,10 +526,10 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                 },
                 {
                   id: "reputation",
-                  labelFR: "Scan Réputation",
-                  labelEN: "IP Reputation",
-                  descFR: "Listes noires / Menaces",
-                  descEN: "Blocklists audit",
+                  labelFR: "Réputation",
+                  labelEN: "Reputation",
+                  descFR: "Contrôle externe",
+                  descEN: "External check",
                   valid: !shieldStatus?.blacklists?.listed,
                 },
               ].map((step, idx) => {
@@ -745,7 +576,9 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     statusBadge = (
                       <span className="inline-flex items-center gap-1 rounded-md bg-warning-bg px-2.5 py-0.5 text-[11px] font-semibold text-warning">
                         <AlertTriangle className="w-3.5 h-3.5" />
-                        {t("domain_shield.status_partial")}
+                        {step.id === "reputation" && shieldStatus?.blacklists?.error
+                          ? (isFR ? "Non vérifiée" : "Not verified")
+                          : t("domain_shield.status_partial")}
                       </span>
                     );
                   } else {
@@ -823,7 +656,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                 {/* Target configuration breakdown list */}
                 {needsDnsSetup && (
                   <div className="bg-surface-low border border-border-subtle rounded-xl p-3.5 space-y-2.5 text-xs">
-                    <div className="font-bold text-[10px] uppercase tracking-wider text-on-surface-variant mb-1 flex items-center justify-between">
+                    <div className="mb-1 flex items-center justify-between text-xs font-bold text-on-surface-variant">
                       <div className="flex items-center gap-1.5">
                         <span>{isFR ? "Enregistrements DNS" : "DNS Records Setup"}</span>
                         
@@ -985,7 +818,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                             {t("domain_shield.ssl_countdown", { days: shieldStatus.ssl.days_remaining })}
                           </span>
                           <span className="text-[10px] font-bold text-on-surface-variant">
-                            {t("domain_shield.ssl_renew_active")}
+                            {isFR ? "Certificat public vérifié" : "Public certificate verified"}
                           </span>
                         </>
                       ) : (
@@ -1005,14 +838,14 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                       </div>
                       <div className="flex items-center gap-1.5">
                         <h5 className="font-semibold text-[14.5px] text-on-surface">
-                          {isFR ? "Surveillance de Réputation" : "Domain Reputation Monitor"}
+                            {isFR ? "Vérification de réputation" : "Reputation check"}
                         </h5>
                         <div className="relative group">
                           <Info className="w-3.5 h-3.5 text-[#2e6bb5] cursor-help hover:text-primary transition-colors" />
                           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-60 bg-white border border-border-subtle text-on-surface text-[10px] p-2.5 rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 z-50 normal-case leading-normal font-sans text-center font-bold">
                             {isFR
-                              ? "Audit continu auprès des listes noires (Spamhaus, RBL) pour garantir la délivrabilité."
-                              : "Continual checks against blocklists (Spamhaus, RBLs) to secure deliverability."}
+                              ? "Interrogation ponctuelle de Spamhaus DBL et SURBL lors de l'audit du domaine."
+                              : "Point-in-time query of Spamhaus DBL and SURBL during the domain audit."}
                           </div>
                         </div>
                       </div>
@@ -1062,7 +895,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                       </div>
                       <div className="flex items-center gap-1.5">
                         <h5 className="font-semibold text-[14.5px] text-on-surface">
-                          {isFR ? "Activité de Blocage DMARC" : "DMARC Block Activity"}
+                          {isFR ? "Échecs observés par DMARC" : "DMARC observed failures"}
                         </h5>
                         <div className="relative group">
                           <Info className="w-3.5 h-3.5 text-[#2e6bb5] cursor-help hover:text-primary transition-colors" />
@@ -1077,10 +910,12 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     <div className="flex flex-col sm:items-end gap-1.5 min-w-[160px]">
                       <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#2e6bb5] bg-[#d0e4ff]/30 px-2.5 py-1 rounded-full border border-primary-container/20 w-fit">
                         <Activity className="w-3.5 h-3.5" />
-                        {isFR ? "28 bloqués" : "28 blocked"}
+                        {dmarcReports?.failed_messages ?? 0} {isFR ? "échoués" : "failed"}
                       </span>
                       <span className="text-[10px] font-bold text-[#2e6bb5]">
-                        {isFR ? "Protection active" : "Protection active"}
+                        {dmarcReports?.report_count
+                          ? (isFR ? `${dmarcReports.report_count} rapport(s) reçu(s)` : `${dmarcReports.report_count} report(s) received`)
+                          : (isFR ? "Aucun rapport reçu" : "No reports received")}
                       </span>
                     </div>
                   </div>
@@ -1100,18 +935,18 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
             <div className="bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border-subtle/50">
                 <div className="flex items-center gap-2 flex-wrap justify-end">
-                  <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider px-2 py-0.5 bg-surface-low rounded">
+                  <span className="rounded bg-surface-low px-2 py-0.5 text-xs font-bold text-on-surface-variant">
                     SPF
                   </span>
                   <span className="font-mono text-xs font-bold text-on-surface">Hostname: @</span>
                 </div>
                 <div>
                   {shieldStatus.spf.valid ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-safe uppercase bg-safe/10 px-2.5 py-0.5 rounded-full">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-safe/10 px-2.5 py-0.5 text-xs font-bold text-safe">
                       <ShieldCheck className="w-3.5 h-3.5" /> {t("domain_shield.status_conform")}
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-warning uppercase bg-warning/10 px-2.5 py-0.5 rounded-full">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2.5 py-0.5 text-xs font-bold text-warning">
                       <AlertTriangle className="w-3.5 h-3.5" /> {t("domain_shield.status_missing")}
                     </span>
                   )}
@@ -1120,7 +955,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-1 text-xs">
                 <div className="space-y-2">
-                  <span className="font-bold text-on-surface-variant uppercase tracking-wider text-[10px] block">
+                  <span className="block text-xs font-bold text-on-surface-variant">
                     {t("domain_shield.active_dns_entry")}
                   </span>
                   {shieldStatus.spf.record ? (
@@ -1135,7 +970,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                 </div>
 
                 <div className="space-y-2">
-                  <span className="font-bold text-on-surface-variant uppercase tracking-wider text-[10px] block">
+                  <span className="block text-xs font-bold text-on-surface-variant">
                     {t("domain_shield.required_dns_setup")}
                   </span>
                   <div className="flex gap-2 items-center">
@@ -1163,18 +998,18 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
             <div className="bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border-subtle/50">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider px-2 py-0.5 bg-surface-low rounded">
+                  <span className="rounded bg-surface-low px-2 py-0.5 text-xs font-bold text-on-surface-variant">
                     DKIM
                   </span>
                   <span className="font-mono text-xs font-bold text-on-surface">Hostname: cloudflare._domainkey</span>
                 </div>
                 <div>
                   {shieldStatus.dkim.valid ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-safe uppercase bg-safe/10 px-2.5 py-0.5 rounded-full">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-safe/10 px-2.5 py-0.5 text-xs font-bold text-safe">
                       <ShieldCheck className="w-3.5 h-3.5" /> {t("domain_shield.status_conform")}
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-warning uppercase bg-warning/10 px-2.5 py-0.5 rounded-full">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2.5 py-0.5 text-xs font-bold text-warning">
                       <AlertTriangle className="w-3.5 h-3.5" /> {t("domain_shield.status_missing")}
                     </span>
                   )}
@@ -1183,7 +1018,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-1 text-xs">
                 <div className="space-y-2">
-                  <span className="font-bold text-on-surface-variant uppercase tracking-wider text-[10px] block">
+                  <span className="block text-xs font-bold text-on-surface-variant">
                     {t("domain_shield.active_dns_entry")}
                   </span>
                   {shieldStatus.dkim.record ? (
@@ -1198,7 +1033,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                 </div>
 
                 <div className="space-y-2">
-                  <span className="font-bold text-on-surface-variant uppercase tracking-wider text-[10px] block">
+                  <span className="block text-xs font-bold text-on-surface-variant">
                     {t("domain_shield.required_dns_setup")}
                   </span>
                   <div className="flex gap-2 items-center">
@@ -1226,14 +1061,14 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
             <div className="bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border-subtle/50">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider px-2 py-0.5 bg-surface-low rounded">
+                  <span className="rounded bg-surface-low px-2 py-0.5 text-xs font-bold text-on-surface-variant">
                     DMARC
                   </span>
                   <span className="font-mono text-xs font-bold text-on-surface">Hostname: _dmarc</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`text-[9px] font-extrabold font-mono px-2 py-0.5 rounded border uppercase select-none ${getDmarcPolicyClass(shieldStatus.dmarc.policy)}`}>
-                    Policy: {shieldStatus.dmarc.policy}
+                  <span className={`select-none rounded border px-2 py-0.5 font-mono text-xs font-bold ${getDmarcPolicyClass(shieldStatus.dmarc.policy)}`}>
+                    {isFR ? "Politique" : "Policy"} : {shieldStatus.dmarc.policy}
                   </span>
                   {isDmarcComplete ? (
                     <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-safe bg-safe/10 px-2.5 py-0.5 rounded-full">
@@ -1253,7 +1088,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-1 text-xs">
                 <div className="space-y-2">
-                  <span className="font-bold text-on-surface-variant uppercase tracking-wider text-[10px] block">
+                  <span className="block text-xs font-bold text-on-surface-variant">
                     {t("domain_shield.active_dns_entry")}
                   </span>
                   {shieldStatus.dmarc.record ? (
@@ -1268,7 +1103,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                 </div>
 
                 <div className="space-y-2">
-                  <span className="font-bold text-on-surface-variant uppercase tracking-wider text-[10px] block">
+                  <span className="block text-xs font-bold text-on-surface-variant">
                     {t("domain_shield.sicurre_recommendation")}
                   </span>
                   <div className="flex gap-2 items-center">
@@ -1304,8 +1139,12 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     {hasSicurreDmarcReporting ? t("domain_shield.report_enabled_desc") : t("domain_shield.report_missing_desc")}
                   </p>
                 </div>
-                <span className={`w-fit rounded-full border px-2.5 py-0.5 text-[10px] font-extrabold ${hasSicurreDmarcReporting ? "border-safe/20 bg-safe/10 text-safe" : "border-warning/25 bg-warning/10 text-warning"}`}>
-                  {hasSicurreDmarcReporting ? t("domain_shield.report_enabled") : t("domain_shield.status_partial")}
+                <span className={`w-fit rounded-md border px-2.5 py-1 text-[11px] font-semibold ${dmarcReports?.report_count ? "border-safe/20 bg-safe/10 text-safe" : "border-warning/25 bg-warning/10 text-warning"}`}>
+                  {dmarcReports?.report_count
+                    ? t("domain_shield.reports_received")
+                    : hasSicurreDmarcReporting
+                      ? t("domain_shield.awaiting_report")
+                      : t("domain_shield.status_partial")}
                 </span>
               </div>
               {dmarcReportsLoading ? (
@@ -1326,7 +1165,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   { label: t("domain_shield.report_failed"), value: dmarcReports?.failed_messages ?? 0 },
                 ].map((metric) => (
                   <div key={metric.label} className="rounded-lg border border-border-subtle bg-surface-lowest p-3">
-                    <p className="text-[10px] font-bold uppercase text-on-surface-variant">{metric.label}</p>
+                    <p className="text-xs font-bold text-on-surface-variant">{metric.label}</p>
                     <p className="mt-1 font-mono text-lg font-extrabold text-on-surface">{metric.value}</p>
                   </div>
                 ))}
