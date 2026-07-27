@@ -80,6 +80,11 @@ class Settings(BaseSettings):
     reported_email_max_message_bytes: int = 5 * 1024 * 1024
     phishtank_api_key: str | None = None
     phishtank_user_agent: str = "phishtank/sicurre-research"
+    spamhaus_dqs_key: str | None = Field(
+        default=None,
+        validation_alias="SPAMHAUSE_DQS_API_KEY",
+        description="Spamhaus DQS API key for authenticated DNSBL queries.",
+    )
     phishtank_snapshot_storage_backend: str | None = None
     phishtank_snapshot_local_dir: Path = ROOT_DIR / "data" / "raw" / "api" / "phishtank"
     phishtank_snapshot_prefix: str = "phishtank"

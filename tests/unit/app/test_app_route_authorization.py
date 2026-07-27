@@ -131,7 +131,7 @@ async def test_domain_shield_cache_ages_ssl_days(monkeypatch) -> None:
     async def allow_domain(_domain: str, _workspace_id: str) -> None:
         return None
 
-    async def blocklists(_domain: str) -> tuple[list[str], list[str]]:
+    async def blocklists(_domain: str, **_kwargs: object) -> tuple[list[str], list[str]]:
         return [], []
 
     updated_at = (datetime.now(UTC) - timedelta(days=3)).isoformat()
@@ -170,7 +170,7 @@ async def test_domain_shield_marks_uninspectable_certificate_unavailable(monkeyp
     async def allow_domain(_domain: str, _workspace_id: str) -> None:
         return None
 
-    async def blocklists(_domain: str) -> tuple[list[str], list[str]]:
+    async def blocklists(_domain: str, **_kwargs: object) -> tuple[list[str], list[str]]:
         return [], []
 
     async def query(_sql: str, _params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:

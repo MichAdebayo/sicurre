@@ -1548,6 +1548,9 @@ def _classify_blocklist_response(provider: str, addresses: list[str]) -> tuple[b
 
     if provider == "Spamhaus DBL":
         if any(str(address).startswith("127.255.255.") for address in parsed):
+            # 127.255.255.254 = open resolver block
+            # 127.255.255.252 = typo in DNSBL name (DQS misconfiguration)
+            # 127.255.255.255 = excessive query volume
             return False, "Spamhaus indisponible depuis le résolveur du serveur"
         return any(address in ipaddress.ip_network("127.0.0.0/16") for address in parsed), None
 
@@ -1559,10 +1562,25 @@ def _classify_blocklist_response(provider: str, addresses: list[str]) -> tuple[b
     return False, None
 
 
-async def _check_domain_blacklists(domain: str) -> tuple[list[str], list[str]]:
+async def _check_domain_blacklists(
+    domain: str,
+    *,
+    dqs_key: str | None = None,
+) -> tuple[list[str], list[str]]:
+    """Query Spamhaus DBL and SURBL for domain reputation listings.
+
+    When *dqs_key* is provided, Spamhaus queries use the authenticated
+    DQS endpoint (``dbl.dq.spamhaus.net``) which works through any DNS
+    resolver.  Without a key the free public mirror is attempted.
+    """
     import dns.resolver
 
-    blacklists = {"dbl.spamhaus.org": "Spamhaus DBL", "multi.surbl.org": "SURBL List"}
+    if dqs_key:
+        spamhaus_zone = f"{dqs_key}.dbl.dq.spamhaus.net"
+    else:
+        spamhaus_zone = "dbl.spamhaus.org"
+
+    blacklists = {spamhaus_zone: "Spamhaus DBL", "multi.surbl.org": "SURBL List"}
     listed_on: list[str] = []
     unavailable: list[str] = []
     for rbl, name in blacklists.items():
@@ -1585,7 +1603,10 @@ async def check_domain_shield_status(
 ):
     await _require_workspace_domain(domain, current_user.workspace_id)
     # Run dynamic blacklist check
-    blacklists_listed, blacklist_errors = await _check_domain_blacklists(domain)
+    settings = get_settings()
+    blacklists_listed, blacklist_errors = await _check_domain_blacklists(
+        domain, dqs_key=settings.spamhaus_dqs_key,
+    )
     blacklist_error = "; ".join(blacklist_errors) or None
 
     # Try fetching from DB cache first
