@@ -209,6 +209,7 @@ async def test_scan_email_persists_ml_stage_contract(
 ) -> None:
     """The app audit row retains the bounded ML provider and stage evidence."""
     writes: list[tuple[str, tuple[Any, ...]]] = []
+    inference_payload: dict[str, Any] = {}
 
     async def query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
         writes.append((sql, params))
@@ -251,7 +252,8 @@ async def test_scan_email_persists_ml_stage_contract(
         async def __aexit__(self, *_: Any) -> None:
             return None
 
-        async def post(self, *_: Any, **__: Any) -> SuccessResponse:
+        async def post(self, *_: Any, **kwargs: Any) -> SuccessResponse:
+            inference_payload.update(kwargs["json"])
             return SuccessResponse()
 
     monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
@@ -262,14 +264,24 @@ async def test_scan_email_persists_ml_stage_contract(
         request=_limiter_request(),
         payload=EmailScanRequest(
             message_id="message-1",
-            subject="Confirmation",
-            sender="events@example.fr",
-            text="Inscription confirmée.",
+            subject="Fwd: Confirmation",
+            sender="Friend <friend@gmail.com>",
+            text=(
+                "Authentication-Results: mx.example; dmarc=pass\n\n"
+                "---------- Forwarded message ---------\n"
+                "You are receiving this newsletter because you subscribed."
+            ),
         ),
         x_sicurre_secret="valid-secret",
     )
 
     assert response.label == "legitimate"
+    assert inference_payload["mail_context"] == {
+        "mailing_list_headers": False,
+        "outer_sender_authenticated": True,
+        "structured_forward": True,
+        "subscription_claimed": True,
+    }
     inserted = next(
         params for sql, params in writes if "INSERT INTO app_inference_event" in sql
     )
