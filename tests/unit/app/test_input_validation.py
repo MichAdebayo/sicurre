@@ -8,6 +8,7 @@ downstream dependencies are unavailable.
 from __future__ import annotations
 
 import hashlib
+import json
 from typing import Any
 
 import pytest
@@ -155,6 +156,51 @@ async def test_scan_email_returns_503_when_inference_unavailable(
 
     assert exc_info.value.status_code == 503
     assert "temporarily unavailable" in str(exc_info.value.detail).lower()
+
+
+@pytest.mark.asyncio
+async def test_scan_email_records_whitelist_stage_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A whitelist decision records why inference was bypassed."""
+    writes: list[tuple[str, tuple[Any, ...]]] = []
+
+    async def query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        writes.append((sql, params))
+        if "FROM cloudflare_integration" in sql:
+            return [
+                {
+                    "id": "int-1",
+                    "user_email": "owner@test",
+                    "workspace_id": "workspace-1",
+                    "workspace_member_user_id": "user-1",
+                    "zone_name": "test.com",
+                    "status": "active",
+                }
+            ]
+        if "FROM app_security_rule" in sql:
+            return [{"rule_type": "whitelist", "pattern": "trusted.test"}]
+        return []
+
+    monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
+    monkeypatch.setattr(integrations, "_async_query", query)
+
+    response = await integrations.scan_email(
+        request=_limiter_request(),
+        payload=EmailScanRequest(
+            subject="Expected message",
+            sender="notices@trusted.test",
+            text="Routine account notice.",
+        ),
+        x_sicurre_secret="valid-secret",
+    )
+
+    assert response.verdict == "safe"
+    insert = next(params for sql, params in writes if "INSERT INTO app_inference_event" in sql)
+    assert json.loads(insert[-3]) == {"custom_rule": "legitimate"}
+    assert json.loads(insert[-2]) == {
+        "custom_rule": {"active": True, "rule_type": "whitelist"}
+    }
 
 
 @pytest.mark.asyncio
