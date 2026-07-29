@@ -1605,10 +1605,12 @@ components:
           description: Stable tenant-scoped identifier also added to delivered mail as X-Sicurre-Event-ID.
         verdict:
           type: string
-          enum: [safe, spam, phishing, quarantine]
+          enum: [safe, phishing, quarantine]
+          description: Delivery/safety decision; spam remains safe for the current forwarding policy.
         label:
           type: string
           enum: [phishing, spam, legitimate]
+          description: Independent three-class model decision, preserved as X-Sicurre-Label on delivery.
         score:
           type: number
           minimum: 0

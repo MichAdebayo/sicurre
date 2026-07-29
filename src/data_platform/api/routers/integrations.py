@@ -53,6 +53,7 @@ from data_platform.services.cloudflare_provisioner import (
     CloudflareAPIError,
     CloudflareProvisioner,
 )
+from data_platform.services.email_context import derive_email_context
 from data_platform.services.quarantine_storage import build_quarantine_store
 from db.runtime import execute_runtime_query
 
@@ -506,6 +507,11 @@ async def scan_email(
         # ── Call inference API ──────────────────────────────────────────────────
         inference_url = settings.inference_api_url or "http://localhost:8000/v1/classify"
         inference_key = settings.inference_api_key or ""
+        mail_context = derive_email_context(
+            subject=payload.subject,
+            sender=payload.sender,
+            text=payload.text,
+        )
 
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
@@ -517,6 +523,7 @@ async def scan_email(
                         "text": payload.text,
                         "use_llm": payload.use_llm,
                         "use_virustotal": payload.use_virustotal,
+                        "mail_context": mail_context.as_payload(),
                     },
                     headers={"Authorization": f"Bearer {inference_key}"},
                 )
