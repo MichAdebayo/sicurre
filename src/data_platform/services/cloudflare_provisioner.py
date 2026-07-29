@@ -52,19 +52,14 @@ export default {
     const from    = message.from    || '';
     const subject = message.headers.get('subject') || message.headers.get('Subject') || '';
 
-    // Read the original MIME once. Only a short text projection is classified.
+    // Read the original MIME once. Sicurre-ML owns deterministic MIME parsing;
+    // preserving headers and boundaries is required for correct decoding.
     let rawBytes = new ArrayBuffer(0);
     let bodyText = '';
     try {
       rawBytes = await new Response(message.raw).arrayBuffer();
       const rawText = new TextDecoder('utf-8', { fatal: false }).decode(rawBytes);
-      // Strip MIME boundary/header noise so the model gets cleaner text
-      bodyText = rawText
-        .replace(/--[A-Za-z0-9_\\-\\.]+(?:--)?/g, '')
-        .replace(/Content-[^\\n]+\\n/g, '')
-        .replace(/\\r\\n\\r\\n/g, '\\n\\n')
-        .trim()
-        .slice(0, 5_500);
+      bodyText = rawText.slice(0, 10_000);
     } catch (_) { /* fail-open body read */ }
 
     const headerMessageId = message.headers.get('message-id') || message.headers.get('Message-ID') || '';
