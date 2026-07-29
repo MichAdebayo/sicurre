@@ -74,6 +74,7 @@ export default {
     let scanStatus = 'unavailable';
     let confidence = '';
     let scanHttpStatus = '';
+    let label = '';
     let quarantineId = '';
     let eventId = '';
     try {
@@ -99,6 +100,7 @@ export default {
         verdict = (data.verdict || 'safe').toLowerCase();
         scanStatus = 'scanned';
         confidence = data.score === undefined ? '' : String(data.score);
+        label = data.label ? String(data.label).toLowerCase() : '';
         quarantineId = data.quarantine_id ? String(data.quarantine_id) : '';
         eventId = data.event_id ? String(data.event_id) : '';
       } else {
@@ -146,6 +148,7 @@ export default {
     traceHeaders.set('X-Sicurre-Gateway', 'cloudflare-email-worker');
     traceHeaders.set('X-Sicurre-Scan-Status', scanStatus);
     traceHeaders.set('X-Sicurre-Verdict', verdict);
+    traceHeaders.set('X-Sicurre-Label', label);
     traceHeaders.set('X-Sicurre-Scan-Http-Status', scanHttpStatus);
     traceHeaders.set('X-Sicurre-Confidence', confidence);
     traceHeaders.set('X-Sicurre-Event-ID', eventId);
