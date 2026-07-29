@@ -21,6 +21,7 @@ Integrations router — two responsibilities:
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import secrets
 import sqlite3
@@ -481,17 +482,26 @@ async def scan_email(
     verdict_safety = "safe"
     score = 0.0
     explanation = ""
+    llm_provider = ""
+    stage_scores: dict[str, Any] = {}
+    stage_labels: dict[str, Any] = {}
+    stage_breakdown: dict[str, Any] = {}
 
     if matched_rule_type == "whitelist":
         verdict_safety = "safe"
         verdict_label = "legitimate"
         score = 0.0
         explanation = "Allowed by custom security whitelist rule."
+        stage_labels = {"custom_rule": "legitimate"}
+        stage_breakdown = {"custom_rule": {"active": True, "rule_type": "whitelist"}}
     elif matched_rule_type == "blocklist":
         verdict_safety = "phishing"
         verdict_label = "phishing"
         score = 1.0
         explanation = "Blocked by custom security blocklist rule."
+        stage_scores = {"custom_rule": 1.0}
+        stage_labels = {"custom_rule": "phishing"}
+        stage_breakdown = {"custom_rule": {"active": True, "rule_type": "blocklist"}}
     else:
         # ── Call inference API ──────────────────────────────────────────────────
         inference_url = settings.inference_api_url or "http://localhost:8000/v1/classify"
@@ -520,6 +530,10 @@ async def scan_email(
             ).lower()
             score = float(result.get("composite_score") or 0.0)
             explanation = str(result.get("explanation") or "")
+            llm_provider = str(result.get("llm_provider") or "")
+            stage_scores = dict(result.get("stage_scores") or {})
+            stage_labels = dict(result.get("stage_labels") or {})
+            stage_breakdown = dict(result.get("stage_breakdown") or {})
 
         except (httpx.HTTPError, ValueError, TypeError) as exc:
             logger.error("Inference API unavailable during email scan: %s", exc)
@@ -648,15 +662,15 @@ async def scan_email(
                 score,
                 1 if classified_as_phishing else 0,
                 0 if classified_as_phishing else 1,
-                "cloudflare_worker",
+                llm_provider,
                 explanation[:500],
                 decision_latency_ms,
                 1 if payload.use_llm else 0,
                 1 if payload.use_virustotal else 0,
                 "api",
-                "{}",
-                "{}",
-                "{}",
+                json.dumps(stage_scores, sort_keys=True, separators=(",", ":")),
+                json.dumps(stage_labels, sort_keys=True, separators=(",", ":")),
+                json.dumps(stage_breakdown, sort_keys=True, separators=(",", ":")),
                 None,
             ),
         )

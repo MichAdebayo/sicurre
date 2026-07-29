@@ -223,7 +223,8 @@ async def test_deploy_email_worker() -> None:
     assert b'"text": "secret"' in request.content
     assert b'"name": "FORWARD_TO"' in request.content
     assert b'"text": "forward@test.com"' in request.content
-    assert b".slice(0, 5_500)" in request.content
+    assert b"rawText.slice(0, 10_000)" in request.content
+    assert b"replace(/Content-" not in request.content
 
 
 @pytest.mark.asyncio
