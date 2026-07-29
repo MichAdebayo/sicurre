@@ -157,6 +157,82 @@ async def test_scan_email_returns_503_when_inference_unavailable(
     assert "temporarily unavailable" in str(exc_info.value.detail).lower()
 
 
+@pytest.mark.asyncio
+async def test_scan_email_persists_ml_stage_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The app audit row retains the bounded ML provider and stage evidence."""
+    writes: list[tuple[str, tuple[Any, ...]]] = []
+
+    async def query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        writes.append((sql, params))
+        if "FROM cloudflare_integration" in sql:
+            return [
+                {
+                    "id": "int-1",
+                    "user_email": "owner@test",
+                    "workspace_id": "workspace-1",
+                    "workspace_member_user_id": "user-1",
+                    "zone_name": "test.com",
+                    "status": "active",
+                }
+            ]
+        return []
+
+    class SuccessResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, Any]:
+            return {
+                "is_phishing": False,
+                "label_verdict": "legitimate",
+                "composite_score": 0.04,
+                "explanation": "Message cohérent.",
+                "llm_provider": "mistral",
+                "stage_scores": {"onnx": 0.1, "llm": 0.02},
+                "stage_labels": {"onnx": "spam", "llm": "legitimate"},
+                "stage_breakdown": {"llm": {"active": True, "provider": "mistral"}},
+            }
+
+    class SuccessClient:
+        def __init__(self, **_: Any) -> None:
+            pass
+
+        async def __aenter__(self) -> SuccessClient:
+            return self
+
+        async def __aexit__(self, *_: Any) -> None:
+            return None
+
+        async def post(self, *_: Any, **__: Any) -> SuccessResponse:
+            return SuccessResponse()
+
+    monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
+    monkeypatch.setattr(integrations, "_async_query", query)
+    monkeypatch.setattr("httpx.AsyncClient", SuccessClient)
+
+    response = await integrations.scan_email(
+        request=_limiter_request(),
+        payload=EmailScanRequest(
+            message_id="message-1",
+            subject="Confirmation",
+            sender="events@example.fr",
+            text="Inscription confirmée.",
+        ),
+        x_sicurre_secret="valid-secret",
+    )
+
+    assert response.label == "legitimate"
+    inserted = next(
+        params for sql, params in writes if "INSERT INTO app_inference_event" in sql
+    )
+    assert inserted[14] == "mistral"
+    assert inserted[20] == '{"llm":0.02,"onnx":0.1}'
+    assert inserted[21] == '{"llm":"legitimate","onnx":"spam"}'
+    assert inserted[22] == '{"llm":{"active":true,"provider":"mistral"}}'
+
+
 # ── Pydantic Schema Validation ───────────────────────────────────────────────
 
 
