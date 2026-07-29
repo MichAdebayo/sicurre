@@ -29,6 +29,7 @@ from data_platform.api.auth import AuthUser, get_current_user
 from data_platform.api.auth import async_query as auth_query
 from data_platform.services.quarantine_delivery import (
     QuarantineDeliveryError,
+    prepare_restoration_mime,
     resolve_sending_address,
     send_raw_email,
 )
@@ -1227,7 +1228,13 @@ async def _release_quarantine_item(*, id: str, current_user: AuthUser) -> dict:
         envelope_from = await resolve_sending_address(
             api_token=api_token,
             account_id=str(integration["account_id"]),
+            zone_id=str(integration["zone_id"]),
             zone_name=str(integration["zone_name"]),
+            recipient=str(integration["destination_email"]),
+        )
+        delivery_mime = prepare_restoration_mime(
+            raw_mime,
+            sender=envelope_from,
             recipient=str(integration["destination_email"]),
         )
         result = await send_raw_email(
@@ -1235,7 +1242,7 @@ async def _release_quarantine_item(*, id: str, current_user: AuthUser) -> dict:
             account_id=str(integration["account_id"]),
             envelope_from=envelope_from,
             recipient=str(integration["destination_email"]),
-            raw_mime=raw_mime,
+            raw_mime=delivery_mime,
         )
     except QuarantineDeliveryError as exc:
         await async_query_auth_db(

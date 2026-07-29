@@ -31,12 +31,17 @@ jobs:
         with:
           fetch-depth: 0
       - name: Scan repository for committed secrets
+        env:
+          GITLEAKS_LOG_OPTS: >-
+            ${{ github.event_name == 'pull_request'
+              && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha)
+              || format('{0}..{1}', github.event.before, github.sha) }}
         run: |
           docker run --rm \
             -v "$PWD:/repo" \
             zricethezav/gitleaks:v8.24.3 \
             detect --source /repo --gitleaks-ignore-path /repo/.gitleaksignore \
-              --redact --no-banner --verbose
+              --log-opts="$GITLEAKS_LOG_OPTS" --redact --no-banner --verbose
 
   app:
     name: App audit, build, and auth typecheck
