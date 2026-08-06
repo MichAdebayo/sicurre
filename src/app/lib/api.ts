@@ -159,6 +159,25 @@ export interface AdminRuntimeHealth {
   }[];
 }
 
+export type OperationalExerciseType = "api_unavailable" | "high_latency" | "elevated_5xx";
+
+export interface OperationalExercise {
+  id: string;
+  exercise_type: OperationalExerciseType;
+  initiated_by: string;
+  started_at: string;
+  expires_at: string;
+  status?: "active" | "recovered";
+  recovered_at?: string | null;
+}
+
+export interface OperationalExerciseState {
+  enabled: boolean;
+  active: OperationalExercise | null;
+  recent: OperationalExercise[];
+  supported_types: OperationalExerciseType[];
+}
+
 export interface CloudflareStatus {
   status: "not_configured" | "provisioning" | "pending_verification" | "active" | "error";
   id?: string;
@@ -414,6 +433,38 @@ export function useAdminRuntimeHealth(enabled = true) {
     queryFn: () => fetchJson<AdminRuntimeHealth>("/admin/runtime-health"),
     enabled,
     refetchInterval: 30000,
+  });
+}
+
+export function useOperationalExercises(enabled = true) {
+  return useQuery<OperationalExerciseState>({
+    queryKey: ["admin-operational-exercises"],
+    queryFn: () => fetchJson<OperationalExerciseState>("/admin/operational-exercises"),
+    enabled,
+    refetchInterval: 15000,
+  });
+}
+
+export function useStartOperationalExercise() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { exercise_type: OperationalExerciseType; duration_seconds: number }) =>
+      fetchJson<OperationalExercise>("/admin/operational-exercises", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-operational-exercises"] }),
+  });
+}
+
+export function useRecoverOperationalExercise() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (exerciseId: string) =>
+      fetchJson<OperationalExercise>(`/admin/operational-exercises/${exerciseId}/recover`, {
+        method: "POST",
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-operational-exercises"] }),
   });
 }
 
