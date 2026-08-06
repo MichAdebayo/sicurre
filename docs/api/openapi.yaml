@@ -1119,6 +1119,54 @@ paths:
         "200": {description: Platform overview}
         "403": {description: Platform admin access required}
 
+  /v1/admin/operational-exercises:
+    get:
+      tags: [admin]
+      summary: List the active controlled monitoring exercise and recent audit records
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Exercise state and recent audit history}
+        "403": {description: Platform admin access required}
+    post:
+      tags: [admin]
+      summary: Start one bounded synthetic monitoring signal
+      security: [{BearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [exercise_type]
+              properties:
+                exercise_type:
+                  type: string
+                  enum: [api_unavailable, high_latency, elevated_5xx]
+                duration_seconds:
+                  type: integer
+                  minimum: 120
+                  maximum: 1800
+                  default: 240
+      responses:
+        "201": {description: Exercise started}
+        "403": {description: Platform admin access required}
+        "409": {description: Exercises disabled or another exercise active}
+        "422": {description: Invalid or excessive duration}
+        "429": {description: Exercise rate limit exceeded}
+
+  /v1/admin/operational-exercises/{exercise_id}/recover:
+    post:
+      tags: [admin]
+      summary: Recover one active controlled monitoring exercise early
+      security: [{BearerAuth: []}]
+      parameters:
+        - {in: path, name: exercise_id, required: true, schema: {type: string}}
+      responses:
+        "200": {description: Exercise recovered}
+        "403": {description: Platform admin access required}
+        "404": {description: Active exercise not found}
+        "429": {description: Recovery rate limit exceeded}
+
   /v1/datasets:
     get:
       tags: [admin]

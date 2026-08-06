@@ -1,0 +1,71 @@
+{
+  "contactPoint": {
+    "uid": "sicurre-operations-email",
+    "name": "Sicurre Operations",
+    "type": "email",
+    "settings": {
+      "addresses": "michael@sicurre.com",
+      "singleEmail": false
+    },
+    "disableResolveMessage": false
+  },
+  "group": "Sicurre production",
+  "interval": "1m",
+  "rules": [
+    {
+      "uid": "sicurre-api-unavailable",
+      "title": "Sicurre API unavailable",
+      "expression": "min(up{stack=\"sicurre\",service_name=\"sicurre-api\"})",
+      "operator": "lt",
+      "threshold": 1,
+      "for": "2m",
+      "noDataState": "Alerting",
+      "summary": "The Sicurre API has not been scrapeable for two minutes.",
+      "runbook": "Check the sicurre-api container, Neon connectivity, and /health before restarting."
+    },
+    {
+      "uid": "sicurre-elevated-5xx",
+      "title": "Sicurre elevated 5xx rate",
+      "expression": "sum(rate(sicurre_app_gateway_responses_total{stack=\"sicurre\",status=~\"5..\"}[5m])) / clamp_min(sum(rate(sicurre_app_gateway_responses_total{stack=\"sicurre\"}[5m])), 0.001)",
+      "operator": "gt",
+      "threshold": 0.02,
+      "for": "5m",
+      "noDataState": "OK",
+      "summary": "More than 2% of Sicurre gateway responses are server errors.",
+      "runbook": "Use the application dashboard and traces to identify the failing surface before rollback."
+    },
+    {
+      "uid": "sicurre-high-latency",
+      "title": "Sicurre latency above SLO",
+      "expression": "histogram_quantile(0.95, sum by (le) (rate(sicurre_app_gateway_request_duration_seconds_bucket{stack=\"sicurre\",route=~\"app|api|auth\"}[5m])))",
+      "operator": "gt",
+      "threshold": 5,
+      "for": "5m",
+      "noDataState": "OK",
+      "summary": "Sicurre gateway p95 latency has exceeded five seconds.",
+      "runbook": "Compare app, API, and auth latency before changing capacity or dependencies."
+    },
+    {
+      "uid": "sicurre-alloy-unavailable",
+      "title": "Sicurre telemetry collector unavailable",
+      "expression": "min(up{stack=\"sicurre\",service_name=\"sicurre-alloy\"})",
+      "operator": "lt",
+      "threshold": 1,
+      "for": "2m",
+      "noDataState": "Alerting",
+      "summary": "The Sicurre Alloy collector has not been scrapeable for two minutes.",
+      "runbook": "Inspect Alloy configuration, remote-write credentials, and container health."
+    },
+    {
+      "uid": "sicurre-controlled-exercise",
+      "title": "Sicurre controlled operational exercise",
+      "expression": "max(sicurre_operational_exercise_active{stack=\"sicurre\"})",
+      "operator": "gt",
+      "threshold": 0,
+      "for": "1m",
+      "noDataState": "OK",
+      "summary": "An owner-approved synthetic monitoring exercise is active.",
+      "runbook": "Confirm the exercise ID in the Sicurre admin console and wait for automatic recovery."
+    }
+  ]
+}
