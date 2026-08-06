@@ -166,3 +166,7 @@ docs/architecture/issue-artifact.md
 scripts/certification/
 
 deploy/cloudflare/README.md
+
+build*.py
+
+skills/

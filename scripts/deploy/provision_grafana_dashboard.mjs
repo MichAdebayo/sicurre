@@ -22,6 +22,8 @@ const dashboardPaths = process.env.GRAFANA_DASHBOARD_PATH
       "sicurre-infrastructure.json",
       "sicurre-telemetry-pipeline.json",
     ].map((name) => path.join(rootDir, "deploy/grafana/dashboards", name));
+const alertingPath = process.env.GRAFANA_ALERTING_PATH
+  || path.join(rootDir, "deploy/grafana/alerts/sicurre-alerts.json");
 
 if (!grafanaUrl || !token) {
   console.error("GRAFANA_URL and GRAFANA_SERVICE_ACCOUNT_TOKEN are required.");
@@ -44,6 +46,122 @@ async function grafanaFetch(endpoint, options = {}) {
     throw new Error(`${options.method || "GET"} ${endpoint} failed: ${response.status} ${text}`);
   }
   return { status: response.status, body };
+}
+
+async function ensureContactPoint(contactPoint) {
+  const { body: contactPoints } = await grafanaFetch("/api/v1/provisioning/contact-points");
+  const existing = contactPoints.find(
+    (candidate) => candidate.uid === contactPoint.uid || candidate.name === contactPoint.name,
+  );
+  const endpoint = existing
+    ? `/api/v1/provisioning/contact-points/${existing.uid}`
+    : "/api/v1/provisioning/contact-points";
+  const payload = { ...contactPoint, uid: existing?.uid || contactPoint.uid };
+  await grafanaFetch(endpoint, {
+    method: existing ? "PUT" : "POST",
+    headers: { "X-Disable-Provenance": "true" },
+    body: JSON.stringify(payload),
+  });
+  return payload.name;
+}
+
+function alertQuery(rule, prometheusUid) {
+  return {
+    title: rule.title,
+    ruleGroup: "Sicurre production",
+    folderUID: folderUid,
+    noDataState: rule.noDataState,
+    execErrState: "Error",
+    for: rule.for,
+    orgId: 1,
+    uid: rule.uid,
+    condition: "B",
+    annotations: {
+      summary: rule.summary,
+      runbook: rule.runbook,
+    },
+    labels: {
+      stack: "sicurre",
+      severity: rule.uid.includes("controlled") ? "info" : "warning",
+      managed_by: "repository",
+    },
+    isPaused: false,
+    data: [
+      {
+        refId: "A",
+        queryType: "",
+        relativeTimeRange: { from: 600, to: 0 },
+        datasourceUid: prometheusUid,
+        model: {
+          expr: rule.expression,
+          hide: false,
+          intervalMs: 1000,
+          maxDataPoints: 43200,
+          refId: "A",
+        },
+      },
+      {
+        refId: "B",
+        queryType: "",
+        relativeTimeRange: { from: 0, to: 0 },
+        datasourceUid: "-100",
+        model: {
+          conditions: [
+            {
+              evaluator: { params: [rule.threshold], type: rule.operator },
+              operator: { type: "and" },
+              query: { params: ["A"] },
+              reducer: { params: [], type: "last" },
+              type: "query",
+            },
+          ],
+          datasource: { type: "__expr__", uid: "-100" },
+          hide: false,
+          intervalMs: 1000,
+          maxDataPoints: 43200,
+          refId: "B",
+          type: "classic_conditions",
+        },
+      },
+    ],
+  };
+}
+
+async function ensureAlertRule(rule, prometheusUid) {
+  const payload = alertQuery(rule, prometheusUid);
+  const existing = await grafanaFetch(`/api/v1/provisioning/alert-rules/${rule.uid}`).catch(
+    () => null,
+  );
+  await grafanaFetch(
+    existing ? `/api/v1/provisioning/alert-rules/${rule.uid}` : "/api/v1/provisioning/alert-rules",
+    {
+      method: existing ? "PUT" : "POST",
+      headers: { "X-Disable-Provenance": "true" },
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+async function ensureNotificationPolicy(receiver) {
+  const { body: policy } = await grafanaFetch("/api/v1/provisioning/policies");
+  const managedRoute = {
+    receiver,
+    object_matchers: [["stack", "=", "sicurre"]],
+    group_by: ["grafana_folder", "alertname"],
+    group_wait: "30s",
+    group_interval: "5m",
+    repeat_interval: "4h",
+  };
+  const routes = (policy.routes || []).filter(
+    (route) => !route.object_matchers?.some(
+      (matcher) => matcher[0] === "stack" && matcher[1] === "=" && matcher[2] === "sicurre",
+    ),
+  );
+  await grafanaFetch("/api/v1/provisioning/policies", {
+    method: "PUT",
+    headers: { "X-Disable-Provenance": "true" },
+    body: JSON.stringify({ ...policy, routes: [...routes, managedRoute] }),
+  });
 }
 
 async function ensureFolder() {
@@ -135,3 +253,21 @@ for (const dashboardPath of dashboardPaths) {
     `${grafanaUrl}${provisioned.body.url}`,
   );
 }
+
+const alerting = JSON.parse(await readFile(alertingPath, "utf8"));
+const receiver = await ensureContactPoint(alerting.contactPoint);
+for (const rule of alerting.rules) {
+  await ensureAlertRule(rule, datasources.prometheus.uid);
+}
+await ensureNotificationPolicy(receiver);
+
+const { body: provisionedRules } = await grafanaFetch("/api/v1/provisioning/alert-rules");
+const missingRuleUids = alerting.rules
+  .map((rule) => rule.uid)
+  .filter((uid) => !provisionedRules.some((rule) => rule.uid === uid));
+if (missingRuleUids.length > 0) {
+  throw new Error(`Grafana alert verification failed: ${missingRuleUids.join(", ")}`);
+}
+console.log(
+  `Provisioned ${alerting.rules.length} Sicurre alert rules and '${receiver}' notification routing.`,
+);
