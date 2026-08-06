@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import get_settings
 from core.database import get_async_session
+from core.operational_exercises import EXERCISE_TYPES, operational_exercises
 from core.rate_limit import limiter
 from core.secret_cipher import decrypt_secret
 from data_platform.api.auth import AuthUser, get_current_user
@@ -39,6 +40,7 @@ from db.runtime import execute_runtime_query
 router = APIRouter(tags=["app-ui-flows"])
 CF_BASE = "https://api.cloudflare.com/client/v4"
 logger = logging.getLogger(__name__)
+_operational_background_tasks: set[asyncio.Task[None]] = set()
 
 
 class StatusUpdate(BaseModel):
@@ -71,6 +73,13 @@ class SupportRequestCreate(BaseModel):
     )
     category: str = Field(pattern="^(incident|dns|billing|feedback|other)$")
     message: str = Field(min_length=10, max_length=4000)
+
+
+class OperationalExerciseCreate(BaseModel):
+    """Validated request for one bounded monitoring exercise."""
+
+    exercise_type: str = Field(pattern="^(api_unavailable|high_latency|elevated_5xx)$")
+    duration_seconds: int = Field(default=240, ge=120, le=1800)
 
 
 def _ensure_app_runtime_tables() -> None:
@@ -1031,6 +1040,124 @@ async def get_admin_overview(current_user: AuthUser = Depends(get_current_user))
         "recent_quarantine": recent_quarantine,
         "recent_support": recent_support,
     }
+
+
+async def _mark_exercise_recovered(exercise_id: str, duration_seconds: int) -> None:
+    """Persist automatic recovery after the synthetic signal expires."""
+    await asyncio.sleep(duration_seconds + 1)
+    recovered_at = datetime.now(timezone.utc).isoformat()
+    await execute_runtime_query(
+        "UPDATE app_operational_exercise SET status = ?, recovered_at = ? "
+        "WHERE id = ? AND status = 'active'",
+        ("recovered", recovered_at, exercise_id),
+    )
+    logger.warning(
+        "Operational exercise recovered automatically",
+        extra={"exercise_id": exercise_id, "event": "operational_exercise_recovered"},
+    )
+
+
+@router.get("/v1/admin/operational-exercises")
+async def get_operational_exercises(current_user: AuthUser = Depends(get_current_user)):
+    """Return active state and recent audit records for platform administrators."""
+    if not current_user.is_platform_admin:
+        raise HTTPException(status_code=403, detail="Platform admin access required")
+    rows = await execute_runtime_query(
+        "SELECT id, exercise_type, status, initiated_by, started_at, expires_at, recovered_at "
+        "FROM app_operational_exercise ORDER BY started_at DESC LIMIT 10"
+    )
+    return {
+        "enabled": get_settings().operational_tests_enabled,
+        "active": operational_exercises.current(),
+        "recent": rows,
+        "supported_types": sorted(EXERCISE_TYPES),
+    }
+
+
+@router.post("/v1/admin/operational-exercises", status_code=201)
+@limiter.limit("2/hour")
+async def start_operational_exercise(
+    request: Request,
+    payload: OperationalExerciseCreate,
+    current_user: AuthUser = Depends(get_current_user),
+):
+    """Start one admin-only synthetic signal without affecting customer traffic."""
+    del request
+    if not current_user.is_platform_admin:
+        raise HTTPException(status_code=403, detail="Platform admin access required")
+    settings = get_settings()
+    if not settings.operational_tests_enabled:
+        raise HTTPException(status_code=409, detail="Operational exercises are disabled")
+    if payload.duration_seconds > settings.operational_test_max_duration_seconds:
+        raise HTTPException(status_code=422, detail="Exercise duration exceeds the configured limit")
+
+    exercise_id = str(uuid.uuid4())
+    try:
+        active = operational_exercises.start(
+            exercise_id=exercise_id,
+            exercise_type=payload.exercise_type,
+            initiated_by=current_user.email,
+            duration_seconds=payload.duration_seconds,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    try:
+        await execute_runtime_query(
+            "INSERT INTO app_operational_exercise "
+            "(id, exercise_type, status, initiated_by, started_at, expires_at, recovered_at) "
+            "VALUES (?, ?, 'active', ?, ?, ?, NULL)",
+            (
+                active["id"],
+                active["exercise_type"],
+                active["initiated_by"],
+                active["started_at"],
+                active["expires_at"],
+            ),
+        )
+    except Exception:
+        operational_exercises.recover(exercise_id)
+        raise
+    recovery_task = asyncio.create_task(
+        _mark_exercise_recovered(exercise_id, payload.duration_seconds)
+    )
+    _operational_background_tasks.add(recovery_task)
+    recovery_task.add_done_callback(_operational_background_tasks.discard)
+    logger.warning(
+        "Controlled operational exercise started",
+        extra={
+            "exercise_id": exercise_id,
+            "exercise_type": payload.exercise_type,
+            "event": "operational_exercise_started",
+        },
+    )
+    return active
+
+
+@router.post("/v1/admin/operational-exercises/{exercise_id}/recover")
+@limiter.limit("6/hour")
+async def recover_operational_exercise(
+    request: Request,
+    exercise_id: str,
+    current_user: AuthUser = Depends(get_current_user),
+):
+    """Recover an active exercise early and preserve its audit trail."""
+    del request
+    if not current_user.is_platform_admin:
+        raise HTTPException(status_code=403, detail="Platform admin access required")
+    recovered = operational_exercises.recover(exercise_id)
+    if recovered is None:
+        raise HTTPException(status_code=404, detail="Active operational exercise not found")
+    recovered_at = datetime.now(timezone.utc).isoformat()
+    await execute_runtime_query(
+        "UPDATE app_operational_exercise SET status = ?, recovered_at = ? WHERE id = ?",
+        ("recovered", recovered_at, exercise_id),
+    )
+    logger.warning(
+        "Controlled operational exercise recovered",
+        extra={"exercise_id": exercise_id, "event": "operational_exercise_recovered"},
+    )
+    return {**recovered, "status": "recovered", "recovered_at": recovered_at}
 
 
 @router.get("/v1/datasets")
