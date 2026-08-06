@@ -22,6 +22,7 @@ APP_TABLE_NAMES = (
     "app_feedback",
     "app_reported_email",
     "app_support_request",
+    "app_operational_exercise",
 )
 
 
@@ -175,6 +176,21 @@ app_alert_history = _workspace_table(
     constraints=(
         sa.PrimaryKeyConstraint("id"),
         sa.Index("ix_app_alert_history_workspace_id", "workspace_id"),
+    ),
+)
+
+app_operational_exercise = _workspace_table(
+    "app_operational_exercise",
+    _text_column("id", nullable=False),
+    _text_column("exercise_type", nullable=False),
+    _text_column("status", nullable=False),
+    _text_column("initiated_by", nullable=False),
+    _text_column("started_at", nullable=False),
+    _text_column("expires_at", nullable=False),
+    _text_column("recovered_at", nullable=True),
+    constraints=(
+        sa.PrimaryKeyConstraint("id"),
+        sa.Index("ix_app_operational_exercise_started_at", "started_at"),
     ),
 )
 

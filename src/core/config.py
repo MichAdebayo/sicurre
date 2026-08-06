@@ -202,6 +202,8 @@ class Settings(BaseSettings):
     telemetry_traces_enabled: bool = False
     telemetry_otlp_endpoint: str = "http://alloy:4318/v1/traces"
     telemetry_trace_sample_ratio: float = Field(default=1.0, ge=0, le=1)
+    operational_tests_enabled: bool = False
+    operational_test_max_duration_seconds: int = Field(default=600, ge=120, le=1800)
     scheduler_interval_seconds: int = Field(
         default=604800,
         validation_alias="SICURRE_SCHEDULER_INTERVAL_SECONDS",
