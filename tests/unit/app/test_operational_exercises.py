@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi import HTTPException
 from starlette.requests import Request
 
 from core.config import Settings
-from core.operational_exercises import OperationalExerciseManager
+from core.operational_exercises import OperationalExercise, OperationalExerciseManager
 from data_platform.api.auth import AuthUser
 from data_platform.api.main import create_app
 from data_platform.api.routers import app_routes
@@ -60,6 +61,35 @@ async def test_manager_allows_one_exercise_and_recovers() -> None:
             initiated_by="owner@sicurre.com",
             duration_seconds=120,
         )
+
+
+@pytest.mark.asyncio
+async def test_manager_clears_expired_and_automatic_signals(monkeypatch) -> None:
+    manager = OperationalExerciseManager()
+    expired = OperationalExercise(
+        id="expired",
+        exercise_type="high_latency",
+        initiated_by="owner@sicurre.com",
+        started_at=(datetime.now(UTC) - timedelta(minutes=2)).isoformat(),
+        expires_at=(datetime.now(UTC) - timedelta(minutes=1)).isoformat(),
+    )
+    manager._active = expired
+    assert manager.current() is None
+
+    manager._active = OperationalExercise(
+        id="automatic",
+        exercise_type="elevated_5xx",
+        initiated_by="owner@sicurre.com",
+        started_at=datetime.now(UTC).isoformat(),
+        expires_at=(datetime.now(UTC) + timedelta(minutes=1)).isoformat(),
+    )
+
+    async def no_sleep(_seconds: float) -> None:
+        return None
+
+    monkeypatch.setattr("core.operational_exercises.asyncio.sleep", no_sleep)
+    await manager._recover_after("automatic", 60)
+    assert manager.current() is None
 
 
 @pytest.mark.asyncio
