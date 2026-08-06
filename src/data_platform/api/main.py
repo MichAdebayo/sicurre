@@ -3,7 +3,7 @@ import logging
 import subprocess
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
@@ -11,6 +11,7 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.sdk.trace.sampling import ParentBased, TraceIdRatioBased
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -125,6 +126,12 @@ def create_app() -> FastAPI:
     @limiter.exempt
     async def healthcheck() -> dict[str, str]:
         return {"status": "ok", "environment": settings.environment}
+
+    @app.get("/metrics", include_in_schema=False)
+    @limiter.exempt
+    async def metrics() -> Response:
+        """Expose bounded application metrics to the private Alloy scraper."""
+        return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
     return app
 
