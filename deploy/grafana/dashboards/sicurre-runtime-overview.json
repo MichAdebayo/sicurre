@@ -44,7 +44,7 @@
       "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0},
       "fieldConfig": {"defaults": {"unit": "percentunit", "decimals": 2, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 0.01}, {"color": "red", "value": 0.05}]}}, "overrides": []},
       "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
-      "targets": [{"expr": "sum(rate(sicurre_app_gateway_responses_total{status=~\"5..\"}[5m])) / clamp_min(sum(rate(sicurre_app_gateway_responses_total[5m])), 0.000001)", "refId": "A"}]
+      "targets": [{"expr": "(sum(rate(sicurre_app_gateway_responses_total{status=~\"5..\"}[5m])) / clamp_min(sum(rate(sicurre_app_gateway_responses_total[5m])), 0.000001)) or vector(0)", "refId": "A"}]
     },
     {
       "id": 5,
