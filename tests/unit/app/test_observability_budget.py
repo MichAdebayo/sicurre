@@ -9,6 +9,10 @@ INFRASTRUCTURE_DASHBOARD = (
     REPOSITORY_ROOT / "deploy/grafana/dashboards/sicurre-infrastructure.json"
 )
 RUNTIME_DASHBOARD = REPOSITORY_ROOT / "deploy/grafana/dashboards/sicurre-runtime-overview.json"
+TELEMETRY_DASHBOARD = (
+    REPOSITORY_ROOT / "deploy/grafana/dashboards/sicurre-telemetry-pipeline.json"
+)
+ALERT_RULES = REPOSITORY_ROOT / "deploy/grafana/alerts/sicurre-alerts.json"
 
 
 def test_cadvisor_metrics_are_scoped_and_allowlisted() -> None:
@@ -42,3 +46,20 @@ def test_application_error_rate_does_not_retain_a_stale_incident() -> None:
     panel = next(panel for panel in dashboard["panels"] if panel["title"] == "5xx Error Rate")
 
     assert panel["targets"][0]["expr"].endswith("or vector(0)")
+
+
+def test_shared_active_series_budget_is_visible_and_alerted() -> None:
+    """Keep the shared Grafana free-tier budget observable before exhaustion."""
+    dashboard = json.loads(TELEMETRY_DASHBOARD.read_text(encoding="utf-8"))
+    alerts = json.loads(ALERT_RULES.read_text(encoding="utf-8"))
+    expressions = {
+        target["expr"]
+        for panel in dashboard["panels"]
+        for target in panel.get("targets", [])
+    }
+    rules = {rule["uid"]: rule for rule in alerts["rules"]}
+
+    assert "sum(prometheus_remote_write_wal_storage_active_series)" in expressions
+    assert "100 * sum(prometheus_remote_write_wal_storage_active_series) / 10000" in expressions
+    assert rules["sicurre-series-budget-warning"]["threshold"] == 7000
+    assert rules["sicurre-series-budget-critical"]["threshold"] == 8500
