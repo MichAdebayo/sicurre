@@ -8,6 +8,7 @@ ALLOY_CONFIG = REPOSITORY_ROOT / "deploy/alloy/config.alloy"
 INFRASTRUCTURE_DASHBOARD = (
     REPOSITORY_ROOT / "deploy/grafana/dashboards/sicurre-infrastructure.json"
 )
+RUNTIME_DASHBOARD = REPOSITORY_ROOT / "deploy/grafana/dashboards/sicurre-runtime-overview.json"
 
 
 def test_cadvisor_metrics_are_scoped_and_allowlisted() -> None:
@@ -33,3 +34,11 @@ def test_infrastructure_dashboard_uses_retained_container_metrics() -> None:
     assert any("container_cpu_usage_seconds_total" in expr for expr in expressions)
     assert any("container_memory_working_set_bytes" in expr for expr in expressions)
     assert any("container_network_receive_bytes_total" in expr for expr in expressions)
+
+
+def test_application_error_rate_does_not_retain_a_stale_incident() -> None:
+    """Render zero when no current 5xx time series exists."""
+    dashboard = json.loads(RUNTIME_DASHBOARD.read_text(encoding="utf-8"))
+    panel = next(panel for panel in dashboard["panels"] if panel["title"] == "5xx Error Rate")
+
+    assert panel["targets"][0]["expr"].endswith("or vector(0)")
