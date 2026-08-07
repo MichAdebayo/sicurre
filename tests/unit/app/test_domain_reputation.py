@@ -144,6 +144,28 @@ async def test_dqs_key_routes_spamhaus_through_authenticated_endpoint(
 
 
 @pytest.mark.asyncio
+async def test_dqs_result_is_not_hidden_by_optional_surbl_refusal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A blocked best-effort SURBL lookup must not invalidate authenticated DQS."""
+
+    async def direct_call(function: Callable[..., object], *args: object) -> object:
+        return function(*args)
+
+    def resolve(hostname: str, _record_type: str) -> list[str]:
+        if hostname.endswith("dbl.dq.spamhaus.net"):
+            raise RuntimeError("NXDOMAIN")
+        return ["127.0.0.1"]
+
+    monkeypatch.setattr(app_routes.asyncio, "to_thread", direct_call)
+    monkeypatch.setattr("dns.resolver.resolve", resolve)
+
+    assert await _check_domain_blacklists(
+        "example.com", dqs_key="synthetic-fixture"
+    ) == ([], [])
+
+
+@pytest.mark.asyncio
 async def test_without_dqs_key_uses_free_spamhaus_mirror(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

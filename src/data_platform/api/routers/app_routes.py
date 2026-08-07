@@ -1724,7 +1724,7 @@ async def _check_domain_blacklists(
             listed, error = _classify_blocklist_response(name, [str(answer) for answer in answers])
             if listed:
                 listed_on.append(name)
-            elif error:
+            elif error and not (dqs_key and name == "SURBL List"):
                 unavailable.append(error)
         except Exception:
             pass
