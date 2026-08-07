@@ -131,12 +131,12 @@ async def test_dqs_key_routes_spamhaus_through_authenticated_endpoint(
     monkeypatch.setattr(app_routes.asyncio, "to_thread", direct_call)
     monkeypatch.setattr("dns.resolver.resolve", resolve)
 
-    await _check_domain_blacklists("example.com", dqs_key="test-key-abc123")
+    await _check_domain_blacklists("example.com", dqs_key="synthetic-fixture")
 
     # Spamhaus query should go through DQS endpoint, not free mirror
     spamhaus_queries = [h for h in queried_hosts if "spamhaus" in h]
     assert len(spamhaus_queries) == 1
-    assert spamhaus_queries[0] == "example.com.test-key-abc123.dbl.dq.spamhaus.net"
+    assert spamhaus_queries[0] == "example.com.synthetic-fixture.dbl.dq.spamhaus.net"
     # SURBL should still use multi.surbl.org
     surbl_queries = [h for h in queried_hosts if "surbl" in h]
     assert len(surbl_queries) == 1
