@@ -76,7 +76,30 @@ prometheus.scrape "containers" {
 		"service_name" = "sicurre-containers",
 	}]
 	scrape_interval = "60s"
-	forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
+	forward_to      = [prometheus.relabel.sicurre_containers.receiver]
+}
+
+// cAdvisor exposes thousands of kernel, TCP, and container-label series for
+// every workload on the shared host. Retain only bounded operational signals
+// for containers owned by this Compose project plus scrape health metadata.
+prometheus.relabel "sicurre_containers" {
+	forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+
+	rule {
+		source_labels = ["__name__", "container_label_com_docker_compose_project"]
+		regex         = "(up|scrape_.*);.*|(container_cpu_usage_seconds_total|container_memory_working_set_bytes|container_network_receive_bytes_total|container_network_transmit_bytes_total|container_oom_events_total|container_last_seen);sicurre-prod"
+		action        = "keep"
+	}
+
+	rule {
+		source_labels = ["container_label_com_docker_compose_service"]
+		target_label  = "container_service"
+	}
+
+	rule {
+		regex  = "container_label_.*|id|image"
+		action = "labeldrop"
+	}
 }
 
 prometheus.scrape "alloy" {
