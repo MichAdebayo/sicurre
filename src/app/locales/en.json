@@ -84,7 +84,7 @@
     "action_items": "Action Items",
     "action_checklist_desc": "Unresolved setup recommendations",
     "last_7_days": "Last 7 Days Trend",
-    "scans_over_time": "Scans over time (phishing vs safe)",
+    "scans_over_time": "Scans over time by classification",
     "checklist_spf_missing": "SPF record is missing or invalid for domain",
     "checklist_dkim_missing": "DKIM record is missing or invalid for domain",
     "checklist_dmarc_missing": "DMARC policy is missing or set to 'none'",
