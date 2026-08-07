@@ -84,7 +84,7 @@
     "action_items": "Actions requises",
     "action_checklist_desc": "Recommandations de configuration non résolues",
     "last_7_days": "Tendance des 7 Derniers Jours",
-    "scans_over_time": "Scans au fil du temps (phishing vs légitime)",
+    "scans_over_time": "Scans au fil du temps par classification",
     "checklist_spf_missing": "L'enregistrement SPF est manquant ou invalide pour le domaine",
     "checklist_dkim_missing": "L'enregistrement DKIM est manquant ou invalide pour le domaine",
     "checklist_dmarc_missing": "La politique DMARC est manquante ou définie sur 'none'",
