@@ -66,6 +66,28 @@
       "noDataState": "OK",
       "summary": "An owner-approved synthetic monitoring exercise is active.",
       "runbook": "Confirm the exercise ID in the Sicurre admin console and wait for automatic recovery."
+    },
+    {
+      "uid": "sicurre-series-budget-warning",
+      "title": "Sicurre active-series budget above 70%",
+      "expression": "sum(prometheus_remote_write_wal_storage_active_series)",
+      "operator": "gt",
+      "threshold": 7000,
+      "for": "10m",
+      "noDataState": "OK",
+      "summary": "The shared Sicurre telemetry footprint exceeds 70% of the 10,000-series free-tier allocation.",
+      "runbook": "Review scrape_samples_scraped and per-job cardinality before adding metrics or labels."
+    },
+    {
+      "uid": "sicurre-series-budget-critical",
+      "title": "Sicurre active-series budget above 85%",
+      "expression": "sum(prometheus_remote_write_wal_storage_active_series)",
+      "operator": "gt",
+      "threshold": 8500,
+      "for": "5m",
+      "noDataState": "OK",
+      "summary": "The shared Sicurre telemetry footprint exceeds 85% of the 10,000-series free-tier allocation.",
+      "runbook": "Freeze new telemetry labels and reduce the highest-cardinality scrape before the tenant limit is reached."
     }
   ]
 }
