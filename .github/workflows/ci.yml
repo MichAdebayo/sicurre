@@ -165,4 +165,4 @@ jobs:
         run: |
           docker build --target release -f Dockerfile.data-platform -t sicurre-data-release:ci .
           docker run --rm --entrypoint uv sicurre-data-release:ci \
-            run --no-sync python -c "from faker import Faker; Faker()"
+            run --no-sync python -c "from faker import Faker; from data_platform.services.shared.synthetic_generation import SyntheticGenerationService; Faker(); [SyntheticGenerationService().load_archetypes(name) for name in ('phishing', 'spam', 'legitimate')]"

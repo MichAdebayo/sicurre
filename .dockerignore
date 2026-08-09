@@ -6,7 +6,9 @@
 .env
 node_modules
 dist
-data
+data/*
+!data/archetypes/
+!data/archetypes/**
 scratch
 tests
 notebooks
