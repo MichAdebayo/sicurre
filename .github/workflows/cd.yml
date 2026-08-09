@@ -199,6 +199,11 @@ jobs:
               exit 1
             fi
 
+            # This is a dedicated service account, so its crontab is fully owned
+            # by Sicurre and must stay synchronized with the deployed release.
+            crontab deploy/hetzner/sicurre-crontab.example
+            crontab -l >/dev/null
+
             if grep -q '^IMAGE_TAG=' .env; then
               sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${{ needs.build-push.outputs.tag }}|" .env
             else
