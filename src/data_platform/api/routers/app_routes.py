@@ -34,6 +34,7 @@ from data_platform.services.quarantine_delivery import (
     resolve_sending_address,
     send_raw_email,
 )
+from data_platform.services.quarantine_retention import purge_expired_quarantine
 from data_platform.services.quarantine_storage import build_quarantine_store
 from db.runtime import execute_runtime_query
 
@@ -1245,22 +1246,10 @@ class SecurityRuleCreate(BaseModel):
 
 
 async def _purge_expired_quarantine(workspace_id: str):
-    now = datetime.now(timezone.utc).isoformat() + "Z"
-    expired = await async_query_auth_db(
-        "SELECT id, raw_storage_uri FROM app_quarantine_item "
-        "WHERE workspace_id = ? AND expires_at < ? AND status = 'held'",
-        (workspace_id, now),
-    )
-    raw_items = [item for item in expired if item.get("raw_storage_uri")]
-    if raw_items:
-        store = build_quarantine_store(get_settings())
-        for item in raw_items:
-            with suppress(Exception):
-                await store.delete(str(item["raw_storage_uri"]))
-    await async_query_auth_db(
-        "UPDATE app_quarantine_item SET status = 'deleted', raw_storage_uri = NULL "
-        "WHERE workspace_id = ? AND expires_at < ? AND status = 'held'",
-        (workspace_id, now),
+    return await purge_expired_quarantine(
+        query=async_query_auth_db,
+        store=build_quarantine_store(get_settings()),
+        workspace_id=workspace_id,
     )
 
 
@@ -1442,10 +1431,18 @@ async def delete_quarantine_item(id: str, current_user: AuthUser = Depends(get_c
         raise HTTPException(status_code=404, detail="Quarantined item not found")
 
     if rows[0].get("raw_storage_uri"):
-        with suppress(Exception):
+        try:
             await build_quarantine_store(get_settings()).delete(str(rows[0]["raw_storage_uri"]))
+        except Exception as exc:
+            logger.exception("Quarantine deletion failed")
+            raise HTTPException(
+                status_code=503,
+                detail="Quarantine storage is temporarily unavailable",
+            ) from exc
     await async_query_auth_db(
-        "UPDATE app_quarantine_item SET status = 'deleted', raw_storage_uri = NULL "
+        "UPDATE app_quarantine_item SET status = 'deleted', sender = '[deleted]', "
+        "subject = '[deleted]', body_text = '', raw_storage_uri = NULL, "
+        "raw_content_hash = NULL, raw_size_bytes = NULL, last_delivery_error = NULL "
         "WHERE id = ? AND workspace_id = ?",
         (id, current_user.workspace_id),
     )
