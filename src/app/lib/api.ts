@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { authBaseURL, authClient } from "./auth-client";
+import { isReusableDomainShieldStatus } from "./domain-shield-cache";
 
 const API_BASE_URL = "/v1";
 const USER_NAME_KEY = "sicurre_user_name";
@@ -836,7 +837,7 @@ function readCachedDomainShieldStatus(domain: string): DomainShieldStatus | unde
     const raw = window.localStorage.getItem(domainShieldCacheKey(domain));
     if (!raw) return undefined;
     const parsed = JSON.parse(raw) as DomainShieldStatus;
-    if (typeof parsed?.reputation_score !== "number" || !parsed?.score_grade) return undefined;
+    if (!isReusableDomainShieldStatus(parsed)) return undefined;
     return parsed;
   } catch {
     window.localStorage.removeItem(domainShieldCacheKey(domain));
