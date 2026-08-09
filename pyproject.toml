@@ -59,6 +59,7 @@ runtime = [
     "cryptography>=50.0.0",
     "dnspython>=2.8.0",
     "fastapi>=0.135.1",
+    "faker>=40.5.1",
     "feedparser>=6.0.12",
     "greenlet>=3.3.2",
     "httpx>=0.28.1",
