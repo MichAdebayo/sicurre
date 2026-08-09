@@ -1,6 +1,9 @@
 {
   "name": "sicurre",
   "version": "1.0.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "type": "module",
   "description": "Real-time phishing detection and inbox remediation for French auto-entrepreneurs and TPEs.",
   "scripts": {
