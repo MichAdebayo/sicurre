@@ -557,7 +557,10 @@ async def scan_email(
     classified_as_phishing = verdict_safety == "phishing"
     if verdict_safety == "phishing":
         quarantine_id = str(uuid4())
-        expires_at = (datetime.now(timezone.utc) + timedelta(days=14)).isoformat() + "Z"
+        expires_at = (
+            datetime.now(timezone.utc)
+            + timedelta(days=settings.quarantine_retention_days)
+        ).isoformat()
         try:
             await _async_query(
                 """
