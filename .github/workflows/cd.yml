@@ -236,6 +236,10 @@ jobs:
               docker compose -f docker-compose.prod.yml logs --tail=200 auth-service sicurre-api
               exit 1
             fi
+
+            # Enforce raw-MIME deletion independently from the daily DB purge.
+            docker compose -f docker-compose.prod.yml run --rm --no-deps sicurre-api \
+              uv run --no-sync python -m data_platform.cli.app.provision_quarantine_lifecycle
             # Bind-mounted Alloy configuration changes do not alter Compose's service hash.
             docker compose -f docker-compose.prod.yml up -d --force-recreate alloy
 

@@ -65,6 +65,7 @@ class Settings(BaseSettings):
     quarantine_local_dir: Path = ROOT_DIR / "data" / "local" / "quarantine"
     quarantine_r2_bucket_name: str | None = None
     quarantine_r2_prefix: str = "quarantine"
+    quarantine_retention_days: int = Field(default=14, ge=1, le=90)
     quarantine_max_message_bytes: int = 5 * 1024 * 1024
     reported_email_address: str = "report@sicurre.com"
     reported_email_alias_secret: str | None = Field(default=None, repr=False)

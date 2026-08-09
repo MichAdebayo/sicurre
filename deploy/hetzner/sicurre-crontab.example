@@ -4,6 +4,9 @@ SHELL=/bin/sh
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 COMPOSE="docker compose -f /home/sicurre-prod/sicurre/docker-compose.prod.yml"
 
+# Daily privacy retention enforcement, independent of workspace activity.
+45 1 * * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/app/run_quarantine_purge.py >> /home/sicurre-prod/sicurre/cron-quarantine-purge.log 2>&1
+
 # Daily API and file deltas, staggered to avoid competing DB/R2 work.
 15 2 * * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/api/run_phishtank_ingestion.py >> /home/sicurre-prod/sicurre/cron-phishtank.log 2>&1
 35 2 * * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/file/run_csv_ingestion.py >> /home/sicurre-prod/sicurre/cron-file.log 2>&1
