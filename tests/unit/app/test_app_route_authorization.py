@@ -310,7 +310,32 @@ async def test_quarantine_delete_write_remains_workspace_scoped(monkeypatch) -> 
     }
     update_sql, update_params = queries[-1]
     assert "WHERE id = ? AND workspace_id = ?" in update_sql
+    assert "sender = '[deleted]'" in update_sql
+    assert "body_text = ''" in update_sql
     assert update_params == ("held-1", "workspace-1")
+
+
+@pytest.mark.asyncio
+async def test_quarantine_delete_keeps_item_when_storage_fails(monkeypatch) -> None:
+    """A custody failure cannot be presented as a successful deletion."""
+    queries: list[tuple[str, tuple[Any, ...]]] = []
+
+    async def query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        queries.append((sql, params))
+        return [{"raw_storage_uri": "r2://bucket/quarantine/workspace-1/held-1.eml"}]
+
+    class Store:
+        async def delete(self, _uri: str) -> None:
+            raise RuntimeError("R2 unavailable")
+
+    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+    monkeypatch.setattr(app_routes, "build_quarantine_store", lambda _settings: Store())
+
+    with pytest.raises(HTTPException) as exc_info:
+        await delete_quarantine_item("held-1", _user(platform_admin=False))
+
+    assert exc_info.value.status_code == 503
+    assert len(queries) == 1
 
 
 @pytest.mark.asyncio
