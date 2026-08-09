@@ -17,6 +17,7 @@ COPY alembic.ini alembic.app.ini ./
 COPY src ./src
 COPY scripts ./scripts
 COPY Makefile ./
+COPY data/archetypes ./data/archetypes
 
 RUN mkdir -p data/local data/raw
 
