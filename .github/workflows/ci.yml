@@ -162,4 +162,7 @@ jobs:
         run: make app-stack-smoke
 
       - name: Build monthly dataset release image
-        run: docker build --target release -f Dockerfile.data-platform .
+        run: |
+          docker build --target release -f Dockerfile.data-platform -t sicurre-data-release:ci .
+          docker run --rm --entrypoint uv sicurre-data-release:ci \
+            run --no-sync python -c "from faker import Faker; Faker()"
