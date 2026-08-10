@@ -5,6 +5,7 @@ import Database from "better-sqlite3";
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { getMigrations } from "better-auth/db/migration";
+import { Kysely, PostgresDialect } from "kysely";
 import { Pool } from "pg";
 
 import { ensureConfiguredAdmin, type AdminSeedResult } from "./admin-seed.js";
@@ -50,11 +51,16 @@ export const authDatabaseDialect = isProduction ? "postgresql" : "sqlite";
 const productionPool = isProduction
   ? new Pool({
       connectionString: productionDatabaseUrl,
-      options: `-c search_path=${authSchema},public`,
       max: 10,
       idleTimeoutMillis: 30_000,
       connectionTimeoutMillis: 10_000,
+      keepAlive: true,
     })
+  : null;
+const productionDatabase = productionPool
+  ? new Kysely<unknown>({
+      dialect: new PostgresDialect({ pool: productionPool }),
+    }).withSchema(authSchema)
   : null;
 
 const resolvedLocalDatabasePath = localDatabasePath
@@ -64,7 +70,7 @@ if (!isProduction) {
 }
 const localDatabase = isProduction ? null : new Database(resolvedLocalDatabasePath);
 
-export const authDatabase = productionPool ?? localDatabase!;
+export const authDatabase = productionDatabase ?? localDatabase!;
 
 export async function prepareAuthDatabase(): Promise<void> {
   if (productionPool) {
@@ -75,8 +81,8 @@ export async function prepareAuthDatabase(): Promise<void> {
 }
 
 export async function closeAuthDatabase(): Promise<void> {
-  if (productionPool) {
-    await productionPool.end();
+  if (productionDatabase) {
+    await productionDatabase.destroy();
     return;
   }
   localDatabase?.close();
