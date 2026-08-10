@@ -5,10 +5,14 @@ import Database from "better-sqlite3";
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { getMigrations } from "better-auth/db/migration";
-import { Kysely, PostgresDialect } from "kysely";
 import { Pool } from "pg";
 
 import { ensureConfiguredAdmin, type AdminSeedResult } from "./admin-seed.js";
+import {
+  createPostgresAuthDatabase,
+  directMigrationUrl,
+  normalizePostgresUrl,
+} from "./database.js";
 import { sendLoopsTransactional } from "./loops.js";
 import "./env.js";
 
@@ -27,8 +31,11 @@ const isProduction = environment === "production";
 const localDatabasePath = process.env.SICURRE_LOCAL_BETTER_AUTH_DB_PATH?.trim();
 const configuredProductionDatabaseUrl = process.env.SICURRE_BETTER_AUTH_DATABASE_URL?.trim();
 const productionDatabaseUrl = configuredProductionDatabaseUrl
-  ?.replace(/^postgresql\+psycopg:\/\//, "postgresql://")
-  .replace(/^postgresql\+asyncpg:\/\//, "postgresql://");
+  ? normalizePostgresUrl(configuredProductionDatabaseUrl)
+  : undefined;
+const productionMigrationDatabaseUrl = productionDatabaseUrl
+  ? directMigrationUrl(productionDatabaseUrl)
+  : undefined;
 const authSchema = (process.env.SICURRE_BETTER_AUTH_SCHEMA ?? "auth").trim();
 
 if (!/^[a-z_][a-z0-9_]*$/.test(authSchema)) {
@@ -57,11 +64,11 @@ const productionPool = isProduction
       keepAlive: true,
     })
   : null;
-const productionDatabase = productionPool
-  ? new Kysely<unknown>({
-      dialect: new PostgresDialect({ pool: productionPool }),
-    }).withSchema(authSchema)
+const productionDatabaseConfig = productionPool
+  ? createPostgresAuthDatabase(productionPool, authSchema)
   : null;
+const productionDatabase = productionDatabaseConfig?.database ?? null;
+const productionAuthDatabase = productionDatabaseConfig?.adapter ?? null;
 
 const resolvedLocalDatabasePath = localDatabasePath
   ?? path.resolve(process.cwd(), "data/local/better-auth.db");
@@ -70,14 +77,33 @@ if (!isProduction) {
 }
 const localDatabase = isProduction ? null : new Database(resolvedLocalDatabasePath);
 
-export const authDatabase = productionDatabase ?? localDatabase!;
+export const authDatabase = productionAuthDatabase ?? localDatabase!;
 
 export async function prepareAuthDatabase(): Promise<void> {
   if (productionPool) {
     await productionPool.query(`CREATE SCHEMA IF NOT EXISTS "${authSchema}"`);
   }
-  const { runMigrations } = await getMigrations(auth.options);
-  await runMigrations();
+  if (!productionMigrationDatabaseUrl) {
+    const { runMigrations } = await getMigrations(auth.options);
+    await runMigrations();
+    return;
+  }
+
+  const migrationPool = new Pool({
+    connectionString: productionMigrationDatabaseUrl,
+    options: `-c search_path=${authSchema},public`,
+    max: 1,
+    connectionTimeoutMillis: 10_000,
+  });
+  try {
+    const { runMigrations } = await getMigrations({
+      ...auth.options,
+      database: migrationPool,
+    });
+    await runMigrations();
+  } finally {
+    await migrationPool.end();
+  }
 }
 
 export async function closeAuthDatabase(): Promise<void> {
