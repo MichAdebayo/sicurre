@@ -1,5 +1,10 @@
 """Regression coverage for privacy-safe email context derivation."""
 
+from typing import Any
+
+import pytest
+
+from data_platform.services import email_context
 from data_platform.services.email_context import derive_email_context
 
 
@@ -98,3 +103,42 @@ def test_calendar_wording_without_mime_structure_is_not_evidence() -> None:
     )
 
     assert context.transactional_evidence is False
+
+
+def test_malformed_message_is_not_transactional(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class BrokenParser:
+        def __init__(self, **_: Any) -> None:
+            pass
+
+        def parsestr(self, _: str) -> None:
+            raise ValueError("malformed message")
+
+    monkeypatch.setattr(email_context, "Parser", BrokenParser)
+
+    assert email_context._has_transactional_calendar("invalid") is False
+
+
+def test_unreadable_calendar_part_is_ignored(monkeypatch: pytest.MonkeyPatch) -> None:
+    class BrokenPart:
+        def get_content_type(self) -> str:
+            return "text/calendar"
+
+        def get_content(self) -> str:
+            raise ValueError("invalid calendar encoding")
+
+    class ParsedMessage:
+        def walk(self) -> list[BrokenPart]:
+            return [BrokenPart()]
+
+    class StubParser:
+        def __init__(self, **_: Any) -> None:
+            pass
+
+        def parsestr(self, _: str) -> ParsedMessage:
+            return ParsedMessage()
+
+    monkeypatch.setattr(email_context, "Parser", StubParser)
+
+    assert email_context._has_transactional_calendar("calendar") is False
