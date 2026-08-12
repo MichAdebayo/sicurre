@@ -1563,23 +1563,48 @@ components:
 
     ClassifyRequest:
       type: object
-      required: [subject, body, sender]
+      required: [subject, text, sender]
       properties:
         subject:
           type: string
           example: "URGENT : Mise a jour URSSAF requise"
-        body:
+        text:
           type: string
         sender:
           type: string
-        received_at:
-          type: string
-          format: date-time
-        message_id:
-          type: string
-        language:
-          type: string
-          example: fr
+        use_llm:
+          type: boolean
+          default: true
+        use_virustotal:
+          type: boolean
+          default: true
+        mail_context:
+          $ref: "#/components/schemas/MailContextRequest"
+
+    MailContextRequest:
+      type: object
+      description: Privacy-safe evidence derived by the authorized Sicurre gateway.
+      properties:
+        structured_forward:
+          type: boolean
+          default: false
+        outer_sender_authenticated:
+          type: boolean
+          default: false
+        mailing_list_headers:
+          type: boolean
+          default: false
+        subscription_claimed:
+          type: boolean
+          default: false
+        recipient_expected:
+          type: boolean
+          default: false
+          description: Explicit tenant intent from an expected-sender rule or reviewed feedback.
+        transactional_evidence:
+          type: boolean
+          default: false
+          description: Bounded gateway-observed transactional structure; never inferred from body claims alone.
 
     ClassifyResponse:
       type: object
