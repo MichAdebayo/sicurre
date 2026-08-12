@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 from dataclasses import asdict, dataclass
+from email import policy
+from email.parser import Parser
 
 _FORWARD_SUBJECT = re.compile(r"^\s*(?:fwd?|tr)\s*:", re.IGNORECASE)
 _FORWARD_MARKER = re.compile(
@@ -22,6 +24,36 @@ _HEADER_BOUNDARY = re.compile(r"\r?\n\r?\n")
 _AUTHENTICATION_RESULTS = re.compile(
     r"(?im)^authentication-results\s*:[^\r\n]*(?:\r?\n[ \t]+[^\r\n]*)*"
 )
+_CALENDAR_REQUIRED_LINES = (
+    re.compile(r"(?im)^begin:vcalendar\s*$"),
+    re.compile(r"(?im)^method\s*:\s*(?:request|reply|cancel)\s*$"),
+    re.compile(r"(?im)^begin:vevent\s*$"),
+    re.compile(r"(?im)^uid\s*:[^\r\n]+$"),
+    re.compile(r"(?im)^dtstart(?:;[^:\r\n]+)?\s*:[^\r\n]+$"),
+    re.compile(r"(?im)^end:vevent\s*$"),
+    re.compile(r"(?im)^end:vcalendar\s*$"),
+)
+
+
+def _has_transactional_calendar(text: str) -> bool:
+    """Recognize a coherent calendar MIME part without trusting prose claims."""
+
+    try:
+        message = Parser(policy=policy.default).parsestr(text[:10_000])
+    except (TypeError, ValueError):
+        return False
+    for part in message.walk():
+        if part.get_content_type() != "text/calendar":
+            continue
+        try:
+            payload = part.get_content()
+        except (KeyError, LookupError, UnicodeError, ValueError):
+            continue
+        if isinstance(payload, str) and all(
+            pattern.search(payload) for pattern in _CALENDAR_REQUIRED_LINES
+        ):
+            return True
+    return False
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +64,8 @@ class EmailContextSignals:
     outer_sender_authenticated: bool
     mailing_list_headers: bool
     subscription_claimed: bool
+    recipient_expected: bool
+    transactional_evidence: bool
 
     def as_payload(self) -> dict[str, bool]:
         """Return the stable service-to-service request shape."""
@@ -52,6 +86,7 @@ def derive_email_context(
     subject: str,
     sender: str,
     text: str,
+    recipient_expected: bool = False,
 ) -> EmailContextSignals:
     """Derive non-sensitive context without trusting body claims as proof."""
 
@@ -75,4 +110,6 @@ def derive_email_context(
         outer_sender_authenticated=authentication_passed,
         mailing_list_headers=has_list_id and has_unsubscribe,
         subscription_claimed=_SUBSCRIPTION_CLAIM.search(text[:10_000]) is not None,
+        recipient_expected=recipient_expected,
+        transactional_evidence=_has_transactional_calendar(text),
     )
