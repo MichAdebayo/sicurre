@@ -51,6 +51,7 @@ def test_process_environment_uses_only_poc_runtime_values() -> None:
     )
     assert environment["SICURRE_POC_R2_PREFIX"] == "demonstrations/jury"
     assert environment["SICURRE_POC_ALLOW_ML_DISPATCH"] == "false"
+    assert environment["SICURRE_TRAINING_DATASET_SNAPSHOT_STORAGE_BACKEND"] == "local"
 
 
 def test_staging_publish_is_allowed_with_explicit_sandbox_contract() -> None:
