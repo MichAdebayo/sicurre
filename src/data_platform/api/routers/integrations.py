@@ -488,14 +488,7 @@ async def scan_email(
     stage_labels: dict[str, Any] = {}
     stage_breakdown: dict[str, Any] = {}
 
-    if matched_rule_type == "whitelist":
-        verdict_safety = "safe"
-        verdict_label = "legitimate"
-        score = 0.0
-        explanation = "Allowed by custom security whitelist rule."
-        stage_labels = {"custom_rule": "legitimate"}
-        stage_breakdown = {"custom_rule": {"active": True, "rule_type": "whitelist"}}
-    elif matched_rule_type == "blocklist":
+    if matched_rule_type == "blocklist":
         verdict_safety = "phishing"
         verdict_label = "phishing"
         score = 1.0
@@ -511,6 +504,7 @@ async def scan_email(
             subject=payload.subject,
             sender=payload.sender,
             text=payload.text,
+            recipient_expected=matched_rule_type == "whitelist",
         )
 
         try:
@@ -541,6 +535,12 @@ async def scan_email(
             stage_scores = dict(result.get("stage_scores") or {})
             stage_labels = dict(result.get("stage_labels") or {})
             stage_breakdown = dict(result.get("stage_breakdown") or {})
+            if matched_rule_type == "whitelist":
+                stage_breakdown["custom_rule"] = {
+                    "active": True,
+                    "rule_type": "whitelist",
+                    "effect": "recipient_expected",
+                }
 
         except (httpx.HTTPError, ValueError, TypeError) as exc:
             logger.error("Inference API unavailable during email scan: %s", exc)
