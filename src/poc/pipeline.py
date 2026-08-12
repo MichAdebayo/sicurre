@@ -67,6 +67,7 @@ def build_poc_process_env(settings: PocSettings) -> dict[str, str]:
             "SICURRE_POC_ALLOW_EXTERNAL_WRITES": str(settings.allow_external_writes).lower(),
             "SICURRE_POC_ALLOW_ML_DISPATCH": str(settings.allow_ml_dispatch).lower(),
             "SICURRE_POC_KAGGLE_DATASET_SLUG": settings.kaggle_dataset_slug or "",
+            "SICURRE_TRAINING_DATASET_SNAPSHOT_STORAGE_BACKEND": "local",
         }
     )
     if settings.kaggle_dataset_slug:
