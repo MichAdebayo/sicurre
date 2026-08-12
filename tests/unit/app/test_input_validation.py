@@ -162,8 +162,9 @@ async def test_scan_email_returns_503_when_inference_unavailable(
 async def test_scan_email_records_whitelist_stage_evidence(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A whitelist decision records why inference was bypassed."""
+    """A tenant whitelist supplies intent without bypassing ML safety checks."""
     writes: list[tuple[str, tuple[Any, ...]]] = []
+    inference_payload: dict[str, Any] = {}
 
     async def query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
         writes.append((sql, params))
@@ -182,8 +183,36 @@ async def test_scan_email_records_whitelist_stage_evidence(
             return [{"rule_type": "whitelist", "pattern": "trusted.test"}]
         return []
 
+    class SuccessResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, Any]:
+            return {
+                "is_phishing": False,
+                "label_verdict": "legitimate",
+                "composite_score": 0.03,
+                "explanation": "Authenticated expected sender.",
+                "stage_breakdown": {"mail_context": {"active": True}},
+            }
+
+    class SuccessClient:
+        def __init__(self, **_: Any) -> None:
+            pass
+
+        async def __aenter__(self) -> SuccessClient:
+            return self
+
+        async def __aexit__(self, *_: Any) -> None:
+            return None
+
+        async def post(self, *_: Any, **kwargs: Any) -> SuccessResponse:
+            inference_payload.update(kwargs["json"])
+            return SuccessResponse()
+
     monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
     monkeypatch.setattr(integrations, "_async_query", query)
+    monkeypatch.setattr("httpx.AsyncClient", SuccessClient)
 
     response = await integrations.scan_email(
         request=_limiter_request(),
@@ -196,10 +225,15 @@ async def test_scan_email_records_whitelist_stage_evidence(
     )
 
     assert response.verdict == "safe"
+    assert inference_payload["mail_context"]["recipient_expected"] is True
     insert = next(params for sql, params in writes if "INSERT INTO app_inference_event" in sql)
-    assert json.loads(insert[-3]) == {"custom_rule": "legitimate"}
     assert json.loads(insert[-2]) == {
-        "custom_rule": {"active": True, "rule_type": "whitelist"}
+        "custom_rule": {
+            "active": True,
+            "effect": "recipient_expected",
+            "rule_type": "whitelist",
+        },
+        "mail_context": {"active": True},
     }
 
 
@@ -279,8 +313,10 @@ async def test_scan_email_persists_ml_stage_contract(
     assert inference_payload["mail_context"] == {
         "mailing_list_headers": False,
         "outer_sender_authenticated": True,
+        "recipient_expected": False,
         "structured_forward": True,
         "subscription_claimed": True,
+        "transactional_evidence": False,
     }
     inserted = next(
         params for sql, params in writes if "INSERT INTO app_inference_event" in sql

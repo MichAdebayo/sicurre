@@ -29,7 +29,12 @@ class DatasetExportService:
         print(f"SICURRE — Export ML Dataset Version: {version_tag}")
         print("=" * 60)
 
-        query = text("""
+        message_join = (
+            "di.normalized_message_id = replace(nm.id, '-', '')"
+            if self.engine.dialect.name == "sqlite"
+            else "di.normalized_message_id = nm.id"
+        )
+        query = text(f"""
             SELECT
                 d.id as dataset_id,
                 d.name as dataset_name,
@@ -40,9 +45,7 @@ class DatasetExportService:
                 nm.current_label as label
             FROM data_dataset d
             JOIN data_dataset_item di ON d.id = di.dataset_id
-            JOIN data_normalized_message nm
-              ON lower(replace(CAST(di.normalized_message_id AS TEXT), '-', ''))
-               = lower(replace(CAST(nm.id AS TEXT), '-', ''))
+            JOIN data_normalized_message nm ON {message_join}
             WHERE d.version_tag = :version_tag
             ORDER BY di.row_order ASC
         """)

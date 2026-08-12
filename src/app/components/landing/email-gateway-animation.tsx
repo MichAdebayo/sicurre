@@ -627,7 +627,12 @@ export function EmailGatewayAnimation() {
       <div className="absolute top-[78%] left-[85%] -translate-x-1/2 -translate-y-1/2 w-36 h-36 bg-red-500/15 blur-[45px] pointer-events-none" />
 
       {/* ── 3D Specular-Shaded Pneumatic Cylinders SVG Layer ── */}
-      <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
+      <svg
+        className="absolute inset-0 w-full h-full pointer-events-none z-0"
+        viewBox="0 0 600 380"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
         <defs>
           {/* Metallic polished steel pipe gradient */}
           <linearGradient id="chrome-pipe-body" x1="0%" y1="0%" x2="0%" y2="100%">
