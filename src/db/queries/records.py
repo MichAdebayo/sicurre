@@ -1,17 +1,23 @@
 from __future__ import annotations
 
-import math
 import hashlib
+import math
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from uuid import UUID
+from datetime import UTC, datetime
+from uuid import UUID, uuid4
 
 import sqlalchemy as sa
 from sqlalchemy import Select, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from data_platform.api.schemas import (
+    AnnotationCreate,
+    DatasetCreate,
+    NormalizedMessageCreate,
+    NormalizedMessageUpdate,
+)
 from db.models import (
     DataAnnotation,
     DataDataset,
@@ -22,12 +28,6 @@ from db.models import (
     DataRawRecord,
     DatasetStatus,
     SplitName,
-)
-from data_platform.api.schemas import (
-    AnnotationCreate,
-    DatasetCreate,
-    NormalizedMessageCreate,
-    NormalizedMessageUpdate,
 )
 
 
@@ -72,7 +72,7 @@ DEFAULT_DATASET_LABELS: tuple[str, ...] = ("phishing", "spam", "legitimate")
 
 def _stable_dataset_rank(text_sha256: str) -> str:
     return hashlib.sha256(
-        f"{DATASET_BUILD_SEED}:{text_sha256}".encode("utf-8")
+        f"{DATASET_BUILD_SEED}:{text_sha256}".encode()
     ).hexdigest()
 
 
@@ -361,10 +361,8 @@ class DatasetQueries:
             )
             .join(
                 latest_annotations,
-                _uuid_text_match(
-                    latest_annotations.c.normalized_message_id,
-                    DataNormalizedMessage.id,
-                ),
+                latest_annotations.c.normalized_message_id
+                == DataNormalizedMessage.id,
             )
             .where(latest_annotations.c.annotation_rank == 1)
             .where(latest_annotations.c.annotation_label.in_(include_labels))
@@ -383,7 +381,7 @@ class DatasetQueries:
             target_usage=target_usage,
             status=status,
             frozen_at=(
-                datetime.now(timezone.utc)
+                datetime.now(UTC)
                 if status == DatasetStatus.FROZEN.value
                 else None
             ),
@@ -434,20 +432,26 @@ class DatasetQueries:
 
         row_order = 1
         split_counts: dict[str, int] = {}
+        dataset_items: list[dict[str, object]] = []
+        created_at = datetime.now(UTC)
         for split_name, _ in splits:
             ordered_rows = sorted(split_buckets[split_name], key=lambda item: item[0])
             split_counts[split_name] = len(ordered_rows)
             for _, normalized_message_id, item_weight in ordered_rows:
-                session.add(
-                    DataDatasetItem(
-                        dataset_id=dataset.id,
-                        normalized_message_id=normalized_message_id,
-                        split_name=split_name,
-                        sample_weight=item_weight,
-                        row_order=row_order,
-                    )
+                dataset_items.append(
+                    {
+                        "id": uuid4(),
+                        "dataset_id": dataset.id,
+                        "normalized_message_id": normalized_message_id,
+                        "split_name": split_name,
+                        "sample_weight": item_weight,
+                        "row_order": row_order,
+                        "created_at": created_at,
+                    }
                 )
                 row_order += 1
+
+        await session.execute(sa.insert(DataDatasetItem), dataset_items)
 
         dataset.item_count = sum(split_counts.values())
 

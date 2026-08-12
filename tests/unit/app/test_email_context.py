@@ -23,6 +23,8 @@ You are receiving this newsletter because you subscribed.
     assert context.structured_forward is True
     assert context.outer_sender_authenticated is True
     assert context.subscription_claimed is True
+    assert context.recipient_expected is False
+    assert context.transactional_evidence is False
 
 
 def test_subject_or_subscription_claim_alone_is_not_a_structured_forward() -> None:
@@ -64,3 +66,35 @@ def test_body_authentication_claim_is_not_transport_evidence() -> None:
     )
 
     assert context.outer_sender_authenticated is False
+
+
+def test_detects_coherent_calendar_mime_as_transactional_evidence() -> None:
+    context = derive_email_context(
+        subject="Accès au webinaire",
+        sender="events@example.fr",
+        recipient_expected=True,
+        text=(
+            "Authentication-Results: mx.example; dmarc=pass\n"
+            "Content-Type: text/calendar; method=REQUEST; charset=utf-8\n\n"
+            "BEGIN:VCALENDAR\nMETHOD:REQUEST\nBEGIN:VEVENT\n"
+            "UID:event-42@example.fr\nDTSTART:20260814T090000Z\n"
+            "END:VEVENT\nEND:VCALENDAR"
+        ),
+    )
+
+    assert context.outer_sender_authenticated is True
+    assert context.recipient_expected is True
+    assert context.transactional_evidence is True
+
+
+def test_calendar_wording_without_mime_structure_is_not_evidence() -> None:
+    context = derive_email_context(
+        subject="Invitation urgente",
+        sender="attacker@example.test",
+        text=(
+            "Vous êtes inscrit. BEGIN:VCALENDAR METHOD:REQUEST "
+            "BEGIN:VEVENT UID:x DTSTART:20260814T090000Z END:VEVENT END:VCALENDAR"
+        ),
+    )
+
+    assert context.transactional_evidence is False
