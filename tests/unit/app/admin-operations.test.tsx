@@ -39,6 +39,7 @@ vi.mock("../../../src/app/lib/api", () => ({
     isFetching: false,
   }),
   useAdminRuntimeHealth: () => ({ data: undefined, isLoading: false }),
+  useAdminDomains: () => ({ data: { items: [], page: 1, page_size: 20, total: 0, pages: 1 } }),
   useOperationalExercises: () => ({
     data: { ...mocks.state, recent: [], supported_types: ["api_unavailable", "high_latency", "elevated_5xx"] },
   }),
@@ -57,6 +58,8 @@ describe("admin operational exercises", () => {
   it("requires an explicit confirmation before starting a bounded exercise", () => {
     render(<LogsRoute />);
 
+    fireEvent.click(screen.getByRole("button", { name: "Opérations" }));
+
     fireEvent.click(screen.getByRole("button", { name: "Latence élevée" }));
     expect(mocks.start).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Lancer le test" }));
@@ -71,6 +74,8 @@ describe("admin operational exercises", () => {
     mocks.state.enabled = false;
     render(<LogsRoute />);
 
+    fireEvent.click(screen.getByRole("button", { name: "Opérations" }));
+
     expect(screen.getByText("Désactivé par configuration")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Indisponibilité API" })).toBeDisabled();
   });
@@ -84,6 +89,8 @@ describe("admin operational exercises", () => {
       expires_at: "2026-08-06T10:04:00Z",
     };
     render(<LogsRoute />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Opérations" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Rétablir maintenant" }));
     expect(mocks.recover).toHaveBeenCalledWith("exercise-1234");

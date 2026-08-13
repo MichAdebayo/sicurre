@@ -192,7 +192,7 @@ export default function SupportRoute({ session }: SupportRouteProps) {
                 <Button
                   type="submit"
                   disabled={createSupportRequest.isPending}
-                  className="flex items-center gap-2 cursor-pointer bg-[#2e6bb5] hover:bg-[#23589b] text-white border-none text-xs font-bold rounded-lg px-5 py-2 h-10 shadow-sm"
+                  className="flex h-10 items-center gap-2 px-5 text-xs font-bold shadow-sm"
                 >
                   {createSupportRequest.isPending ? (
                     <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
