@@ -315,9 +315,9 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
       </div>
 
       {/* Two-Column Split Layout */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Navigation Sidebar */}
-        <div className="col-span-12 flex gap-1.5 overflow-x-auto border-b border-border-subtle pb-3 md:col-span-3 md:block md:space-y-1.5 md:overflow-visible md:rounded-xl md:border md:bg-surface-lowest md:p-3.5 md:shadow-sm">
+        <div className="col-span-12 flex gap-1.5 overflow-x-auto border-b border-border-subtle pb-3 lg:col-span-3 lg:block lg:space-y-1.5 lg:overflow-visible lg:rounded-xl lg:border lg:bg-surface-lowest lg:p-3.5 lg:shadow-sm">
           {tabs.map((tab) => {
             const IconComp = tab.icon;
             const isActive = activeTab === tab.id;
@@ -328,7 +328,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                   setActiveTab(tab.id as any);
                   setShowIntegrator(false);
                 }}
-                className={`flex shrink-0 items-center gap-2 rounded-lg border-b-2 px-3 py-2.5 text-left text-sm font-bold transition-all md:w-full md:gap-3 md:border-b-0 md:border-l-2 md:px-4 ${isActive
+                className={`flex shrink-0 items-center gap-2 rounded-lg border-b-2 px-3 py-2.5 text-left text-sm font-bold transition-all lg:w-full lg:gap-3 lg:border-b-0 lg:border-l-2 lg:px-4 ${isActive
                   ? "bg-primary/[0.04] text-primary border-primary"
                   : "text-on-surface-variant hover:bg-surface-low hover:text-on-surface border-transparent"
                   }`}
@@ -341,7 +341,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
         </div>
 
         {/* Right Column: Tab Content */}
-        <div className="col-span-12 md:col-span-9 space-y-6">
+        <div className="col-span-12 lg:col-span-9 space-y-6">
           {/* Profile Tab */}
           {activeTab === "profile" && (
             <div className="bg-surface-lowest rounded-xl border border-border-subtle p-6 shadow-sm">

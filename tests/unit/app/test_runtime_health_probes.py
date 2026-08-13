@@ -249,6 +249,8 @@ async def test_kpis_aggregate_each_class_for_current_workspace(
     async def query(sql: str, *_: object, **__: object) -> list[dict]:
         nonlocal captured_sql
         captured_sql = sql
+        if "COUNT(*) AS total" in sql:
+            return [{"total": 2}]
         return [
             {"label_verdict": "phishing", "cnt": 2},
             {"label_verdict": "quarantine", "cnt": 1},
@@ -279,6 +281,8 @@ async def test_threat_list_masks_non_threat_content(
     async def query(sql: str, *_: object, **__: object) -> list[dict]:
         nonlocal captured_sql
         captured_sql = sql
+        if "COUNT(*) AS total" in sql:
+            return [{"total": 2}]
         base = {
             "message_id": "message",
             "confidence": 0.9,
@@ -311,10 +315,10 @@ async def test_threat_list_masks_non_threat_content(
 
     result = await app_routes.get_threats(USER)
 
-    assert result[0]["subject"] == "[Masqué par Sicurre]"
-    assert result[0]["status"] == "active"
-    assert result[1]["subject"] == "Suspicious invoice"
-    assert result[1]["sender"] == "attacker@example.test"
+    assert result["items"][0]["subject"] == "[Masqué par Sicurre]"
+    assert result["items"][0]["status"] == "active"
+    assert result["items"][1]["subject"] == "Suspicious invoice"
+    assert result["items"][1]["sender"] == "attacker@example.test"
     assert "label_verdict" in captured_sql
 
 

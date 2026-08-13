@@ -11,7 +11,7 @@ import uuid
 import xml.etree.ElementTree as ET
 import zipfile
 from contextlib import suppress
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -46,6 +46,13 @@ _operational_background_tasks: set[asyncio.Task[None]] = set()
 
 class StatusUpdate(BaseModel):
     status: str
+
+
+class ThreatVisibilityUpdate(BaseModel):
+    """Workspace-scoped visibility change that preserves audit evidence."""
+
+    ids: list[str] = Field(min_length=1, max_length=100)
+    hidden: bool
 
 
 class UpdateProfileRequest(BaseModel):
@@ -309,53 +316,141 @@ async def get_kpis(
     }
 
 
+def _serialize_threat(row: dict[str, object]) -> dict[str, object]:
+    """Return the privacy-preserving customer representation of an event."""
+    status = row.get("status")
+    if status not in ("active", "trashed", "restored"):
+        status = "active"
+    verdict = str(row.get("verdict") or "legitimate")
+    is_anonymized = verdict not in ("phishing", "quarantine")
+    identifier = str(row["id"])
+    return {
+        "id": identifier,
+        "message_id": row.get("message_id"),
+        "privacy_reference": f"MSG-{identifier.replace('-', '')[:8].upper()}",
+        "content_redacted": is_anonymized,
+        "subject": "[Masqué par Sicurre]" if is_anonymized else row.get("subject"),
+        "sender": "[Masqué par Sicurre]" if is_anonymized else row.get("sender"),
+        "body_preview": "[Masqué par Sicurre]" if is_anonymized else row.get("body_preview"),
+        "verdict": verdict,
+        "confidence": row.get("confidence"),
+        "received_at": row.get("received_at"),
+        "status": status,
+        "latency_ms": row.get("latency_ms"),
+        "explanation": row.get("explanation"),
+    }
+
+
 @router.get("/v1/threats")
-async def get_threats(current_user: AuthUser = Depends(get_current_user)):
+async def get_threats(
+    current_user: AuthUser = Depends(get_current_user),
+    page: int = 1,
+    page_size: int = 10,
+    verdict: str = "all",
+    date_range: str = "all",
+    search: str = "",
+    hidden: bool = False,
+):
+    """Return one filtered page of workspace events."""
+    page = max(1, page)
+    page_size = min(100, max(1, page_size))
+    if verdict not in {"all", "phishing", "spam", "legitimate"}:
+        raise HTTPException(status_code=400, detail="Invalid verdict filter")
+    if date_range not in {"all", "today", "7d", "month", "last_month"}:
+        raise HTTPException(status_code=400, detail="Invalid date filter")
+
+    verdict_expr = (
+        "COALESCE(label_verdict, CASE WHEN safety_verdict = 'safe' "
+        "THEN 'legitimate' ELSE safety_verdict END)"
+    )
+    where = ["workspace_id = ?", "COALESCE(is_deleted, 0) = ?"]
+    params: list[object] = [current_user.workspace_id, 1 if hidden else 0]
+    if verdict == "phishing":
+        where.append(f"{verdict_expr} IN ('phishing', 'quarantine')")
+    elif verdict != "all":
+        where.append(f"{verdict_expr} = ?")
+        params.append(verdict)
+
+    now = datetime.now(timezone.utc)
+    if date_range == "today":
+        where.append("created_at >= ?")
+        params.append(now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat())
+    elif date_range == "7d":
+        where.append("created_at >= ?")
+        params.append((now - timedelta(days=7)).isoformat())
+    elif date_range == "month":
+        where.append("created_at >= ?")
+        params.append(now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat())
+    elif date_range == "last_month":
+        this_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        previous_month = (this_month - timedelta(days=1)).replace(day=1)
+        where.extend(["created_at >= ?", "created_at < ?"])
+        params.extend([previous_month.isoformat(), this_month.isoformat()])
+
+    normalized_search = search.strip()[:120]
+    if normalized_search:
+        token = f"%{normalized_search.lower()}%"
+        where.append(
+            "(LOWER(COALESCE(subject, '')) LIKE ? OR LOWER(COALESCE(sender, '')) LIKE ? "
+            "OR LOWER(REPLACE(id, '-', '')) LIKE ?)"
+        )
+        params.extend([token, token, token.replace("msg-", "")])
+
+    where_sql = " AND ".join(where)
+    count_rows = await async_query_auth_db(
+        f"SELECT COUNT(*) AS total FROM app_inference_event WHERE {where_sql}",
+        tuple(params),
+    )
+    total = int(count_rows[0]["total"]) if count_rows else 0
     rows = await async_query_auth_db(
-        """
+        f"""
             SELECT
                 id,
                 id AS message_id,
                 subject,
                 sender,
                 snippet AS body_preview,
-                COALESCE(label_verdict, CASE WHEN safety_verdict = 'safe' THEN 'legitimate' ELSE safety_verdict END) AS verdict,
+                {verdict_expr} AS verdict,
                 composite_score AS confidence,
                 created_at AS received_at,
                 COALESCE(override_verdict, 'active') AS status,
                 latency_ms,
                 explanation
             FROM app_inference_event
-            WHERE workspace_id = ? AND (is_deleted IS NULL OR is_deleted = 0)
+            WHERE {where_sql}
             ORDER BY created_at DESC
+            LIMIT ? OFFSET ?
             """,
-        (current_user.workspace_id,),
+        (*params, page_size, (page - 1) * page_size),
     )
-    threats = []
-    for row in rows:
-        status = row["status"]
-        if status not in ("active", "trashed", "restored"):
-            status = "active"
-        verdict = row["verdict"]
-        is_anonymized = verdict not in ("phishing", "quarantine")
-        threats.append(
-            {
-                "id": row["id"],
-                "message_id": row["message_id"],
-                "privacy_reference": f"MSG-{str(row['id']).replace('-', '')[:8].upper()}",
-                "content_redacted": is_anonymized,
-                "subject": "[Masqué par Sicurre]" if is_anonymized else row["subject"],
-                "sender": "[Masqué par Sicurre]" if is_anonymized else row["sender"],
-                "body_preview": "[Masqué par Sicurre]" if is_anonymized else row["body_preview"],
-                "verdict": verdict,
-                "confidence": row["confidence"],
-                "received_at": row["received_at"],
-                "status": status,
-                "latency_ms": row["latency_ms"],
-                "explanation": row.get("explanation"),
-            }
-        )
-    return threats
+    return {
+        "items": [_serialize_threat(row) for row in rows],
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+        "pages": max(1, (total + page_size - 1) // page_size),
+    }
+
+
+@router.post("/v1/threats/visibility")
+async def update_threat_visibility(
+    payload: ThreatVisibilityUpdate,
+    current_user: AuthUser = Depends(get_current_user),
+):
+    """Hide or restore selected events without deleting their audit evidence."""
+    placeholders = ", ".join("?" for _ in payload.ids)
+    existing = await async_query_auth_db(
+        f"SELECT id FROM app_inference_event WHERE workspace_id = ? AND id IN ({placeholders})",
+        (current_user.workspace_id, *payload.ids),
+    )
+    existing_ids = {str(row["id"]) for row in existing}
+    if len(existing_ids) != len(set(payload.ids)):
+        raise HTTPException(status_code=404, detail="Threat not found")
+    await async_query_auth_db(
+        f"UPDATE app_inference_event SET is_deleted = ? WHERE workspace_id = ? AND id IN ({placeholders})",
+        (1 if payload.hidden else 0, current_user.workspace_id, *payload.ids),
+    )
+    return {"updated": len(existing_ids), "hidden": payload.hidden}
 
 
 @router.post("/v1/threats/{id}/status")
@@ -1040,6 +1135,40 @@ async def get_admin_overview(current_user: AuthUser = Depends(get_current_user))
         "recent_feedback": recent_feedback,
         "recent_quarantine": recent_quarantine,
         "recent_support": recent_support,
+    }
+
+
+@router.get("/v1/admin/domains")
+async def get_admin_domains(
+    current_user: AuthUser = Depends(get_current_user),
+    page: int = 1,
+    page_size: int = 20,
+    search: str = "",
+):
+    """Return a bounded, searchable Cloudflare integration inventory."""
+    if not current_user.is_platform_admin:
+        raise HTTPException(status_code=403, detail="Platform admin access required")
+    page = max(1, page)
+    page_size = min(100, max(1, page_size))
+    normalized_search = search.strip()[:120]
+    where = ""
+    params: tuple[object, ...] = ()
+    if normalized_search:
+        where = "WHERE LOWER(COALESCE(zone_name, '')) LIKE ? OR LOWER(COALESCE(user_email, '')) LIKE ?"
+        token = f"%{normalized_search.lower()}%"
+        params = (token, token)
+    total = await _admin_count(f"SELECT COUNT(*) AS count FROM cloudflare_integration {where}", params)
+    items = await _admin_rows(
+        f"SELECT zone_name, status, user_email, updated_at FROM cloudflare_integration {where} "
+        "ORDER BY updated_at DESC LIMIT ? OFFSET ?",
+        (*params, page_size, (page - 1) * page_size),
+    )
+    return {
+        "items": items,
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+        "pages": max(1, (total + page_size - 1) // page_size),
     }
 
 

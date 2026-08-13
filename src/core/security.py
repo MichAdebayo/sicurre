@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import logging
 from typing import Any
 
 import httpx
@@ -10,6 +11,8 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
 from core.config import Settings, get_settings
+
+logger = logging.getLogger(__name__)
 
 
 class AuthenticatedPrincipal(BaseModel):
@@ -169,7 +172,26 @@ async def require_authenticated_principal(
                 client_ip=request.headers.get("x-real-ip")
                 or (request.client.host if request.client else None),
             )
+        except httpx.TimeoutException as exc:
+            logger.warning("better_auth_validation_timeout")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentication service unavailable",
+            ) from exc
+        except httpx.HTTPStatusError as exc:
+            logger.warning(
+                "better_auth_validation_http_error",
+                extra={"upstream_status": exc.response.status_code},
+            )
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentication service unavailable",
+            ) from exc
         except httpx.HTTPError as exc:
+            logger.warning(
+                "better_auth_validation_transport_error",
+                extra={"error_type": type(exc).__name__},
+            )
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Authentication service unavailable",

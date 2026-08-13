@@ -26,12 +26,12 @@
     {
       "uid": "sicurre-elevated-5xx",
       "title": "Sicurre elevated 5xx rate",
-      "expression": "sum(rate(sicurre_app_gateway_responses_total{stack=\"sicurre\",status=~\"5..\"}[5m])) / clamp_min(sum(rate(sicurre_app_gateway_responses_total{stack=\"sicurre\"}[5m])), 0.001)",
+      "expression": "(sum(increase(sicurre_app_gateway_responses_total{stack=\"sicurre\",route=~\"app|api|auth\",status=~\"5..\"}[15m])) / clamp_min(sum(increase(sicurre_app_gateway_responses_total{stack=\"sicurre\",route=~\"app|api|auth\"}[15m])), 1)) and (sum(increase(sicurre_app_gateway_responses_total{stack=\"sicurre\",route=~\"app|api|auth\",status=~\"5..\"}[15m])) >= 5) and (sum(increase(sicurre_app_gateway_responses_total{stack=\"sicurre\",route=~\"app|api|auth\"}[15m])) >= 20)",
       "operator": "gt",
       "threshold": 0.02,
-      "for": "5m",
+      "for": "10m",
       "noDataState": "OK",
-      "summary": "More than 2% of Sicurre gateway responses are server errors.",
+      "summary": "More than 2% of at least 20 customer-facing requests were server errors, including at least five failures.",
       "runbook": "Use the application dashboard and traces to identify the failing surface before rollback."
     },
     {

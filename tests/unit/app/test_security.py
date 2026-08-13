@@ -247,6 +247,40 @@ async def test_authentication_reports_missing_and_unavailable_services() -> None
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "upstream_error",
+    [
+        httpx.ReadTimeout("timed out"),
+        httpx.ConnectError("connection failed"),
+        httpx.HTTPStatusError(
+            "upstream failed",
+            request=httpx.Request("GET", "http://auth-service/session"),
+            response=httpx.Response(500),
+        ),
+    ],
+)
+async def test_authentication_records_bounded_upstream_failure(
+    monkeypatch, caplog, upstream_error: httpx.HTTPError
+) -> None:
+    async def fail_validation(*_args: Any, **_kwargs: Any) -> None:
+        raise upstream_error
+
+    monkeypatch.setattr("core.security._validate_with_better_auth", fail_validation)
+    settings = Settings(
+        _env_file=None,
+        auth_allow_dev_tokens=False,
+        better_auth_base_url="http://auth-service:3005",
+    )
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="token")
+
+    with pytest.raises(HTTPException) as unavailable:
+        await require_authenticated_principal(_request(), credentials, settings)
+
+    assert unavailable.value.status_code == 503
+    assert "better_auth_validation_" in caplog.text
+
+
+@pytest.mark.asyncio
 async def test_internal_key_contract() -> None:
     with pytest.raises(HTTPException) as missing:
         await require_internal_key(None, Settings(_env_file=None, internal_api_key=None))
