@@ -299,7 +299,7 @@ export default function LandingRoute({
             <LanguageSwitcher scrolled={scrolled} />
             <button
               onClick={onNavigateToLogin}
-              className="text-[13px] font-medium text-white/60 hover:text-primary transition-colors cursor-pointer hidden sm:block"
+              className="text-[12px] font-semibold text-white/75 hover:text-white transition-colors cursor-pointer"
             >
               {t("landing.nav_login")}
             </button>

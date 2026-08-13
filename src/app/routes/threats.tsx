@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useDeferredValue, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import {
@@ -6,8 +6,10 @@ import {
   Download,
   Copy,
   AlertTriangle,
+  Eye,
+  EyeOff,
 } from "lucide-react";
-import { useReportAddress, useThreatLogs } from "../lib/api";
+import { useReportAddress, useSetThreatVisibility, useThreatLogs, useThreatPage } from "../lib/api";
 import { VerdictBadge } from "../components/threats/verdict-badge";
 import { Button } from "../components/ui/button";
 import { AppToast } from "../components/common/app-toast";
@@ -16,14 +18,15 @@ const MotionDiv = motion.div as any;
 
 export default function ThreatsRoute() {
   const { t, i18n } = useTranslation();
-  const { data: threats, isLoading, error } = useThreatLogs();
   const { data: reportAddressData } = useReportAddress();
 
   const [searchQuery, setSearchQuery] = useState("");
+  const deferredSearch = useDeferredValue(searchQuery);
   const [filterVerdict, setFilterVerdict] = useState<string>("all");
 
   // Date range filters ("all", "today", "7d", "month")
-  const [dateFilter, setDateFilter] = useState<"today" | "7d" | "month" | "last_month">("7d");
+  const [dateFilter, setDateFilter] = useState<"all" | "today" | "7d" | "month" | "last_month">("all");
+  const [showHidden, setShowHidden] = useState(false);
 
   // Latency chart hover state
   const [hoveredLatencyIndex, setHoveredLatencyIndex] = useState<number | null>(null);
@@ -31,6 +34,19 @@ export default function ThreatsRoute() {
   // Table pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const { data: threatPage, isLoading, error } = useThreatPage({
+    page: currentPage,
+    pageSize: itemsPerPage,
+    verdict: filterVerdict as "all" | "phishing" | "spam" | "legitimate",
+    dateRange: dateFilter,
+    search: deferredSearch,
+    hidden: showHidden,
+  });
+  const { data: chartThreats } = useThreatLogs();
+  const visibilityMutation = useSetThreatVisibility();
+  const threats = threatPage?.items ?? [];
 
   const [actionSuccess, setActionSuccess] = useState("");
   const reportAddress = reportAddressData?.address ?? "";
@@ -41,50 +57,28 @@ export default function ThreatsRoute() {
     setActionSuccess(t("threats.report_address_copied"));
   };
 
-  // Date filtering logic
-  const matchesDateFilter = (receivedAtStr: string) => {
-    const received = new Date(receivedAtStr);
-    const now = new Date();
+  useEffect(() => {
+    setCurrentPage(1);
+    setSelectedIds(new Set());
+  }, [deferredSearch, filterVerdict, dateFilter, showHidden]);
 
-    if (dateFilter === "today") {
-      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-      return received >= start;
-    }
-    if (dateFilter === "7d") {
-      const start = new Date();
-      start.setDate(now.getDate() - 7);
-      return received >= start;
-    }
-    if (dateFilter === "month") {
-      const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-      return received >= start;
-    }
-    if (dateFilter === "last_month") {
-      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
-      const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
-      return received >= start && received <= end;
-    }
-    return true;
+  const updateSelection = (id: string, checked: boolean) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      checked ? next.add(id) : next.delete(id);
+      return next;
+    });
   };
 
-  const filteredThreats = threats
-    ? threats.filter((threat) => {
-      const query = searchQuery.toLowerCase();
-      const matchesSearch =
-        threat.subject?.toLowerCase().includes(query) ||
-        threat.sender?.toLowerCase().includes(query) ||
-        threat.privacy_reference.toLowerCase().includes(query);
-      const matchesFilter =
-        filterVerdict === "all" ||
-        threat.verdict === filterVerdict ||
-        (filterVerdict === "phishing" && threat.verdict === "quarantine");
-      const matchesDate = matchesDateFilter(threat.received_at);
-      return matchesSearch && matchesFilter && matchesDate;
-    })
-    : [];
+  const updateVisibility = async () => {
+    if (selectedIds.size === 0) return;
+    await visibilityMutation.mutateAsync({ ids: [...selectedIds], hidden: !showHidden });
+    setSelectedIds(new Set());
+    setActionSuccess(showHidden ? t("threats.restore_success") : t("threats.hide_success"));
+  };
 
   const handleExportCSV = () => {
-    if (!threats || threats.length === 0) return;
+    if (threats.length === 0) return;
     const headers = "Date,Sender,Subject,Verdict,Confidence,Status\n";
     const rows = threats
       .map(
@@ -102,11 +96,28 @@ export default function ThreatsRoute() {
   };
 
   const getLatencyData = () => {
-    const threatsList = threats || [];
+    const threatsList = chartThreats || [];
     const days = [];
     const now = new Date();
 
-    if (dateFilter === "today") {
+    if (dateFilter === "all") {
+      const groups = new Map<string, typeof threatsList>();
+      threatsList.forEach((threat) => {
+        const key = new Date(threat.received_at).toISOString().slice(0, 10);
+        groups.set(key, [...(groups.get(key) ?? []), threat]);
+      });
+      [...groups.entries()].sort(([left], [right]) => left.localeCompare(right)).forEach(([key, events]) => {
+        const measured = events.filter((event) => (event.latency_ms ?? 0) > 0);
+        days.push({
+          label: new Date(`${key}T12:00:00`).toLocaleDateString(i18n.language === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric" }),
+          latency: measured.length
+            ? Math.round(measured.reduce((sum, event) => sum + (event.latency_ms ?? 0), 0) / measured.length)
+            : 0,
+          emails_count: events.length,
+          measured_count: measured.length,
+        });
+      });
+    } else if (dateFilter === "today") {
       // 24 hourly points (from 23 hours ago to current hour)
       for (let i = 23; i >= 0; i--) {
         const d = new Date();
@@ -218,13 +229,10 @@ export default function ThreatsRoute() {
   const pathD = points.length > 0 ? `M ${points.map((p) => `${p.x} ${p.y}`).join(" L ")}` : "";
 
   // Pagination bounds
-  const totalItems = filteredThreats.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+  const totalItems = threatPage?.total ?? 0;
+  const totalPages = threatPage?.pages ?? 1;
   const activePage = Math.min(currentPage, totalPages);
-  const paginatedThreats = filteredThreats.slice(
-    (activePage - 1) * itemsPerPage,
-    activePage * itemsPerPage
-  );
+  const paginatedThreats = threats;
 
   return (
     <MotionDiv
@@ -262,6 +270,7 @@ export default function ThreatsRoute() {
             }}
             className="px-3 py-2 bg-white border border-border-subtle rounded-lg text-xs font-bold text-on-surface focus:outline-none focus:border-primary cursor-pointer shadow-sm h-9"
           >
+            <option value="all">{t("threats.range_all")}</option>
             <option value="today">{t("threats.range_today")}</option>
             <option value="7d">{t("threats.range_7d")}</option>
             <option value="month">{t("threats.range_month")}</option>
@@ -431,8 +440,34 @@ export default function ThreatsRoute() {
               {v === "all" ? t("threats.all") : t(`threats.badge_${v}`)}
             </button>
           ))}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowHidden((current) => !current)}
+            className="gap-2"
+          >
+            {showHidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+            {showHidden ? t("threats.show_visible") : t("threats.show_hidden")}
+          </Button>
         </div>
       </div>
+
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-y border-border-subtle py-3">
+          <span className="text-sm font-semibold text-on-surface">
+            {t("threats.selected_count", { count: selectedIds.size })}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void updateVisibility()}
+            disabled={visibilityMutation.isPending}
+          >
+            {showHidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+            {showHidden ? t("threats.restore_selected") : t("threats.hide_selected")}
+          </Button>
+        </div>
+      )}
 
       {/* Threats Table (Spans full width unconditionally) */}
       <div className="bg-white rounded-xl border border-border-subtle overflow-hidden shadow-sm">
@@ -456,6 +491,22 @@ export default function ThreatsRoute() {
             <table className="w-full text-left border-collapse font-sans">
               <thead>
                 <tr className="border-b border-border-subtle bg-surface-low/40">
+                  <th className="w-12 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      aria-label={t("threats.select_page")}
+                      checked={paginatedThreats.length > 0 && paginatedThreats.every((threat) => selectedIds.has(threat.id))}
+                      onChange={(event) => {
+                        const checked = event.target.checked;
+                        setSelectedIds((current) => {
+                          const next = new Set(current);
+                          paginatedThreats.forEach((threat) => checked ? next.add(threat.id) : next.delete(threat.id));
+                          return next;
+                        });
+                      }}
+                      className="h-4 w-4 accent-primary"
+                    />
+                  </th>
                   <th className="min-w-[210px] px-5 py-3 text-xs font-bold text-on-surface-variant">{t("threats.processed_item")}</th>
                   <th className="min-w-[150px] px-5 py-3 text-xs font-bold text-on-surface-variant">{t("threats.timestamp")}</th>
                   <th className="min-w-[140px] px-5 py-3 text-xs font-bold text-on-surface-variant">{t("threats.verdict")}</th>
@@ -472,6 +523,15 @@ export default function ThreatsRoute() {
                     className="contents"
                   >
                     <tr className="hover:bg-surface-low/20 transition-all text-xs">
+                      <td className="px-4 py-3.5">
+                        <input
+                          type="checkbox"
+                          aria-label={t("threats.select_item", { reference: threat.privacy_reference })}
+                          checked={selectedIds.has(threat.id)}
+                          onChange={(event) => updateSelection(threat.id, event.target.checked)}
+                          className="h-4 w-4 accent-primary"
+                        />
+                      </td>
                       <td className="px-5 py-3.5">
                         <span className="block font-semibold text-on-surface">
                           {t("threats.processed_reference", { reference: threat.privacy_reference.replace("MSG-", "") })}

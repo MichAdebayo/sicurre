@@ -43,6 +43,13 @@ paths:
       summary: List registered data sources
       security:
         - BearerAuth: []
+      parameters:
+        - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
+        - { in: query, name: page_size, schema: { type: integer, minimum: 1, maximum: 100, default: 10 } }
+        - { in: query, name: verdict, schema: { type: string, enum: [all, phishing, spam, legitimate], default: all } }
+        - { in: query, name: date_range, schema: { type: string, enum: [all, today, 7d, month, last_month], default: all } }
+        - { in: query, name: search, schema: { type: string, maxLength: 120 } }
+        - { in: query, name: hidden, schema: { type: boolean, default: false } }
       responses:
         "200":
           description: List of source systems
@@ -560,9 +567,23 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ThreatLogEntry"
+                $ref: "#/components/schemas/ThreatLogPage"
+
+  /v1/threats/visibility:
+    post:
+      tags: [app]
+      summary: Hide or restore workspace threat-log rows without deleting audit evidence
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ThreatVisibilityUpdate"
+      responses:
+        "200":
+          description: Visibility update summary
 
   /v1/threats/{id}/status:
     post:
@@ -1117,6 +1138,19 @@ paths:
       security: [{BearerAuth: []}]
       responses:
         "200": {description: Platform overview}
+        "403": {description: Platform admin access required}
+
+  /v1/admin/domains:
+    get:
+      tags: [admin]
+      summary: List Cloudflare integrations with server-side search and pagination
+      security: [{BearerAuth: []}]
+      parameters:
+        - {in: query, name: page, schema: {type: integer, minimum: 1, default: 1}}
+        - {in: query, name: page_size, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+        - {in: query, name: search, schema: {type: string, maxLength: 120}}
+      responses:
+        "200": {description: Paginated integration inventory}
         "403": {description: Platform admin access required}
 
   /v1/admin/operational-exercises:
@@ -1763,6 +1797,30 @@ components:
         action_at:
           type: string
           format: date-time
+
+    ThreatLogPage:
+      type: object
+      required: [items, page, page_size, total, pages]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ThreatLogEntry"
+        page: { type: integer }
+        page_size: { type: integer }
+        total: { type: integer }
+        pages: { type: integer }
+
+    ThreatVisibilityUpdate:
+      type: object
+      required: [ids, hidden]
+      properties:
+        ids:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { type: string }
+        hidden: { type: boolean }
 
     ThreatStatusUpdate:
       type: object
