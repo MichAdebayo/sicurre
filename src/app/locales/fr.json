@@ -91,9 +91,37 @@
     "checklist_threats_active": "Alertes de menaces non résolues dans le journal",
     "all_clear": "Toutes les configurations sont optimales ! Le bouclier est vert."
   },
+  "admin": {
+    "title": "Console d’administration",
+    "subtitle": "Vue synthétique des espaces clients, opérations, intégrations et signalements.",
+    "refresh": "Actualiser",
+    "views_label": "Vues de la console",
+    "views": { "overview": "Vue d’ensemble", "operations": "Opérations", "integrations": "Intégrations", "reviews": "À examiner" },
+    "unknown": "Inconnu",
+    "status": "Statut",
+    "load_error": "Impossible de charger la console d’administration.",
+    "load_error_help": "Vérifiez votre session administrateur puis réessayez.",
+    "refresh_error": "Actualisation indisponible. Le dernier état connu reste affiché.",
+    "health": {
+      "technical_detail": "Détail technique",
+      "messages": { "ok": "Contrôle réussi.", "degraded": "Contrôle partiel, à surveiller.", "down": "Contrôle en échec, intervention requise.", "unknown": "État non déterminé." },
+      "components": {
+        "inference_api": "API d’inférence", "public_app_api": "API Sicurre", "public_app_health": "Santé de l’application",
+        "email_scan_gateway": "Passerelle d’analyse", "cloudflare_worker": "Worker Cloudflare", "cloudflare_worker_binding": "Liaison du Worker",
+        "cloudflare_routing_rule": "Règle de routage", "cloudflare_email_sending": "Envoi d’e-mails Cloudflare", "quarantine_storage": "Stockage de quarantaine"
+      }
+    },
+    "values": {
+      "legitimate": "légitime", "spam": "indésirable", "phishing": "phishing", "quarantine": "quarantaine",
+      "active": "actif", "error": "en erreur", "pending": "en attente", "held": "retenu", "restored": "restauré",
+      "false_negative": "faux négatif", "false_positive": "faux positif", "true_positive": "vrai positif", "true_negative": "vrai négatif",
+      "incident": "incident", "dns": "DNS", "billing": "facturation", "feedback": "retour utilisateur", "other": "autre", "open": "ouvert", "closed": "fermé"
+    }
+  },
   "threats": {
     "title": "Journal des menaces",
     "subtitle": "Historique des classifications et des actions de remédiation.",
+    "range_all": "Tout l’historique",
     "range_today": "Aujourd’hui",
     "range_7d": "7 derniers jours",
     "range_month": "Ce mois-ci",
@@ -146,6 +174,15 @@
     "report_missed_description": "Transférez le message à {{address}} pour le signaler avec les éléments nécessaires à son analyse.",
     "copy_address": "Copier l’adresse",
     "report_address_copied": "Adresse copiée.",
+    "show_hidden": "Éléments masqués",
+    "show_visible": "Revenir au journal",
+    "hide_selected": "Masquer de mon espace",
+    "restore_selected": "Restaurer dans mon espace",
+    "hide_success": "Éléments masqués.",
+    "restore_success": "Éléments restaurés.",
+    "selected_count": "{{count}} élément(s) sélectionné(s)",
+    "select_page": "Sélectionner cette page",
+    "select_item": "Sélectionner {{reference}}",
     "safe_preview": "Aperçu Sécurisé",
     "reasoning": "Explication",
     "mark_safe": "Marquer comme sûr",
