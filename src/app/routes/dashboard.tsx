@@ -78,7 +78,7 @@ function KPIBlock({
 
 export default function DashboardRoute({ session, onGoToSettings }: DashboardRouteProps) {
   const { t, i18n } = useTranslation();
-  const { data: kpis, isLoading: kpisLoading } = useKPIStats();
+  const { data: kpis, isLoading: kpisLoading } = useKPIStats(session.workspace_id);
   const { data: threats, isLoading: threatsLoading } = useThreatLogs();
   const datasetsQuery = useDatasets(session.is_platform_admin);
   const runPipelineMutation = useRunPipeline();

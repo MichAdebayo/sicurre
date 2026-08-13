@@ -88,6 +88,23 @@ export interface ThreatLog {
   content_redacted: boolean;
 }
 
+export interface ThreatPage {
+  items: ThreatLog[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+}
+
+export interface ThreatQuery {
+  page?: number;
+  pageSize?: number;
+  verdict?: "all" | "phishing" | "spam" | "legitimate";
+  dateRange?: "all" | "today" | "7d" | "month" | "last_month";
+  search?: string;
+  hidden?: boolean;
+}
+
 export interface FeedbackPayload {
   event_id?: string;
   feedback_type: "false_negative" | "false_positive" | "true_positive" | "true_negative";
@@ -142,6 +159,14 @@ export interface AdminOverview {
     status: string;
     created_at: string;
   }[];
+}
+
+export interface AdminDomainPage {
+  items: AdminOverview["cloudflare_domains"];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
 }
 
 export interface AdminRuntimeHealth {
@@ -412,11 +437,29 @@ export function useChangePassword() {
   });
 }
 
-export function useKPIStats() {
+function readCachedKpis(workspaceId: string): KPIStats | undefined {
+  if (!workspaceId || typeof window === "undefined") return undefined;
+  try {
+    const raw = window.sessionStorage.getItem(`sicurre:kpis:${workspaceId}`);
+    return raw ? (JSON.parse(raw) as KPIStats) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function useKPIStats(workspaceId = "current") {
   return useQuery<KPIStats>({
-    queryKey: ["kpis"],
-    queryFn: () => fetchJson<KPIStats>("/stats/kpi"),
-    refetchInterval: 10000,
+    queryKey: ["kpis", workspaceId],
+    queryFn: async () => {
+      const data = await fetchJson<KPIStats>("/stats/kpi");
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(`sicurre:kpis:${workspaceId}`, JSON.stringify(data));
+      }
+      return data;
+    },
+    initialData: () => readCachedKpis(workspaceId),
+    refetchInterval: 60000,
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -424,7 +467,19 @@ export function useAdminOverview() {
   return useQuery<AdminOverview>({
     queryKey: ["admin-overview"],
     queryFn: () => fetchJson<AdminOverview>("/admin/overview"),
-    refetchInterval: 15000,
+    retry: false,
+    refetchInterval: (query) => query.state.status === "error" ? false : 60000,
+    refetchIntervalInBackground: false,
+  });
+}
+
+export function useAdminDomains(page: number, search: string, enabled = true) {
+  const params = new URLSearchParams({ page: String(page), page_size: "20", search });
+  return useQuery<AdminDomainPage>({
+    queryKey: ["admin-domains", page, search],
+    queryFn: () => fetchJson<AdminDomainPage>(`/admin/domains?${params.toString()}`),
+    enabled,
+    placeholderData: (previous) => previous,
   });
 }
 
@@ -433,7 +488,9 @@ export function useAdminRuntimeHealth(enabled = true) {
     queryKey: ["admin-runtime-health"],
     queryFn: () => fetchJson<AdminRuntimeHealth>("/admin/runtime-health"),
     enabled,
-    refetchInterval: 30000,
+    retry: false,
+    refetchInterval: (query) => query.state.status === "error" ? false : 60000,
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -442,7 +499,9 @@ export function useOperationalExercises(enabled = true) {
     queryKey: ["admin-operational-exercises"],
     queryFn: () => fetchJson<OperationalExerciseState>("/admin/operational-exercises"),
     enabled,
-    refetchInterval: 15000,
+    retry: false,
+    refetchInterval: (query) => query.state.status === "error" ? false : 60000,
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -469,11 +528,43 @@ export function useRecoverOperationalExercise() {
   });
 }
 
+export function useThreatPage(query: ThreatQuery = {}) {
+  const params = new URLSearchParams({
+    page: String(query.page ?? 1),
+    page_size: String(query.pageSize ?? 10),
+    verdict: query.verdict ?? "all",
+    date_range: query.dateRange ?? "all",
+    search: query.search ?? "",
+    hidden: String(query.hidden ?? false),
+  });
+  return useQuery<ThreatPage>({
+    queryKey: ["threats", query],
+    queryFn: () => fetchJson<ThreatPage>(`/threats?${params.toString()}`),
+    placeholderData: (previous) => previous,
+    refetchInterval: 30000,
+    refetchIntervalInBackground: false,
+  });
+}
+
 export function useThreatLogs() {
   return useQuery<ThreatLog[]>({
-    queryKey: ["threats"],
-    queryFn: () => fetchJson<ThreatLog[]>("/threats"),
-    refetchInterval: 10000,
+    queryKey: ["threats", "recent"],
+    queryFn: async () => (await fetchJson<ThreatPage>("/threats?page=1&page_size=100&date_range=all")).items,
+    placeholderData: (previous) => previous,
+    refetchInterval: 30000,
+    refetchIntervalInBackground: false,
+  });
+}
+
+export function useSetThreatVisibility() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { ids: string[]; hidden: boolean }) =>
+      fetchJson<{ updated: number; hidden: boolean }>("/threats/visibility", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["threats"] }),
   });
 }
 
@@ -792,7 +883,8 @@ export function useAlertHistory() {
   return useQuery<AlertHistoryItem[]>({
     queryKey: ["alert-history"],
     queryFn: () => fetchJson<AlertHistoryItem[]>("/alerts/history"),
-    refetchInterval: 10000,
+    refetchInterval: 60000,
+    refetchIntervalInBackground: false,
   });
 }
 

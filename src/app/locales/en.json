@@ -91,9 +91,37 @@
     "checklist_threats_active": "Unresolved threat alerts in threat log",
     "all_clear": "All configurations are optimal! Shield is green."
   },
+  "admin": {
+    "title": "Admin console",
+    "subtitle": "A concise view of customer workspaces, operations, integrations and review queues.",
+    "refresh": "Refresh",
+    "views_label": "Console views",
+    "views": { "overview": "Overview", "operations": "Operations", "integrations": "Integrations", "reviews": "Review queues" },
+    "unknown": "Unknown",
+    "status": "Status",
+    "load_error": "Unable to load the admin console.",
+    "load_error_help": "Check your administrator session and try again.",
+    "refresh_error": "Refresh unavailable. The last known state remains visible.",
+    "health": {
+      "technical_detail": "Technical detail",
+      "messages": { "ok": "Check passed.", "degraded": "Partial check; monitoring required.", "down": "Check failed; action required.", "unknown": "Status not determined." },
+      "components": {
+        "inference_api": "Inference API", "public_app_api": "Sicurre API", "public_app_health": "Application health",
+        "email_scan_gateway": "Email scan gateway", "cloudflare_worker": "Cloudflare Worker", "cloudflare_worker_binding": "Worker binding",
+        "cloudflare_routing_rule": "Routing rule", "cloudflare_email_sending": "Cloudflare email sending", "quarantine_storage": "Quarantine storage"
+      }
+    },
+    "values": {
+      "legitimate": "legitimate", "spam": "spam", "phishing": "phishing", "quarantine": "quarantine",
+      "active": "active", "error": "error", "pending": "pending", "held": "held", "restored": "restored",
+      "false_negative": "false negative", "false_positive": "false positive", "true_positive": "true positive", "true_negative": "true negative",
+      "incident": "incident", "dns": "DNS", "billing": "billing", "feedback": "user feedback", "other": "other", "open": "open", "closed": "closed"
+    }
+  },
   "threats": {
     "title": "Threat Log",
     "subtitle": "History of classifications and remediation actions.",
+    "range_all": "All history",
     "range_today": "Today",
     "range_7d": "Last 7 days",
     "range_month": "This month",
@@ -146,6 +174,15 @@
     "report_missed_description": "Forward the message to {{address}} so it can be reported with the evidence needed for analysis.",
     "copy_address": "Copy address",
     "report_address_copied": "Address copied.",
+    "show_hidden": "Hidden items",
+    "show_visible": "Back to threat log",
+    "hide_selected": "Hide from my workspace",
+    "restore_selected": "Restore to my workspace",
+    "hide_success": "Items hidden.",
+    "restore_success": "Items restored.",
+    "selected_count": "{{count}} item(s) selected",
+    "select_page": "Select this page",
+    "select_item": "Select {{reference}}",
     "safe_preview": "Safe Preview",
     "reasoning": "Reasoning",
     "mark_safe": "Mark as Safe",

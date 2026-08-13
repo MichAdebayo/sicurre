@@ -459,6 +459,10 @@ div[data-baseweb="tab-highlight"] {
   background: transparent !important;
   border: none !important;
 }
+[data-testid="stSidebarCollapseButton"] [data-testid="stIconMaterial"],
+[data-testid="stSidebarCollapsedControl"] [data-testid="stIconMaterial"] {
+  color: var(--text-2) !important;
+}
 [data-testid="stSidebarCollapseButton"] button:hover {
   color: var(--accent) !important;
 }
@@ -874,6 +878,12 @@ div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid=
 [data-testid="stSidebarCollapsedControl"] button:hover [data-testid="stIconMaterial"],
 [data-testid="stSidebarCollapsedControl"] button:focus [data-testid="stIconMaterial"] {
   color: #FFFFFF !important;
+}
+
+/* Local development file-watch state is tooling chrome, not product copy. */
+[data-testid="stStatusWidget"],
+[data-testid="stConnectionStatus"] {
+  display: none !important;
 }
 
 /* ── Sidebar flex bottom push ─────────────────────────── */

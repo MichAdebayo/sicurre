@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import { SidebarPage } from "./sidebar";
 import {
-  useThreatLogs,
   useCloudflareList,
   useDomainShieldStatus,
   useQuarantineItems,
@@ -69,7 +68,6 @@ export function TopBar({
   };
 
   // Load real-time workspace data to build dynamic actionable notifications
-  const { data: threats } = useThreatLogs();
   const { data: domains } = useCloudflareList();
   const { data: quarantineItems } = useQuarantineItems();
   const { data: alertHistory } = useAlertHistory();
@@ -124,21 +122,6 @@ export function TopBar({
     : [];
   notificationsList.push(...recentAlertHistory);
 
-  // 1. Phishing alerts
-  const activePhishing = threats?.filter(t => t.verdict === "phishing" && t.status === "active") || [];
-  if (!onboardingRequired && recentAlertHistory.length === 0 && activePhishing.length > 0) {
-    const latest = activePhishing[0];
-    notificationsList.push({
-      id: "phish_blocked_" + latest.id,
-      title: t("topbar.phishing_blocked"),
-      desc: t("topbar.phishing_blocked_desc"),
-      time: timeSince(latest.received_at),
-      category: "Critical" as const,
-      page: "threats" as const,
-      unread: true,
-    });
-  }
-
   // 2. SSL Expiry Alert
   if (!onboardingRequired && shieldStatus && shieldStatus.ssl.valid && shieldStatus.ssl.days_remaining < 30) {
     notificationsList.push({
@@ -172,7 +155,6 @@ export function TopBar({
   if (
     !onboardingRequired
     && recentAlertHistory.length === 0
-    && activePhishing.length === 0
     && quarantineItems
     && quarantineItems.length > 0
   ) {
