@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     auth_dev_bearer_tokens: str = "dev-token,dev-rate-limit"
     better_auth_base_url: str | None = "http://127.0.0.1:3005"
     better_auth_session_path: str = "/api/auth/get-session"
-    better_auth_timeout_seconds: float = 5.0
+    better_auth_timeout_seconds: float = 12.0
     better_auth_cookie_name: str = "better-auth.session_token"
     better_auth_schema: str = "auth"
     platform_admin_emails: str = ""

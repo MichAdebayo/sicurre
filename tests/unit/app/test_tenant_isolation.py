@@ -65,6 +65,16 @@ USER_B = AuthUser(
     is_platform_admin=False,
 )
 
+PLATFORM_ADMIN = AuthUser(
+    id="platform-admin",
+    email="admin@sicurre.com",
+    display_name="Admin",
+    role="admin",
+    workspace_id="admin-workspace",
+    workspace_name="Sicurre",
+    is_platform_admin=True,
+)
+
 
 def _tracking_query(
     rows_for_workspace: dict[str, list[dict[str, Any]]],
@@ -133,8 +143,100 @@ async def test_threats_are_workspace_scoped(monkeypatch: pytest.MonkeyPatch) -> 
 
     result = await get_threats(USER_A)
 
-    assert result == [], "User A must not see threats belonging to workspace-2"
+    assert result["items"] == [], "User A must not see threats belonging to workspace-2"
+    assert result["total"] == 0
     assert all("workspace-1" in params for _, params in captured)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("kwargs", "expected_fragment", "expected_parameter"),
+    [
+        ({"verdict": "phishing"}, "IN ('phishing', 'quarantine')", None),
+        ({"verdict": "spam"}, "= ?", "spam"),
+        ({"date_range": "today"}, "created_at >= ?", None),
+        ({"date_range": "7d"}, "created_at >= ?", None),
+        ({"date_range": "month"}, "created_at >= ?", None),
+        ({"date_range": "last_month"}, "created_at < ?", None),
+        ({"search": "MSG-ABC"}, "LOWER(COALESCE(subject", "%msg-abc%"),
+    ],
+)
+async def test_threat_filters_build_bounded_workspace_queries(
+    monkeypatch: pytest.MonkeyPatch,
+    kwargs: dict[str, str],
+    expected_fragment: str,
+    expected_parameter: str | None,
+) -> None:
+    captured: list[tuple[str, tuple[Any, ...]]] = []
+
+    async def query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        captured.append((sql, params))
+        return [{"total": 0}] if "COUNT(*)" in sql else []
+
+    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+
+    result = await get_threats(USER_A, page=0, page_size=500, **kwargs)
+
+    assert result["page"] == 1
+    assert result["page_size"] == 100
+    assert expected_fragment in captured[0][0]
+    assert USER_A.workspace_id in captured[0][1]
+    if expected_parameter:
+        assert expected_parameter in captured[0][1]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("kwargs", "detail"),
+    [
+        ({"verdict": "unsafe"}, "Invalid verdict filter"),
+        ({"date_range": "year"}, "Invalid date filter"),
+    ],
+)
+async def test_threat_filters_reject_unknown_values(
+    kwargs: dict[str, str], detail: str
+) -> None:
+    with pytest.raises(HTTPException) as exc_info:
+        await get_threats(USER_A, **kwargs)
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == detail
+
+
+@pytest.mark.asyncio
+async def test_threat_visibility_is_workspace_scoped(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Bulk hiding verifies ownership before updating any audit row."""
+    captured: list[tuple[str, tuple[Any, ...]]] = []
+
+    async def query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        captured.append((sql, params))
+        if sql.strip().startswith("SELECT id"):
+            return [{"id": "event-1"}]
+        return []
+
+    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+    result = await app_routes.update_threat_visibility(
+        app_routes.ThreatVisibilityUpdate(ids=["event-1"], hidden=True), USER_A
+    )
+
+    assert result == {"updated": 1, "hidden": True}
+    assert USER_A.workspace_id in captured[-1][1]
+    assert "is_deleted = ?" in captured[-1][0]
+
+
+@pytest.mark.asyncio
+async def test_threat_visibility_rejects_foreign_rows(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A missing workspace-owned row aborts the entire visibility update."""
+
+    async def query(*_: object, **__: object) -> list[dict[str, Any]]:
+        return []
+
+    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+    with pytest.raises(app_routes.HTTPException) as exc_info:
+        await app_routes.update_threat_visibility(
+            app_routes.ThreatVisibilityUpdate(ids=["foreign-event"], hidden=True), USER_A
+        )
+    assert exc_info.value.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -564,6 +666,47 @@ async def test_admin_overview_rejects_customer() -> None:
         await get_admin_overview(USER_A)
 
     assert exc_info.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_admin_domain_inventory_rejects_customer() -> None:
+    """GET /v1/admin/domains rejects non-admin users."""
+    with pytest.raises(HTTPException) as exc_info:
+        await app_routes.get_admin_domains(USER_A)
+
+    assert exc_info.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_admin_domain_inventory_is_searchable_and_bounded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    async def count(sql: str, params: tuple[Any, ...] = ()) -> int:
+        captured["count"] = (sql, params)
+        return 25
+
+    async def rows(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        captured["rows"] = (sql, params)
+        return [{"zone_name": "vinse.app", "status": "active"}]
+
+    monkeypatch.setattr(app_routes, "_admin_count", count)
+    monkeypatch.setattr(app_routes, "_admin_rows", rows)
+
+    result = await app_routes.get_admin_domains(
+        PLATFORM_ADMIN, page=0, page_size=500, search=" VINSE "
+    )
+
+    assert result == {
+        "items": [{"zone_name": "vinse.app", "status": "active"}],
+        "page": 1,
+        "page_size": 100,
+        "total": 25,
+        "pages": 1,
+    }
+    assert captured["count"][1] == ("%vinse%", "%vinse%")
+    assert captured["rows"][1] == ("%vinse%", "%vinse%", 100, 0)
 
 
 # ── Extra User-Scoped Isolation Tests ─────────────────────────────────────────

@@ -162,7 +162,13 @@ div[data-testid="stFormSubmitButton"] button:active * { color: var(--cta-text) !
 }
 
 /* Forced dark: collapsible sidebar button */
-[data-testid="stSidebarCollapseButton"] button svg { fill: #FFFFFF !important; color: #FFFFFF !important; }
+[data-testid="stSidebarCollapseButton"] button svg,
+[data-testid="stSidebarCollapsedControl"] button svg,
+[data-testid="stSidebarCollapseButton"] [data-testid="stIconMaterial"],
+[data-testid="stSidebarCollapsedControl"] [data-testid="stIconMaterial"] {
+  fill: #FFFFFF !important;
+  color: #FFFFFF !important;
+}
 [data-testid="stSidebarCollapseButton"] button:hover svg { fill: var(--accent) !important; color: var(--accent) !important; }
 
 /* Forced dark: password reveal eye icon */
