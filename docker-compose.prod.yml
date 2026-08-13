@@ -17,6 +17,7 @@ services:
       SICURRE_ENVIRONMENT: production
       SICURRE_AUTH_ENABLED: "true"
       SICURRE_BETTER_AUTH_BASE_URL: http://auth-service:3005
+      SICURRE_BETTER_AUTH_TIMEOUT_SECONDS: "12"
       SICURRE_INFERENCE_API_URL: http://inference.sicurre.internal:8000/v1/classify
       SICURRE_INTERNAL_APP_PROBE_URL: http://sicurre-app:5173
       SICURRE_TELEMETRY_TRACES_ENABLED: "true"

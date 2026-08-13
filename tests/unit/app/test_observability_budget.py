@@ -48,6 +48,18 @@ def test_application_error_rate_does_not_retain_a_stale_incident() -> None:
     assert panel["targets"][0]["expr"].endswith("or vector(0)")
 
 
+def test_gateway_error_alert_requires_meaningful_customer_traffic() -> None:
+    """Prevent sparse probes and one-off failures from paging operations."""
+    alerts = json.loads(ALERT_RULES.read_text(encoding="utf-8"))
+    rule = next(rule for rule in alerts["rules"] if rule["uid"] == "sicurre-elevated-5xx")
+
+    assert 'route=~"app|api|auth"' in rule["expression"]
+    assert "[15m]" in rule["expression"]
+    assert ">= 5" in rule["expression"]
+    assert ">= 20" in rule["expression"]
+    assert rule["for"] == "10m"
+
+
 def test_shared_active_series_budget_is_visible_and_alerted() -> None:
     """Keep the shared Grafana free-tier budget observable before exhaustion."""
     dashboard = json.loads(TELEMETRY_DASHBOARD.read_text(encoding="utf-8"))

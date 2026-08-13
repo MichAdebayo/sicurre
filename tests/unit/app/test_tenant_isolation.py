@@ -133,8 +133,45 @@ async def test_threats_are_workspace_scoped(monkeypatch: pytest.MonkeyPatch) -> 
 
     result = await get_threats(USER_A)
 
-    assert result == [], "User A must not see threats belonging to workspace-2"
+    assert result["items"] == [], "User A must not see threats belonging to workspace-2"
+    assert result["total"] == 0
     assert all("workspace-1" in params for _, params in captured)
+
+
+@pytest.mark.asyncio
+async def test_threat_visibility_is_workspace_scoped(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Bulk hiding verifies ownership before updating any audit row."""
+    captured: list[tuple[str, tuple[Any, ...]]] = []
+
+    async def query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        captured.append((sql, params))
+        if sql.strip().startswith("SELECT id"):
+            return [{"id": "event-1"}]
+        return []
+
+    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+    result = await app_routes.update_threat_visibility(
+        app_routes.ThreatVisibilityUpdate(ids=["event-1"], hidden=True), USER_A
+    )
+
+    assert result == {"updated": 1, "hidden": True}
+    assert USER_A.workspace_id in captured[-1][1]
+    assert "is_deleted = ?" in captured[-1][0]
+
+
+@pytest.mark.asyncio
+async def test_threat_visibility_rejects_foreign_rows(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A missing workspace-owned row aborts the entire visibility update."""
+
+    async def query(*_: object, **__: object) -> list[dict[str, Any]]:
+        return []
+
+    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+    with pytest.raises(app_routes.HTTPException) as exc_info:
+        await app_routes.update_threat_visibility(
+            app_routes.ThreatVisibilityUpdate(ids=["foreign-event"], hidden=True), USER_A
+        )
+    assert exc_info.value.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -562,6 +599,15 @@ async def test_admin_overview_rejects_customer() -> None:
 
     with pytest.raises(HTTPException) as exc_info:
         await get_admin_overview(USER_A)
+
+    assert exc_info.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_admin_domain_inventory_rejects_customer() -> None:
+    """GET /v1/admin/domains rejects non-admin users."""
+    with pytest.raises(HTTPException) as exc_info:
+        await app_routes.get_admin_domains(USER_A)
 
     assert exc_info.value.status_code == 403
 
