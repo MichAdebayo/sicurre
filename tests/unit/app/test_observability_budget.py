@@ -5,6 +5,16 @@ from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 ALLOY_CONFIG = REPOSITORY_ROOT / "deploy/alloy/config.alloy"
+PRODUCTION_COMPOSE = REPOSITORY_ROOT / "docker-compose.prod.yml"
+
+# Metric groups the infrastructure dashboards actually consume. Everything else
+# cAdvisor can emit is disabled at the source.
+RETAINED_CADVISOR_METRIC_GROUPS = {"cpu", "memory", "network", "oom_event"}
+DISABLEABLE_CADVISOR_METRIC_GROUPS = {
+    "advtcp", "app", "cpu", "cpuLoad", "cpu_topology", "cpuset", "disk", "diskIO",
+    "hugetlb", "memory", "memory_numa", "network", "oom_event", "percpu",
+    "perf_event", "process", "referenced_memory", "resctrl", "sched", "tcp", "udp",
+}
 INFRASTRUCTURE_DASHBOARD = (
     REPOSITORY_ROOT / "deploy/grafana/dashboards/sicurre-infrastructure.json"
 )
@@ -75,3 +85,49 @@ def test_shared_active_series_budget_is_visible_and_alerted() -> None:
     assert "100 * sum(prometheus_remote_write_wal_storage_active_series) / 10000" in expressions
     assert rules["sicurre-series-budget-warning"]["threshold"] == 7000
     assert rules["sicurre-series-budget-critical"]["threshold"] == 8500
+
+
+def _cadvisor_command() -> list[str]:
+    """Return the cAdvisor command arguments from the production Compose file."""
+    compose = PRODUCTION_COMPOSE.read_text(encoding="utf-8")
+    block = compose.split("\n  cadvisor:\n", maxsplit=1)[1]
+    return [
+        line.strip().removeprefix("- ")
+        for line in block.split("\n    devices:", maxsplit=1)[0].splitlines()
+        if line.strip().startswith("- --")
+    ]
+
+
+def test_cadvisor_disables_every_metric_group_the_dashboards_do_not_use() -> None:
+    """Bound cardinality at the source, not only in the Alloy relabel filter."""
+    disable_flag = next(
+        arg for arg in _cadvisor_command() if arg.startswith("--disable_metrics=")
+    )
+    disabled = set(disable_flag.split("=", maxsplit=1)[1].split(","))
+
+    # Only real cAdvisor metric groups; an invalid value crashloops the container.
+    assert disabled <= DISABLEABLE_CADVISOR_METRIC_GROUPS
+    assert disabled == DISABLEABLE_CADVISOR_METRIC_GROUPS - RETAINED_CADVISOR_METRIC_GROUPS
+
+
+def test_cadvisor_reports_docker_containers_only() -> None:
+    """Raw system cgroups on the shared host are not Sicurre's to observe."""
+    assert "--docker_only=true" in _cadvisor_command()
+
+
+def test_cadvisor_keeps_the_container_labels_the_alloy_filter_depends_on() -> None:
+    """Guard the interlock between the two configuration files.
+
+    The Alloy relabel rule keeps container series by matching the Compose
+    project label. Suppressing container labels at the source would make that
+    rule match nothing and silently remove every container panel from the
+    infrastructure dashboard. It would also save no cardinality, because those
+    are labels on existing series and Alloy already drops them before remote
+    write. Disabling them is therefore pure downside.
+    """
+    command = _cadvisor_command()
+    assert not any(arg.startswith("--store_container_labels=false") for arg in command)
+
+    alloy = ALLOY_CONFIG.read_text(encoding="utf-8")
+    assert "container_label_com_docker_compose_project" in alloy
+    assert 'regex  = "container_label_.*|id|image"' in alloy
