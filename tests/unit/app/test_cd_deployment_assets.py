@@ -18,3 +18,34 @@ def test_cd_copies_every_declared_deployment_asset() -> None:
 
     assert not missing, f"CD references missing deployment assets: {missing}"
     assert "deploy/grafana/alerts/sicurre-alerts.json" in deployment_assets
+
+
+def test_cd_transfers_every_module_the_provisioning_script_imports() -> None:
+    """Close the converse gap: declared assets exist, but are they sufficient?
+
+    The existing check proves every declared asset is present in the
+    repository. It cannot catch the opposite failure, where a script gains a
+    local import that the explicit SCP bundle never transfers. That deploys
+    cleanly and then dies with ERR_MODULE_NOT_FOUND on the host, which is the
+    same class of defect as the omitted Grafana alert bundle.
+    """
+    workflow = CD_WORKFLOW.read_text(encoding="utf-8")
+    match = re.search(r'^\s+source: "([^"]+)"$', workflow, flags=re.MULTILINE)
+    assert match is not None
+    deployment_assets = set(match.group(1).split(","))
+
+    script_assets = [
+        asset for asset in deployment_assets
+        if asset.startswith("scripts/") and asset.endswith(".mjs")
+    ]
+    assert script_assets, "No provisioning scripts are transferred by CD"
+
+    for asset in script_assets:
+        source = (REPOSITORY_ROOT / asset).read_text(encoding="utf-8")
+        relative_imports = re.findall(r'^import .*? from "(\.[^"]+)";', source, flags=re.MULTILINE)
+        for relative_import in relative_imports:
+            resolved = (REPOSITORY_ROOT / asset).parent / relative_import
+            required = resolved.resolve().relative_to(REPOSITORY_ROOT).as_posix()
+            assert required in deployment_assets, (
+                f"{asset} imports {required}, which CD does not transfer"
+            )
