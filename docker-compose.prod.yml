@@ -151,8 +151,20 @@ services:
     restart: unless-stopped
     privileged: true
     command:
-      # Docker 29's containerd image store has no legacy layerdb metadata.
-      - --disable_metrics=disk
+      # Bound cardinality at the source rather than relying only on the Alloy
+      # relabel filter. cAdvisor otherwise exposes ~10k series per scrape for
+      # every workload on the shared host, of which the dashboards use four
+      # families. Keep cpu, memory, network, and oom_event; drop the rest.
+      # Docker 29's containerd image store also has no legacy layerdb metadata,
+      # which is why disk/diskIO stay disabled.
+      - --disable_metrics=advtcp,app,cpuLoad,cpu_topology,cpuset,disk,diskIO,hugetlb,memory_numa,percpu,perf_event,process,referenced_memory,resctrl,sched,tcp,udp
+      # Report Docker containers only, not raw system cgroups.
+      - --docker_only=true
+      # Deliberately NOT setting --store_container_labels=false. Those are
+      # labels on existing series rather than extra series, and Alloy already
+      # drops them before remote write, so suppressing them saves no
+      # cardinality. It would however remove the Compose project label that the
+      # Alloy keep rule matches on, silently discarding every container series.
     devices:
       - /dev/kmsg:/dev/kmsg
     volumes:
