@@ -2,6 +2,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { TransientError, isRetryableStatus, withRetry } from "./retry.mjs";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "../..");
 
@@ -25,27 +27,75 @@ const dashboardPaths = process.env.GRAFANA_DASHBOARD_PATH
 const alertingPath = process.env.GRAFANA_ALERTING_PATH
   || path.join(rootDir, "deploy/grafana/alerts/sicurre-alerts.json");
 
+// A suspended free-tier instance answers 503 while it wakes. Six attempts with
+// capped exponential backoff wait roughly 90s before giving up.
+const retryMaxAttempts = Number(process.env.GRAFANA_PROVISION_MAX_ATTEMPTS || 6);
+const retryBaseMs = Number(process.env.GRAFANA_PROVISION_RETRY_BASE_MS || 2000);
+const retryMaxMs = Number(process.env.GRAFANA_PROVISION_RETRY_MAX_MS || 30000);
+
 if (!grafanaUrl || !token) {
   console.error("GRAFANA_URL and GRAFANA_SERVICE_ACCOUNT_TOKEN are required.");
   process.exit(1);
 }
 
-async function grafanaFetch(endpoint, options = {}) {
-  const response = await fetch(`${grafanaUrl}${endpoint}`, {
-    ...options,
-    headers: {
-      "Authorization": `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-  });
-
-  const text = await response.text();
-  const body = text ? JSON.parse(text) : {};
-  if (!response.ok && response.status !== 412) {
-    throw new Error(`${options.method || "GET"} ${endpoint} failed: ${response.status} ${text}`);
+function parseBody(text) {
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    // A gateway or a waking instance can answer with HTML. Keep the raw text so
+    // the surfaced error describes the real failure instead of a parse error.
+    return { raw: text };
   }
-  return { status: response.status, body };
+}
+
+async function grafanaFetch(endpoint, options = {}) {
+  const method = options.method || "GET";
+
+  return withRetry(
+    async () => {
+      let response;
+      try {
+        response = await fetch(`${grafanaUrl}${endpoint}`, {
+          ...options,
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json",
+            ...(options.headers || {}),
+          },
+        });
+      } catch (error) {
+        // DNS, connection reset, and timeouts are worth repeating.
+        throw new TransientError(`${method} ${endpoint} failed: ${error.message}`, {
+          cause: error,
+        });
+      }
+
+      const text = await response.text();
+      const body = parseBody(text);
+      if (response.ok || response.status === 412) {
+        return { status: response.status, body };
+      }
+
+      const message = `${method} ${endpoint} failed: ${response.status} ${text}`;
+      if (isRetryableStatus(response.status)) {
+        throw new TransientError(message, { status: response.status });
+      }
+      throw new Error(message);
+    },
+    {
+      maxAttempts: retryMaxAttempts,
+      baseMs: retryBaseMs,
+      maxMs: retryMaxMs,
+      onRetry: ({ attempt, maxAttempts, delayMs, error }) => {
+        const wait = delayMs >= 1000 ? `${Math.round(delayMs / 1000)}s` : `${delayMs}ms`;
+        console.warn(
+          `Grafana call not ready (attempt ${attempt}/${maxAttempts}), `
+            + `retrying in ${wait}: ${error.message}`,
+        );
+      },
+    },
+  );
 }
 
 async function ensureContactPoint(contactPoint) {
