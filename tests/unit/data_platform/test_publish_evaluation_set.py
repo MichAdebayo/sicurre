@@ -68,7 +68,7 @@ async def test_publish_evaluation_set_stores_and_registers_manifest(
             return None
 
     register = AsyncMock()
-    monkeypatch.setattr(command, "build_snapshot_store", lambda **_: store)
+    monkeypatch.setattr(command, "build_evaluation_set_store", lambda **_: store)
     monkeypatch.setattr(command, "AsyncSessionFactory", lambda: SessionContext())
     monkeypatch.setattr(command, "register_evaluation_set", register)
     args = Namespace(
@@ -134,3 +134,59 @@ def test_publish_cli_parses_and_prints_registration(
     command.main()
     assert '"version_tag": "golden-v1"' in capsys.readouterr().out
     publish.assert_awaited_once()
+
+
+class _EvalSettings:
+    """Minimal settings stub: avoids clearing the shared get_settings cache."""
+
+    def __init__(self, **overrides: object) -> None:
+        self.raw_snapshot_storage_backend = "r2"
+        self.evaluation_set_r2_bucket_name = "sicurre-golden-evaluation-dataset"
+        self.evaluation_set_r2_endpoint_url = "https://r2.test"
+        self.evaluation_set_r2_access_key_id = "key"
+        self.evaluation_set_r2_secret_access_key = "secret"
+        self.evaluation_set_r2_region = "auto"
+        self.raw_snapshot_r2_bucket_name = "sicurre-raw"
+        for name, value in overrides.items():
+            setattr(self, name, value)
+
+
+def test_evaluation_store_addresses_the_dedicated_bucket(monkeypatch, tmp_path) -> None:
+    """The published URI must name the bucket Sicurre-ML actually reads.
+
+    The shared snapshot store resolves every R2 backend to the raw ingestion
+    bucket, so publishing through it wrote the golden set to `sicurre-raw`
+    while the ML repository read from `sicurre-golden-evaluation-dataset`. The
+    publish reported success and registered an object_uri nothing could fetch.
+    """
+    from data_platform.services.shared import snapshot_storage
+
+    monkeypatch.setattr(snapshot_storage, "get_settings", lambda: _EvalSettings())
+
+    store = snapshot_storage.build_evaluation_set_store(
+        local_root_dir=tmp_path, repo_root=tmp_path, backend="r2"
+    )
+
+    assert store.bucket_name == "sicurre-golden-evaluation-dataset"
+    assert store.bucket_name != "sicurre-raw"
+    # The raw prefix must not be applied: the contract path is
+    # evaluation_sets/<version>/golden.jsonl at the bucket root.
+    assert store.root_prefix == ""
+
+
+def test_evaluation_publish_refuses_to_fall_back_to_the_raw_bucket(
+    monkeypatch, tmp_path
+) -> None:
+    """A missing evaluation bucket must fail loudly, not silently reuse raw."""
+    from data_platform.services.shared import snapshot_storage
+
+    monkeypatch.setattr(
+        snapshot_storage,
+        "get_settings",
+        lambda: _EvalSettings(evaluation_set_r2_bucket_name=None),
+    )
+
+    with pytest.raises(RuntimeError, match="must not fall back to the raw snapshot bucket"):
+        snapshot_storage.build_evaluation_set_store(
+            local_root_dir=tmp_path, repo_root=tmp_path, backend="r2"
+        )
