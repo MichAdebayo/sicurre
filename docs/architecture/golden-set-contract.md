@@ -104,12 +104,21 @@ evaluation bucket with checksum
 
 ### Why the block was added
 
-Version one is a business-email-compromise corpus: supplier fraud, IBAN
-substitution, président fraud and e-signature lures. That focus is right for
-TPEs, but the word `impot` appeared zero times across all 60 records while the
-DGFiP refund campaign was reaching millions of French households. Auto-entrepreneurs
-file with the DGFiP and pay URSSAF cotisations, so administrative impersonation
-sits squarely in their threat model.
+This set is a promotion gate, not a benchmark, so the reason is regression
+detection rather than representativeness. Version one could compare a candidate
+against the incumbent on business email compromise — supplier fraud, IBAN
+substitution, président fraud, e-signature lures — and on nothing else. A
+candidate that degraded on administrative impersonation would have passed the
+gate unchanged, because the gate contained no record of that decision class.
+
+Administrative impersonation is a decision class the deployed product actually
+takes: auto-entrepreneurs file with the DGFiP and pay URSSAF cotisations, so the
+runtime classifies these messages in production. A gate that cannot fail on a
+decision the product makes cannot protect that decision.
+
+This is a statement about the gate's coverage of decision classes. It is not a
+claim that the corpus mirrors the distribution of French phishing, and the set
+remains explicitly not a representative customer benchmark.
 
 The block covers DGFiP refunds and arrears, URSSAF cotisations, CPAM/ameli, ANTAI
 fines, parcel delivery and customs, CPF, France Travail, professional VAT,
@@ -126,12 +135,33 @@ counts must be equal, so aggregate metrics cannot move through composition alone
 and no class may fall below its version-one floor. The set may grow, but it may
 not become unbalanced or lose coverage.
 
+### What this set must not be used for
+
+The gate's value is its independence. It may be used only to compare a candidate
+model against the incumbent, as described under promotion below.
+
+It must not be used to tune runtime configuration: fusion stage weights, LLM
+provider order or model tier, thresholds, or quantization settings. Those are
+service configuration, not model candidates, and iterating any of them against
+these 84 records fits the configuration to the gate. The gate then stops being an
+independent signal precisely when a genuine regression needs catching.
+
+Runtime configuration is measured against the training dataset's own `test` and
+`holdout` splits, or against a disposable benchmark built for that purpose. Those
+may be iterated against freely because nothing depends on their independence.
+
 ### Known gaps
 
-Median body length remains ~420 characters and every record is plain text. Real
-campaigns carry HTML, footers, disclaimers and tracking markup, so length and
-markup realism remain untested. Review is still single-reviewer, so there is no
-inter-annotator agreement.
+Every record is plain text with a median body of ~420 characters. The runtime
+receives MIME from the Cloudflare Email Worker and canonicalizes HTML before
+classification, so a candidate change affecting that path — display text that
+disagrees with its href, markup-obscured payloads, tracking and footer noise —
+cannot currently fail this gate. That is a coverage gap in the decision classes
+the gate can detect, and is the intended subject of a later version.
+
+Review is single-reviewer, so there is no inter-annotator agreement. The set is
+synthetic and provisional; it demonstrates reproducible candidate-versus-incumbent
+decisions and establishes no real-world performance claim.
 
 ### Publication defect to resolve
 
