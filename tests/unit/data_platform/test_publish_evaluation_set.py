@@ -136,6 +136,21 @@ def test_publish_cli_parses_and_prints_registration(
     publish.assert_awaited_once()
 
 
+class _EvalSettings:
+    """Minimal settings stub: avoids clearing the shared get_settings cache."""
+
+    def __init__(self, **overrides: object) -> None:
+        self.raw_snapshot_storage_backend = "r2"
+        self.evaluation_set_r2_bucket_name = "sicurre-golden-evaluation-dataset"
+        self.evaluation_set_r2_endpoint_url = "https://r2.test"
+        self.evaluation_set_r2_access_key_id = "key"
+        self.evaluation_set_r2_secret_access_key = "secret"
+        self.evaluation_set_r2_region = "auto"
+        self.raw_snapshot_r2_bucket_name = "sicurre-raw"
+        for name, value in overrides.items():
+            setattr(self, name, value)
+
+
 def test_evaluation_store_addresses_the_dedicated_bucket(monkeypatch, tmp_path) -> None:
     """The published URI must name the bucket Sicurre-ML actually reads.
 
@@ -144,17 +159,11 @@ def test_evaluation_store_addresses_the_dedicated_bucket(monkeypatch, tmp_path) 
     while the ML repository read from `sicurre-golden-evaluation-dataset`. The
     publish reported success and registered an object_uri nothing could fetch.
     """
-    from core.config import get_settings
-    from data_platform.services.shared.snapshot_storage import build_evaluation_set_store
+    from data_platform.services.shared import snapshot_storage
 
-    get_settings.cache_clear()
-    monkeypatch.setenv("SICURRE_EVALUATION_SET_R2_BUCKET_NAME", "sicurre-golden-evaluation-dataset")
-    monkeypatch.setenv("SICURRE_EVALUATION_SET_R2_ENDPOINT_URL", "https://r2.test")
-    monkeypatch.setenv("SICURRE_EVALUATION_SET_R2_ACCESS_KEY_ID", "key")
-    monkeypatch.setenv("SICURRE_EVALUATION_SET_R2_SECRET_ACCESS_KEY", "secret")
-    monkeypatch.setenv("SICURRE_RAW_SNAPSHOT_R2_BUCKET_NAME", "sicurre-raw")
+    monkeypatch.setattr(snapshot_storage, "get_settings", lambda: _EvalSettings())
 
-    store = build_evaluation_set_store(
+    store = snapshot_storage.build_evaluation_set_store(
         local_root_dir=tmp_path, repo_root=tmp_path, backend="r2"
     )
 
@@ -163,28 +172,21 @@ def test_evaluation_store_addresses_the_dedicated_bucket(monkeypatch, tmp_path) 
     # The raw prefix must not be applied: the contract path is
     # evaluation_sets/<version>/golden.jsonl at the bucket root.
     assert store.root_prefix == ""
-    get_settings.cache_clear()
 
 
 def test_evaluation_publish_refuses_to_fall_back_to_the_raw_bucket(
     monkeypatch, tmp_path
 ) -> None:
     """A missing evaluation bucket must fail loudly, not silently reuse raw."""
-    from core.config import get_settings
-    from data_platform.services.shared.snapshot_storage import build_evaluation_set_store
+    from data_platform.services.shared import snapshot_storage
 
-    get_settings.cache_clear()
-    for name in (
-        "SICURRE_EVALUATION_SET_R2_BUCKET_NAME",
-        "SICURRE_EVALUATION_SET_R2_ENDPOINT_URL",
-        "SICURRE_EVALUATION_SET_R2_ACCESS_KEY_ID",
-        "SICURRE_EVALUATION_SET_R2_SECRET_ACCESS_KEY",
-    ):
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.setenv("SICURRE_RAW_SNAPSHOT_R2_BUCKET_NAME", "sicurre-raw")
+    monkeypatch.setattr(
+        snapshot_storage,
+        "get_settings",
+        lambda: _EvalSettings(evaluation_set_r2_bucket_name=None),
+    )
 
     with pytest.raises(RuntimeError, match="must not fall back to the raw snapshot bucket"):
-        build_evaluation_set_store(
+        snapshot_storage.build_evaluation_set_store(
             local_root_dir=tmp_path, repo_root=tmp_path, backend="r2"
         )
-    get_settings.cache_clear()
