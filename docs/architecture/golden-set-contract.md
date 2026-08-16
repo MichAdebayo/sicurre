@@ -171,3 +171,45 @@ rather than to the dedicated evaluation bucket this contract specifies. Version 
 was therefore placed in `sicurre-golden-evaluation-dataset` directly after
 validation. The CLI should target the evaluation bucket so publication and
 consumption address the same store.
+
+## Version Three Composition
+
+`golden-20260816-v3` extends version two. All 84 version-two records are carried
+forward with their identifiers and review provenance, and 11 HTML records are
+added: 5 phishing, 5 legitimate and 1 spam.
+
+Composition is 42 phishing, 42 legitimate and 11 spam across 95 French records,
+stored at `evaluation_sets/golden-20260816-v3/golden.jsonl` with checksum
+`6d15f2141cd69d98c9b4ee9b47d505c8aae8505d900fa77705fe0c57b13fb632`.
+
+### Why the block was added
+
+Decision coverage, not realism. The runtime receives MIME from the Cloudflare
+Email Worker and canonicalizes it before classification: `_HTMLTextExtractor`
+lifts `href` from `<a>` and `src` from `<img>` into the security text,
+`_html_to_text` flattens markup, and `html.unescape` resolves entities. Every
+record in versions one and two canonicalizes as `plain`, so a candidate change
+affecting the HTML path could not fail the gate.
+
+The block reaches decisions the plain-text corpus cannot:
+
+- display text that disagrees with its `href`, visible only after extraction;
+- entity-obscured payloads that resolve only after unescaping;
+- tracking pixels, unsubscribe links and table layouts, which the classifier
+  prompt states do not on their own prove a message is unsolicited.
+
+Every fraudulent record is paired with a legitimate record carrying the same
+markup features, so the gate measures the decision rather than the presence of
+HTML. One legitimate record deliberately contains no link at all, since
+directing the reader to an existing bookmark instead of a supplied link is
+itself the discriminating behaviour.
+
+Verified against the runtime canonicalizer: all 11 records report
+`source_format = html`, and each supplied destination reaches the security text
+where URL reputation can act on it.
+
+### Remaining gap
+
+Review is still single-reviewer, so there is no inter-annotator agreement. The
+set remains synthetic and provisional and establishes no real-world performance
+claim.
