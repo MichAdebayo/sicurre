@@ -10,7 +10,16 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-EXPECTED_LABEL_COUNTS = {"phishing": 25, "legitimate": 25, "spam": 10}
+# Version one fixed the composition at exactly 25/25/10. That blocked any
+# growth of the set, which matters because v1 covered business email compromise
+# only and carried no administrative-impersonation records at all.
+#
+# What actually has to hold is the balance, not a magic total: phishing and
+# legitimate must stay equal so aggregate metrics cannot drift through
+# composition alone, and every class must remain represented well enough for a
+# per-class metric to mean something.
+MINIMUM_LABEL_COUNTS = {"phishing": 25, "legitimate": 25, "spam": 10}
+BALANCED_LABELS = ("phishing", "legitimate")
 
 
 class GoldenSetRecord(BaseModel):
@@ -47,11 +56,22 @@ def build_evaluation_asset(records: list[GoldenSetRecord]) -> EvaluationAsset:
         raise ValueError("Golden-set record IDs must be unique")
     label_counts = {
         label: sum(record.expected_label == label for record in records)
-        for label in EXPECTED_LABEL_COUNTS
+        for label in MINIMUM_LABEL_COUNTS
     }
-    if label_counts != EXPECTED_LABEL_COUNTS:
+    below_minimum = {
+        label: count
+        for label, count in label_counts.items()
+        if count < MINIMUM_LABEL_COUNTS[label]
+    }
+    if below_minimum:
         raise ValueError(
-            f"Golden-set label composition must be {EXPECTED_LABEL_COUNTS}, got {label_counts}"
+            f"Golden-set label counts must be at least {MINIMUM_LABEL_COUNTS}, got {label_counts}"
+        )
+    balanced = {label_counts[label] for label in BALANCED_LABELS}
+    if len(balanced) != 1:
+        raise ValueError(
+            "Golden-set phishing and legitimate counts must be equal so aggregate "
+            f"metrics cannot drift through composition alone, got {label_counts}"
         )
     language_counts = {"fr": len(records)}
     lines = [
