@@ -61,6 +61,18 @@ class Settings(BaseSettings):
     raw_snapshot_r2_access_key_id: str | None = None
     raw_snapshot_r2_secret_access_key: str | None = None
     raw_snapshot_r2_region: str = "auto"
+
+    # The golden evaluation set lives in its own bucket, not under the raw
+    # ingestion prefix. That separation is a permission boundary rather than a
+    # naming convention: Sicurre-ML holds credentials scoped to this bucket
+    # alone and read-only, which is what keeps an evaluation-only asset out of
+    # the training lineage store.
+    evaluation_set_prefix: str = "evaluation_sets"
+    evaluation_set_r2_bucket_name: str | None = None
+    evaluation_set_r2_endpoint_url: str | None = None
+    evaluation_set_r2_access_key_id: str | None = None
+    evaluation_set_r2_secret_access_key: str | None = None
+    evaluation_set_r2_region: str = "auto"
     quarantine_storage_backend: str = "local"
     quarantine_local_dir: Path = ROOT_DIR / "data" / "local" / "quarantine"
     quarantine_r2_bucket_name: str | None = None
