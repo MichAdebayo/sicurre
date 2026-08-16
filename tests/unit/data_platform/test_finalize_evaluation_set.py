@@ -103,3 +103,86 @@ def test_finalize_cli_parses_and_prints_checksum(
     command.main()
     assert len(capsys.readouterr().out.strip()) == 64
     assert output.exists()
+
+
+def _reviewed_draft(path: Path, *, drop_field: str | None = None) -> None:
+    """Write a draft of already-reviewed records carried forward from v1."""
+    rows = []
+    for label, count in (("phishing", 25), ("legitimate", 25), ("spam", 10)):
+        for index in range(count):
+            row = {
+                "id": f"golden-{label}-{index}",
+                "subject": f"Objet {index}",
+                "sender": f"sender-{index}@example.test",
+                "text": f"Message français synthétique {label} numéro {index}.",
+                "expected_label": label,
+                "language": "fr",
+                "scenario": "Scénario synthétique revu",
+                "difficulty": "hard",
+                "reviewer_rationale": "Relu lors de la version une.",
+                "reviewed_by": "MichAdebayo",
+                "reviewed_at": "2026-07-19T17:29:21Z",
+                "review_status": "reviewed",
+            }
+            if drop_field:
+                row.pop(drop_field)
+            rows.append(row)
+    path.write_text(
+        "\n".join(json.dumps(row, ensure_ascii=False) for row in rows) + "\n",
+        encoding="utf-8",
+    )
+
+
+def test_carried_forward_records_keep_their_original_review_provenance(
+    tmp_path: Path,
+) -> None:
+    """Restamping would make an eight-week-old review look like it happened today."""
+    draft = tmp_path / "draft.jsonl"
+    output = tmp_path / "golden.jsonl"
+    _reviewed_draft(draft)
+
+    finalize(
+        draft,
+        output,
+        reviewed_by="SomeoneElse",
+        reviewed_at=datetime(2026, 8, 16, 9, 20, tzinfo=UTC),
+    )
+
+    records = load_evaluation_records(output.read_bytes())
+    assert {record.reviewed_by for record in records} == {"MichAdebayo"}
+    assert {record.reviewed_at.date().isoformat() for record in records} == {"2026-07-19"}
+
+
+@pytest.mark.parametrize(
+    "missing_field", ["reviewer_rationale", "reviewed_by", "reviewed_at"]
+)
+def test_reviewed_records_must_carry_complete_provenance(
+    tmp_path: Path, missing_field: str
+) -> None:
+    """A record claiming prior review must prove it."""
+    draft = tmp_path / "draft.jsonl"
+    _reviewed_draft(draft, drop_field=missing_field)
+
+    with pytest.raises(ValueError, match=missing_field):
+        finalize(
+            draft,
+            tmp_path / "golden.jsonl",
+            reviewed_by="MichAdebayo",
+            reviewed_at=datetime(2026, 8, 16, 9, 20, tzinfo=UTC),
+        )
+
+
+def test_unknown_review_status_is_rejected(tmp_path: Path) -> None:
+    """Only explicit pending or reviewed states may enter a published version."""
+    draft = tmp_path / "draft.jsonl"
+    draft.write_text(
+        json.dumps({"id": "golden-x", "review_status": "draft"}) + "\n", encoding="utf-8"
+    )
+
+    with pytest.raises(ValueError, match="not pending review"):
+        finalize(
+            draft,
+            tmp_path / "golden.jsonl",
+            reviewed_by="MichAdebayo",
+            reviewed_at=datetime(2026, 8, 16, 9, 20, tzinfo=UTC),
+        )
