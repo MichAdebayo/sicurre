@@ -163,14 +163,23 @@ Review is single-reviewer, so there is no inter-annotator agreement. The set is
 synthetic and provisional; it demonstrates reproducible candidate-versus-incumbent
 decisions and establishes no real-world performance claim.
 
-### Publication defect to resolve
+### Publication path
 
-`publish_evaluation_set` writes through the shared snapshot store, which resolves
-to the raw-snapshot bucket (`r2://sicurre-raw/raw-snapshots/evaluation_sets/...`)
-rather than to the dedicated evaluation bucket this contract specifies. Version two
-was therefore placed in `sicurre-golden-evaluation-dataset` directly after
-validation. The CLI should target the evaluation bucket so publication and
-consumption address the same store.
+`publish_evaluation_set` addresses the dedicated evaluation bucket through
+`build_evaluation_set_store`, writing to
+`r2://sicurre-golden-evaluation-dataset/evaluation_sets/<version>/golden.jsonl`.
+
+It previously used the shared snapshot store, which resolves every R2 backend to
+the raw ingestion bucket. Publishing therefore wrote to
+`r2://sicurre-raw/raw-snapshots/evaluation_sets/...` while Sicurre-ML read from
+the evaluation bucket: the CLI reported success and registered an `object_uri`
+the consumer could never fetch. Versions two and three were placed by hand while
+that held.
+
+Missing evaluation-bucket settings now raise rather than falling back to the raw
+bucket. The separation is a permission boundary, not a naming convention:
+Sicurre-ML holds credentials scoped to this bucket alone and read-only, which is
+what makes "cannot enter training splits" enforceable rather than conventional.
 
 ## Version Three Composition
 
