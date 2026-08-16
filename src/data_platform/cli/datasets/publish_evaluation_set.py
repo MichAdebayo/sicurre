@@ -14,7 +14,7 @@ from data_platform.services.evaluation_set_asset import (
     load_evaluation_records,
 )
 from data_platform.services.model_provenance import register_evaluation_set
-from data_platform.services.shared.snapshot_storage import build_snapshot_store
+from data_platform.services.shared.snapshot_storage import build_evaluation_set_store
 
 
 def parse_args() -> argparse.Namespace:
@@ -32,10 +32,9 @@ async def publish(args: argparse.Namespace) -> EvaluationSetRegistration:
     """Validate, store, and register one immutable approved version."""
     records = load_evaluation_records(args.input.read_bytes())
     asset = build_evaluation_asset(records)
-    store = build_snapshot_store(
+    store = build_evaluation_set_store(
         local_root_dir=ROOT_DIR / "data" / "local" / "evaluation_sets",
         repo_root=ROOT_DIR,
-        source_key="evaluation_set",
         backend=args.backend,
     )
     object_key = store.build_object_key(

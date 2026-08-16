@@ -68,7 +68,7 @@ async def test_publish_evaluation_set_stores_and_registers_manifest(
             return None
 
     register = AsyncMock()
-    monkeypatch.setattr(command, "build_snapshot_store", lambda **_: store)
+    monkeypatch.setattr(command, "build_evaluation_set_store", lambda **_: store)
     monkeypatch.setattr(command, "AsyncSessionFactory", lambda: SessionContext())
     monkeypatch.setattr(command, "register_evaluation_set", register)
     args = Namespace(
@@ -134,3 +134,57 @@ def test_publish_cli_parses_and_prints_registration(
     command.main()
     assert '"version_tag": "golden-v1"' in capsys.readouterr().out
     publish.assert_awaited_once()
+
+
+def test_evaluation_store_addresses_the_dedicated_bucket(monkeypatch, tmp_path) -> None:
+    """The published URI must name the bucket Sicurre-ML actually reads.
+
+    The shared snapshot store resolves every R2 backend to the raw ingestion
+    bucket, so publishing through it wrote the golden set to `sicurre-raw`
+    while the ML repository read from `sicurre-golden-evaluation-dataset`. The
+    publish reported success and registered an object_uri nothing could fetch.
+    """
+    from core.config import get_settings
+    from data_platform.services.shared.snapshot_storage import build_evaluation_set_store
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("SICURRE_EVALUATION_SET_R2_BUCKET_NAME", "sicurre-golden-evaluation-dataset")
+    monkeypatch.setenv("SICURRE_EVALUATION_SET_R2_ENDPOINT_URL", "https://r2.test")
+    monkeypatch.setenv("SICURRE_EVALUATION_SET_R2_ACCESS_KEY_ID", "key")
+    monkeypatch.setenv("SICURRE_EVALUATION_SET_R2_SECRET_ACCESS_KEY", "secret")
+    monkeypatch.setenv("SICURRE_RAW_SNAPSHOT_R2_BUCKET_NAME", "sicurre-raw")
+
+    store = build_evaluation_set_store(
+        local_root_dir=tmp_path, repo_root=tmp_path, backend="r2"
+    )
+
+    assert store.bucket_name == "sicurre-golden-evaluation-dataset"
+    assert store.bucket_name != "sicurre-raw"
+    # The raw prefix must not be applied: the contract path is
+    # evaluation_sets/<version>/golden.jsonl at the bucket root.
+    assert store.root_prefix == ""
+    get_settings.cache_clear()
+
+
+def test_evaluation_publish_refuses_to_fall_back_to_the_raw_bucket(
+    monkeypatch, tmp_path
+) -> None:
+    """A missing evaluation bucket must fail loudly, not silently reuse raw."""
+    from core.config import get_settings
+    from data_platform.services.shared.snapshot_storage import build_evaluation_set_store
+
+    get_settings.cache_clear()
+    for name in (
+        "SICURRE_EVALUATION_SET_R2_BUCKET_NAME",
+        "SICURRE_EVALUATION_SET_R2_ENDPOINT_URL",
+        "SICURRE_EVALUATION_SET_R2_ACCESS_KEY_ID",
+        "SICURRE_EVALUATION_SET_R2_SECRET_ACCESS_KEY",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("SICURRE_RAW_SNAPSHOT_R2_BUCKET_NAME", "sicurre-raw")
+
+    with pytest.raises(RuntimeError, match="must not fall back to the raw snapshot bucket"):
+        build_evaluation_set_store(
+            local_root_dir=tmp_path, repo_root=tmp_path, backend="r2"
+        )
+    get_settings.cache_clear()
