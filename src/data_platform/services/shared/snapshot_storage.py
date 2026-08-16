@@ -134,6 +134,54 @@ class R2SnapshotStore:
         return normalized
 
 
+def build_evaluation_set_store(
+    *,
+    local_root_dir: Path,
+    repo_root: Path,
+    backend: str | None = None,
+) -> SnapshotStore:
+    """Return a store addressing the dedicated evaluation bucket.
+
+    The shared snapshot store resolves every R2 backend to the raw ingestion
+    bucket, because that is the only destination raw snapshots need. Publishing
+    the golden set through it wrote the asset to `sicurre-raw` while Sicurre-ML
+    read from `sicurre-golden-evaluation-dataset`, so a publish reported success
+    and registered an `object_uri` the consumer could never fetch.
+
+    Keeping the evaluation set in its own bucket is what makes "cannot enter
+    training splits" a permission boundary rather than a prefix convention.
+    """
+    settings = get_settings()
+    resolved_backend = (backend or settings.raw_snapshot_storage_backend).strip().lower()
+
+    if resolved_backend in ("r2", "prod"):
+        required_settings = {
+            "evaluation_set_r2_bucket_name": settings.evaluation_set_r2_bucket_name,
+            "evaluation_set_r2_endpoint_url": settings.evaluation_set_r2_endpoint_url,
+            "evaluation_set_r2_access_key_id": settings.evaluation_set_r2_access_key_id,
+            "evaluation_set_r2_secret_access_key": settings.evaluation_set_r2_secret_access_key,
+        }
+        if missing_fields := [
+            name for name, value in required_settings.items() if not value
+        ]:
+            missing = ", ".join(missing_fields)
+            raise RuntimeError(
+                f"Missing evaluation-set R2 settings: {missing}. The golden set "
+                "must not fall back to the raw snapshot bucket."
+            )
+
+        return R2SnapshotStore(
+            bucket_name=settings.evaluation_set_r2_bucket_name,
+            endpoint_url=settings.evaluation_set_r2_endpoint_url,
+            access_key_id=settings.evaluation_set_r2_access_key_id,
+            secret_access_key=settings.evaluation_set_r2_secret_access_key,
+            region_name=settings.evaluation_set_r2_region,
+            root_prefix="",
+        )
+
+    return LocalSnapshotStore(root_dir=local_root_dir, repo_root=repo_root)
+
+
 def build_snapshot_store(
     *,
     local_root_dir: Path,
