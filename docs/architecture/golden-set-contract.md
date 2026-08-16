@@ -89,3 +89,55 @@ The promotion manifest belongs to the Sicurre-ML evaluation run. Sicurre keeps
 the bounded decision snapshot and external identifiers needed to trace it; it
 does not duplicate full metrics or artifacts from MLflow. Neither system may
 put secrets, raw emails, generated sample text, or user PII in tags or manifests.
+
+## Version Two Composition
+
+`golden-20260816-v2` extends version one rather than replacing it. All 60
+version-one records are carried forward unchanged, keeping their identifiers and
+their original `2026-07-19` review provenance, and 24 administrative-impersonation
+records are added as 12 matched phishing/legitimate pairs.
+
+Composition is 37 phishing, 37 legitimate and 10 spam across 84 French records,
+stored at `evaluation_sets/golden-20260816-v2/golden.jsonl` in the dedicated
+evaluation bucket with checksum
+`448809d4a6c98d115f889887697259c393bfe4e9eccfdb43a01145efe3222387`.
+
+### Why the block was added
+
+Version one is a business-email-compromise corpus: supplier fraud, IBAN
+substitution, président fraud and e-signature lures. That focus is right for
+TPEs, but the word `impot` appeared zero times across all 60 records while the
+DGFiP refund campaign was reaching millions of French households. Auto-entrepreneurs
+file with the DGFiP and pay URSSAF cotisations, so administrative impersonation
+sits squarely in their threat model.
+
+The block covers DGFiP refunds and arrears, URSSAF cotisations, CPAM/ameli, ANTAI
+fines, parcel delivery and customs, CPF, France Travail, professional VAT,
+FranceConnect and complementary health insurance. Each fraudulent record is paired
+with a legitimate notice from the same institution, so the evaluation measures
+discrimination rather than brand-keyword sensitivity: a genuine notice announces
+and directs to an official portal, while the fraudulent one collects banking or
+identity data through an external link under time pressure.
+
+### Composition rule
+
+Fixed per-class counts are replaced by an invariant. Phishing and legitimate
+counts must be equal, so aggregate metrics cannot move through composition alone,
+and no class may fall below its version-one floor. The set may grow, but it may
+not become unbalanced or lose coverage.
+
+### Known gaps
+
+Median body length remains ~420 characters and every record is plain text. Real
+campaigns carry HTML, footers, disclaimers and tracking markup, so length and
+markup realism remain untested. Review is still single-reviewer, so there is no
+inter-annotator agreement.
+
+### Publication defect to resolve
+
+`publish_evaluation_set` writes through the shared snapshot store, which resolves
+to the raw-snapshot bucket (`r2://sicurre-raw/raw-snapshots/evaluation_sets/...`)
+rather than to the dedicated evaluation bucket this contract specifies. Version two
+was therefore placed in `sicurre-golden-evaluation-dataset` directly after
+validation. The CLI should target the evaluation bucket so publication and
+consumption address the same store.
