@@ -34,13 +34,28 @@ def finalize(
         if not line.strip():
             continue
         payload: dict[str, Any] = json.loads(line)
-        if payload.pop("review_status", None) != "pending":
+        review_status = payload.pop("review_status", None)
+        if review_status == "reviewed":
+            # A record carried forward from an earlier version keeps its own
+            # review provenance. Restamping it would erase when it was actually
+            # reviewed and make the new version look wholly freshly reviewed.
+            missing = [
+                field
+                for field in ("reviewer_rationale", "reviewed_by", "reviewed_at")
+                if not payload.get(field)
+            ]
+            if missing:
+                raise ValueError(
+                    f"Reviewed record at line {line_number} is missing {', '.join(missing)}"
+                )
+        elif review_status == "pending":
+            payload.update(
+                reviewer_rationale=f"Scénario relu et approuvé : {payload['scenario']}.",
+                reviewed_by=reviewed_by,
+                reviewed_at=reviewed_at,
+            )
+        else:
             raise ValueError(f"Draft record at line {line_number} is not pending review")
-        payload.update(
-            reviewer_rationale=f"Scénario relu et approuvé : {payload['scenario']}.",
-            reviewed_by=reviewed_by,
-            reviewed_at=reviewed_at,
-        )
         records.append(GoldenSetRecord.model_validate(payload))
     asset = build_evaluation_asset(records)
     output_path.parent.mkdir(parents=True, exist_ok=True)
