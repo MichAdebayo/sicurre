@@ -159,7 +159,11 @@ deploy/nginx/*.md
 
 DEPLOYMENT_BLOCKERS.md
 cert-readiness-audit.md
-golden-set-draft.fr.jsonl
+# Golden evaluation sets are canonical in the dedicated R2 bucket, addressed by
+# immutable version tag and checksum. Local copies are working artifacts only,
+# and are kept beside data/local rather than inside it so an evaluation-only
+# asset is never mixed with data-platform run output.
+data/evaluation_sets/
 
 scripts/README.md
 docs/architecture/issue-artifact.md
