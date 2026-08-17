@@ -98,7 +98,7 @@ docs/certification/
 docs/architecture/notebook-*.md
 docs/architecture/diagrams/final/
 docs/architecture/threat-model.md
-docs/architecture/privacy-rgpd.md
+# docs/architecture/privacy-rgpd.md
 docs/architecture/data-platform-cadence.md
 docs/architecture/diagrams/*.dot
 docs/adr/0001-post-delivery-gmail.md
