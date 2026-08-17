@@ -222,3 +222,20 @@ where URL reputation can act on it.
 Review is still single-reviewer, so there is no inter-annotator agreement. The
 set remains synthetic and provisional and establishes no real-world performance
 claim.
+
+## Local Working Copies
+
+Published versions are canonical in the dedicated R2 bucket, addressed by
+immutable version tag and checksum. Local copies exist only as working
+artifacts and live under `data/evaluation_sets/`, with pending review drafts in
+`data/evaluation_sets/drafts/`.
+
+That directory is a sibling of `data/local/`, not a child of it. `data/local/`
+holds data-platform run output — SQLite databases, database copies, manifests —
+and placing an evaluation-only asset inside it would repeat locally the same
+conflation that put the golden set in the raw ingestion bucket. The separation
+between an evaluation asset and the training data platform is kept in both
+places for the same reason.
+
+The directory is gitignored, so R2 remains the single source of truth for a
+published version.
