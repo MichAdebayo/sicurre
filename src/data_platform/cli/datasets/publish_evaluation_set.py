@@ -33,7 +33,7 @@ async def publish(args: argparse.Namespace) -> EvaluationSetRegistration:
     records = load_evaluation_records(args.input.read_bytes())
     asset = build_evaluation_asset(records)
     store = build_evaluation_set_store(
-        local_root_dir=ROOT_DIR / "data" / "local" / "evaluation_sets",
+        local_root_dir=ROOT_DIR / "data" / "evaluation_sets",
         repo_root=ROOT_DIR,
         backend=args.backend,
     )
