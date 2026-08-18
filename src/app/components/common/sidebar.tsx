@@ -91,7 +91,7 @@ export function Sidebar({
       </div>
 
       {/* Main Navigation */}
-      <nav className="flex-1 px-3 py-5 space-y-0.5 overflow-y-auto">
+      <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
         {mainNav.map((item) => {
           const Icon = item.icon;
           const isActive = currentPage === item.id;
@@ -108,7 +108,7 @@ export function Sidebar({
               title={isLocked ? "Connectez Cloudflare pour déverrouiller cette page" : undefined}
               aria-disabled={isLocked}
               className={clsx(
-                "w-full flex items-center gap-3 px-3.5 py-2.5 text-[13px] font-semibold rounded-lg transition-all duration-150 select-none",
+                "w-full flex items-center gap-3 px-3.5 py-3 text-[14px] font-semibold rounded-lg transition-all duration-150 select-none",
                 isLocked
                   ? "cursor-not-allowed text-on-surface-variant/35 opacity-70"
                   : isActive
@@ -135,7 +135,7 @@ export function Sidebar({
               key={item.id}
               onClick={() => onPageChange(item.id as SidebarPage)}
               className={clsx(
-                "w-full flex items-center gap-3 px-3.5 py-2.5 text-[13px] font-semibold rounded-lg transition-all cursor-pointer select-none",
+                "w-full flex items-center gap-3 px-3.5 py-3 text-[14px] font-semibold rounded-lg transition-all cursor-pointer select-none",
                 isActive
                   ? "bg-primary text-on-primary shadow-sm shadow-primary/20"
                   : "text-on-surface-variant hover:bg-surface-low hover:text-on-surface",
@@ -151,7 +151,7 @@ export function Sidebar({
         {onLockdown && (
           <button
             onClick={onLockdown}
-            className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 bg-error text-on-error hover:bg-on-error-container font-semibold rounded-lg transition-all active:scale-[0.97] cursor-pointer text-[13px]"
+            className="w-full flex items-center justify-center gap-2 px-3.5 py-3 bg-error text-on-error hover:bg-on-error-container font-semibold rounded-lg transition-all active:scale-[0.97] cursor-pointer text-[14px]"
           >
             <Zap className="w-4 h-4" />
             <span>{t("sidebar.lockdown")}</span>
@@ -162,7 +162,7 @@ export function Sidebar({
           <button
             type="button"
             onClick={onLogout}
-            className="flex w-full cursor-pointer items-center gap-3 rounded-lg px-3.5 py-2.5 text-[13px] font-semibold text-on-surface-variant transition-colors hover:bg-error/5 hover:text-error"
+            className="flex w-full cursor-pointer items-center gap-3 rounded-lg px-3.5 py-3 text-[14px] font-semibold text-on-surface-variant transition-colors hover:bg-error/5 hover:text-error"
           >
             <LogOut className="h-[18px] w-[18px] stroke-[1.5]" />
             <span>{t("common.logout")}</span>
