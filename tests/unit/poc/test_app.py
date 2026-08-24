@@ -6,6 +6,7 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 from poc import config, local_runtime
+from poc.inference import FaultProbeResult, PocInferenceClient
 
 APP_PATH = Path(__file__).resolve().parents[3] / "src" / "poc" / "app.py"
 
@@ -38,25 +39,41 @@ def _seed_data_evidence(data_path: Path) -> None:
             CREATE TABLE IF NOT EXISTS data_ingestion_run (
                 id TEXT PRIMARY KEY,
                 source_system_id TEXT NOT NULL,
+                raw_object_count INTEGER NOT NULL,
                 raw_record_count INTEGER NOT NULL,
+                started_at TEXT NOT NULL,
                 finished_at TEXT NOT NULL,
+                trigger_mode TEXT NOT NULL,
                 status TEXT NOT NULL
             )
         """)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS data_dataset (
-                version_tag TEXT PRIMARY KEY,
+                id TEXT PRIMARY KEY,
+                version_tag TEXT NOT NULL,
                 status TEXT NOT NULL,
                 item_count INTEGER NOT NULL,
                 created_at TEXT NOT NULL
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS data_raw_object (
+                id TEXT PRIMARY KEY,
+                ingestion_run_id TEXT NOT NULL
+            )
+        """)
         conn.execute(
             "CREATE TABLE IF NOT EXISTS data_raw_record "
-            "(id TEXT PRIMARY KEY, source_system_id TEXT)"
+            "(id TEXT PRIMARY KEY, source_system_id TEXT, raw_object_id TEXT)"
         )
-        conn.execute("CREATE TABLE IF NOT EXISTS data_normalized_message (id TEXT PRIMARY KEY)")
-        conn.execute("CREATE TABLE IF NOT EXISTS data_dataset_item (id TEXT PRIMARY KEY)")
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS data_normalized_message "
+            "(id TEXT PRIMARY KEY, raw_record_id TEXT)"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS data_dataset_item "
+            "(id TEXT PRIMARY KEY, dataset_id TEXT, normalized_message_id TEXT)"
+        )
 
         # Seed data
         conn.execute(
@@ -70,20 +87,28 @@ def _seed_data_evidence(data_path: Path) -> None:
             "('ss-3', 'reconstructed/current_frozen/native_external', 'manual')"
         )
         conn.execute(
-            "INSERT INTO data_ingestion_run (id, source_system_id, raw_record_count, finished_at, status) VALUES ('ir-1', 'ss-1', 100, '2026-07-15T12:00:00Z', 'success')"
+            "INSERT INTO data_ingestion_run (id, source_system_id, raw_object_count, raw_record_count, started_at, finished_at, trigger_mode, status) VALUES ('ir-1', 'ss-1', 1, 100, '2026-07-15T11:59:00Z', '2026-07-15T12:00:00Z', 'manual', 'completed')"
         )
         conn.execute(
-            "INSERT INTO data_ingestion_run (id, source_system_id, raw_record_count, finished_at, status) VALUES ('ir-2', 'ss-2', 50, '2026-07-15T13:00:00Z', 'success')"
+            "INSERT INTO data_ingestion_run (id, source_system_id, raw_object_count, raw_record_count, started_at, finished_at, trigger_mode, status) VALUES ('ir-2', 'ss-2', 1, 50, '2026-07-15T12:59:00Z', '2026-07-15T13:00:00Z', 'scheduled', 'completed')"
         )
         conn.execute(
-            "INSERT INTO data_dataset (version_tag, status, item_count, created_at) VALUES ('base-20260715', 'frozen', 120, '2026-07-15T14:00:00Z')"
+            "INSERT INTO data_dataset (id, version_tag, status, item_count, created_at) VALUES ('ds-1', 'base-20260715', 'frozen', 120, '2026-07-15T14:00:00Z')"
         )
         conn.execute(
-            "INSERT INTO data_raw_record (id, source_system_id) "
-            "VALUES ('1', 'ss-1'), ('2', 'ss-2'), ('3', 'ss-3')"
+            "INSERT INTO data_raw_object (id, ingestion_run_id) VALUES ('ro-1', 'ir-1'), ('ro-2', 'ir-2')"
         )
-        conn.execute("INSERT INTO data_normalized_message (id) VALUES ('1'), ('2')")
-        conn.execute("INSERT INTO data_dataset_item (id) VALUES ('1'), ('2')")
+        conn.execute(
+            "INSERT INTO data_raw_record (id, source_system_id, raw_object_id) "
+            "VALUES ('1', 'ss-1', 'ro-1'), ('2', 'ss-2', 'ro-2'), ('3', 'ss-3', NULL)"
+        )
+        conn.execute(
+            "INSERT INTO data_normalized_message (id, raw_record_id) VALUES ('nm-1', '1'), ('nm-2', '2')"
+        )
+        conn.execute(
+            "INSERT INTO data_dataset_item (id, dataset_id, normalized_message_id) "
+            "VALUES ('di-1', 'ds-1', 'nm-1'), ('di-2', 'ds-1', 'nm-2')"
+        )
         conn.commit()
     finally:
         conn.close()
@@ -110,6 +135,12 @@ def poc_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AppTest:
     from poc.presentation import pipeline_page
 
     monkeypatch.setattr(pipeline_page, "stream_operation", mock_stream_operation)
+    monkeypatch.setattr(PocInferenceClient, "health", lambda self: (True, "Prêt"))
+    monkeypatch.setattr(
+        PocInferenceClient,
+        "run_fault_probe",
+        lambda self, scenario: FaultProbeResult(scenario, "401", "401", True),
+    )
 
     environment = {
         "SICURRE_POC_DATABASE_URL": f"sqlite+aiosqlite:///{auth_path}",
@@ -156,23 +187,13 @@ def test_invalid_and_valid_login_are_contextual(poc_app: AppTest) -> None:
     assert poc_app.session_state["user"]["display_name"] == "Admin Test"
 
 
-def test_controlled_incident_is_visible_and_not_persisted(poc_app: AppTest) -> None:
+def test_resilience_page_exposes_selectable_real_fault_evidence(poc_app: AppTest) -> None:
     login(poc_app)
     open_page(poc_app, "Résilience", "nav_resilience")
-    trigger = next(button for button in poc_app.button if button.label == "Déclencher l’incident")
+    assert any(selectbox.label == "Scénario à exercer" for selectbox in poc_app.selectbox)
+    trigger = next(button for button in poc_app.button if button.label == "Exécuter le scénario")
     trigger.click().run()
-
-    assert any("Indisponibilité contrôlée" in error.value for error in poc_app.error)
-    recover = next(button for button in poc_app.button if button.label == "Rétablir le service")
-    recover.click().run()
-    assert poc_app.session_state["controlled_incident_active"] is False
-
-
-def test_database_evidence_is_admin_only_and_readable(poc_app: AppTest) -> None:
-    login(poc_app)
-    open_page(poc_app, "État SQLite", "nav_database")
-    assert any("Preuves de persistance SQLite" in title.value for title in poc_app.title)
-    assert not poc_app.exception
+    assert any("défaut attendu" in success.value for success in poc_app.success)
 
 
 def test_successful_simulation_populates_operational_pages(poc_app: AppTest) -> None:
@@ -253,7 +274,7 @@ def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
     assert not poc_app.exception
     # Verify seeded counts are shown
     assert any("base-20260715" in md.value for md in poc_app.markdown)
-    assert any("PhishTank" in md.value for md in poc_app.markdown)
+    assert any("PhishTank" in str(dataframe.value) for dataframe in poc_app.dataframe)
     assert any("totaux V1 sont reconstruits" in caption.value for caption in poc_app.caption)
 
     # 2. Test Pipeline Page - Admin Successful Run
@@ -296,7 +317,7 @@ def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
     assert poc_app.session_state["authenticated"] is True
     assert poc_app.session_state["user"]["role"] == "viewer"
 
-    for admin_page in ("Flux de données", "Résilience", "État SQLite"):
+    for admin_page in ("Flux de données", "Résilience"):
         assert not any(btn.label == admin_page for btn in poc_app.button)
     poc_app.session_state["page"] = "nav_pipeline"
     poc_app.run()

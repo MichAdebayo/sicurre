@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from collections import Counter
 from collections.abc import Callable
+from html import escape
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -42,6 +43,71 @@ def _metric(column: Any, label: str, value: int) -> None:
         f"<div class='value'>{format_number(value)}</div></div>",
         unsafe_allow_html=True,
     )
+
+
+def _render_incremental_run(evidence: DataEvidence, translate: Callable[[str], str]) -> None:
+    """Show one selected ingestion run from collection through dataset membership."""
+    runs = evidence.query(
+        """
+        SELECT ir.id, ss.name, ir.status, ir.trigger_mode,
+               ir.raw_object_count, ir.raw_record_count, ir.started_at, ir.finished_at,
+               COUNT(DISTINCT nm.id) AS normalized_count,
+               COUNT(DISTINCT di.normalized_message_id) AS dataset_item_count
+        FROM data_ingestion_run ir
+        JOIN data_source_system ss ON ss.id = ir.source_system_id
+        LEFT JOIN data_raw_object ro ON ro.ingestion_run_id = ir.id
+        LEFT JOIN data_raw_record rr ON rr.raw_object_id = ro.id
+        LEFT JOIN data_normalized_message nm ON nm.raw_record_id = rr.id
+        LEFT JOIN data_dataset_item di
+          ON di.normalized_message_id = nm.id
+         AND di.dataset_id = (
+             SELECT id FROM data_dataset ORDER BY created_at DESC LIMIT 1
+         )
+        WHERE ss.name NOT LIKE 'reconstructed/%'
+        GROUP BY ir.id, ss.name
+        ORDER BY ir.finished_at DESC
+        LIMIT 20
+        """
+    )
+    st.markdown(f"#### {translate('incremental_run_title')}")
+    if not runs:
+        st.info(translate("no_incremental_runs"))
+        return
+
+    run_index = {str(row["id"]): row for row in runs}
+    selected_id = st.selectbox(
+        translate("incremental_run_select"),
+        list(run_index),
+        format_func=lambda run_id: _run_label(run_index[run_id], translate),
+    )
+    selected = run_index[selected_id]
+    values = (
+        (translate("run_raw_objects"), int(selected.get("raw_object_count") or 0)),
+        (translate("run_raw_records"), int(selected.get("raw_record_count") or 0)),
+        (translate("run_normalized"), int(selected.get("normalized_count") or 0)),
+        (translate("run_dataset_items"), int(selected.get("dataset_item_count") or 0)),
+    )
+    cells = "".join(
+        "<div class='evidence-step'>"
+        f"<span>{escape(label)}</span><strong>{format_number(value)}</strong></div>"
+        for label, value in values
+    )
+    st.markdown(f"<div class='evidence-funnel'>{cells}</div>", unsafe_allow_html=True)
+
+    raw_count = int(selected.get("raw_record_count") or 0)
+    normalized_count = int(selected.get("normalized_count") or 0)
+    if raw_count == 0 and str(selected.get("status")) == "completed":
+        st.info(translate("incremental_run_idempotent"))
+    elif raw_count > 0 and normalized_count == 0:
+        st.info(translate("incremental_run_reference_only"))
+
+
+def _run_label(row: dict[str, Any], translate: Callable[[str], str]) -> str:
+    """Build a concise selector label for one ingestion run."""
+    finished_at = str(row.get("finished_at") or row.get("started_at") or "")[:16].replace("T", " ")
+    name = _source_label(str(row.get("name") or "—"), translate)
+    records = format_number(int(row.get("raw_record_count") or 0))
+    return f"{finished_at} · {name} · {records} {translate('records')}"
 
 
 def _source_label(source: str, translate: Callable[[str], str]) -> str:
@@ -203,37 +269,30 @@ def _render_sources(evidence: DataEvidence, translate: Callable[[str], str]) -> 
         }
         st.vega_lite_chart(chart_rows, specification, width="stretch")
 
-    st.markdown(f"#### {translate('recent_ingestion')}")
-    runs = evidence.query(
-        """
-        SELECT ss.name, ir.status, ir.raw_record_count, ir.finished_at
-        FROM data_ingestion_run ir
-        JOIN data_source_system ss ON ss.id = ir.source_system_id
-        WHERE ir.finished_at IS NOT NULL
-        ORDER BY ir.finished_at DESC
-        LIMIT 20
-        """
+    provider_rows = []
+    for source, count in frozen_distribution.items():
+        provider_rows.append(
+            {
+                translate("source"): _source_label(source, translate),
+                translate("source_method"): translate(f"source_family_{_source_family(source)}"),
+                translate("records"): count,
+            }
+        )
+    provider_rows.extend(
+        {
+            translate("source"): _source_label(str(row.get("name") or "—"), translate),
+            translate("source_method"): translate(
+                f"source_family_{_source_family(str(row.get('name') or ''), str(row.get('source_type') or ''))}"
+            ),
+            translate("records"): int(row.get("total_records") or 0),
+        }
+        for row in sources
+        if int(row.get("total_records") or 0) > 0
+        and not str(row.get("name") or "").startswith("reconstructed/")
     )
-    if not runs:
-        st.info(translate("no_ingestion"))
-        return
-    for row in runs:
-        finished_at = str(row.get("finished_at") or "")[:16].replace("T", " ")
-        count = int(row.get("raw_record_count") or 0)
-        status = str(row.get("status") or "")
-        badge_class = (
-            "badge-ok" if status.lower() in {"success", "completed", "done"} else "badge-danger"
-        )
-        st.markdown(
-            "<div class='card' style='padding:9px 12px;margin-bottom:4px;'>"
-            "<div style='display:flex;justify-content:space-between;align-items:center;'>"
-            f"<span style='font-size:0.9rem;font-weight:600;color:var(--text);'>"
-            f"{_source_label(str(row.get('name', '')), translate)}</span>"
-            f"<span class='badge {badge_class}'>{status}</span></div>"
-            f"<div style='font-size:0.78rem;color:var(--text-muted);'>"
-            f"{format_number(count)} {translate('records')} &middot; {finished_at}</div></div>",
-            unsafe_allow_html=True,
-        )
+    if provider_rows:
+        with st.expander(translate("source_provider_details")):
+            st.dataframe(provider_rows, hide_index=True, width="stretch")
 
 
 def _render_versions(evidence: DataEvidence, translate: Callable[[str], str]) -> None:
@@ -277,7 +336,7 @@ def render_datasets(evidence: DataEvidence, translate: Callable[[str], str]) -> 
         """
     )
     latest_item_count = int(latest_dataset[0]["item_count"]) if latest_dataset else 0
-    columns = st.columns(4)
+    columns = st.columns(3)
     _metric(columns[0], translate("total_raw"), evidence.count("data_raw_record"))
     _metric(
         columns[1],
@@ -289,7 +348,7 @@ def render_datasets(evidence: DataEvidence, translate: Callable[[str], str]) -> 
         translate("total_dataset_items"),
         latest_item_count,
     )
-    _metric(columns[3], translate("dataset_versions"), evidence.count("data_dataset"))
     st.markdown("<div style='margin-bottom:16px;'></div>", unsafe_allow_html=True)
+    _render_incremental_run(evidence, translate)
     _render_sources(evidence, translate)
     _render_versions(evidence, translate)
