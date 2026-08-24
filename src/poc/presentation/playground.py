@@ -74,12 +74,17 @@ def render_playground(
     persist: PersistInference,
     render_result: Callable[[dict[str, Any]], None],
 ) -> None:
-    """Render the three-mode local inference evidence journey."""
+    """Render real local inference and deterministic simulation journeys."""
     st.title(translate("playground_title"))
     st.caption(translate("playground_subtitle"))
-    modes = [InferenceMode.LIVE, InferenceMode.SIMULATION, InferenceMode.INCIDENT]
+    modes = [InferenceMode.LIVE, InferenceMode.SIMULATION]
     labels = {mode: translate(f"inference_mode_{mode.value}") for mode in modes}
-    current = InferenceMode(st.session_state.get("inference_mode", InferenceMode.LIVE.value))
+    stored_mode = st.session_state.get("inference_mode", InferenceMode.LIVE.value)
+    current = (
+        InferenceMode(stored_mode)
+        if stored_mode in {mode.value for mode in modes}
+        else InferenceMode.LIVE
+    )
     selected = st.segmented_control(
         translate("inference_mode"),
         options=modes,

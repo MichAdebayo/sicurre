@@ -268,7 +268,16 @@ def render_datasets(evidence: DataEvidence, translate: Callable[[str], str]) -> 
     """Render local record volumes, source lineage, runs, and dataset versions."""
     st.title(translate("data_platform_title"))
     st.caption(translate("data_platform_subtitle"))
-    columns = st.columns(3)
+    latest_dataset = evidence.query(
+        """
+        SELECT item_count
+        FROM data_dataset
+        ORDER BY created_at DESC
+        LIMIT 1
+        """
+    )
+    latest_item_count = int(latest_dataset[0]["item_count"]) if latest_dataset else 0
+    columns = st.columns(4)
     _metric(columns[0], translate("total_raw"), evidence.count("data_raw_record"))
     _metric(
         columns[1],
@@ -278,8 +287,9 @@ def render_datasets(evidence: DataEvidence, translate: Callable[[str], str]) -> 
     _metric(
         columns[2],
         translate("total_dataset_items"),
-        evidence.count("data_dataset_item"),
+        latest_item_count,
     )
+    _metric(columns[3], translate("dataset_versions"), evidence.count("data_dataset"))
     st.markdown("<div style='margin-bottom:16px;'></div>", unsafe_allow_html=True)
     _render_sources(evidence, translate)
     _render_versions(evidence, translate)

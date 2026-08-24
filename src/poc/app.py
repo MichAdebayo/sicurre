@@ -17,12 +17,14 @@ from poc.inference import (
     PocInferenceError,
 )
 from poc.local_runtime import POC_AUTH_DB_PATH, POC_DATA_DB_PATH, ensure_local_auth_db
+from poc.presentation.database_evidence import render_database_evidence
 from poc.presentation.datasets import render_datasets
 from poc.presentation.home import render_home
 from poc.presentation.i18n import PocTranslator
 from poc.presentation.pipeline_page import execute_pipeline_action, render_pipeline_page
 from poc.presentation.playground import render_playground
 from poc.presentation.remediation import render_smail, render_threat_log
+from poc.presentation.resilience import render_resilience
 from poc.presentation.result import render_inference_result
 from poc.presentation.settings import render_settings
 from poc.presentation.shell import render_login, render_sidebar
@@ -204,6 +206,24 @@ def classify_email_for_ui(
         return None
 
 
+def simulate_controlled_incident() -> str:
+    """Exercise the typed local failure path without network or persistence."""
+    try:
+        INFERENCE_CLIENT.classify(
+            ClassificationRequest(
+                subject="Incident contrôlé",
+                sender="demo@sicurre.local",
+                text="Vérification locale sans contenu utilisateur.",
+                use_llm=False,
+                use_virustotal=False,
+            ),
+            mode=InferenceMode.INCIDENT,
+        )
+    except PocInferenceError as error:
+        return str(error)
+    raise RuntimeError("The controlled incident did not raise the expected error.")
+
+
 def reclassify_event(event_id: str, new_verdict: str, by_user: str) -> None:
     """Override the safety verdict for a single event."""
     EVENT_STORE.reclassify(event_id, new_verdict, by_user)
@@ -257,7 +277,7 @@ render_sidebar(
 
 events = EVENT_STORE.list_for_user(user["email"], limit=2000)
 page = st.session_state.get("page", "nav_home")
-if page == "nav_pipeline" and user["role"] != "admin":
+if page in {"nav_pipeline", "nav_resilience", "nav_database"} and user["role"] != "admin":
     page = "nav_home"
     st.session_state["page"] = page
 
@@ -299,6 +319,14 @@ elif page == "nav_pipeline":
 # ── Jeux de données ───────────────────────────────────────────────────────────
 elif page == "nav_datasets":
     render_datasets(DATA_EVIDENCE_STORE, tr)
+
+# ── Résilience contrôlée ─────────────────────────────────────────────────────
+elif page == "nav_resilience":
+    render_resilience(tr, inference_status, simulate_controlled_incident)
+
+# ── Preuves SQLite ───────────────────────────────────────────────────────────
+elif page == "nav_database":
+    render_database_evidence(DATA_EVIDENCE_STORE, tr)
 
 # ── Paramètres ────────────────────────────────────────────────────────────────
 elif page == "nav_settings":
