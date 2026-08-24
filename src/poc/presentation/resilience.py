@@ -1,65 +1,95 @@
-"""Controlled incident evidence for POC administrators."""
+"""Selectable fault evidence for POC administrators."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import asdict
+from typing import Any
 
 import streamlit as st
+
+from poc.inference import FaultProbeResult, FaultScenario
+
+SCENARIOS = (
+    FaultScenario.INVALID_BEARER,
+    FaultScenario.INVALID_PAYLOAD,
+    FaultScenario.UNREACHABLE_ENDPOINT,
+)
 
 
 def render_resilience(
     translate: Callable[[str], str],
     inference_health: Callable[[], tuple[bool, str]],
-    trigger_incident: Callable[[], str],
+    run_probe: Callable[[FaultScenario], FaultProbeResult],
 ) -> None:
-    """Demonstrate one bounded inference outage and its recovery workflow."""
+    """Exercise selectable local API failures and verify nominal recovery."""
     st.title(translate("resilience_title"))
     st.caption(translate("resilience_subtitle"))
 
-    incident_active = bool(st.session_state.get("controlled_incident_active", False))
     service_ready, service_status = inference_health()
-    observed_ready = service_ready and not incident_active
+    if service_ready:
+        st.success(translate("resilience_service_ready"))
+    else:
+        st.error(translate("resilience_service_unavailable"))
+    st.caption(service_status)
 
-    status_column, action_column = st.columns([2, 1])
-    with status_column:
-        if observed_ready:
-            st.success(translate("resilience_service_ready"))
-        else:
-            st.error(translate("resilience_service_unavailable"))
-        st.caption(service_status)
-    with action_column:
-        if incident_active:
-            if st.button(
-                translate("resilience_recover"),
-                type="primary",
-                use_container_width=True,
-            ):
-                st.session_state["controlled_incident_active"] = False
-                st.rerun()
-        elif st.button(
-            translate("resilience_trigger"),
-            type="primary",
-            use_container_width=True,
-        ):
-            st.session_state["controlled_incident_message"] = trigger_incident()
-            st.session_state["controlled_incident_active"] = True
-            st.rerun()
+    scenario = st.selectbox(
+        translate("resilience_scenario"),
+        SCENARIOS,
+        format_func=lambda value: translate(f"resilience_scenario_{value.value}"),
+    )
+    st.caption(translate(f"resilience_scenario_{scenario.value}_help"))
+    if st.button(
+        translate("resilience_trigger"),
+        type="primary",
+        disabled=not service_ready and scenario is not FaultScenario.UNREACHABLE_ENDPOINT,
+    ):
+        result = run_probe(scenario)
+        recovery_ready, recovery_status = inference_health()
+        st.session_state["fault_probe_result"] = {
+            **asdict(result),
+            "scenario": result.scenario.value,
+            "recovery_ready": recovery_ready,
+            "recovery_status": recovery_status,
+        }
 
-    if incident_active:
-        st.code(
-            f"PocInferenceUnavailable: {st.session_state.get('controlled_incident_message', '')}",
-            language="text",
-        )
+    result_data = st.session_state.get("fault_probe_result")
+    if not isinstance(result_data, dict):
+        st.info(translate("resilience_no_probe"))
+        return
+    _render_probe_result(result_data, translate)
+
+
+def _render_probe_result(result: dict[str, Any], translate: Callable[[str], str]) -> None:
+    """Render expected, observed, and recovery evidence for one probe."""
+    passed = bool(result.get("passed"))
+    recovered = bool(result.get("recovery_ready"))
+    if passed and recovered:
+        st.success(translate("resilience_probe_passed"))
+    else:
+        st.error(translate("resilience_probe_failed"))
 
     st.markdown(f"#### {translate('resilience_evidence_title')}")
-    evidence = (
-        ("1", translate("resilience_symptom"), not observed_ready),
-        ("2", translate("resilience_diagnosis"), incident_active),
-        ("3", translate("resilience_recovery"), not incident_active),
-        ("4", translate("resilience_validation"), observed_ready),
+    st.dataframe(
+        [
+            {
+                translate("resilience_check"): translate("resilience_fault_observation"),
+                translate("resilience_expected"): result.get("expected", "—"),
+                translate("resilience_observed"): result.get("observed", "—"),
+                translate("status"): (
+                    translate("status_valid") if passed else translate("status_invalid")
+                ),
+            },
+            {
+                translate("resilience_check"): translate("resilience_recovery"),
+                translate("resilience_expected"): translate("resilience_service_ready"),
+                translate("resilience_observed"): result.get("recovery_status", "—"),
+                translate("status"): (
+                    translate("status_valid") if recovered else translate("status_invalid")
+                ),
+            },
+        ],
+        hide_index=True,
+        width="stretch",
     )
-    for number, label, complete in evidence:
-        icon = "✓" if complete else "·"
-        st.markdown(f"**{number}. {label}** &nbsp; {icon}")
-
-    st.info(translate("resilience_scope"))
+    st.caption(translate("resilience_scope"))

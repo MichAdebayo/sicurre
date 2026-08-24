@@ -19,11 +19,10 @@ NAVIGATION_KEYS = (
     "nav_pipeline",
     "nav_datasets",
     "nav_resilience",
-    "nav_database",
     "nav_settings",
 )
 
-ADMIN_NAVIGATION_KEYS = {"nav_pipeline", "nav_resilience", "nav_database"}
+ADMIN_NAVIGATION_KEYS = {"nav_pipeline", "nav_resilience"}
 
 
 def _logo_html(logo_path: Path, width: int, *, login: bool = False) -> str:

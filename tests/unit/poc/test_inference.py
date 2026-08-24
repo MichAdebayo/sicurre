@@ -7,6 +7,7 @@ import respx
 from poc.config import PocSettings
 from poc.inference import (
     ClassificationRequest,
+    FaultScenario,
     InferenceMode,
     PocInferenceClient,
     PocInferenceContractError,
@@ -48,16 +49,35 @@ def test_simulation_is_deterministic_and_explicit(
     assert first["composite_score"] == second["composite_score"]
 
 
-def test_incident_mode_never_calls_the_network(
-    configured_settings: PocSettings, classification_request: ClassificationRequest
+@respx.mock
+def test_fault_probes_exercise_real_request_boundaries(
+    configured_settings: PocSettings,
 ) -> None:
-    with respx.mock(assert_all_called=False) as router:
-        route = router.post(configured_settings.inference_api_url)
-        with pytest.raises(PocInferenceUnavailable, match="Incident contrôlé"):
-            PocInferenceClient(configured_settings).classify(
-                classification_request, mode=InferenceMode.INCIDENT
-            )
-        assert not route.called
+    classify_route = respx.post(configured_settings.inference_api_url)
+    classify_route.mock(return_value=httpx.Response(401))
+    client = PocInferenceClient(configured_settings)
+
+    auth_result = client.run_fault_probe(FaultScenario.INVALID_BEARER)
+    assert auth_result.passed
+    assert auth_result.observed == "401"
+    assert classify_route.calls[-1].request.headers["Authorization"].endswith("invalid-probe")
+
+    classify_route.mock(return_value=httpx.Response(422))
+    payload_result = client.run_fault_probe(FaultScenario.INVALID_PAYLOAD)
+    assert payload_result.passed
+    assert payload_result.observed == "422"
+
+
+@respx.mock
+def test_unreachable_fault_probe_records_connection_failure(
+    configured_settings: PocSettings,
+) -> None:
+    respx.post("http://127.0.0.1:1/v1/classify").mock(side_effect=httpx.ConnectError("offline"))
+    result = PocInferenceClient(configured_settings).run_fault_probe(
+        FaultScenario.UNREACHABLE_ENDPOINT
+    )
+    assert result.passed
+    assert result.observed == "ConnectError"
 
 
 @respx.mock

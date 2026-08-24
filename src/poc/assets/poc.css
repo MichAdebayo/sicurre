@@ -547,6 +547,8 @@ div[data-testid="stMarkdownContainer"] h6 {
   border-radius: 12px;
   padding: 12px 14px;
   box-shadow: var(--shadow);
+  min-height: 92px;
+  height: 100%;
 }
 .kpi .label {
   font-size: 0.72rem;
@@ -566,6 +568,34 @@ div[data-testid="stMarkdownContainer"] h6 {
   font-size: 0.78rem;
   color: var(--text-muted);
   margin-top: 2px;
+}
+
+.evidence-funnel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  margin: 0.65rem 0 0.8rem;
+}
+
+.evidence-step {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 60px;
+  padding: 0.85rem 1rem;
+  color: var(--text-2);
+}
+
+.evidence-step:nth-child(odd) { border-right: 1px solid var(--border); }
+.evidence-step:nth-child(-n + 2) { border-bottom: 1px solid var(--border); }
+.evidence-step strong { color: var(--text); font-size: 1.2rem; }
+
+@media (max-width: 640px) {
+  .evidence-funnel { grid-template-columns: 1fr; }
+  .evidence-step:nth-child(odd) { border-right: 0; }
+  .evidence-step:nth-child(-n + 3) { border-bottom: 1px solid var(--border); }
 }
 
 /* ── Verdict badges ────────────────────────────────────── */
