@@ -110,7 +110,12 @@ def render_sidebar(
             unsafe_allow_html=True,
         )
         current_page = st.session_state.get("page", "nav_home")
-        for navigation_key in NAVIGATION_KEYS:
+        navigation_keys = (
+            NAVIGATION_KEYS
+            if user["role"] == "admin"
+            else tuple(key for key in NAVIGATION_KEYS if key != "nav_pipeline")
+        )
+        for navigation_key in navigation_keys:
             is_active = navigation_key == current_page
             selected = st.button(
                 translate(navigation_key),

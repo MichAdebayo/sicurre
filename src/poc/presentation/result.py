@@ -47,7 +47,7 @@ def render_inference_result(result: dict[str, Any], translate: Callable[[str], s
     style = result_style(result)
     score = float(result["composite_score"]) * 100.0
     latency = float(result.get("latency_ms") or 0.0)
-    explanation = result.get("explanation") or translate("no_explanation")
+    explanation = str(result.get("explanation") or "").strip()
     colors = {"phishing": "#DC2626", "spam": "#B45309", "legitimate": "#047857"}
     labels = {
         "phishing": translate("class_phishing"),
@@ -60,18 +60,23 @@ def render_inference_result(result: dict[str, Any], translate: Callable[[str], s
         for label in ("phishing", "spam", "legitimate")
         if label in distribution
     )
+    explanation_markup = (
+        "<div style='margin-bottom:12px;'>"
+        "<div style='font-size:0.78rem;color:var(--text-2);margin-bottom:4px;"
+        f"font-weight:600;'>{translate('explanation')}</div>"
+        f"<p style='font-size:0.9rem;color:var(--text);margin:0;'>{explanation}</p></div>"
+        if explanation
+        else ""
+    )
     st.markdown(
         f"""
 <div class='result-card {style.card_class}'>
   <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;'>
     <span class='badge {style.badge_class}'>{translate(style.label_key)}</span>
-    <span style='font-size:0.8rem;color:var(--text-muted);'>Score {score:.1f} % | {latency:.0f} ms</span>
+    <span style='font-size:0.8rem;color:var(--text-muted);'>{translate("phishing_risk")} {score:.1f} % | {latency:.0f} ms</span>
   </div>
-  <div style='margin-bottom:12px;'>
-    <div style='font-size:0.78rem;color:var(--text-2);margin-bottom:4px;font-weight:600;text-transform:uppercase;'>{translate("explanation")}</div>
-    <p style='font-size:0.9rem;color:var(--text);margin:0;'>{explanation}</p>
-  </div>
-  <div style='font-size:0.78rem;color:var(--text-2);margin-bottom:6px;font-weight:600;text-transform:uppercase;'>{translate("class_distribution")}</div>
+  {explanation_markup}
+  <div style='font-size:0.78rem;color:var(--text-2);margin-bottom:6px;font-weight:600;'>{translate("class_distribution")}</div>
   {bars}
 </div>
 """,

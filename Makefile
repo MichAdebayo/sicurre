@@ -1,4 +1,4 @@
-.PHONY: help install test dev-api test-inference openapi openapi-check \
+.PHONY: help install test dev-api poc-inference-smoke poc-ui-smoke openapi openapi-check \
         ingest-all-base \
         data-platform-staging-smoke \
         app-stack-smoke \
@@ -42,7 +42,8 @@ help:
 	@echo "  make test                      - Run backend test suite"
 	@echo "  make openapi                   - Regenerate docs/api/openapi.yaml from FastAPI"
 	@echo "  make openapi-check             - Fail when the generated OpenAPI contract is stale"
-	@echo "  make test-inference            - Smoke-test the inference API (localhost:8000)"
+	@echo "  make poc-inference-smoke       - Test authenticated local POC inference"
+	@echo "  make poc-ui-smoke              - Run the deterministic POC UI logic suite"
 	@echo "  make dev-api                   - Start data platform API on http://localhost:8001"
 	@echo "  make data-platform-staging-smoke - Build and smoke-test data platform container"
 	@echo "  make app-stack-smoke           - Build and smoke-test app + auth + API containers"
@@ -160,8 +161,11 @@ ci-data-quality:
 	uv run --group backend --group dev --group storage pytest tests/unit tests/integration --cov=src/core --cov=src/db --cov-branch --cov-report=term-missing --cov-fail-under=90
 	npm run test:coverage
 
-test-inference:
-	uv run tests/e2e/app/smoke_inference_api.py
+poc-inference-smoke:
+	PYTHONPATH=src uv run python tests/e2e/poc/smoke_local_inference.py
+
+poc-ui-smoke:
+	uv run pytest tests/unit/poc -q
 
 # ── Base Ingestion ─────────────────────────────────────────────────────────────
 
@@ -342,22 +346,29 @@ poc-replay-frozen:
 	@echo "POC frozen replay completed: deterministic parity synced to current_frozen."
 
 poc-cron-demo:
-	@test "$${SICURRE_POC_MODE}" = "true" || (echo "Refusing cron demo outside SICURRE_POC_MODE."; exit 1)
-	@test "$${SICURRE_POC_ALLOW_EXTERNAL_WRITES}" = "true" || (echo "Set SICURRE_POC_ALLOW_EXTERNAL_WRITES=true for the sandbox feed snapshot."; exit 1)
-	@echo "Running isolated SEKOIA cron under $${SICURRE_POC_R2_PREFIX}/scraping/sekoia_ioc..."
-	PYTHONPATH=src uv run python src/data_platform/cron_schedulers/scraping/run_sekoia_ioc.py
+	@echo "Running SEKOIA read-only fetch with local POC snapshot and SQLite persistence..."
+	@uv run --env-file .env sh -c 'SICURRE_POC_MODE=true \
+		SICURRE_DATA_PLATFORM_DATABASE_URL="$$SICURRE_POC_DATA_PLATFORM_DATABASE_URL" \
+		SICURRE_SEKOIA_SNAPSHOT_STORAGE_BACKEND=local PYTHONPATH=src \
+		python src/data_platform/cron_schedulers/scraping/run_sekoia_ioc.py'
 
 poc-release-preview:
-	@test "$${SICURRE_POC_MODE}" = "true" || (echo "Refusing POC release preview outside SICURRE_POC_MODE."; exit 1)
-	$(MAKE) pipeline-push DATASET_TAG_PREFIX=poc-preview
+	@uv run --env-file .env sh -c 'SICURRE_POC_MODE=true \
+		SICURRE_DATA_PLATFORM_DATABASE_URL="$$SICURRE_POC_DATA_PLATFORM_DATABASE_URL" \
+		SICURRE_TRAINING_DATASET_SNAPSHOT_STORAGE_BACKEND=local \
+		$(MAKE) pipeline-push DATASET_TAG_PREFIX=poc-preview'
 	@echo "POC release preview completed locally. No Kaggle publication or ML dispatch occurred."
 
 poc-staging-publish:
-	@test "$${SICURRE_POC_MODE}" = "true" || (echo "Refusing staging publication outside SICURRE_POC_MODE."; exit 1)
-	@test "$${SICURRE_POC_ALLOW_EXTERNAL_WRITES}" = "true" || (echo "Set SICURRE_POC_ALLOW_EXTERNAL_WRITES=true for staging publication."; exit 1)
-	@test -n "$${SICURRE_POC_KAGGLE_DATASET_SLUG}" || (echo "SICURRE_POC_KAGGLE_DATASET_SLUG is required."; exit 1)
-	@test "$${SICURRE_POC_ALLOW_ML_DISPATCH}" != "true" || (echo "ML dispatch is forbidden from the POC staging publisher."; exit 1)
-	KAGGLE_DATASET_SLUG="$${SICURRE_POC_KAGGLE_DATASET_SLUG}" uv run --no-sync python scripts/data_platform/publish_latest.py --skip-github-dispatch
+	@uv run --env-file .env sh -c 'set -eu; \
+		test "$${SICURRE_POC_ALLOW_STAGING_PUBLICATION:-false}" = "true" || \
+		{ echo "Set SICURRE_POC_ALLOW_STAGING_PUBLICATION=true for staging publication."; exit 1; }; \
+		test -n "$${SICURRE_POC_KAGGLE_DATASET_SLUG:-}" || \
+		{ echo "SICURRE_POC_KAGGLE_DATASET_SLUG is required."; exit 1; }; \
+		test "$${SICURRE_POC_ALLOW_ML_DISPATCH:-false}" != "true" || \
+		{ echo "ML dispatch is forbidden from the POC staging publisher."; exit 1; }; \
+		SICURRE_POC_MODE=true KAGGLE_DATASET_SLUG="$$SICURRE_POC_KAGGLE_DATASET_SLUG" \
+		python scripts/data_platform/publish_latest.py --skip-github-dispatch'
 
 # ── Pipeline & Demos ──────────────────────────────────────────────────────────
 

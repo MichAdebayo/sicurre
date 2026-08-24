@@ -63,7 +63,7 @@ def normalize_inference_result(raw: dict[str, Any]) -> dict[str, Any]:
         "is_phishing": is_phishing,
         "composite_score": float(raw.get("composite_score") or 0.0),
         "llm_provider": str(raw.get("llm_provider") or "n/a"),
-        "explanation": str(raw.get("explanation") or "Aucune explication fournie."),
+        "explanation": str(raw.get("explanation") or ""),
         "stage_scores": raw.get("stage_scores") or {},
         "stage_labels": raw.get("stage_labels") or {},
         "label_distribution": raw.get("label_distribution") or {},
@@ -114,7 +114,7 @@ class PocInferenceClient:
     def health(self) -> tuple[bool, str]:
         """Return local model API and bearer-contract availability."""
         if not self.settings.inference_api_key:
-            return False, "Clé d'inférence POC absente"
+            return False, "inference_health_missing_key"
         health_url = self.settings.inference_api_url.removesuffix("/v1/classify") + "/health"
         try:
             health_response = httpx.get(
@@ -122,20 +122,20 @@ class PocInferenceClient:
                 timeout=5.0,
             )
             if not health_response.is_success:
-                return False, f"HTTP {health_response.status_code}"
+                return False, "inference_health_unavailable"
             auth_response = httpx.post(
                 self.settings.inference_api_url,
                 json={},
                 headers=self._headers(),
                 timeout=5.0,
             )
-        except httpx.HTTPError as exc:
-            return False, f"Service local indisponible: {type(exc).__name__}"
+        except httpx.HTTPError:
+            return False, "inference_health_unavailable"
         if auth_response.status_code == 401:
-            return False, "Clé d'inférence locale refusée"
+            return False, "inference_health_rejected"
         if auth_response.status_code == 422:
-            return True, "Service local disponible et authentifié"
-        return False, f"Contrat d'authentification inattendu (HTTP {auth_response.status_code})"
+            return True, "inference_health_ready"
+        return False, "inference_health_unexpected"
 
     def classify(
         self,

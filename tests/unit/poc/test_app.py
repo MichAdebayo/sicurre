@@ -238,7 +238,7 @@ def test_false_negative_report_moves_delivered_message_to_threat_log(poc_app: Ap
 
 
 def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
-    """Test successful and failing pipeline runs, observer warning, and datasets display."""
+    """Test every pipeline action, failure handling, datasets, and viewer isolation."""
     login(poc_app)
 
     # 1. Test Datasets Page (showing metrics and seeded database)
@@ -253,13 +253,18 @@ def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
     open_page(poc_app, "Flux de données", "nav_pipeline")
     assert any(btn.label == "1. Reconstruire la base" for btn in poc_app.button)
     assert any(btn.label == "3. Normaliser + construire" for btn in poc_app.button)
-    cron_btn = next(btn for btn in poc_app.button if btn.label == "2. Collecter SEKOIA")
-    cron_btn.click().run()
-    assert not poc_app.exception
-    assert any("Dernière opération terminée avec succès" in info.value for info in poc_app.info)
+    for label in (
+        "1. Reconstruire la base",
+        "2. Collecter SEKOIA",
+        "3. Normaliser + construire",
+    ):
+        next(btn for btn in poc_app.button if btn.label == label).click().run()
+        assert not poc_app.exception
+        assert any("Dernière opération terminée avec succès" in info.value for info in poc_app.info)
 
     # 3. Test Pipeline Page - Permission Error Handler
     pytest._pipeline_fail_type = "permission"  # type: ignore[attr-defined]
+    cron_btn = next(btn for btn in poc_app.button if btn.label == "2. Collecter SEKOIA")
     cron_btn.click().run()
     assert not poc_app.exception
     assert any("Dernière opération en erreur" in warning.value for warning in poc_app.warning)
@@ -271,7 +276,7 @@ def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
     assert any("Dernière opération en erreur" in warning.value for warning in poc_app.warning)
     pytest._pipeline_fail_type = None  # type: ignore[attr-defined]
 
-    # 5. Test Pipeline Page - Observer Restriction
+    # 5. Test Pipeline Page - Viewer Restriction
     # Logout and login as viewer/observer
     open_page(poc_app, "Paramètres", "nav_settings")
     logout_btn = next(btn for btn in poc_app.button if btn.label == "Déconnexion")
@@ -284,5 +289,8 @@ def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
     assert poc_app.session_state["authenticated"] is True
     assert poc_app.session_state["user"]["role"] == "viewer"
 
-    open_page(poc_app, "Flux de données", "nav_pipeline")
-    assert any("Accès réservé" in warning.value for warning in poc_app.warning)
+    assert not any(btn.label == "Flux de données" for btn in poc_app.button)
+    poc_app.session_state["page"] = "nav_pipeline"
+    poc_app.run()
+    assert poc_app.session_state["page"] == "nav_home"
+    assert not any(btn.label == "Flux de données" for btn in poc_app.button)
