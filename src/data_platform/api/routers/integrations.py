@@ -27,7 +27,7 @@ import secrets
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from time import perf_counter
-from typing import Any
+from typing import Any, Literal
 from uuid import NAMESPACE_URL, uuid4, uuid5
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -48,6 +48,17 @@ from core.loops import send_loops_transactional
 from core.rate_limit import limiter
 from core.secret_cipher import decrypt_secret, encrypt_secret
 from data_platform.api.auth import AuthUser, ensure_runtime_tables, get_current_user
+from data_platform.api.schemas.app_responses import (
+    CloudflareIntegrationResponse,
+    StatusResponse,
+)
+from data_platform.api.schemas.integration_responses import (
+    CloudflareSetupResponse,
+    CloudflareTeardownResponse,
+    CloudflareTokenStatusResponse,
+    CloudflareTokenVerificationResponse,
+    QuarantineCustodyResponse,
+)
 from data_platform.cleaning.normalization import anonymize_pii
 from data_platform.services.cloudflare_provisioner import (
     CloudflareAPIError,
@@ -333,12 +344,12 @@ class EmailScanRequest(BaseModel):
 
 class EmailScanResponse(BaseModel):
     event_id: str
-    verdict: str  # "phishing" | "safe"
-    label: str  # "phishing" | "spam" | "legitimate"
-    score: float
+    verdict: Literal["safe", "phishing", "quarantine"]
+    label: Literal["phishing", "spam", "legitimate"]
+    score: float = Field(ge=0, le=1)
     explanation: str = ""
     quarantine_id: str | None = None
-    latency_ms: float | None = None
+    latency_ms: float | None = Field(default=None, ge=0)
 
 
 class CloudflareSetupRequest(BaseModel):
@@ -704,7 +715,10 @@ async def scan_email(
     )
 
 
-@router.put("/v1/email/quarantine/{item_id}/content")
+@router.put(
+    "/v1/email/quarantine/{item_id}/content",
+    response_model=QuarantineCustodyResponse,
+)
 @limiter.limit("120/minute")
 async def upload_quarantine_content(
     item_id: str,
@@ -768,7 +782,12 @@ async def upload_quarantine_content(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/v1/integrations/cloudflare/setup", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/v1/integrations/cloudflare/setup",
+    status_code=status.HTTP_201_CREATED,
+    response_model=CloudflareSetupResponse,
+    response_model_exclude_unset=True,
+)
 @limiter.limit("10/hour")
 async def setup_cloudflare(
     payload: CloudflareSetupRequest,
@@ -1206,7 +1225,11 @@ async def setup_cloudflare(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/v1/integrations/cloudflare/status")
+@router.get(
+    "/v1/integrations/cloudflare/status",
+    response_model=CloudflareIntegrationResponse,
+    response_model_exclude_unset=True,
+)
 async def cloudflare_status(
     current_user: AuthUser = Depends(get_current_user),
 ) -> dict[str, Any]:
@@ -1239,7 +1262,10 @@ async def cloudflare_status(
 # ---------------------------------------------------------------------------
 
 
-@router.delete("/v1/integrations/cloudflare")
+@router.delete(
+    "/v1/integrations/cloudflare",
+    response_model=CloudflareTeardownResponse,
+)
 async def teardown_cloudflare(
     payload: TeardownRequest,
     current_user: AuthUser = Depends(get_current_user),
@@ -1341,7 +1367,11 @@ class TokenVerifyRequest(BaseModel):
     zone_name: str
 
 
-@router.post("/v1/integrations/cloudflare/verify-token")
+@router.post(
+    "/v1/integrations/cloudflare/verify-token",
+    response_model=CloudflareTokenVerificationResponse,
+    response_model_exclude_unset=True,
+)
 async def verify_cloudflare_token(
     payload: TokenVerifyRequest,
     current_user: AuthUser = Depends(get_current_user),
@@ -1370,7 +1400,10 @@ class CloudflareTokenSaveRequest(BaseModel):
     cf_api_token: str = Field(..., description="Cloudflare API token to store")
 
 
-@router.get("/v1/integrations/cloudflare/token")
+@router.get(
+    "/v1/integrations/cloudflare/token",
+    response_model=CloudflareTokenStatusResponse,
+)
 async def get_workspace_cloudflare_token(
     current_user: AuthUser = Depends(get_current_user),
 ) -> dict[str, Any]:
@@ -1400,7 +1433,7 @@ async def get_workspace_cloudflare_token(
     return {"configured": bool(integ_rows[0]["api_token"])}
 
 
-@router.post("/v1/integrations/cloudflare/token")
+@router.post("/v1/integrations/cloudflare/token", response_model=StatusResponse)
 async def save_workspace_cloudflare_token(
     payload: CloudflareTokenSaveRequest,
     current_user: AuthUser = Depends(get_current_user),
@@ -1439,7 +1472,7 @@ async def save_workspace_cloudflare_token(
     return {"status": "saved"}
 
 
-@router.delete("/v1/integrations/cloudflare/token")
+@router.delete("/v1/integrations/cloudflare/token", response_model=StatusResponse)
 async def delete_workspace_cloudflare_token(
     current_user: AuthUser = Depends(get_current_user),
 ) -> dict[str, Any]:

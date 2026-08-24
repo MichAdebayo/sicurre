@@ -1,4 +1,4 @@
-.PHONY: help install test dev-api test-inference \
+.PHONY: help install test dev-api test-inference openapi openapi-check \
         ingest-all-base \
         data-platform-staging-smoke \
         app-stack-smoke \
@@ -40,6 +40,8 @@ help:
 	@echo "  Setup"
 	@echo "  make install                   - Install local python dependencies"
 	@echo "  make test                      - Run backend test suite"
+	@echo "  make openapi                   - Regenerate docs/api/openapi.yaml from FastAPI"
+	@echo "  make openapi-check             - Fail when the generated OpenAPI contract is stale"
 	@echo "  make test-inference            - Smoke-test the inference API (localhost:8000)"
 	@echo "  make dev-api                   - Start data platform API on http://localhost:8001"
 	@echo "  make data-platform-staging-smoke - Build and smoke-test data platform container"
@@ -99,6 +101,12 @@ test-unit:
 
 test-integration:
 	uv run pytest tests/integration
+
+openapi:
+	uv run --no-sync python scripts/data_platform/generate_openapi.py
+
+openapi-check:
+	uv run --no-sync python scripts/data_platform/generate_openapi.py --check
 
 dev-api:
 	@pids="$$(pgrep -f 'uvicorn data_platform.api.main:app --reload --port 8001' 2>/dev/null) $$(lsof -tiTCP:8001 -sTCP:LISTEN 2>/dev/null)"; \

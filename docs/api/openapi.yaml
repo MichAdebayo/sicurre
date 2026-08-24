@@ -1,2043 +1,4743 @@
-openapi: 3.0.3
+components:
+  schemas:
+    AdminDomainPageResponse:
+      additionalProperties: false
+      description: Searchable page of connected customer domains.
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/AdminDomainResponse'
+          title: Items
+          type: array
+        page:
+          minimum: 1.0
+          title: Page
+          type: integer
+        page_size:
+          maximum: 100.0
+          minimum: 1.0
+          title: Page Size
+          type: integer
+        pages:
+          minimum: 1.0
+          title: Pages
+          type: integer
+        total:
+          minimum: 0.0
+          title: Total
+          type: integer
+      required:
+      - items
+      - page
+      - page_size
+      - total
+      - pages
+      title: AdminDomainPageResponse
+      type: object
+    AdminDomainResponse:
+      additionalProperties: false
+      description: Bounded Cloudflare domain inventory row.
+      properties:
+        status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+        updated_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Updated At
+        user_email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: User Email
+        zone_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Zone Name
+      title: AdminDomainResponse
+      type: object
+    AdminFeedbackResponse:
+      additionalProperties: false
+      description: Recent feedback audit row.
+      properties:
+        corrected_verdict:
+          title: Corrected Verdict
+          type: string
+        created_at:
+          title: Created At
+          type: string
+        feedback_type:
+          title: Feedback Type
+          type: string
+        id:
+          title: Id
+          type: string
+        original_verdict:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Original Verdict
+        reporter_email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reporter Email
+        workspace_id:
+          title: Workspace Id
+          type: string
+      required:
+      - id
+      - workspace_id
+      - feedback_type
+      - corrected_verdict
+      - created_at
+      title: AdminFeedbackResponse
+      type: object
+    AdminOverviewResponse:
+      additionalProperties: false
+      description: Bounded operational overview for platform administrators.
+      properties:
+        cloudflare_domains:
+          items:
+            $ref: '#/components/schemas/AdminDomainResponse'
+          title: Cloudflare Domains
+          type: array
+        feedback_by_type:
+          items:
+            $ref: '#/components/schemas/FeedbackCountResponse'
+          title: Feedback By Type
+          type: array
+        recent_feedback:
+          items:
+            $ref: '#/components/schemas/AdminFeedbackResponse'
+          title: Recent Feedback
+          type: array
+        recent_quarantine:
+          items:
+            $ref: '#/components/schemas/AdminQuarantineResponse'
+          title: Recent Quarantine
+          type: array
+        recent_support:
+          items:
+            $ref: '#/components/schemas/AdminSupportResponse'
+          title: Recent Support
+          type: array
+        summary:
+          $ref: '#/components/schemas/AdminSummaryResponse'
+        verdicts:
+          items:
+            $ref: '#/components/schemas/VerdictCountResponse'
+          title: Verdicts
+          type: array
+      required:
+      - summary
+      - verdicts
+      - feedback_by_type
+      - cloudflare_domains
+      - recent_feedback
+      - recent_quarantine
+      - recent_support
+      title: AdminOverviewResponse
+      type: object
+    AdminQuarantineResponse:
+      additionalProperties: false
+      description: Recent quarantine audit row.
+      properties:
+        composite_score:
+          title: Composite Score
+          type: number
+        created_at:
+          title: Created At
+          type: string
+        expires_at:
+          title: Expires At
+          type: string
+        id:
+          title: Id
+          type: string
+        safety_verdict:
+          title: Safety Verdict
+          type: string
+        status:
+          title: Status
+          type: string
+        workspace_id:
+          title: Workspace Id
+          type: string
+      required:
+      - id
+      - workspace_id
+      - safety_verdict
+      - composite_score
+      - status
+      - created_at
+      - expires_at
+      title: AdminQuarantineResponse
+      type: object
+    AdminRuntimeHealthResponse:
+      additionalProperties: false
+      description: Aggregated platform health visible to administrators.
+      properties:
+        checked_at:
+          title: Checked At
+          type: string
+        components:
+          items:
+            $ref: '#/components/schemas/RuntimeComponentResponse'
+          title: Components
+          type: array
+        expected_worker_scan_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Expected Worker Scan Url
+        inference_api_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Inference Api Url
+        public_api_host:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Public Api Host
+        status:
+          enum:
+          - ok
+          - degraded
+          - down
+          - unknown
+          title: Status
+          type: string
+      required:
+      - status
+      - checked_at
+      - components
+      title: AdminRuntimeHealthResponse
+      type: object
+    AdminSummaryResponse:
+      additionalProperties: false
+      description: Platform-wide bounded counters.
+      properties:
+        cloudflare_active_count:
+          minimum: 0.0
+          title: Cloudflare Active Count
+          type: integer
+        cloudflare_integrations_count:
+          minimum: 0.0
+          title: Cloudflare Integrations Count
+          type: integer
+        false_negative_count:
+          minimum: 0.0
+          title: False Negative Count
+          type: integer
+        feedback_count:
+          minimum: 0.0
+          title: Feedback Count
+          type: integer
+        members_count:
+          minimum: 0.0
+          title: Members Count
+          type: integer
+        quarantine_held_count:
+          minimum: 0.0
+          title: Quarantine Held Count
+          type: integer
+        reported_email_count:
+          minimum: 0.0
+          title: Reported Email Count
+          type: integer
+        support_open_count:
+          minimum: 0.0
+          title: Support Open Count
+          type: integer
+        threat_events_count:
+          minimum: 0.0
+          title: Threat Events Count
+          type: integer
+        workspaces_count:
+          minimum: 0.0
+          title: Workspaces Count
+          type: integer
+      required:
+      - workspaces_count
+      - members_count
+      - threat_events_count
+      - feedback_count
+      - false_negative_count
+      - reported_email_count
+      - quarantine_held_count
+      - cloudflare_integrations_count
+      - cloudflare_active_count
+      - support_open_count
+      title: AdminSummaryResponse
+      type: object
+    AdminSupportResponse:
+      additionalProperties: false
+      description: Recent support request audit row.
+      properties:
+        category:
+          title: Category
+          type: string
+        created_at:
+          title: Created At
+          type: string
+        id:
+          title: Id
+          type: string
+        requester_email:
+          title: Requester Email
+          type: string
+        status:
+          title: Status
+          type: string
+        workspace_id:
+          title: Workspace Id
+          type: string
+      required:
+      - id
+      - workspace_id
+      - requester_email
+      - category
+      - status
+      - created_at
+      title: AdminSupportResponse
+      type: object
+    AlertHistoryResponse:
+      additionalProperties: false
+      description: One customer-visible notification.
+      properties:
+        created_at:
+          title: Created At
+          type: string
+        id:
+          title: Id
+          type: string
+        message:
+          title: Message
+          type: string
+        title:
+          title: Title
+          type: string
+      required:
+      - id
+      - title
+      - message
+      - created_at
+      title: AlertHistoryResponse
+      type: object
+    AlertPreferenceResponse:
+      additionalProperties: false
+      description: Workspace notification preferences.
+      properties:
+        notify_phishing:
+          title: Notify Phishing
+          type: boolean
+        notify_spam:
+          title: Notify Spam
+          type: boolean
+        quiet_hours_enabled:
+          title: Quiet Hours Enabled
+          type: boolean
+        quiet_hours_end:
+          title: Quiet Hours End
+          type: string
+        quiet_hours_start:
+          title: Quiet Hours Start
+          type: string
+        timezone:
+          title: Timezone
+          type: string
+      required:
+      - notify_phishing
+      - notify_spam
+      - quiet_hours_enabled
+      - quiet_hours_start
+      - quiet_hours_end
+      - timezone
+      title: AlertPreferenceResponse
+      type: object
+    AlertPreferenceUpdate:
+      properties:
+        notify_phishing:
+          title: Notify Phishing
+          type: boolean
+        notify_spam:
+          title: Notify Spam
+          type: boolean
+        quiet_hours_enabled:
+          title: Quiet Hours Enabled
+          type: boolean
+        quiet_hours_end:
+          default: 07:00
+          pattern: ^(?:[01]\d|2[0-3]):[0-5]\d$
+          title: Quiet Hours End
+          type: string
+        quiet_hours_start:
+          default: '22:00'
+          pattern: ^(?:[01]\d|2[0-3]):[0-5]\d$
+          title: Quiet Hours Start
+          type: string
+        timezone:
+          default: Europe/Paris
+          maxLength: 64
+          minLength: 1
+          title: Timezone
+          type: string
+      required:
+      - notify_phishing
+      - notify_spam
+      - quiet_hours_enabled
+      title: AlertPreferenceUpdate
+      type: object
+    AnnotationCreate:
+      properties:
+        annotated_at:
+          format: date-time
+          title: Annotated At
+          type: string
+        comment:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Comment
+        confidence:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Confidence
+        is_validated:
+          default: false
+          title: Is Validated
+          type: boolean
+        label:
+          $ref: '#/components/schemas/AnnotationLabel'
+        label_source:
+          $ref: '#/components/schemas/AnnotationLabelSource'
+        normalized_message_id:
+          format: uuid
+          title: Normalized Message Id
+          type: string
+      required:
+      - normalized_message_id
+      - label
+      - label_source
+      - annotated_at
+      title: AnnotationCreate
+      type: object
+    AnnotationLabel:
+      enum:
+      - phishing
+      - spam
+      - legitimate
+      - unknown
+      title: AnnotationLabel
+      type: string
+    AnnotationLabelSource:
+      enum:
+      - common_crawl_acceptance_review
+      - generation_gated_promotion
+      - manual_review
+      - normalized_message_backfill
+      title: AnnotationLabelSource
+      type: string
+    AnnotationRead:
+      properties:
+        annotated_at:
+          format: date-time
+          title: Annotated At
+          type: string
+        comment:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Comment
+        confidence:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Confidence
+        created_at:
+          format: date-time
+          title: Created At
+          type: string
+        id:
+          format: uuid
+          title: Id
+          type: string
+        is_validated:
+          default: false
+          title: Is Validated
+          type: boolean
+        label:
+          $ref: '#/components/schemas/AnnotationLabel'
+        label_source:
+          $ref: '#/components/schemas/AnnotationLabelSource'
+        normalized_message_id:
+          format: uuid
+          title: Normalized Message Id
+          type: string
+      required:
+      - normalized_message_id
+      - label
+      - label_source
+      - annotated_at
+      - id
+      - created_at
+      title: AnnotationRead
+      type: object
+    AuthSessionResponse:
+      additionalProperties: false
+      description: Authenticated workspace and onboarding state.
+      properties:
+        display_name:
+          title: Display Name
+          type: string
+        email:
+          title: Email
+          type: string
+        has_cloudflare_integration:
+          title: Has Cloudflare Integration
+          type: boolean
+        id:
+          title: Id
+          type: string
+        is_platform_admin:
+          title: Is Platform Admin
+          type: boolean
+        onboarding_required:
+          title: Onboarding Required
+          type: boolean
+        role:
+          title: Role
+          type: string
+        sla_latency_ms:
+          minimum: 0.0
+          title: Sla Latency Ms
+          type: integer
+        threat_count:
+          minimum: 0.0
+          title: Threat Count
+          type: integer
+        workspace_id:
+          title: Workspace Id
+          type: string
+        workspace_name:
+          title: Workspace Name
+          type: string
+      required:
+      - id
+      - email
+      - display_name
+      - role
+      - workspace_id
+      - workspace_name
+      - is_platform_admin
+      - has_cloudflare_integration
+      - threat_count
+      - onboarding_required
+      - sla_latency_ms
+      title: AuthSessionResponse
+      type: object
+    BlacklistStatusResponse:
+      additionalProperties: false
+      description: Consolidated reputation-provider result.
+      properties:
+        error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error
+        listed:
+          title: Listed
+          type: boolean
+        matched:
+          items:
+            type: string
+          title: Matched
+          type: array
+      required:
+      - listed
+      - matched
+      title: BlacklistStatusResponse
+      type: object
+    CloudflareDnsSyncResponse:
+      additionalProperties: false
+      description: Domain Shield values recomputed during provisioning.
+      properties:
+        dmarc_record:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Dmarc Record
+        dmarc_reporting_enabled:
+          title: Dmarc Reporting Enabled
+          type: boolean
+        reputation_score:
+          maximum: 100.0
+          minimum: 0.0
+          title: Reputation Score
+          type: integer
+        score_grade:
+          title: Score Grade
+          type: string
+        updated_at:
+          title: Updated At
+          type: string
+        zone_id:
+          title: Zone Id
+          type: string
+      required:
+      - zone_id
+      - dmarc_reporting_enabled
+      - reputation_score
+      - score_grade
+      - updated_at
+      title: CloudflareDnsSyncResponse
+      type: object
+    CloudflareIntegrationResponse:
+      additionalProperties: false
+      description: Sanitized Cloudflare integration state; credentials are never returned.
+      properties:
+        created_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Created At
+        destination_email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Destination Email
+        error_message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error Message
+        id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Id
+        status:
+          title: Status
+          type: string
+        token_configured:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Token Configured
+        updated_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Updated At
+        user_email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: User Email
+        worker_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Worker Name
+        zone_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Zone Name
+      required:
+      - status
+      title: CloudflareIntegrationResponse
+      type: object
+    CloudflareSetupRequest:
+      properties:
+        cf_api_token:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Cloudflare API token with DNS + Workers + Email Routing write access
+          title: Cf Api Token
+        destination_email:
+          description: Where clean mail is forwarded after scanning
+          title: Destination Email
+          type: string
+        fix_dkim:
+          default: true
+          title: Fix Dkim
+          type: boolean
+        fix_dmarc:
+          default: true
+          title: Fix Dmarc
+          type: boolean
+        fix_spf:
+          default: true
+          title: Fix Spf
+          type: boolean
+        zone_name:
+          description: Domain to protect, e.g. vinse.app
+          title: Zone Name
+          type: string
+      required:
+      - zone_name
+      - destination_email
+      title: CloudflareSetupRequest
+      type: object
+    CloudflareSetupResponse:
+      additionalProperties: false
+      description: Cloudflare provisioning or reprovisioning acknowledgement.
+      properties:
+        destination_email:
+          title: Destination Email
+          type: string
+        dns_sync:
+          anyOf:
+          - $ref: '#/components/schemas/CloudflareDnsSyncResponse'
+          - type: 'null'
+        integration_id:
+          title: Integration Id
+          type: string
+        message:
+          title: Message
+          type: string
+        status:
+          title: Status
+          type: string
+        worker_update:
+          anyOf:
+          - $ref: '#/components/schemas/CloudflareWorkerUpdateResponse'
+          - type: 'null'
+        zone_name:
+          title: Zone Name
+          type: string
+      required:
+      - integration_id
+      - status
+      - zone_name
+      - destination_email
+      - message
+      title: CloudflareSetupResponse
+      type: object
+    CloudflareTeardownResponse:
+      additionalProperties: false
+      description: Removed Cloudflare integration.
+      properties:
+        status:
+          const: removed
+          title: Status
+          type: string
+        zone_name:
+          title: Zone Name
+          type: string
+      required:
+      - status
+      - zone_name
+      title: CloudflareTeardownResponse
+      type: object
+    CloudflareTokenSaveRequest:
+      properties:
+        cf_api_token:
+          description: Cloudflare API token to store
+          title: Cf Api Token
+          type: string
+      required:
+      - cf_api_token
+      title: CloudflareTokenSaveRequest
+      type: object
+    CloudflareTokenStatusResponse:
+      additionalProperties: false
+      description: Presence of an encrypted workspace Cloudflare credential.
+      properties:
+        configured:
+          title: Configured
+          type: boolean
+      required:
+      - configured
+      title: CloudflareTokenStatusResponse
+      type: object
+    CloudflareTokenVerificationResponse:
+      additionalProperties: false
+      description: Cloudflare token and zone-access validation result.
+      properties:
+        error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error
+        valid:
+          title: Valid
+          type: boolean
+        zone_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Zone Id
+      required:
+      - valid
+      title: CloudflareTokenVerificationResponse
+      type: object
+    CloudflareWorkerUpdateResponse:
+      additionalProperties: false
+      description: Worker binding update performed during reprovisioning.
+      properties:
+        scan_url:
+          title: Scan Url
+          type: string
+        updated:
+          title: Updated
+          type: boolean
+        worker_name:
+          title: Worker Name
+          type: string
+      required:
+      - updated
+      - scan_url
+      - worker_name
+      title: CloudflareWorkerUpdateResponse
+      type: object
+    DataSourceCreate:
+      properties:
+        contains_personal_data:
+          default: false
+          title: Contains Personal Data
+          type: boolean
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        legal_basis:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Legal Basis
+        name:
+          minLength: 1
+          title: Name
+          type: string
+        owner_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner Name
+        retention_days:
+          anyOf:
+          - minimum: 1.0
+            type: integer
+          - type: 'null'
+          title: Retention Days
+        source_type:
+          $ref: '#/components/schemas/SourceType'
+      required:
+      - name
+      - source_type
+      title: DataSourceCreate
+      type: object
+    DataSourceListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/DataSourceRead'
+          title: Items
+          type: array
+        total:
+          title: Total
+          type: integer
+      required:
+      - items
+      - total
+      title: DataSourceListResponse
+      type: object
+    DataSourceRead:
+      properties:
+        contains_personal_data:
+          default: false
+          title: Contains Personal Data
+          type: boolean
+        created_at:
+          format: date-time
+          title: Created At
+          type: string
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        id:
+          format: uuid
+          title: Id
+          type: string
+        is_active:
+          title: Is Active
+          type: boolean
+        legal_basis:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Legal Basis
+        name:
+          minLength: 1
+          title: Name
+          type: string
+        owner_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Owner Name
+        retention_days:
+          anyOf:
+          - minimum: 1.0
+            type: integer
+          - type: 'null'
+          title: Retention Days
+        source_type:
+          $ref: '#/components/schemas/SourceType'
+        updated_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          title: Updated At
+      required:
+      - name
+      - source_type
+      - id
+      - is_active
+      - created_at
+      title: DataSourceRead
+      type: object
+    DatasetCreate:
+      properties:
+        name:
+          minLength: 1
+          title: Name
+          type: string
+        status:
+          $ref: '#/components/schemas/DatasetStatus'
+        target_usage:
+          minLength: 1
+          title: Target Usage
+          type: string
+        version_tag:
+          minLength: 1
+          title: Version Tag
+          type: string
+      required:
+      - name
+      - version_tag
+      - target_usage
+      - status
+      title: DatasetCreate
+      type: object
+    DatasetItemListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/DatasetItemRead'
+          title: Items
+          type: array
+        total:
+          title: Total
+          type: integer
+      required:
+      - items
+      - total
+      title: DatasetItemListResponse
+      type: object
+    DatasetItemRead:
+      properties:
+        created_at:
+          format: date-time
+          title: Created At
+          type: string
+        dataset_id:
+          format: uuid
+          title: Dataset Id
+          type: string
+        id:
+          format: uuid
+          title: Id
+          type: string
+        normalized_message_id:
+          format: uuid
+          title: Normalized Message Id
+          type: string
+        row_order:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Row Order
+        sample_weight:
+          title: Sample Weight
+          type: number
+        split_name:
+          $ref: '#/components/schemas/SplitName'
+      required:
+      - id
+      - dataset_id
+      - normalized_message_id
+      - split_name
+      - sample_weight
+      - created_at
+      title: DatasetItemRead
+      type: object
+    DatasetListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/DatasetRead'
+          title: Items
+          type: array
+        total:
+          title: Total
+          type: integer
+      required:
+      - items
+      - total
+      title: DatasetListResponse
+      type: object
+    DatasetPublishResponse:
+      properties:
+        github_dispatch_sent:
+          title: Github Dispatch Sent
+          type: boolean
+        kaggle_url:
+          title: Kaggle Url
+          type: string
+        kaggle_version_id:
+          title: Kaggle Version Id
+          type: integer
+      required:
+      - kaggle_url
+      - kaggle_version_id
+      - github_dispatch_sent
+      title: DatasetPublishResponse
+      type: object
+    DatasetRead:
+      properties:
+        created_at:
+          format: date-time
+          title: Created At
+          type: string
+        frozen_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          title: Frozen At
+        id:
+          format: uuid
+          title: Id
+          type: string
+        item_count:
+          title: Item Count
+          type: integer
+        name:
+          minLength: 1
+          title: Name
+          type: string
+        status:
+          $ref: '#/components/schemas/DatasetStatus'
+        target_usage:
+          minLength: 1
+          title: Target Usage
+          type: string
+        updated_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          title: Updated At
+        version_tag:
+          minLength: 1
+          title: Version Tag
+          type: string
+      required:
+      - name
+      - version_tag
+      - target_usage
+      - status
+      - id
+      - item_count
+      - created_at
+      title: DatasetRead
+      type: object
+    DatasetStatus:
+      enum:
+      - draft
+      - frozen
+      - archived
+      title: DatasetStatus
+      type: string
+    DatasetSummaryResponse:
+      additionalProperties: false
+      description: Published or draft dataset visible to administrators.
+      properties:
+        id:
+          title: Id
+          type: string
+        item_count:
+          minimum: 0.0
+          title: Item Count
+          type: integer
+        published_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Published At
+        status:
+          title: Status
+          type: string
+        version_tag:
+          title: Version Tag
+          type: string
+      required:
+      - id
+      - version_tag
+      - item_count
+      - status
+      title: DatasetSummaryResponse
+      type: object
+    DmarcImportResponse:
+      additionalProperties: false
+      description: Idempotent DMARC import result.
+      properties:
+        record_count:
+          minimum: 0.0
+          title: Record Count
+          type: integer
+        status:
+          enum:
+          - imported
+          - already_imported
+          title: Status
+          type: string
+      required:
+      - status
+      - record_count
+      title: DmarcImportResponse
+      type: object
+    DmarcSourceResponse:
+      additionalProperties: false
+      description: Aggregate DMARC result grouped by sending source.
+      properties:
+        disposition:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Disposition
+        dkim_result:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Dkim Result
+        message_count:
+          minimum: 0.0
+          title: Message Count
+          type: integer
+        source_ip:
+          title: Source Ip
+          type: string
+        spf_result:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Spf Result
+      required:
+      - source_ip
+      - message_count
+      title: DmarcSourceResponse
+      type: object
+    DmarcStatusResponse:
+      additionalProperties: false
+      description: DMARC validation and reporting state.
+      properties:
+        error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error
+        policy:
+          title: Policy
+          type: string
+        record:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Record
+        reporting_enabled:
+          default: false
+          title: Reporting Enabled
+          type: boolean
+        valid:
+          title: Valid
+          type: boolean
+      required:
+      - valid
+      - policy
+      title: DmarcStatusResponse
+      type: object
+    DmarcSummaryResponse:
+      additionalProperties: false
+      description: Tenant-scoped aggregate DMARC report summary.
+      properties:
+        aligned_messages:
+          minimum: 0.0
+          title: Aligned Messages
+          type: integer
+        domain:
+          title: Domain
+          type: string
+        failed_messages:
+          minimum: 0.0
+          title: Failed Messages
+          type: integer
+        last_report_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Report At
+        report_count:
+          minimum: 0.0
+          title: Report Count
+          type: integer
+        top_sources:
+          items:
+            $ref: '#/components/schemas/DmarcSourceResponse'
+          title: Top Sources
+          type: array
+        total_messages:
+          minimum: 0.0
+          title: Total Messages
+          type: integer
+      required:
+      - domain
+      - total_messages
+      - aligned_messages
+      - failed_messages
+      - report_count
+      - top_sources
+      title: DmarcSummaryResponse
+      type: object
+    DnsRecordStatusResponse:
+      additionalProperties: false
+      description: Validation state for an email authentication record.
+      properties:
+        error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error
+        record:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Record
+        valid:
+          title: Valid
+          type: boolean
+      required:
+      - valid
+      title: DnsRecordStatusResponse
+      type: object
+    DomainShieldResponse:
+      additionalProperties: false
+      description: Current DNS, TLS, and reputation posture for one connected domain.
+      properties:
+        blacklists:
+          $ref: '#/components/schemas/BlacklistStatusResponse'
+        dkim:
+          $ref: '#/components/schemas/DnsRecordStatusResponse'
+        dmarc:
+          $ref: '#/components/schemas/DmarcStatusResponse'
+        reputation_score:
+          maximum: 100.0
+          minimum: 0.0
+          title: Reputation Score
+          type: integer
+        score_grade:
+          title: Score Grade
+          type: string
+        spf:
+          $ref: '#/components/schemas/DnsRecordStatusResponse'
+        ssl:
+          $ref: '#/components/schemas/SslStatusResponse'
+        updated_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Updated At
+      required:
+      - spf
+      - dkim
+      - dmarc
+      - ssl
+      - reputation_score
+      - score_grade
+      - blacklists
+      title: DomainShieldResponse
+      type: object
+    EmailScanRequest:
+      properties:
+        message_id:
+          anyOf:
+          - maxLength: 500
+            type: string
+          - type: 'null'
+          title: Message Id
+        sender:
+          default: ''
+          maxLength: 200
+          title: Sender
+          type: string
+        subject:
+          default: ''
+          maxLength: 500
+          title: Subject
+          type: string
+        text:
+          default: ''
+          maxLength: 10000
+          title: Text
+          type: string
+        use_llm:
+          default: true
+          title: Use Llm
+          type: boolean
+        use_virustotal:
+          default: false
+          title: Use Virustotal
+          type: boolean
+      title: EmailScanRequest
+      type: object
+    EmailScanResponse:
+      properties:
+        event_id:
+          title: Event Id
+          type: string
+        explanation:
+          default: ''
+          title: Explanation
+          type: string
+        label:
+          enum:
+          - phishing
+          - spam
+          - legitimate
+          title: Label
+          type: string
+        latency_ms:
+          anyOf:
+          - minimum: 0.0
+            type: number
+          - type: 'null'
+          title: Latency Ms
+        quarantine_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Quarantine Id
+        score:
+          maximum: 1.0
+          minimum: 0.0
+          title: Score
+          type: number
+        verdict:
+          enum:
+          - safe
+          - phishing
+          - quarantine
+          title: Verdict
+          type: string
+      required:
+      - event_id
+      - verdict
+      - label
+      - score
+      title: EmailScanResponse
+      type: object
+    EvaluationSetRegistration:
+      description: Immutable golden-set manifest registered by the data-platform owner.
+      properties:
+        content_checksum:
+          pattern: ^[a-fA-F0-9]{64}$
+          title: Content Checksum
+          type: string
+        item_count:
+          exclusiveMinimum: 0.0
+          title: Item Count
+          type: integer
+        label_counts:
+          additionalProperties:
+            type: integer
+          title: Label Counts
+          type: object
+        language_counts:
+          additionalProperties:
+            type: integer
+          title: Language Counts
+          type: object
+        name:
+          maxLength: 200
+          minLength: 1
+          title: Name
+          type: string
+        object_uri:
+          pattern: ^r2://[^/]+/.+
+          title: Object Uri
+          type: string
+        provenance:
+          const: synthetic_provisional
+          title: Provenance
+          type: string
+        reviewed_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          title: Reviewed At
+        reviewed_by:
+          anyOf:
+          - maxLength: 320
+            type: string
+          - type: 'null'
+          title: Reviewed By
+        schema_version:
+          maxLength: 50
+          minLength: 1
+          title: Schema Version
+          type: string
+        status:
+          default: draft
+          enum:
+          - draft
+          - approved
+          title: Status
+          type: string
+        version_tag:
+          maxLength: 120
+          minLength: 1
+          title: Version Tag
+          type: string
+      required:
+      - name
+      - version_tag
+      - schema_version
+      - provenance
+      - object_uri
+      - content_checksum
+      - item_count
+      - label_counts
+      - language_counts
+      title: EvaluationSetRegistration
+      type: object
+    FeedbackCountResponse:
+      additionalProperties: false
+      description: Count grouped by feedback type.
+      properties:
+        count:
+          minimum: 0.0
+          title: Count
+          type: integer
+        feedback_type:
+          title: Feedback Type
+          type: string
+      required:
+      - feedback_type
+      - count
+      title: FeedbackCountResponse
+      type: object
+    FeedbackCreate:
+      properties:
+        corrected_verdict:
+          pattern: ^(phishing|spam|legitimate|quarantine)$
+          title: Corrected Verdict
+          type: string
+        event_id:
+          anyOf:
+          - maxLength: 120
+            type: string
+          - type: 'null'
+          title: Event Id
+        feedback_type:
+          pattern: ^(false_negative|false_positive|true_positive|true_negative)$
+          title: Feedback Type
+          type: string
+        reporter_note:
+          anyOf:
+          - maxLength: 500
+            type: string
+          - type: 'null'
+          title: Reporter Note
+      required:
+      - feedback_type
+      - corrected_verdict
+      title: FeedbackCreate
+      type: object
+    FeedbackResponse:
+      additionalProperties: false
+      description: Persisted classification correction.
+      properties:
+        corrected_verdict:
+          title: Corrected Verdict
+          type: string
+        created_at:
+          title: Created At
+          type: string
+        event_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Event Id
+        feedback_type:
+          title: Feedback Type
+          type: string
+        id:
+          title: Id
+          type: string
+        original_verdict:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Original Verdict
+      required:
+      - id
+      - feedback_type
+      - corrected_verdict
+      - created_at
+      title: FeedbackResponse
+      type: object
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          title: Detail
+          type: array
+      title: HTTPValidationError
+      type: object
+    HealthResponse:
+      additionalProperties: false
+      description: Process liveness and deployment environment.
+      properties:
+        environment:
+          title: Environment
+          type: string
+        status:
+          const: ok
+          title: Status
+          type: string
+      required:
+      - status
+      - environment
+      title: HealthResponse
+      type: object
+    IngestionRunCreate:
+      properties:
+        finished_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          title: Finished At
+        log_message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Log Message
+        raw_object_count:
+          default: 0
+          minimum: 0.0
+          title: Raw Object Count
+          type: integer
+        raw_record_count:
+          default: 0
+          minimum: 0.0
+          title: Raw Record Count
+          type: integer
+        source_system_id:
+          format: uuid
+          title: Source System Id
+          type: string
+        started_at:
+          format: date-time
+          title: Started At
+          type: string
+        status:
+          $ref: '#/components/schemas/IngestionStatus'
+        trigger_mode:
+          minLength: 1
+          title: Trigger Mode
+          type: string
+      required:
+      - source_system_id
+      - started_at
+      - status
+      - trigger_mode
+      title: IngestionRunCreate
+      type: object
+    IngestionRunListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/IngestionRunRead'
+          title: Items
+          type: array
+        total:
+          title: Total
+          type: integer
+      required:
+      - items
+      - total
+      title: IngestionRunListResponse
+      type: object
+    IngestionRunRead:
+      properties:
+        created_at:
+          format: date-time
+          title: Created At
+          type: string
+        finished_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          title: Finished At
+        id:
+          format: uuid
+          title: Id
+          type: string
+        log_message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Log Message
+        raw_object_count:
+          default: 0
+          minimum: 0.0
+          title: Raw Object Count
+          type: integer
+        raw_record_count:
+          default: 0
+          minimum: 0.0
+          title: Raw Record Count
+          type: integer
+        source_system_id:
+          format: uuid
+          title: Source System Id
+          type: string
+        started_at:
+          format: date-time
+          title: Started At
+          type: string
+        status:
+          $ref: '#/components/schemas/IngestionStatus'
+        trigger_mode:
+          minLength: 1
+          title: Trigger Mode
+          type: string
+      required:
+      - source_system_id
+      - started_at
+      - status
+      - trigger_mode
+      - id
+      - created_at
+      title: IngestionRunRead
+      type: object
+    IngestionStatus:
+      enum:
+      - pending
+      - running
+      - completed
+      - failed
+      - partial
+      title: IngestionStatus
+      type: string
+    KpiResponse:
+      additionalProperties: false
+      description: Workspace and dataset counters displayed by the dashboard.
+      properties:
+        dataset_items_count:
+          minimum: 0.0
+          title: Dataset Items Count
+          type: integer
+        normalized_messages_count:
+          minimum: 0.0
+          title: Normalized Messages Count
+          type: integer
+        raw_records_count:
+          minimum: 0.0
+          title: Raw Records Count
+          type: integer
+        threats_legitimate_count:
+          minimum: 0.0
+          title: Threats Legitimate Count
+          type: integer
+        threats_phishing_count:
+          minimum: 0.0
+          title: Threats Phishing Count
+          type: integer
+        threats_spam_count:
+          minimum: 0.0
+          title: Threats Spam Count
+          type: integer
+      required:
+      - raw_records_count
+      - normalized_messages_count
+      - dataset_items_count
+      - threats_phishing_count
+      - threats_spam_count
+      - threats_legitimate_count
+      title: KpiResponse
+      type: object
+    LineageRecordResponse:
+      description: Stable identity returned for an idempotently persisted record.
+      properties:
+        id:
+          title: Id
+          type: string
+        idempotent:
+          title: Idempotent
+          type: boolean
+        status:
+          title: Status
+          type: string
+      required:
+      - id
+      - status
+      - idempotent
+      title: LineageRecordResponse
+      type: object
+    ModelCandidateRegistration:
+      description: Identity emitted after a successful candidate training run.
+      properties:
+        huggingface_repository:
+          maxLength: 300
+          minLength: 1
+          title: Huggingface Repository
+          type: string
+        huggingface_revision:
+          maxLength: 200
+          minLength: 7
+          title: Huggingface Revision
+          type: string
+        mlflow_model_version:
+          maxLength: 100
+          minLength: 1
+          title: Mlflow Model Version
+          type: string
+        mlflow_run_id:
+          maxLength: 200
+          minLength: 1
+          title: Mlflow Run Id
+          type: string
+        model_name:
+          maxLength: 200
+          minLength: 1
+          title: Model Name
+          type: string
+        semantic_version:
+          maxLength: 80
+          minLength: 1
+          title: Semantic Version
+          type: string
+        service_source_revision:
+          pattern: ^[a-fA-F0-9]{40}$
+          title: Service Source Revision
+          type: string
+        training_dataset_version_tag:
+          maxLength: 120
+          minLength: 1
+          title: Training Dataset Version Tag
+          type: string
+        training_github_run_id:
+          maxLength: 100
+          minLength: 1
+          title: Training Github Run Id
+          type: string
+      required:
+      - model_name
+      - semantic_version
+      - service_source_revision
+      - mlflow_run_id
+      - mlflow_model_version
+      - huggingface_repository
+      - huggingface_revision
+      - training_github_run_id
+      - training_dataset_version_tag
+      title: ModelCandidateRegistration
+      type: object
+    ModelDeploymentRegistration:
+      description: Result returned by the manually approved production workflow.
+      properties:
+        approved_at:
+          format: date-time
+          title: Approved At
+          type: string
+        approved_by:
+          maxLength: 320
+          minLength: 1
+          title: Approved By
+          type: string
+        candidate_mlflow_run_id:
+          maxLength: 200
+          minLength: 1
+          title: Candidate Mlflow Run Id
+          type: string
+        deployed_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          title: Deployed At
+        deployed_revision:
+          anyOf:
+          - maxLength: 200
+            type: string
+          - type: 'null'
+          title: Deployed Revision
+        failure_reason:
+          anyOf:
+          - maxLength: 1000
+            type: string
+          - type: 'null'
+          title: Failure Reason
+        github_run_id:
+          maxLength: 100
+          minLength: 1
+          title: Github Run Id
+          type: string
+        mlflow_evaluation_run_id:
+          maxLength: 200
+          minLength: 1
+          title: Mlflow Evaluation Run Id
+          type: string
+        status:
+          enum:
+          - active
+          - failed
+          - rolled_back
+          title: Status
+          type: string
+      required:
+      - candidate_mlflow_run_id
+      - mlflow_evaluation_run_id
+      - github_run_id
+      - approved_by
+      - approved_at
+      - status
+      title: ModelDeploymentRegistration
+      type: object
+    ModelEvaluationRegistration:
+      description: Golden-set decision produced by Sicurre-ML and linked to MLflow.
+      properties:
+        candidate_mlflow_run_id:
+          maxLength: 200
+          minLength: 1
+          title: Candidate Mlflow Run Id
+          type: string
+        evaluated_at:
+          format: date-time
+          title: Evaluated At
+          type: string
+        evaluation_set_checksum:
+          pattern: ^[a-fA-F0-9]{64}$
+          title: Evaluation Set Checksum
+          type: string
+        evaluation_set_version_tag:
+          maxLength: 120
+          minLength: 1
+          title: Evaluation Set Version Tag
+          type: string
+        incumbent_huggingface_revision:
+          anyOf:
+          - maxLength: 200
+            type: string
+          - type: 'null'
+          title: Incumbent Huggingface Revision
+        metrics:
+          $ref: '#/components/schemas/PromotionMetricSnapshot'
+        mlflow_evaluation_run_id:
+          maxLength: 200
+          minLength: 1
+          title: Mlflow Evaluation Run Id
+          type: string
+        outcome:
+          enum:
+          - passed
+          - failed
+          - inconclusive
+          title: Outcome
+          type: string
+      required:
+      - candidate_mlflow_run_id
+      - evaluation_set_version_tag
+      - evaluation_set_checksum
+      - mlflow_evaluation_run_id
+      - outcome
+      - metrics
+      - evaluated_at
+      title: ModelEvaluationRegistration
+      type: object
+    NormalizedLabel:
+      enum:
+      - phishing
+      - spam
+      - legitimate
+      - unknown
+      title: NormalizedLabel
+      type: string
+    NormalizedMessageCreate:
+      properties:
+        contains_pii:
+          default: false
+          title: Contains Pii
+          type: boolean
+        current_label:
+          $ref: '#/components/schemas/NormalizedLabel'
+        language:
+          title: Language
+          type: string
+        normalized_text:
+          minLength: 1
+          title: Normalized Text
+          type: string
+        processing_run_id:
+          format: uuid
+          title: Processing Run Id
+          type: string
+        quality_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Quality Score
+        raw_record_id:
+          format: uuid
+          title: Raw Record Id
+          type: string
+        redaction_status:
+          $ref: '#/components/schemas/RedactionStatus'
+          default: not_required
+      required:
+      - raw_record_id
+      - processing_run_id
+      - normalized_text
+      - language
+      - current_label
+      title: NormalizedMessageCreate
+      type: object
+    NormalizedMessageListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/NormalizedMessageRead'
+          title: Items
+          type: array
+        total:
+          title: Total
+          type: integer
+      required:
+      - items
+      - total
+      title: NormalizedMessageListResponse
+      type: object
+    NormalizedMessageRead:
+      properties:
+        contains_pii:
+          default: false
+          title: Contains Pii
+          type: boolean
+        created_at:
+          format: date-time
+          title: Created At
+          type: string
+        current_label:
+          $ref: '#/components/schemas/NormalizedLabel'
+        id:
+          format: uuid
+          title: Id
+          type: string
+        language:
+          title: Language
+          type: string
+        normalized_at:
+          format: date-time
+          title: Normalized At
+          type: string
+        normalized_text:
+          minLength: 1
+          title: Normalized Text
+          type: string
+        processing_run_id:
+          format: uuid
+          title: Processing Run Id
+          type: string
+        quality_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Quality Score
+        raw_record_id:
+          format: uuid
+          title: Raw Record Id
+          type: string
+        redaction_status:
+          $ref: '#/components/schemas/RedactionStatus'
+          default: not_required
+        text_length:
+          title: Text Length
+          type: integer
+        text_sha256:
+          title: Text Sha256
+          type: string
+        updated_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          title: Updated At
+      required:
+      - raw_record_id
+      - processing_run_id
+      - normalized_text
+      - language
+      - current_label
+      - id
+      - text_sha256
+      - text_length
+      - normalized_at
+      - created_at
+      title: NormalizedMessageRead
+      type: object
+    NormalizedMessageUpdate:
+      properties:
+        current_label:
+          anyOf:
+          - $ref: '#/components/schemas/NormalizedLabel'
+          - type: 'null'
+        quality_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Quality Score
+        redaction_status:
+          anyOf:
+          - $ref: '#/components/schemas/RedactionStatus'
+          - type: 'null'
+      title: NormalizedMessageUpdate
+      type: object
+    OperationalExerciseCreate:
+      description: Validated request for one bounded monitoring exercise.
+      properties:
+        duration_seconds:
+          default: 240
+          maximum: 1800.0
+          minimum: 120.0
+          title: Duration Seconds
+          type: integer
+        exercise_type:
+          pattern: ^(api_unavailable|high_latency|elevated_5xx)$
+          title: Exercise Type
+          type: string
+      required:
+      - exercise_type
+      title: OperationalExerciseCreate
+      type: object
+    OperationalExerciseResponse:
+      additionalProperties: false
+      description: One controlled monitoring exercise.
+      properties:
+        exercise_type:
+          enum:
+          - api_unavailable
+          - high_latency
+          - elevated_5xx
+          title: Exercise Type
+          type: string
+        expires_at:
+          title: Expires At
+          type: string
+        id:
+          title: Id
+          type: string
+        initiated_by:
+          title: Initiated By
+          type: string
+        recovered_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Recovered At
+        started_at:
+          title: Started At
+          type: string
+        status:
+          anyOf:
+          - enum:
+            - active
+            - recovered
+            type: string
+          - type: 'null'
+          title: Status
+      required:
+      - id
+      - exercise_type
+      - initiated_by
+      - started_at
+      - expires_at
+      title: OperationalExerciseResponse
+      type: object
+    OperationalExerciseStateResponse:
+      additionalProperties: false
+      description: Current and recent controlled monitoring exercises.
+      properties:
+        active:
+          anyOf:
+          - $ref: '#/components/schemas/OperationalExerciseResponse'
+          - type: 'null'
+        enabled:
+          title: Enabled
+          type: boolean
+        recent:
+          items:
+            $ref: '#/components/schemas/OperationalExerciseResponse'
+          title: Recent
+          type: array
+        supported_types:
+          items:
+            enum:
+            - api_unavailable
+            - high_latency
+            - elevated_5xx
+            type: string
+          title: Supported Types
+          type: array
+      required:
+      - enabled
+      - active
+      - recent
+      - supported_types
+      title: OperationalExerciseStateResponse
+      type: object
+    PhishtankSnapshotResponse:
+      additionalProperties: false
+      description: Internal phishing URL snapshot consumed by Sicurre-ML.
+      properties:
+        count:
+          minimum: 0.0
+          title: Count
+          type: integer
+        generated_at:
+          title: Generated At
+          type: string
+        source:
+          title: Source
+          type: string
+        urls:
+          items:
+            type: string
+          title: Urls
+          type: array
+      required:
+      - urls
+      - count
+      - source
+      - generated_at
+      title: PhishtankSnapshotResponse
+      type: object
+    PipelineRunResponse:
+      additionalProperties: false
+      description: Asynchronous source-ingestion trigger acknowledgement.
+      properties:
+        run_id:
+          title: Run Id
+          type: string
+      required:
+      - run_id
+      title: PipelineRunResponse
+      type: object
+    PromotionMetricSnapshot:
+      description: Minimal reproducible values used by the non-regression gate.
+      properties:
+        candidate_legitimate_false_positives:
+          minimum: 0.0
+          title: Candidate Legitimate False Positives
+          type: integer
+        candidate_phishing_recall:
+          maximum: 1.0
+          minimum: 0.0
+          title: Candidate Phishing Recall
+          type: number
+        candidate_weighted_f1:
+          maximum: 1.0
+          minimum: 0.0
+          title: Candidate Weighted F1
+          type: number
+        production_legitimate_false_positives:
+          minimum: 0.0
+          title: Production Legitimate False Positives
+          type: integer
+        production_phishing_recall:
+          maximum: 1.0
+          minimum: 0.0
+          title: Production Phishing Recall
+          type: number
+        production_weighted_f1:
+          maximum: 1.0
+          minimum: 0.0
+          title: Production Weighted F1
+          type: number
+      required:
+      - candidate_weighted_f1
+      - production_weighted_f1
+      - candidate_phishing_recall
+      - production_phishing_recall
+      - candidate_legitimate_false_positives
+      - production_legitimate_false_positives
+      title: PromotionMetricSnapshot
+      type: object
+    QuarantineCustodyResponse:
+      additionalProperties: false
+      description: Idempotent raw-MIME custody result.
+      properties:
+        idempotent:
+          title: Idempotent
+          type: boolean
+        status:
+          const: stored
+          title: Status
+          type: string
+      required:
+      - status
+      - idempotent
+      title: QuarantineCustodyResponse
+      type: object
+    QuarantineItemResponse:
+      additionalProperties: false
+      description: Held message metadata and bounded content preview.
+      properties:
+        body_text:
+          title: Body Text
+          type: string
+        composite_score:
+          title: Composite Score
+          type: number
+        created_at:
+          title: Created At
+          type: string
+        expires_at:
+          title: Expires At
+          type: string
+        id:
+          title: Id
+          type: string
+        message_id:
+          title: Message Id
+          type: string
+        safety_verdict:
+          title: Safety Verdict
+          type: string
+        sender:
+          title: Sender
+          type: string
+        status:
+          title: Status
+          type: string
+        subject:
+          title: Subject
+          type: string
+      required:
+      - id
+      - message_id
+      - sender
+      - subject
+      - body_text
+      - safety_verdict
+      - composite_score
+      - status
+      - created_at
+      - expires_at
+      title: QuarantineItemResponse
+      type: object
+    QuarantineReleaseResponse:
+      additionalProperties: false
+      description: Idempotent quarantine restoration result.
+      properties:
+        delivery_message_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Delivery Message Id
+        forwarded_to:
+          title: Forwarded To
+          type: string
+        idempotent:
+          title: Idempotent
+          type: boolean
+        queued:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Queued
+        status:
+          const: released
+          title: Status
+          type: string
+      required:
+      - status
+      - forwarded_to
+      - idempotent
+      title: QuarantineReleaseResponse
+      type: object
+    QuarantineWhitelistResponse:
+      additionalProperties: false
+      description: Restoration result with the tenant whitelist rule created.
+      properties:
+        delivery_message_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Delivery Message Id
+        forwarded_to:
+          title: Forwarded To
+          type: string
+        idempotent:
+          title: Idempotent
+          type: boolean
+        queued:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Queued
+        status:
+          const: released
+          title: Status
+          type: string
+        whitelisted_pattern:
+          title: Whitelisted Pattern
+          type: string
+      required:
+      - status
+      - forwarded_to
+      - idempotent
+      - whitelisted_pattern
+      title: QuarantineWhitelistResponse
+      type: object
+    RawRecordListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/RawRecordRead'
+          title: Items
+          type: array
+        total:
+          title: Total
+          type: integer
+      required:
+      - items
+      - total
+      title: RawRecordListResponse
+      type: object
+    RawRecordRead:
+      properties:
+        created_at:
+          format: date-time
+          title: Created At
+          type: string
+        detected_language:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Detected Language
+        extracted_at:
+          format: date-time
+          title: Extracted At
+          type: string
+        id:
+          format: uuid
+          title: Id
+          type: string
+        is_usable:
+          title: Is Usable
+          type: boolean
+        raw_content:
+          title: Raw Content
+          type: string
+        raw_object_id:
+          format: uuid
+          title: Raw Object Id
+          type: string
+        record_key:
+          title: Record Key
+          type: string
+        rejection_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Rejection Reason
+      required:
+      - id
+      - raw_object_id
+      - record_key
+      - raw_content
+      - is_usable
+      - extracted_at
+      - created_at
+      title: RawRecordRead
+      type: object
+    RedactionStatus:
+      enum:
+      - not_required
+      - redacted
+      - review_needed
+      title: RedactionStatus
+      type: string
+    ReportAddressResponse:
+      additionalProperties: false
+      description: Signed false-negative forwarding address.
+      properties:
+        address:
+          title: Address
+          type: string
+      required:
+      - address
+      title: ReportAddressResponse
+      type: object
+    ReportedEmailIngestResponse:
+      additionalProperties: false
+      description: Idempotent forwarded-message ingestion result.
+      properties:
+        idempotent:
+          title: Idempotent
+          type: boolean
+        status:
+          const: accepted
+          title: Status
+          type: string
+      required:
+      - status
+      - idempotent
+      title: ReportedEmailIngestResponse
+      type: object
+    RuntimeComponentResponse:
+      additionalProperties: false
+      description: Health result for one deployed component.
+      properties:
+        checked_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Checked Url
+        component:
+          title: Component
+          type: string
+        detail:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Detail
+        latency_ms:
+          anyOf:
+          - minimum: 0.0
+            type: integer
+          - type: 'null'
+          title: Latency Ms
+        message:
+          title: Message
+          type: string
+        status:
+          enum:
+          - ok
+          - degraded
+          - down
+          - unknown
+          title: Status
+          type: string
+      required:
+      - component
+      - status
+      - message
+      title: RuntimeComponentResponse
+      type: object
+    SecurityRuleCreate:
+      properties:
+        pattern:
+          maxLength: 254
+          minLength: 3
+          pattern: ^(?:[^@\s]+@)?(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$
+          title: Pattern
+          type: string
+        rule_type:
+          pattern: ^(whitelist|blocklist)$
+          title: Rule Type
+          type: string
+      required:
+      - rule_type
+      - pattern
+      title: SecurityRuleCreate
+      type: object
+    SecurityRuleResponse:
+      additionalProperties: false
+      description: Workspace sender or domain rule.
+      properties:
+        created_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Created At
+        id:
+          title: Id
+          type: string
+        pattern:
+          title: Pattern
+          type: string
+        rule_type:
+          enum:
+          - whitelist
+          - blocklist
+          title: Rule Type
+          type: string
+      required:
+      - id
+      - rule_type
+      - pattern
+      title: SecurityRuleResponse
+      type: object
+    SourceType:
+      enum:
+      - api
+      - file
+      - scraping
+      - sql
+      - bigdata
+      - manual
+      title: SourceType
+      type: string
+    SplitName:
+      enum:
+      - train
+      - val
+      - test
+      - holdout
+      title: SplitName
+      type: string
+    SslStatusResponse:
+      additionalProperties: false
+      description: Public certificate state.
+      properties:
+        auto_renew:
+          title: Auto Renew
+          type: boolean
+        days_remaining:
+          title: Days Remaining
+          type: integer
+        error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error
+        valid:
+          title: Valid
+          type: boolean
+      required:
+      - valid
+      - days_remaining
+      - auto_renew
+      title: SslStatusResponse
+      type: object
+    StatusResponse:
+      additionalProperties: false
+      description: Stable acknowledgement for a completed command.
+      properties:
+        status:
+          title: Status
+          type: string
+      required:
+      - status
+      title: StatusResponse
+      type: object
+    StatusUpdate:
+      properties:
+        status:
+          title: Status
+          type: string
+      required:
+      - status
+      title: StatusUpdate
+      type: object
+    SupportRequestCreate:
+      properties:
+        category:
+          pattern: ^(incident|dns|billing|feedback|other)$
+          title: Category
+          type: string
+        message:
+          maxLength: 4000
+          minLength: 10
+          title: Message
+          type: string
+        requester_email:
+          maxLength: 254
+          minLength: 5
+          pattern: ^[^@\s]+@[^@\s]+\.[^@\s]+$
+          title: Requester Email
+          type: string
+        requester_name:
+          maxLength: 120
+          minLength: 2
+          title: Requester Name
+          type: string
+      required:
+      - requester_name
+      - requester_email
+      - category
+      - message
+      title: SupportRequestCreate
+      type: object
+    SupportResponse:
+      additionalProperties: false
+      description: Accepted support request.
+      properties:
+        created_at:
+          title: Created At
+          type: string
+        id:
+          title: Id
+          type: string
+        status:
+          const: open
+          title: Status
+          type: string
+      required:
+      - id
+      - status
+      - created_at
+      title: SupportResponse
+      type: object
+    TeardownRequest:
+      properties:
+        cf_api_token:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Optional override for the stored Cloudflare API token
+          title: Cf Api Token
+        integration_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Specific connected-domain integration to remove
+          title: Integration Id
+      title: TeardownRequest
+      type: object
+    ThreatLogResponse:
+      additionalProperties: false
+      description: Privacy-preserving representation of one classified message.
+      properties:
+        body_preview:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Body Preview
+        confidence:
+          anyOf:
+          - maximum: 1.0
+            minimum: 0.0
+            type: number
+          - type: 'null'
+          title: Confidence
+        content_redacted:
+          title: Content Redacted
+          type: boolean
+        explanation:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Explanation
+        id:
+          title: Id
+          type: string
+        latency_ms:
+          anyOf:
+          - minimum: 0.0
+            type: number
+          - type: 'null'
+          title: Latency Ms
+        message_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Message Id
+        privacy_reference:
+          title: Privacy Reference
+          type: string
+        received_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Received At
+        sender:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sender
+        status:
+          enum:
+          - active
+          - trashed
+          - restored
+          title: Status
+          type: string
+        subject:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Subject
+        verdict:
+          enum:
+          - phishing
+          - spam
+          - legitimate
+          - quarantine
+          title: Verdict
+          type: string
+      required:
+      - id
+      - privacy_reference
+      - content_redacted
+      - verdict
+      - status
+      title: ThreatLogResponse
+      type: object
+    ThreatPageResponse:
+      additionalProperties: false
+      description: One bounded page of classified messages.
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/ThreatLogResponse'
+          title: Items
+          type: array
+        page:
+          minimum: 1.0
+          title: Page
+          type: integer
+        page_size:
+          maximum: 100.0
+          minimum: 1.0
+          title: Page Size
+          type: integer
+        pages:
+          minimum: 1.0
+          title: Pages
+          type: integer
+        total:
+          minimum: 0.0
+          title: Total
+          type: integer
+      required:
+      - items
+      - page
+      - page_size
+      - total
+      - pages
+      title: ThreatPageResponse
+      type: object
+    ThreatVisibilityResponse:
+      additionalProperties: false
+      description: Result of hiding or restoring workspace events.
+      properties:
+        hidden:
+          title: Hidden
+          type: boolean
+        updated:
+          minimum: 0.0
+          title: Updated
+          type: integer
+      required:
+      - updated
+      - hidden
+      title: ThreatVisibilityResponse
+      type: object
+    ThreatVisibilityUpdate:
+      description: Workspace-scoped visibility change that preserves audit evidence.
+      properties:
+        hidden:
+          title: Hidden
+          type: boolean
+        ids:
+          items:
+            type: string
+          maxItems: 100
+          minItems: 1
+          title: Ids
+          type: array
+      required:
+      - ids
+      - hidden
+      title: ThreatVisibilityUpdate
+      type: object
+    TokenVerifyRequest:
+      properties:
+        cf_api_token:
+          title: Cf Api Token
+          type: string
+        zone_name:
+          title: Zone Name
+          type: string
+      required:
+      - cf_api_token
+      - zone_name
+      title: TokenVerifyRequest
+      type: object
+    UpdateProfileRequest:
+      properties:
+        display_name:
+          maxLength: 120
+          minLength: 2
+          title: Display Name
+          type: string
+      required:
+      - display_name
+      title: UpdateProfileRequest
+      type: object
+    ValidationError:
+      properties:
+        ctx:
+          title: Context
+          type: object
+        input:
+          title: Input
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          title: Location
+          type: array
+        msg:
+          title: Message
+          type: string
+        type:
+          title: Error Type
+          type: string
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+      type: object
+    VerdictCountResponse:
+      additionalProperties: false
+      description: Count grouped by classifier verdict.
+      properties:
+        count:
+          minimum: 0.0
+          title: Count
+          type: integer
+        verdict:
+          title: Verdict
+          type: string
+      required:
+      - verdict
+      - count
+      title: VerdictCountResponse
+      type: object
+  securitySchemes:
+    HTTPBearer:
+      scheme: bearer
+      type: http
 info:
+  description: Generated from the deployed FastAPI routes and Pydantic models. Authenticated customer
+    operations use Better Auth sessions or bearer tokens; internal and email-gateway routes require their
+    documented service credentials.
+  summary: Data, application, and integration contracts for Sicurre.
   title: Sicurre Platform API
-  version: 0.2.0
-  description: >
-    Certification-first API contract for Sicurre. The API is organized into
-    three layers: Data API for Bloc 1, Model API for Bloc 2, and Application
-    API for Bloc 3.
-servers:
-  - url: https://sicurre.com
-tags:
-  - name: health
-  - name: data-sources
-  - name: data-ingestion
-  - name: data-raw-records
-  - name: data-messages
-  - name: data-annotations
-  - name: data-datasets
-  - name: model
-  - name: app
-  - name: auth
-  - name: internal
+  version: 1.0.0
+openapi: 3.1.0
 paths:
   /health:
     get:
-      tags: [health]
-      summary: Health check
+      operationId: healthcheck_health_get
       responses:
-        "200":
-          description: OK
+        '200':
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: ok
-
-  /v1/data/sources:
-    get:
-      tags: [data-sources]
-      summary: List registered data sources
-      security:
-        - BearerAuth: []
-      parameters:
-        - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
-        - { in: query, name: page_size, schema: { type: integer, minimum: 1, maximum: 100, default: 10 } }
-        - { in: query, name: verdict, schema: { type: string, enum: [all, phishing, spam, legitimate], default: all } }
-        - { in: query, name: date_range, schema: { type: string, enum: [all, today, 7d, month, last_month], default: all } }
-        - { in: query, name: search, schema: { type: string, maxLength: 120 } }
-        - { in: query, name: hidden, schema: { type: boolean, default: false } }
-      responses:
-        "200":
-          description: List of source systems
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  items:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/DataSource"
-                  total:
-                    type: integer
-    post:
-      tags: [data-sources]
-      summary: Register a new data source system
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/DataSourceCreate"
-      responses:
-        "201":
-          description: Data source created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DataSource"
-
-  /v1/data/ingestion-runs:
-    get:
-      tags: [data-ingestion]
-      summary: List ingestion runs
-      security:
-        - BearerAuth: []
-      responses:
-        "200":
-          description: List of ingestion runs
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  items:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/IngestionRun"
-                  total:
-                    type: integer
-    post:
-      tags: [data-ingestion]
-      summary: Create an ingestion run
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/IngestionRunCreate"
-      responses:
-        "201":
-          description: Ingestion run created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/IngestionRun"
-
-  /v1/data/raw-records:
-    get:
-      tags: [data-raw-records]
-      summary: List raw records extracted from collected source objects
-      security:
-        - BearerAuth: []
-      parameters:
-        - in: query
-          name: source_system_id
-          schema:
-            type: string
-        - in: query
-          name: language
-          schema:
-            type: string
-            example: fr
-        - in: query
-          name: is_usable
-          schema:
-            type: boolean
-        - in: query
-          name: limit
-          schema:
-            type: integer
-            default: 50
-            maximum: 200
-        - in: query
-          name: offset
-          schema:
-            type: integer
-            default: 0
-      responses:
-        "200":
-          description: List of raw records
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  items:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/RawRecord"
-                  total:
-                    type: integer
-
-  /v1/data/messages:
-    get:
-      tags: [data-messages]
-      summary: List normalized messages
-      security:
-        - BearerAuth: []
-      parameters:
-        - in: query
-          name: label
-          schema:
-            type: string
-            enum: [phishing, spam, legitimate, unknown]
-        - in: query
-          name: language
-          schema:
-            type: string
-            example: fr
-        - in: query
-          name: split
-          schema:
-            type: string
-            enum: [train, val, test, holdout]
-        - in: query
-          name: limit
-          schema:
-            type: integer
-            default: 50
-            maximum: 200
-        - in: query
-          name: offset
-          schema:
-            type: integer
-            default: 0
-      responses:
-        "200":
-          description: List of normalized messages
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  items:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/NormalizedMessage"
-                  total:
-                    type: integer
-    post:
-      tags: [data-messages]
-      summary: Create a normalized message
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/NormalizedMessageCreate"
-      responses:
-        "201":
-          description: Message created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/NormalizedMessage"
-
-  /v1/data/messages/{id}:
-    get:
-      tags: [data-messages]
-      summary: Get one normalized message
-      security:
-        - BearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Message details
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/NormalizedMessage"
-        "404":
-          description: Not found
-    patch:
-      tags: [data-messages]
-      summary: Update label or redaction metadata on a normalized message
-      security:
-        - BearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/NormalizedMessageUpdate"
-      responses:
-        "200":
-          description: Message updated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/NormalizedMessage"
-        "404":
-          description: Not found
-    delete:
-      tags: [data-messages]
-      summary: Delete a normalized message
-      security:
-        - BearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      responses:
-        "204":
-          description: Deleted
-        "404":
-          description: Not found
-
-  /v1/data/annotations:
-    post:
-      tags: [data-annotations]
-      summary: Add an annotation to a normalized message
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/AnnotationCreate"
-      responses:
-        "201":
-          description: Annotation created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Annotation"
-
-  /v1/data/datasets:
-    get:
-      tags: [data-datasets]
-      summary: List dataset versions
-      security:
-        - BearerAuth: []
-      responses:
-        "200":
-          description: List of datasets
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  items:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Dataset"
-                  total:
-                    type: integer
-    post:
-      tags: [data-datasets]
-      summary: Create a dataset version
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/DatasetCreate"
-      responses:
-        "201":
-          description: Dataset created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Dataset"
-
-  /v1/data/datasets/{id}/items:
-    get:
-      tags: [data-datasets]
-      summary: List items inside a dataset
-      security:
-        - BearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Dataset items
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  items:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/DatasetItem"
-                  total:
-                    type: integer
-        "404":
-          description: Dataset not found
-
-  /v1/email/scan:
-    post:
-      tags: [app]
-      summary: Scan an inbound email from the Cloudflare Email Worker
-      security:
-        - WorkerSecretAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/EmailScanRequest"
-      responses:
-        "200":
-          description: Classification verdict for the Worker
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/EmailScanResponse"
-        "401":
-          description: Missing or invalid Worker secret
-        "503":
-          description: Inference is unavailable; the Worker must not treat the message as scanned
-
-  /v1/email/quarantine/{item_id}/content:
-    put:
-      tags: [internal]
-      summary: Store original MIME for a quarantined Worker message
-      description: >
-        Worker-only custody route. The MIME object is private, size bounded,
-        retained for at most the quarantine period, and deleted after release
-        or expiry.
-      security:
-        - WorkerSecretAuth: []
-      parameters:
-        - in: path
-          name: item_id
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          message/rfc822:
-            schema:
-              type: string
-              format: binary
-      responses:
-        "200":
-          description: MIME stored, including idempotent retry
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/QuarantineCustodyResponse"
-        "401":
-          description: Missing or invalid Worker secret
-        "404":
-          description: Quarantine item does not belong to the Worker workspace
-        "409":
-          description: Different content was already stored for this item
-        "413":
-          description: MIME exceeds the configured custody limit
-
-  /v1/email/reports/{token}:
-    post:
-      tags: [internal]
-      summary: Ingest a missed threat forwarded to a signed workspace alias
-      description: >
-        The dedicated Sicurre Email Routing Worker authenticates this request.
-        The API verifies the signed workspace token, discards the outer
-        forwarding envelope, anonymizes personal identifiers, stores evidence
-        in private R2, and records a false-negative feedback event.
-      security:
-        - ReportWorkerAuth: []
-      parameters:
-        - in: path
-          name: token
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          message/rfc822:
-            schema:
-              type: string
-              format: binary
-      responses:
-        "202":
-          description: Evidence accepted, including an idempotent replay
-        "400":
-          description: Empty message
-        "401":
-          description: Invalid Worker credential
-        "404":
-          description: Invalid or unknown workspace alias
-        "413":
-          description: Message exceeds the configured limit
-
-  /v1/email/dmarc-reports:
-    post:
-      tags: [internal]
-      summary: Ingest an aggregate DMARC report delivered by Email Routing
-      description: >
-        The Sicurre Email Routing Worker forwards the original RFC 822 message.
-        The API extracts an XML, GZIP, or ZIP aggregate report, resolves the
-        onboarded workspace from policy_published.domain, and stores each record
-        with fingerprint idempotency.
-      security:
-        - ReportWorkerAuth: []
-      requestBody:
-        required: true
-        content:
-          message/rfc822:
-            schema:
-              type: string
-              format: binary
-      responses:
-        "202":
-          description: Report imported or already imported
-        "400":
-          description: Empty message or missing/invalid DMARC attachment
-        "401":
-          description: Invalid Worker credential
-        "404":
-          description: Report domain is not an active Sicurre integration
-        "413":
-          description: Message exceeds the configured limit
-
-  /v1/auth/session:
-    get:
-      tags: [app]
-      summary: Get the current Better Auth-backed Sicurre session
-      security:
-        - BearerAuth: []
-      responses:
-        "200":
-          description: Current session
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AuthSession"
-
-  /v1/auth/profile:
-    patch:
-      tags: [app]
-      summary: Update the current user's display name
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [display_name]
-              properties:
-                display_name:
-                  type: string
-                  minLength: 2
-                  maxLength: 120
-      responses:
-        "200":
-          description: Updated session payload
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AuthSession"
-
-  /v1/threats:
-    get:
-      tags: [app]
-      summary: List workspace-scoped scan events for the threat log
-      security:
-        - BearerAuth: []
-      responses:
-        "200":
-          description: Threat log rows
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ThreatLogPage"
-
-  /v1/threats/visibility:
-    post:
-      tags: [app]
-      summary: Hide or restore workspace threat-log rows without deleting audit evidence
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ThreatVisibilityUpdate"
-      responses:
-        "200":
-          description: Visibility update summary
-
-  /v1/threats/{id}/status:
-    post:
-      tags: [app]
-      summary: Update a threat log row status
-      security:
-        - BearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ThreatStatusUpdate"
-      responses:
-        "200":
-          description: Updated threat log row
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ThreatLogEntry"
-
-  /v1/feedback:
-    post:
-      tags: [app]
-      summary: Submit production feedback for false positives or false negatives
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/FeedbackRequest"
-      responses:
-        "201":
-          description: Feedback recorded
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/FeedbackResponse"
-        "409":
-          description: Feedback already submitted for the same event/type
-
-  /v1/feedback/report-address:
-    get:
-      tags: [app]
-      summary: Get the signed false-negative forwarding alias for this workspace
-      security:
-        - BearerAuth: []
-      responses:
-        "200":
-          description: Workspace-scoped reporting address
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [address]
-                properties:
-                  address:
-                    type: string
-                    format: email
-        "503":
-          description: Report aliases are not configured
-
-  /v1/support/requests:
-    post:
-      tags: [app]
-      summary: Create a tenant-scoped support request
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SupportRequest"
-      responses:
-        "201":
-          description: Support request recorded
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SupportResponse"
-        "422":
-          description: Invalid request fields
-        "429":
-          description: Support request rate limit exceeded
-
-  /v1/quarantine:
-    get:
-      tags: [app]
-      summary: List currently held quarantine items
-      security:
-        - BearerAuth: []
-      responses:
-        "200":
-          description: Quarantine items
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/QuarantineItem"
-
-  /v1/quarantine/{id}/release:
-    post:
-      tags: [app]
-      summary: Release a quarantined item to the configured destination inbox
-      security:
-        - BearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Original email delivered or an earlier release confirmed
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/QuarantineReleaseResponse"
-        "403":
-          description: Cloudflare Email Sending permission is missing
-        "409":
-          description: Item is unavailable, already releasing, or lacks original MIME
-        "424":
-          description: Cloudflare rejected or could not queue the delivery
-        "404":
-          description: Quarantine item not found
-        "503":
-          description: Private quarantine storage is temporarily unavailable
-
-  /v1/quarantine/{id}/whitelist:
-    post:
-      tags: [app]
-      summary: Release a quarantined item and create an allow-list rule
-      security:
-        - BearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Release completed and sender allow-list state confirmed
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/QuarantineReleaseResponse"
-                  - type: object
-                    properties:
-                      whitelisted_pattern:
-                        type: string
-        "404":
-          description: Quarantine item not found
-
-  /v1/quarantine/{id}:
-    delete:
-      tags: [app]
-      summary: Delete a quarantined item
-      security:
-        - BearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Quarantine item deleted
-        "404":
-          description: Quarantine item not found
-
-  /v1/integrations/cloudflare/setup:
-    post:
-      tags: [app]
-      summary: Start Cloudflare Email Routing provisioning for a domain
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CloudflareSetupRequest"
-      responses:
-        "201":
-          description: Provisioning started
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CloudflareSetupResponse"
-
-  /v1/integrations/cloudflare/status:
-    get:
-      tags: [app]
-      summary: Get the latest Cloudflare integration status for the workspace
-      security:
-        - BearerAuth: []
-      responses:
-        "200":
-          description: Cloudflare integration status
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CloudflareStatus"
-
-  /v1/integrations/cloudflare/verify-token:
-    post:
-      tags: [app]
-      summary: Verify that a Cloudflare token can access a zone
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CloudflareTokenVerifyRequest"
-      responses:
-        "200":
-          description: Token verification result
-
-  /v1/integrations/cloudflare/list:
-    get:
-      tags: [auth]
-      summary: List Cloudflare integrations connected to the workspace
-      security:
-        - BearerAuth: []
-      responses:
-        "200":
-          description: Integration list
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/CloudflareStatus"
-
-  /v1/integrations/cloudflare:
-    delete:
-      tags: [app]
-      summary: Remove the current Cloudflare Email Routing integration
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CloudflareTeardownRequest"
-      responses:
-        "200":
-          description: Integration removed
-        "400":
-          description: No stored Cloudflare credential is available
-        "404":
-          description: Integration not found
-        "409":
-          description: Provisioning is still in progress
-        "502":
-          description: Cloudflare rejected cleanup; local integration state is preserved
-
-  /v1/integrations/cloudflare/token:
-    get:
-      tags: [app]
-      summary: Get the workspace Cloudflare token status
-      security:
-        - BearerAuth: []
-      responses:
-        "200":
-          description: Token lookup result
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CloudflareTokenStatus"
-    post:
-      tags: [app]
-      summary: Save or replace the workspace Cloudflare API token
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CloudflareTokenSaveRequest"
-      responses:
-        "200":
-          description: Token saved
-    delete:
-      tags: [app]
-      summary: Delete the workspace Cloudflare token and connected integrations
-      security:
-        - BearerAuth: []
-      responses:
-        "200":
-          description: Token and integrations deleted
-
-  /internal/phishtank/snapshot:
-    get:
-      tags: [internal]
-      summary: Export all usable PhishTank phishing URLs
-      description: >
-        Returns a flat list of phishing URLs sourced from the `phishtank-online-valid`
-        feed. Intended for service-to-service calls (e.g. sicurre-ml classifier pipeline).
-        Authenticated with a static bearer token (`INTERNAL_API_KEY`).
-        Use the `since` parameter for incremental syncs after the initial seed load.
-      security:
-        - InternalServiceAuth: []
-      parameters:
-        - name: since
-          in: query
-          required: false
-          description: ISO 8601 timestamp — only return URLs extracted after this time.
-          schema:
-            type: string
-            format: date-time
-            example: "2025-01-01T00:00:00Z"
-      responses:
-        "200":
-          description: Snapshot of known PhishTank phishing URLs
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PhishtankSnapshotResponse"
-        "401":
-          description: Missing or invalid internal API key
-        "429":
-          description: Rate limit exceeded (10/minute)
-        "503":
-          description: Internal API not configured (INTERNAL_API_KEY not set)
-
-  /internal/ml/evaluation-sets:
-    post:
-      tags: [internal]
-      summary: Register or approve an immutable evaluation-only asset
-      security: [{InternalServiceAuth: []}]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: "#/components/schemas/EvaluationSetRegistration"}
-      responses:
-        "200":
-          description: Idempotently persisted evaluation-set manifest
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/LineageRecordResponse"}
-        "401": {description: Missing or invalid internal API key}
-        "409": {description: Version exists with conflicting immutable content}
-        "422": {description: Invalid evaluation-set manifest}
-        "429": {description: Rate limit exceeded (10/minute)}
-        "503": {description: Internal API authentication is not configured}
-
+                $ref: '#/components/schemas/HealthResponse'
+          description: Successful Response
+      summary: Healthcheck
+      tags:
+      - system
   /internal/ml/candidates:
     post:
-      tags: [internal]
-      summary: Register a successful training result as a candidate
-      security: [{InternalServiceAuth: []}]
+      description: Register a successful training result as a non-production candidate.
+      operationId: persist_model_candidate_internal_ml_candidates_post
       requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: "#/components/schemas/ModelCandidateRegistration"}
-      responses:
-        "200":
-          description: Idempotently persisted candidate identity
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/LineageRecordResponse"}
-        "401": {description: Missing or invalid internal API key}
-        "409": {description: MLflow run is linked to conflicting lineage}
-        "422": {description: Invalid payload or unknown frozen training dataset}
-        "429": {description: Rate limit exceeded (10/minute)}
-        "503": {description: Internal API authentication is not configured}
-
-  /internal/ml/evaluations:
-    post:
-      tags: [internal]
-      summary: Record a golden-set decision with its MLflow evidence reference
-      security: [{InternalServiceAuth: []}]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: "#/components/schemas/ModelEvaluationRegistration"}
-      responses:
-        "200":
-          description: Idempotently persisted evaluation decision
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/LineageRecordResponse"}
-        "401": {description: Missing or invalid internal API key}
-        "409": {description: MLflow evaluation run has conflicting lineage}
-        "422": {description: Candidate or approved evaluation set is unavailable}
-        "429": {description: Rate limit exceeded (10/minute)}
-        "503": {description: Internal API authentication is not configured}
-
-  /internal/ml/deployments:
-    post:
-      tags: [internal]
-      summary: Record a manually approved production promotion result
-      security: [{InternalServiceAuth: []}]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: "#/components/schemas/ModelDeploymentRegistration"}
-      responses:
-        "200":
-          description: Idempotently persisted deployment result
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/LineageRecordResponse"}
-        "401": {description: Missing or invalid internal API key}
-        "409": {description: Promotion workflow run has conflicting lineage}
-        "422": {description: Candidate has no passing evaluation}
-        "429": {description: Rate limit exceeded (10/minute)}
-        "503": {description: Internal API authentication is not configured}
-
-  /v1/stats/kpi:
-    get:
-      tags: [app]
-      summary: Get tenant-scoped classification counts and operator dataset counts
-      security: [{BearerAuth: []}]
-      responses:
-        "200": {description: Current KPI snapshot}
-
-  /v1/alerts/preferences:
-    get:
-      tags: [app]
-      summary: Get workspace alert preferences
-      security: [{BearerAuth: []}]
-      responses:
-        "200": {description: Alert preferences}
-    put:
-      tags: [app]
-      summary: Replace workspace alert preferences
-      security: [{BearerAuth: []}]
-      responses:
-        "200": {description: Preferences updated}
-
-  /v1/alerts/rules:
-    get:
-      tags: [app]
-      summary: List workspace allowlist and blocklist rules
-      security: [{BearerAuth: []}]
-      responses:
-        "200": {description: Workspace rules}
-    post:
-      tags: [app]
-      summary: Create a workspace rule
-      security: [{BearerAuth: []}]
-      responses:
-        "200": {description: Rule created}
-
-  /v1/alerts/rules/{id}:
-    delete:
-      tags: [app]
-      summary: Delete a workspace rule
-      security: [{BearerAuth: []}]
-      parameters:
-        - {in: path, name: id, required: true, schema: {type: string}}
-      responses:
-        "200": {description: Rule deleted}
-        "404": {description: Rule not found in this workspace}
-
-  /v1/alerts/history:
-    get:
-      tags: [app]
-      summary: List active workspace notifications
-      security: [{BearerAuth: []}]
-      responses:
-        "200": {description: Notification history}
-
-  /v1/alerts/history/{id}/dismiss:
-    post:
-      tags: [app]
-      summary: Dismiss a workspace notification
-      security: [{BearerAuth: []}]
-      parameters:
-        - {in: path, name: id, required: true, schema: {type: string}}
-      responses:
-        "200": {description: Notification dismissed}
-        "404": {description: Notification not found in this workspace}
-
-  /v1/domain-shield/{domain}/status:
-    get:
-      tags: [app]
-      summary: Read the persisted Domain Shield assessment or explicitly refresh it
-      security: [{BearerAuth: []}]
-      parameters:
-        - {in: path, name: domain, required: true, schema: {type: string}}
-        - {in: query, name: refresh, required: false, schema: {type: boolean, default: false}}
-      responses:
-        "200": {description: Domain Shield assessment}
-
-  /v1/domain-shield/{domain}/dmarc-reports:
-    get:
-      tags: [app]
-      summary: Get workspace DMARC aggregate-report summaries
-      security: [{BearerAuth: []}]
-      parameters:
-        - {in: path, name: domain, required: true, schema: {type: string}}
-      responses:
-        "200": {description: DMARC report summary and top sources}
-
-  /v1/domain-shield/{domain}/dmarc-reports/import:
-    post:
-      tags: [app]
-      summary: Import a DMARC XML or compressed XML aggregate report
-      security: [{BearerAuth: []}]
-      parameters:
-        - {in: path, name: domain, required: true, schema: {type: string}}
-      requestBody:
-        required: true
-        content:
-          application/xml:
-            schema: {type: string, format: binary}
-          application/gzip:
-            schema: {type: string, format: binary}
-      responses:
-        "200": {description: Report imported idempotently}
-        "400": {description: Invalid report or mismatched domain}
-
-  /v1/admin/runtime-health:
-    get:
-      tags: [admin]
-      summary: Probe deployed app, inference, Cloudflare, and quarantine dependencies
-      security: [{BearerAuth: []}]
-      responses:
-        "200": {description: Platform runtime health}
-        "403": {description: Platform admin access required}
-
-  /v1/admin/overview:
-    get:
-      tags: [admin]
-      summary: Get global platform analytics and recent operational records
-      security: [{BearerAuth: []}]
-      responses:
-        "200": {description: Platform overview}
-        "403": {description: Platform admin access required}
-
-  /v1/admin/domains:
-    get:
-      tags: [admin]
-      summary: List Cloudflare integrations with server-side search and pagination
-      security: [{BearerAuth: []}]
-      parameters:
-        - {in: query, name: page, schema: {type: integer, minimum: 1, default: 1}}
-        - {in: query, name: page_size, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
-        - {in: query, name: search, schema: {type: string, maxLength: 120}}
-      responses:
-        "200": {description: Paginated integration inventory}
-        "403": {description: Platform admin access required}
-
-  /v1/admin/operational-exercises:
-    get:
-      tags: [admin]
-      summary: List the active controlled monitoring exercise and recent audit records
-      security: [{BearerAuth: []}]
-      responses:
-        "200": {description: Exercise state and recent audit history}
-        "403": {description: Platform admin access required}
-    post:
-      tags: [admin]
-      summary: Start one bounded synthetic monitoring signal
-      security: [{BearerAuth: []}]
-      requestBody:
-        required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [exercise_type]
-              properties:
-                exercise_type:
-                  type: string
-                  enum: [api_unavailable, high_latency, elevated_5xx]
-                duration_seconds:
-                  type: integer
-                  minimum: 120
-                  maximum: 1800
-                  default: 240
+              $ref: '#/components/schemas/ModelCandidateRegistration'
+        required: true
       responses:
-        "201": {description: Exercise started}
-        "403": {description: Platform admin access required}
-        "409": {description: Exercises disabled or another exercise active}
-        "422": {description: Invalid or excessive duration}
-        "429": {description: Exercise rate limit exceeded}
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LineageRecordResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Persist Model Candidate
+      tags:
+      - internal
+  /internal/ml/deployments:
+    post:
+      description: Record a manually approved promotion workflow result.
+      operationId: persist_model_deployment_internal_ml_deployments_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelDeploymentRegistration'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LineageRecordResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Persist Model Deployment
+      tags:
+      - internal
+  /internal/ml/evaluation-sets:
+    post:
+      description: Register or approve an immutable evaluation-only asset.
+      operationId: persist_evaluation_set_internal_ml_evaluation_sets_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluationSetRegistration'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LineageRecordResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Persist Evaluation Set
+      tags:
+      - internal
+  /internal/ml/evaluations:
+    post:
+      description: Record a golden-set decision and its authoritative MLflow reference.
+      operationId: persist_model_evaluation_internal_ml_evaluations_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelEvaluationRegistration'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LineageRecordResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Persist Model Evaluation
+      tags:
+      - internal
+  /internal/phishtank/snapshot:
+    get:
+      description: 'Return all known PhishTank phishing URLs for classifier pipeline use.
 
+
+        Intended for service-to-service calls only (e.g. from sicurre-ml).
+
+        Pass ``since`` for incremental updates after the initial seed load.'
+      operationId: get_phishtank_snapshot_internal_phishtank_snapshot_get
+      parameters:
+      - description: ISO 8601 timestamp — only return URLs extracted after this time
+        in: query
+        name: since
+        required: false
+        schema:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          description: ISO 8601 timestamp — only return URLs extracted after this time
+          title: Since
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhishtankSnapshotResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Get Phishtank Snapshot
+      tags:
+      - internal
+  /v1/admin/domains:
+    get:
+      description: Return a bounded, searchable Cloudflare integration inventory.
+      operationId: get_admin_domains_v1_admin_domains_get
+      parameters:
+      - in: query
+        name: page
+        required: false
+        schema:
+          default: 1
+          title: Page
+          type: integer
+      - in: query
+        name: page_size
+        required: false
+        schema:
+          default: 20
+          title: Page Size
+          type: integer
+      - in: query
+        name: search
+        required: false
+        schema:
+          default: ''
+          title: Search
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDomainPageResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Get Admin Domains
+      tags:
+      - app-ui-flows
+  /v1/admin/operational-exercises:
+    get:
+      description: Return active state and recent audit records for platform administrators.
+      operationId: get_operational_exercises_v1_admin_operational_exercises_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationalExerciseStateResponse'
+          description: Successful Response
+      security:
+      - HTTPBearer: []
+      summary: Get Operational Exercises
+      tags:
+      - app-ui-flows
+    post:
+      description: Start one admin-only synthetic signal without affecting customer traffic.
+      operationId: start_operational_exercise_v1_admin_operational_exercises_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperationalExerciseCreate'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationalExerciseResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Start Operational Exercise
+      tags:
+      - app-ui-flows
   /v1/admin/operational-exercises/{exercise_id}/recover:
     post:
-      tags: [admin]
-      summary: Recover one active controlled monitoring exercise early
-      security: [{BearerAuth: []}]
+      description: Recover an active exercise early and preserve its audit trail.
+      operationId: recover_operational_exercise_v1_admin_operational_exercises__exercise_id__recover_post
       parameters:
-        - {in: path, name: exercise_id, required: true, schema: {type: string}}
+      - in: path
+        name: exercise_id
+        required: true
+        schema:
+          title: Exercise Id
+          type: string
       responses:
-        "200": {description: Exercise recovered}
-        "403": {description: Platform admin access required}
-        "404": {description: Active exercise not found}
-        "429": {description: Recovery rate limit exceeded}
-
-  /v1/datasets:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationalExerciseResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Recover Operational Exercise
+      tags:
+      - app-ui-flows
+  /v1/admin/overview:
     get:
-      tags: [admin]
-      summary: List global dataset versions for platform operators
-      security: [{BearerAuth: []}]
+      operationId: get_admin_overview_v1_admin_overview_get
       responses:
-        "200": {description: Dataset versions}
-        "403": {description: Platform admin access required}
-
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminOverviewResponse'
+          description: Successful Response
+      security:
+      - HTTPBearer: []
+      summary: Get Admin Overview
+      tags:
+      - app-ui-flows
+  /v1/admin/runtime-health:
+    get:
+      operationId: get_admin_runtime_health_v1_admin_runtime_health_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminRuntimeHealthResponse'
+          description: Successful Response
+      security:
+      - HTTPBearer: []
+      summary: Get Admin Runtime Health
+      tags:
+      - app-ui-flows
+  /v1/alerts/history:
+    get:
+      operationId: list_alert_history_v1_alerts_history_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/AlertHistoryResponse'
+                title: Response List Alert History V1 Alerts History Get
+                type: array
+          description: Successful Response
+      security:
+      - HTTPBearer: []
+      summary: List Alert History
+      tags:
+      - app-ui-flows
+  /v1/alerts/history/{id}/dismiss:
+    post:
+      operationId: dismiss_alert_v1_alerts_history__id__dismiss_post
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          title: Id
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Dismiss Alert
+      tags:
+      - app-ui-flows
+  /v1/alerts/preferences:
+    get:
+      operationId: get_alert_preferences_v1_alerts_preferences_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertPreferenceResponse'
+          description: Successful Response
+      security:
+      - HTTPBearer: []
+      summary: Get Alert Preferences
+      tags:
+      - app-ui-flows
+    put:
+      operationId: update_alert_preferences_v1_alerts_preferences_put
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertPreferenceUpdate'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Update Alert Preferences
+      tags:
+      - app-ui-flows
+  /v1/alerts/rules:
+    get:
+      operationId: list_security_rules_v1_alerts_rules_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/SecurityRuleResponse'
+                title: Response List Security Rules V1 Alerts Rules Get
+                type: array
+          description: Successful Response
+      security:
+      - HTTPBearer: []
+      summary: List Security Rules
+      tags:
+      - app-ui-flows
+    post:
+      operationId: create_security_rule_v1_alerts_rules_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SecurityRuleCreate'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SecurityRuleResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Create Security Rule
+      tags:
+      - app-ui-flows
+  /v1/alerts/rules/{id}:
+    delete:
+      operationId: delete_security_rule_v1_alerts_rules__id__delete
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          title: Id
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Delete Security Rule
+      tags:
+      - app-ui-flows
+  /v1/auth/profile:
+    patch:
+      operationId: patch_profile_v1_auth_profile_patch
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSessionResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Patch Profile
+      tags:
+      - app-ui-flows
+  /v1/auth/session:
+    get:
+      operationId: get_session_v1_auth_session_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSessionResponse'
+          description: Successful Response
+      security:
+      - HTTPBearer: []
+      summary: Get Session
+      tags:
+      - app-ui-flows
+  /v1/data/annotations:
+    post:
+      operationId: create_annotation_v1_data_annotations_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnnotationCreate'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnotationRead'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Create Annotation
+      tags:
+      - data-annotations
+  /v1/data/datasets:
+    get:
+      operationId: list_datasets_v1_data_datasets_get
+      parameters:
+      - in: query
+        name: status
+        required: false
+        schema:
+          anyOf:
+          - $ref: '#/components/schemas/DatasetStatus'
+          - type: 'null'
+          title: Status
+      - in: query
+        name: limit
+        required: false
+        schema:
+          default: 50
+          maximum: 200
+          minimum: 1
+          title: Limit
+          type: integer
+      - in: query
+        name: offset
+        required: false
+        schema:
+          default: 0
+          minimum: 0
+          title: Offset
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetListResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: List Datasets
+      tags:
+      - data-datasets
+    post:
+      operationId: create_dataset_v1_data_datasets_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DatasetCreate'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetRead'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Create Dataset
+      tags:
+      - data-datasets
+  /v1/data/datasets/{id}/items:
+    get:
+      operationId: list_dataset_items_v1_data_datasets__id__items_get
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          title: Id
+          type: string
+      - in: query
+        name: limit
+        required: false
+        schema:
+          default: 50
+          maximum: 200
+          minimum: 1
+          title: Limit
+          type: integer
+      - in: query
+        name: offset
+        required: false
+        schema:
+          default: 0
+          minimum: 0
+          title: Offset
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetItemListResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: List Dataset Items
+      tags:
+      - data-datasets
   /v1/data/datasets/{id}/publish:
     post:
-      tags: [admin]
-      summary: Publish a dataset version as a platform operator
-      security: [{BearerAuth: []}]
+      operationId: publish_dataset_v1_data_datasets__id__publish_post
       parameters:
-        - {in: path, name: id, required: true, schema: {type: string}}
+      - in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          title: Id
+          type: string
       responses:
-        "200": {description: Publication result}
-        "403": {description: Platform admin access required}
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetPublishResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Publish Dataset
+      tags:
+      - data-datasets
+  /v1/data/ingestion-runs:
+    get:
+      operationId: list_ingestion_runs_v1_data_ingestion_runs_get
+      parameters:
+      - in: query
+        name: source_system_id
+        required: false
+        schema:
+          anyOf:
+          - format: uuid
+            type: string
+          - type: 'null'
+          title: Source System Id
+      - in: query
+        name: status
+        required: false
+        schema:
+          anyOf:
+          - $ref: '#/components/schemas/IngestionStatus'
+          - type: 'null'
+          title: Status
+      - in: query
+        name: limit
+        required: false
+        schema:
+          default: 50
+          maximum: 200
+          minimum: 1
+          title: Limit
+          type: integer
+      - in: query
+        name: offset
+        required: false
+        schema:
+          default: 0
+          minimum: 0
+          title: Offset
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionRunListResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: List Ingestion Runs
+      tags:
+      - data-ingestion
+    post:
+      operationId: create_ingestion_run_v1_data_ingestion_runs_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngestionRunCreate'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionRunRead'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Create Ingestion Run
+      tags:
+      - data-ingestion
+  /v1/data/messages:
+    get:
+      operationId: list_messages_v1_data_messages_get
+      parameters:
+      - in: query
+        name: label
+        required: false
+        schema:
+          anyOf:
+          - $ref: '#/components/schemas/NormalizedLabel'
+          - type: 'null'
+          title: Label
+      - in: query
+        name: language
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Language
+      - in: query
+        name: split
+        required: false
+        schema:
+          anyOf:
+          - $ref: '#/components/schemas/SplitName'
+          - type: 'null'
+          title: Split
+      - in: query
+        name: limit
+        required: false
+        schema:
+          default: 50
+          maximum: 200
+          minimum: 1
+          title: Limit
+          type: integer
+      - in: query
+        name: offset
+        required: false
+        schema:
+          default: 0
+          minimum: 0
+          title: Offset
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NormalizedMessageListResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: List Messages
+      tags:
+      - data-messages
+    post:
+      operationId: create_message_v1_data_messages_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NormalizedMessageCreate'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NormalizedMessageRead'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Create Message
+      tags:
+      - data-messages
+  /v1/data/messages/{id}:
+    delete:
+      operationId: delete_message_v1_data_messages__id__delete
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          title: Id
+          type: string
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Delete Message
+      tags:
+      - data-messages
+    get:
+      operationId: get_message_v1_data_messages__id__get
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          title: Id
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NormalizedMessageRead'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Get Message
+      tags:
+      - data-messages
+    patch:
+      operationId: update_message_v1_data_messages__id__patch
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          title: Id
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NormalizedMessageUpdate'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NormalizedMessageRead'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Update Message
+      tags:
+      - data-messages
+  /v1/data/raw-records:
+    get:
+      operationId: list_raw_records_v1_data_raw_records_get
+      parameters:
+      - in: query
+        name: source_system_id
+        required: false
+        schema:
+          anyOf:
+          - format: uuid
+            type: string
+          - type: 'null'
+          title: Source System Id
+      - in: query
+        name: language
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Language
+      - in: query
+        name: is_usable
+        required: false
+        schema:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Is Usable
+      - in: query
+        name: limit
+        required: false
+        schema:
+          default: 50
+          maximum: 200
+          minimum: 1
+          title: Limit
+          type: integer
+      - in: query
+        name: offset
+        required: false
+        schema:
+          default: 0
+          minimum: 0
+          title: Offset
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RawRecordListResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: List Raw Records
+      tags:
+      - data-raw-records
+  /v1/data/sources:
+    get:
+      operationId: list_sources_v1_data_sources_get
+      parameters:
+      - in: query
+        name: source_type
+        required: false
+        schema:
+          anyOf:
+          - $ref: '#/components/schemas/SourceType'
+          - type: 'null'
+          title: Source Type
+      - in: query
+        name: is_active
+        required: false
+        schema:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Is Active
+      - in: query
+        name: limit
+        required: false
+        schema:
+          default: 50
+          maximum: 200
+          minimum: 1
+          title: Limit
+          type: integer
+      - in: query
+        name: offset
+        required: false
+        schema:
+          default: 0
+          minimum: 0
+          title: Offset
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataSourceListResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: List Sources
+      tags:
+      - data-sources
+    post:
+      operationId: create_source_v1_data_sources_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DataSourceCreate'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataSourceRead'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Create Source
+      tags:
+      - data-sources
+  /v1/datasets:
+    get:
+      operationId: list_datasets_alias_v1_datasets_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/DatasetSummaryResponse'
+                title: Response List Datasets Alias V1 Datasets Get
+                type: array
+          description: Successful Response
+      security:
+      - HTTPBearer: []
+      summary: List Datasets Alias
+      tags:
+      - app-ui-flows
+  /v1/domain-shield/{domain}/dmarc-reports:
+    get:
+      operationId: get_dmarc_report_summary_v1_domain_shield__domain__dmarc_reports_get
+      parameters:
+      - in: path
+        name: domain
+        required: true
+        schema:
+          title: Domain
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DmarcSummaryResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Get Dmarc Report Summary
+      tags:
+      - app-ui-flows
+  /v1/domain-shield/{domain}/dmarc-reports/import:
+    post:
+      operationId: import_dmarc_report_v1_domain_shield__domain__dmarc_reports_import_post
+      parameters:
+      - in: path
+        name: domain
+        required: true
+        schema:
+          title: Domain
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DmarcImportResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Import Dmarc Report
+      tags:
+      - app-ui-flows
+  /v1/domain-shield/{domain}/status:
+    get:
+      operationId: check_domain_shield_status_v1_domain_shield__domain__status_get
+      parameters:
+      - in: path
+        name: domain
+        required: true
+        schema:
+          title: Domain
+          type: string
+      - in: query
+        name: refresh
+        required: false
+        schema:
+          default: false
+          title: Refresh
+          type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DomainShieldResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Check Domain Shield Status
+      tags:
+      - app-ui-flows
+  /v1/email/dmarc-reports:
+    post:
+      description: Accept one Worker-authenticated aggregate DMARC report email.
+      operationId: ingest_dmarc_email_v1_email_dmarc_reports_post
+      parameters:
+      - in: header
+        name: x-sicurre-report-key
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Sicurre-Report-Key
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DmarcImportResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Ingest Dmarc Email
+      tags:
+      - reported-email
+  /v1/email/quarantine/{item_id}/content:
+    put:
+      description: Persist original MIME after a Worker receives a quarantine verdict.
+      operationId: upload_quarantine_content_v1_email_quarantine__item_id__content_put
+      parameters:
+      - in: path
+        name: item_id
+        required: true
+        schema:
+          title: Item Id
+          type: string
+      - in: header
+        name: X-Sicurre-Secret
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Sicurre-Secret
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuarantineCustodyResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Upload Quarantine Content
+      tags:
+      - integrations
+  /v1/email/reports/{token}:
+    post:
+      description: Accept one Worker-authenticated forwarded message as sanitized evidence.
+      operationId: ingest_reported_email_v1_email_reports__token__post
+      parameters:
+      - in: path
+        name: token
+        required: true
+        schema:
+          title: Token
+          type: string
+      - in: header
+        name: x-sicurre-report-key
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Sicurre-Report-Key
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportedEmailIngestResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Ingest Reported Email
+      tags:
+      - reported-email
+  /v1/email/scan:
+    post:
+      description: 'Validate the Worker shared secret, call the inference API, log the result,
 
+        and return a verdict.
+
+
+        This endpoint is intentionally public (no user session) — it is called by
+
+        Cloudflare Workers and authenticated exclusively through the per-integration
+
+        shared secret header.'
+      operationId: scan_email_v1_email_scan_post
+      parameters:
+      - in: header
+        name: X-Sicurre-Secret
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Sicurre-Secret
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailScanRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailScanResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Scan Email
+      tags:
+      - integrations
+  /v1/feedback:
+    post:
+      operationId: create_feedback_v1_feedback_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackCreate'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedbackResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Create Feedback
+      tags:
+      - app-ui-flows
+  /v1/feedback/report-address:
+    get:
+      description: Return the signed forwarding alias for the authenticated workspace.
+      operationId: get_report_address_v1_feedback_report_address_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportAddressResponse'
+          description: Successful Response
+      security:
+      - HTTPBearer: []
+      summary: Get Report Address
+      tags:
+      - reported-email
+  /v1/integrations/cloudflare:
+    delete:
+      description: Remove the Cloudflare Worker and routing rule then delete the DB record.
+      operationId: teardown_cloudflare_v1_integrations_cloudflare_delete
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeardownRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CloudflareTeardownResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Teardown Cloudflare
+      tags:
+      - integrations
+  /v1/integrations/cloudflare/list:
+    get:
+      operationId: list_cloudflare_integrations_v1_integrations_cloudflare_list_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/CloudflareIntegrationResponse'
+                title: Response List Cloudflare Integrations V1 Integrations Cloudflare List Get
+                type: array
+          description: Successful Response
+      security:
+      - HTTPBearer: []
+      summary: List Cloudflare Integrations
+      tags:
+      - app-ui-flows
+  /v1/integrations/cloudflare/setup:
+    post:
+      description: "Full one-shot provisioning:\n  • Find zone → enable Email Routing → deploy Email Worker\
+        \ → create catch-all rule\nThe user only needs to click the verification email Cloudflare sends\
+        \ to\n``destination_email``."
+      operationId: setup_cloudflare_v1_integrations_cloudflare_setup_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CloudflareSetupRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CloudflareSetupResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Setup Cloudflare
+      tags:
+      - integrations
+  /v1/integrations/cloudflare/status:
+    get:
+      description: Return the most recent integration record for a user.
+      operationId: cloudflare_status_v1_integrations_cloudflare_status_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CloudflareIntegrationResponse'
+          description: Successful Response
+      security:
+      - HTTPBearer: []
+      summary: Cloudflare Status
+      tags:
+      - integrations
+  /v1/integrations/cloudflare/token:
+    delete:
+      description: Delete the stored Cloudflare API token and all connected integrations for the current
+        workspace.
+      operationId: delete_workspace_cloudflare_token_v1_integrations_cloudflare_token_delete
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+          description: Successful Response
+      security:
+      - HTTPBearer: []
+      summary: Delete Workspace Cloudflare Token
+      tags:
+      - integrations
+    get:
+      description: Retrieve the stored Cloudflare API token for the current workspace if an active domain
+        is connected.
+      operationId: get_workspace_cloudflare_token_v1_integrations_cloudflare_token_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CloudflareTokenStatusResponse'
+          description: Successful Response
+      security:
+      - HTTPBearer: []
+      summary: Get Workspace Cloudflare Token
+      tags:
+      - integrations
+    post:
+      description: Save or overwrite the stored Cloudflare API token for the current workspace.
+      operationId: save_workspace_cloudflare_token_v1_integrations_cloudflare_token_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CloudflareTokenSaveRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Save Workspace Cloudflare Token
+      tags:
+      - integrations
+  /v1/integrations/cloudflare/verify-token:
+    post:
+      description: 'Lightweight check: verify the token is valid and can see the requested zone.
+
+        Called by the UI before the actual setup to give early feedback.'
+      operationId: verify_cloudflare_token_v1_integrations_cloudflare_verify_token_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenVerifyRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CloudflareTokenVerificationResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Verify Cloudflare Token
+      tags:
+      - integrations
   /v1/pipeline/run:
     post:
-      tags: [admin]
-      summary: Enqueue the fixed incremental data pipeline operation
-      security: [{BearerAuth: []}]
+      operationId: run_pipeline_v1_pipeline_run_post
       responses:
-        "200": {description: Allowlisted pipeline operation enqueued}
-        "403": {description: Platform admin access required}
-
-components:
-  securitySchemes:
-    ApiKeyAuth:
-      type: apiKey
-      in: header
-      name: X-API-Key
-    BearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-    WorkerSecretAuth:
-      type: apiKey
-      in: header
-      name: X-Sicurre-Secret
-    ReportWorkerAuth:
-      type: apiKey
-      in: header
-      name: X-Sicurre-Report-Key
-    InternalServiceAuth:
-      type: http
-      scheme: bearer
-      description: Static service bearer token for internal platform calls.
-  schemas:
-    LineageRecordResponse:
-      type: object
-      required: [id, status, idempotent]
-      properties:
-        id: {type: string, format: uuid}
-        status: {type: string}
-        idempotent: {type: boolean}
-
-    EvaluationSetRegistration:
-      type: object
-      required: [name, version_tag, schema_version, provenance, status, object_uri, content_checksum, item_count, label_counts, language_counts]
-      properties:
-        name: {type: string}
-        version_tag: {type: string}
-        schema_version: {type: string}
-        provenance: {type: string, enum: [synthetic_provisional]}
-        status: {type: string, enum: [draft, approved]}
-        object_uri: {type: string, example: "r2://sicurre-evaluation/golden-v1/golden.jsonl"}
-        content_checksum: {type: string, description: Lowercase SHA-256 digest}
-        item_count: {type: integer, minimum: 1}
-        label_counts: {type: object, additionalProperties: {type: integer}}
-        language_counts: {type: object, additionalProperties: {type: integer}}
-        reviewed_by: {type: string, nullable: true}
-        reviewed_at: {type: string, format: date-time, nullable: true}
-
-    ModelCandidateRegistration:
-      type: object
-      required: [model_name, semantic_version, service_source_revision, mlflow_run_id, mlflow_model_version, huggingface_repository, huggingface_revision, training_github_run_id, training_dataset_version_tag]
-      properties:
-        model_name: {type: string}
-        semantic_version: {type: string}
-        service_source_revision: {type: string, pattern: "^[a-fA-F0-9]{40}$"}
-        mlflow_run_id: {type: string}
-        mlflow_model_version: {type: string}
-        huggingface_repository: {type: string}
-        huggingface_revision: {type: string}
-        training_github_run_id: {type: string}
-        training_dataset_version_tag: {type: string}
-
-    PromotionMetricSnapshot:
-      type: object
-      required: [candidate_weighted_f1, production_weighted_f1, candidate_phishing_recall, production_phishing_recall, candidate_legitimate_false_positives, production_legitimate_false_positives]
-      properties:
-        candidate_weighted_f1: {type: number, minimum: 0, maximum: 1}
-        production_weighted_f1: {type: number, minimum: 0, maximum: 1}
-        candidate_phishing_recall: {type: number, minimum: 0, maximum: 1}
-        production_phishing_recall: {type: number, minimum: 0, maximum: 1}
-        candidate_legitimate_false_positives: {type: integer, minimum: 0}
-        production_legitimate_false_positives: {type: integer, minimum: 0}
-
-    ModelEvaluationRegistration:
-      type: object
-      required: [candidate_mlflow_run_id, evaluation_set_version_tag, evaluation_set_checksum, mlflow_evaluation_run_id, outcome, metrics, evaluated_at]
-      properties:
-        candidate_mlflow_run_id: {type: string}
-        incumbent_huggingface_revision: {type: string, nullable: true}
-        evaluation_set_version_tag: {type: string}
-        evaluation_set_checksum: {type: string}
-        mlflow_evaluation_run_id: {type: string}
-        outcome: {type: string, enum: [passed, failed, inconclusive]}
-        metrics: {$ref: "#/components/schemas/PromotionMetricSnapshot"}
-        evaluated_at: {type: string, format: date-time}
-
-    ModelDeploymentRegistration:
-      type: object
-      required: [candidate_mlflow_run_id, mlflow_evaluation_run_id, github_run_id, approved_by, approved_at, status]
-      properties:
-        candidate_mlflow_run_id: {type: string}
-        mlflow_evaluation_run_id: {type: string}
-        github_run_id: {type: string}
-        approved_by: {type: string}
-        approved_at: {type: string, format: date-time}
-        status: {type: string, enum: [active, failed, rolled_back]}
-        deployed_revision: {type: string, nullable: true}
-        failure_reason: {type: string, nullable: true}
-        deployed_at: {type: string, format: date-time, nullable: true}
-
-    PhishtankSnapshotResponse:
-      type: object
-      required: [urls, count, source, generated_at]
-      properties:
-        urls:
-          type: array
-          items:
-            type: string
-            format: uri
-          description: Flat list of phishing URLs from PhishTank.
-          example:
-            - "http://example-phish.fr/login"
-            - "http://urssaf-verify.net/compte"
-        count:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PipelineRunResponse'
+          description: Successful Response
+      security:
+      - HTTPBearer: []
+      summary: Run Pipeline
+      tags:
+      - app-ui-flows
+  /v1/quarantine:
+    get:
+      operationId: list_quarantine_v1_quarantine_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/QuarantineItemResponse'
+                title: Response List Quarantine V1 Quarantine Get
+                type: array
+          description: Successful Response
+      security:
+      - HTTPBearer: []
+      summary: List Quarantine
+      tags:
+      - app-ui-flows
+  /v1/quarantine/{id}:
+    delete:
+      operationId: delete_quarantine_item_v1_quarantine__id__delete
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          title: Id
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Delete Quarantine Item
+      tags:
+      - app-ui-flows
+  /v1/quarantine/{id}/release:
+    post:
+      operationId: release_quarantine_item_v1_quarantine__id__release_post
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          title: Id
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuarantineReleaseResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Release Quarantine Item
+      tags:
+      - app-ui-flows
+  /v1/quarantine/{id}/whitelist:
+    post:
+      operationId: release_and_whitelist_item_v1_quarantine__id__whitelist_post
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          title: Id
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuarantineWhitelistResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Release And Whitelist Item
+      tags:
+      - app-ui-flows
+  /v1/stats/kpi:
+    get:
+      operationId: get_kpis_v1_stats_kpi_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KpiResponse'
+          description: Successful Response
+      security:
+      - HTTPBearer: []
+      summary: Get Kpis
+      tags:
+      - app-ui-flows
+  /v1/support/requests:
+    post:
+      description: Create a durable tenant-scoped support ticket.
+      operationId: create_support_request_v1_support_requests_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupportRequestCreate'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Create Support Request
+      tags:
+      - app-ui-flows
+  /v1/threats:
+    get:
+      description: Return one filtered page of workspace events.
+      operationId: get_threats_v1_threats_get
+      parameters:
+      - in: query
+        name: page
+        required: false
+        schema:
+          default: 1
+          title: Page
           type: integer
-          description: Number of URLs returned.
-          example: 4218
-        source:
-          type: string
-          description: Source system name.
-          example: phishtank-online-valid
-        generated_at:
-          type: string
-          format: date-time
-          description: UTC timestamp when the snapshot was generated.
-          example: "2025-05-22T14:30:00Z"
-    DataSourceCreate:
-      type: object
-      required: [name, source_type]
-      properties:
-        name:
-          type: string
-          example: cert-fr-cti
-        source_type:
-          type: string
-          enum: [api, file, scraping, sql, bigdata, manual]
-        description:
-          type: string
-        owner_name:
-          type: string
-        legal_basis:
-          type: string
-        contains_personal_data:
-          type: boolean
-        retention_days:
+      - in: query
+        name: page_size
+        required: false
+        schema:
+          default: 10
+          title: Page Size
           type: integer
-
-    DataSource:
-      allOf:
-        - $ref: "#/components/schemas/DataSourceCreate"
-        - type: object
-          properties:
-            id:
-              type: string
-            is_active:
-              type: boolean
-            created_at:
-              type: string
-              format: date-time
-            updated_at:
-              type: string
-              format: date-time
-
-    IngestionRunCreate:
-      type: object
-      required: [source_system_id, started_at, status, trigger_mode]
-      properties:
-        source_system_id:
+      - in: query
+        name: verdict
+        required: false
+        schema:
+          default: all
+          title: Verdict
           type: string
-        started_at:
+      - in: query
+        name: date_range
+        required: false
+        schema:
+          default: all
+          title: Date Range
           type: string
-          format: date-time
-        status:
+      - in: query
+        name: search
+        required: false
+        schema:
+          default: ''
+          title: Search
           type: string
-          enum: [pending, running, completed, failed, partial]
-        trigger_mode:
-          type: string
-          enum: [manual, scheduled]
-          example: scheduled
-
-    IngestionRun:
-      allOf:
-        - $ref: "#/components/schemas/IngestionRunCreate"
-        - type: object
-          properties:
-            id:
-              type: string
-            finished_at:
-              type: string
-              format: date-time
-            raw_object_count:
-              type: integer
-            raw_record_count:
-              type: integer
-            log_message:
-              type: string
-
-    RawRecord:
-      type: object
-      properties:
-        id:
-          type: string
-        raw_object_id:
-          type: string
-        record_key:
-          type: string
-        raw_content:
-          type: string
-        detected_language:
-          type: string
-        is_usable:
-          type: boolean
-        rejection_reason:
-          type: string
-        extracted_at:
-          type: string
-          format: date-time
-        created_at:
-          type: string
-          format: date-time
-
-    NormalizedMessageCreate:
-      type: object
-      required: [raw_record_id, processing_run_id, normalized_text, language, current_label]
-      properties:
-        raw_record_id:
-          type: string
-        processing_run_id:
-          type: string
-        normalized_text:
-          type: string
-        language:
-          type: string
-          example: fr
-        current_label:
-          type: string
-          enum: [phishing, spam, legitimate, unknown]
-        quality_score:
-          type: number
-        contains_pii:
-          type: boolean
-        redaction_status:
-          type: string
-          enum: [not_required, redacted, review_needed]
-
-    NormalizedMessageUpdate:
-      type: object
-      properties:
-        current_label:
-          type: string
-          enum: [phishing, spam, legitimate, unknown]
-        quality_score:
-          type: number
-        redaction_status:
-          type: string
-          enum: [not_required, redacted, review_needed]
-
-    NormalizedMessage:
-      allOf:
-        - $ref: "#/components/schemas/NormalizedMessageCreate"
-        - type: object
-          properties:
-            id:
-              type: string
-            text_sha256:
-              type: string
-            text_length:
-              type: integer
-            normalized_at:
-              type: string
-              format: date-time
-            created_at:
-              type: string
-              format: date-time
-            updated_at:
-              type: string
-              format: date-time
-
-    AnnotationCreate:
-      type: object
-      required: [normalized_message_id, label, label_source, annotated_at]
-      properties:
-        normalized_message_id:
-          type: string
-        label:
-          type: string
-          enum: [phishing, spam, legitimate, unknown]
-        label_source:
-          type: string
-          example: manual-review
-        confidence:
-          type: number
-          minimum: 0
-          maximum: 1
-        comment:
-          type: string
-        is_validated:
-          type: boolean
-        annotated_at:
-          type: string
-          format: date-time
-
-    Annotation:
-      allOf:
-        - $ref: "#/components/schemas/AnnotationCreate"
-        - type: object
-          properties:
-            id:
-              type: string
-            created_at:
-              type: string
-              format: date-time
-
-    DatasetCreate:
-      type: object
-      required: [name, version_tag, target_usage, status]
-      properties:
-        name:
-          type: string
-        version_tag:
-          type: string
-          example: french-phishing-v1
-        target_usage:
-          type: string
-          example: training
-        status:
-          type: string
-          enum: [draft, frozen, archived]
-
-    Dataset:
-      allOf:
-        - $ref: "#/components/schemas/DatasetCreate"
-        - type: object
-          properties:
-            id:
-              type: string
-            frozen_at:
-              type: string
-              format: date-time
-            item_count:
-              type: integer
-            created_at:
-              type: string
-              format: date-time
-
-    DatasetItem:
-      type: object
-      properties:
-        id:
-          type: string
-        dataset_id:
-          type: string
-        normalized_message_id:
-          type: string
-        split_name:
-          type: string
-          enum: [train, val, test, holdout]
-        sample_weight:
-          type: number
-        row_order:
-          type: integer
-        created_at:
-          type: string
-          format: date-time
-
-    ClassifyRequest:
-      type: object
-      required: [subject, text, sender]
-      properties:
-        subject:
-          type: string
-          example: "URGENT : Mise a jour URSSAF requise"
-        text:
-          type: string
-        sender:
-          type: string
-        use_llm:
-          type: boolean
-          default: true
-        use_virustotal:
-          type: boolean
-          default: true
-        mail_context:
-          $ref: "#/components/schemas/MailContextRequest"
-
-    MailContextRequest:
-      type: object
-      description: Privacy-safe evidence derived by the authorized Sicurre gateway.
-      properties:
-        structured_forward:
-          type: boolean
+      - in: query
+        name: hidden
+        required: false
+        schema:
           default: false
-        outer_sender_authenticated:
+          title: Hidden
           type: boolean
-          default: false
-        mailing_list_headers:
-          type: boolean
-          default: false
-        subscription_claimed:
-          type: boolean
-          default: false
-        recipient_expected:
-          type: boolean
-          default: false
-          description: Explicit tenant intent from an expected-sender rule or reviewed feedback.
-        transactional_evidence:
-          type: boolean
-          default: false
-          description: Bounded gateway-observed transactional structure; never inferred from body claims alone.
-
-    ClassifyResponse:
-      type: object
-      required: [label, confidence, signals, model_version]
-      properties:
-        label:
-          type: string
-          enum: [phishing, spam, legitimate]
-        confidence:
-          type: number
-          minimum: 0
-          maximum: 1
-        signals:
-          type: array
-          items:
-            type: string
-        model_version:
-          type: string
-
-    ModelVersion:
-      type: object
-      properties:
-        id:
-          type: string
-        version_tag:
-          type: string
-        artifact_uri:
-          type: string
-        f1_score:
-          type: number
-        precision_score:
-          type: number
-        recall_score:
-          type: number
-        eval_samples:
-          type: integer
-        promoted_at:
-          type: string
-          format: date-time
-
-    EmailScanRequest:
-      type: object
-      required: [sender]
-      properties:
-        message_id:
-          type: string
-          maxLength: 500
-          description: Stable Message-ID or raw-MIME SHA-256 used for retry idempotency.
-        subject:
-          type: string
-          example: "Facture impayee - action requise"
-        sender:
-          type: string
-          example: "billing@example.test"
-        text:
-          type: string
-          description: Plain-text email content extracted by the Cloudflare Email Worker.
-        use_llm:
-          type: boolean
-          default: false
-        use_virustotal:
-          type: boolean
-          default: false
-
-    EmailScanResponse:
-      type: object
-      required: [event_id, verdict, label, score]
-      properties:
-        event_id:
-          type: string
-          description: Stable tenant-scoped identifier also added to delivered mail as X-Sicurre-Event-ID.
-        verdict:
-          type: string
-          enum: [safe, phishing, quarantine]
-          description: Delivery/safety decision; spam remains safe for the current forwarding policy.
-        label:
-          type: string
-          enum: [phishing, spam, legitimate]
-          description: Independent three-class model decision, preserved as X-Sicurre-Label on delivery.
-        score:
-          type: number
-          minimum: 0
-          maximum: 1
-        explanation:
-          type: string
-        quarantine_id:
-          type: string
-          nullable: true
-          description: Present only when the Worker must upload original MIME for custody.
-
-    AuthSession:
-      type: object
-      properties:
-        user:
-          type: object
-          properties:
-            id:
-              type: string
-            email:
-              type: string
-              format: email
-            name:
-              type: string
-        workspace:
-          type: object
-          properties:
-            id:
-              type: string
-            name:
-              type: string
-        member:
-          type: object
-          properties:
-            role:
-              type: string
-              enum: [owner, admin, analyst, viewer]
-        session:
-          type: object
-          properties:
-            id:
-              type: string
-            expires_at:
-              type: string
-              format: date-time
-
-    ThreatLogEntry:
-      type: object
-      properties:
-        id:
-          type: string
-        message_id:
-          type: string
-        subject:
-          type: string
-        sender:
-          type: string
-        body_preview:
-          type: string
-        received_at:
-          type: string
-          format: date-time
-        verdict:
-          type: string
-          enum: [phishing, spam, legitimate, quarantine]
-        confidence:
-          type: number
-        status:
-          type: string
-          enum: [active, trashed, restored]
-        model_version:
-          type: string
-        latency_ms:
-          type: number
-        explanation:
-          type: string
-        action_at:
-          type: string
-          format: date-time
-
-    ThreatLogPage:
-      type: object
-      required: [items, page, page_size, total, pages]
-      properties:
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/ThreatLogEntry"
-        page: { type: integer }
-        page_size: { type: integer }
-        total: { type: integer }
-        pages: { type: integer }
-
-    ThreatVisibilityUpdate:
-      type: object
-      required: [ids, hidden]
-      properties:
-        ids:
-          type: array
-          minItems: 1
-          maxItems: 100
-          items: { type: string }
-        hidden: { type: boolean }
-
-    ThreatStatusUpdate:
-      type: object
-      required: [status]
-      properties:
-        status:
-          type: string
-          enum: [active, trashed, restored]
-
-    FeedbackRequest:
-      type: object
-      required: [feedback_type, corrected_verdict]
-      properties:
-        event_id:
-          type: string
-          description: Optional app_inference_event id when feedback is tied to a known scan.
-        feedback_type:
-          type: string
-          enum: [true_positive, false_positive, false_negative, true_negative]
-        corrected_verdict:
-          type: string
-          enum: [phishing, spam, legitimate]
-        reporter_note:
-          type: string
-
-    FeedbackResponse:
-      type: object
-      properties:
-        id:
-          type: string
-        event_id:
-          type: string
-        feedback_type:
-          type: string
-        created_at:
-          type: string
-          format: date-time
-
-    SupportRequest:
-      type: object
-      required: [requester_name, requester_email, category, message]
-      properties:
-        requester_name:
-          type: string
-          minLength: 2
-          maxLength: 120
-        requester_email:
-          type: string
-          format: email
-        category:
-          type: string
-          enum: [incident, dns, billing, feedback, other]
-        message:
-          type: string
-          minLength: 10
-          maxLength: 4000
-
-    SupportResponse:
-      type: object
-      required: [id, status, created_at]
-      properties:
-        id:
-          type: string
-        status:
-          type: string
-          enum: [open]
-        created_at:
-          type: string
-          format: date-time
-
-    QuarantineItem:
-      type: object
-      properties:
-        id:
-          type: string
-        event_id:
-          type: string
-        subject:
-          type: string
-        sender:
-          type: string
-        recipient:
-          type: string
-        verdict:
-          type: string
-          enum: [phishing, spam, quarantine]
-        confidence:
-          type: number
-        status:
-          type: string
-          enum: [held, released, deleted, whitelisted]
-        released_at:
-          type: string
-          format: date-time
-        created_at:
-          type: string
-          format: date-time
-
-    QuarantineCustodyResponse:
-      type: object
-      required: [status, idempotent]
-      properties:
-        status:
-          type: string
-          enum: [stored]
-        idempotent:
-          type: boolean
-
-    QuarantineReleaseResponse:
-      type: object
-      required: [status, forwarded_to, idempotent]
-      properties:
-        status:
-          type: string
-          enum: [released]
-        forwarded_to:
-          type: string
-          format: email
-        delivery_message_id:
-          type: string
-          nullable: true
-        queued:
-          type: boolean
-        idempotent:
-          type: boolean
-
-    CloudflareSetupRequest:
-      type: object
-      required: [cf_api_token, zone_name, destination_email]
-      properties:
-        cf_api_token:
-          type: string
-          writeOnly: true
-        zone_name:
-          type: string
-          example: example.fr
-        destination_email:
-          type: string
-          format: email
-        fix_spf:
-          type: boolean
-          default: true
-        fix_dkim:
-          type: boolean
-          default: true
-        fix_dmarc:
-          type: boolean
-          default: true
-
-    CloudflareSetupResponse:
-      type: object
-      properties:
-        integration_id:
-          type: string
-        status:
-          type: string
-          enum: [provisioning, active, degraded, disconnected]
-        message:
-          type: string
-
-    CloudflareStatus:
-      type: object
-      properties:
-        id:
-          type: string
-        domain:
-          type: string
-        zone_name:
-          type: string
-        zone_id:
-          type: string
-        status:
-          type: string
-          enum: [not_configured, provisioning, active, degraded, disconnected]
-        routing_enabled:
-          type: boolean
-        worker_deployed:
-          type: boolean
-        mx_configured:
-          type: boolean
-        last_checked_at:
-          type: string
-          format: date-time
-
-    CloudflareTokenVerifyRequest:
-      type: object
-      required: [cf_api_token, zone_name]
-      properties:
-        cf_api_token:
-          type: string
-          writeOnly: true
-        zone_name:
-          type: string
-
-    CloudflareTeardownRequest:
-      type: object
-      required: [integration_id]
-      properties:
-        integration_id:
-          type: string
-        cf_api_token:
-          type: string
-          writeOnly: true
-          description: Optional one-request override; the stored encrypted credential is used by default
-
-    CloudflareTokenSaveRequest:
-      type: object
-      required: [cf_api_token]
-      properties:
-        cf_api_token:
-          type: string
-          writeOnly: true
-
-    CloudflareTokenStatus:
-      type: object
-      properties:
-        configured:
-          type: boolean
-          nullable: true
-          description: Indicates whether an encrypted Cloudflare token is available; the token value is never returned.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreatPageResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Get Threats
+      tags:
+      - app-ui-flows
+  /v1/threats/visibility:
+    post:
+      description: Hide or restore selected events without deleting their audit evidence.
+      operationId: update_threat_visibility_v1_threats_visibility_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThreatVisibilityUpdate'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreatVisibilityResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Update Threat Visibility
+      tags:
+      - app-ui-flows
+  /v1/threats/{id}/status:
+    post:
+      operationId: update_threat_status_v1_threats__id__status_post
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          title: Id
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StatusUpdate'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreatLogResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Update Threat Status
+      tags:
+      - app-ui-flows
+servers:
+- description: Current Sicurre deployment
+  url: /
+tags:
+- description: Process health and deployment metadata.
+  name: system
+- description: Registered dataset source systems.
+  name: data-sources
+- description: Source ingestion run lineage.
+  name: data-ingestion
+- description: Authorized raw-record retrieval.
+  name: data-raw-records
+- description: Normalized message curation.
+  name: data-messages
+- description: Human and automated annotations.
+  name: data-annotations
+- description: Versioned dataset assembly and publication.
+  name: data-datasets
+- description: Bearer-protected service-to-service contracts.
+  name: internal
+- description: Authenticated workspace and administration flows.
+  name: app-ui-flows
+- description: Cloudflare routing and email scan gateways.
+  name: integrations
+- description: False-negative and DMARC report ingestion.
+  name: reported-email

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import get_async_session
 from core.rate_limit import limiter, touch_rate_limit_request
 from core.security import require_internal_key
+from data_platform.api.schemas.integration_responses import PhishtankSnapshotResponse
 from data_platform.api.schemas.mlops import (
     EvaluationSetRegistration,
     LineageRecordResponse,
@@ -113,7 +114,7 @@ async def persist_model_deployment(
     return await _persist_lineage(register_deployment(session, payload))
 
 
-@router.get("/phishtank/snapshot")
+@router.get("/phishtank/snapshot", response_model=PhishtankSnapshotResponse)
 @limiter.limit("10/minute")
 async def get_phishtank_snapshot(
     request: Request,

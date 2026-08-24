@@ -20,6 +20,11 @@ from data_platform.api.routers.app_routes import (
     _extract_dmarc_xml_payload,
     persist_dmarc_report,
 )
+from data_platform.api.schemas.app_responses import DmarcImportResponse
+from data_platform.api.schemas.integration_responses import (
+    ReportAddressResponse,
+    ReportedEmailIngestResponse,
+)
 from data_platform.services.reported_email import (
     InvalidReportAlias,
     ReportAliasCodec,
@@ -68,7 +73,7 @@ def _codec(settings: Settings) -> ReportAliasCodec:
         ) from exc
 
 
-@router.get("/v1/feedback/report-address")
+@router.get("/v1/feedback/report-address", response_model=ReportAddressResponse)
 async def get_report_address(
     current_user: AuthUser = Depends(get_current_user),  # noqa: B008
 ) -> dict[str, str]:
@@ -78,7 +83,11 @@ async def get_report_address(
     return {"address": report_address(settings.reported_email_address, token)}
 
 
-@router.post("/v1/email/reports/{token}", status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/v1/email/reports/{token}",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=ReportedEmailIngestResponse,
+)
 @limiter.limit("30/minute")
 async def ingest_reported_email(
     request: Request,
@@ -166,7 +175,11 @@ async def ingest_reported_email(
     return {"status": "accepted", "idempotent": False}
 
 
-@router.post("/v1/email/dmarc-reports", status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/v1/email/dmarc-reports",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=DmarcImportResponse,
+)
 @limiter.limit("30/minute")
 async def ingest_dmarc_email(
     request: Request,
