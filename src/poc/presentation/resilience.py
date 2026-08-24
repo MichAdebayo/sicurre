@@ -33,17 +33,20 @@ def render_resilience(
         st.error(translate("resilience_service_unavailable"))
     st.caption(service_status)
 
-    scenario = st.selectbox(
-        translate("resilience_scenario"),
-        SCENARIOS,
-        format_func=lambda value: translate(f"resilience_scenario_{value.value}"),
-    )
-    st.caption(translate(f"resilience_scenario_{scenario.value}_help"))
-    if st.button(
-        translate("resilience_trigger"),
-        type="primary",
-        disabled=not service_ready and scenario is not FaultScenario.UNREACHABLE_ENDPOINT,
-    ):
+    with st.form("resilience_probe_form"):
+        scenario = st.selectbox(
+            translate("resilience_scenario"),
+            SCENARIOS,
+            format_func=lambda value: translate(f"resilience_scenario_{value.value}"),
+            key="resilience_fault_scenario",
+        )
+        st.caption(translate(f"resilience_scenario_{scenario.value}_help"))
+        submitted = st.form_submit_button(
+            translate("resilience_trigger"),
+            type="primary",
+            disabled=not service_ready and scenario is not FaultScenario.UNREACHABLE_ENDPOINT,
+        )
+    if submitted:
         result = run_probe(scenario)
         recovery_ready, recovery_status = inference_health()
         st.session_state["fault_probe_result"] = {
