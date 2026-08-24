@@ -62,7 +62,7 @@ st.set_page_config(
     page_title="Sicurre - POC",
     page_icon="S",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 st.markdown(

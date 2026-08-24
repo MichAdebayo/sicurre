@@ -9,8 +9,8 @@ import pytest
 from poc.presentation.datasets import (
     _load_frozen_source_distribution,
     _source_family,
-    _source_family_rows,
     _source_label,
+    _source_provider_rows,
 )
 from poc.presentation.formatting import (
     effective_label,
@@ -78,27 +78,22 @@ def test_frozen_source_distribution_is_validated(tmp_path: Path) -> None:
     assert _load_frozen_source_distribution(metadata) == {"kaggle_multilingual_spam": 4}
 
 
-def test_dataset_family_rows_conserve_frozen_base_and_add_live_lineage() -> None:
+def test_dataset_provider_rows_make_api_evidence_visible() -> None:
     sources = [
         {
             "name": "reconstructed/current_frozen/native_external",
             "source_type": "manual",
             "total_records": 6,
         },
-        {"name": "PhishTank", "source_type": "api", "total_records": 3},
-        {"name": "SEKOIA Community IOC", "source_type": "scraping", "total_records": 2},
+        {"name": "PhishTank API (rejeu local)", "source_type": "api", "total_records": 3},
+        {"name": "sekoia-community-ioc", "source_type": "scraping", "total_records": 2},
     ]
-    frozen = {
-        "kaggle_multilingual_spam": 4,
-        "common-crawl-bigdata": 1,
-        "sap-labs-blog": 1,
-    }
+    frozen = {"kaggle_multilingual_spam": 4, "common-crawl-bigdata": 1}
 
-    rows = _source_family_rows(sources, frozen)
-    totals = {row["family"]: row["count"] for row in rows}
+    rows = _source_provider_rows(sources, frozen)
+    totals = {row["provider"]: row["count"] for row in rows}
 
-    assert totals == {"file": 4, "api": 3, "scraping": 3, "bigdata": 1}
-    assert sum(totals.values()) == sum(frozen.values()) + 5
+    assert totals == {"kaggle": 4, "phishtank": 3, "sekoia": 2, "common_crawl": 1}
 
 
 def test_presentation_formatting_preserves_existing_contract() -> None:

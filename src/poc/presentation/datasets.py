@@ -160,20 +160,37 @@ def _load_frozen_source_distribution(
     }
 
 
-def _source_family_rows(
+def _source_provider(source: str) -> str:
+    """Group detailed lineage into concise, truthful provider bars."""
+    normalized = source.lower().replace("_", "-")
+    if normalized.startswith("kaggle"):
+        return "kaggle"
+    if normalized.startswith("database/faker"):
+        return "faker"
+    if "adapted" in normalized:
+        return "adapted"
+    if "common-crawl" in normalized:
+        return "common_crawl"
+    if normalized.startswith("sap-labs"):
+        return "sap_labs"
+    if "phishtank" in normalized:
+        return "phishtank"
+    if "sekoia" in normalized:
+        return "sekoia"
+    return "other"
+
+
+def _source_provider_rows(
     sources: list[dict[str, Any]], frozen_distribution: dict[str, int]
 ) -> list[dict[str, Any]]:
-    """Combine recovered V1 totals with real post-V1 source lineage."""
-    totals: Counter[str] = Counter()
-    provider_counts: Counter[str] = Counter()
+    """Combine frozen and incremental lineage as visible provider totals."""
+    totals: Counter[tuple[str, str]] = Counter()
     has_reconstructed_base = any(
         str(row.get("name", "")).startswith("reconstructed/current_frozen/") for row in sources
     )
     if has_reconstructed_base:
         for source, count in frozen_distribution.items():
-            family = _source_family(source)
-            totals[family] += count
-            provider_counts[family] += 1
+            totals[(_source_provider(source), _source_family(source))] += count
 
     for row in sources:
         source = str(row.get("name", ""))
@@ -181,12 +198,11 @@ def _source_family_rows(
         if count <= 0 or source.startswith("reconstructed/current_frozen/"):
             continue
         family = _source_family(source, str(row.get("source_type") or ""))
-        totals[family] += count
-        provider_counts[family] += 1
+        totals[(_source_provider(source), family)] += count
 
     return [
-        {"family": family, "count": count, "provider_count": provider_counts[family]}
-        for family, count in totals.most_common()
+        {"provider": provider, "family": family, "count": count}
+        for (provider, family), count in totals.most_common()
     ]
 
 
@@ -213,9 +229,10 @@ def _render_sources(evidence: DataEvidence, translate: Callable[[str], str]) -> 
         """
     )
     frozen_distribution = _load_frozen_source_distribution()
-    chart_rows = _source_family_rows(sources, frozen_distribution)
+    chart_rows = _source_provider_rows(sources, frozen_distribution)
     for row in chart_rows:
         row["family_label"] = translate(f"source_family_{row['family']}")
+        row["provider_label"] = translate(f"source_provider_{row['provider']}")
     if chart_rows:
         st.markdown(f"#### {translate('source_breakdown')}")
         if any(str(row["name"]).startswith("reconstructed/") for row in sources):
@@ -224,7 +241,7 @@ def _render_sources(evidence: DataEvidence, translate: Callable[[str], str]) -> 
         family_order = [family for family in SOURCE_FAMILY_COLORS if family in present_families]
         family_labels = [translate(f"source_family_{family}") for family in family_order]
         specification = {
-            "height": 220,
+            "height": max(240, len(chart_rows) * 38),
             "mark": {
                 "type": "bar",
                 "cornerRadiusTopRight": 3,
@@ -232,10 +249,15 @@ def _render_sources(evidence: DataEvidence, translate: Callable[[str], str]) -> 
             },
             "encoding": {
                 "y": {
-                    "field": "family_label",
+                    "field": "provider_label",
                     "type": "nominal",
                     "sort": "-x",
-                    "axis": {"title": None, "labelFontSize": 13, "labelOverlap": False},
+                    "axis": {
+                        "title": None,
+                        "labelFontSize": 13,
+                        "labelLimit": 220,
+                        "labelOverlap": False,
+                    },
                 },
                 "x": {
                     "field": "count",
@@ -253,16 +275,16 @@ def _render_sources(evidence: DataEvidence, translate: Callable[[str], str]) -> 
                 },
                 "tooltip": [
                     {
+                        "field": "provider_label",
+                        "type": "nominal",
+                        "title": translate("source"),
+                    },
+                    {
                         "field": "family_label",
                         "type": "nominal",
                         "title": translate("source_method"),
                     },
                     {"field": "count", "type": "quantitative", "title": translate("records")},
-                    {
-                        "field": "provider_count",
-                        "type": "quantitative",
-                        "title": translate("source_count"),
-                    },
                 ],
             },
             "config": {"background": "transparent", "view": {"stroke": "transparent"}},
