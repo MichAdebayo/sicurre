@@ -158,14 +158,21 @@ def test_invalid_and_valid_login_are_contextual(poc_app: AppTest) -> None:
 
 def test_controlled_incident_is_visible_and_not_persisted(poc_app: AppTest) -> None:
     login(poc_app)
-    open_page(poc_app, "Espace d'essai", "nav_playground")
-    poc_app.button_group[0].set_value("incident").run()
-    analyze = next(button for button in poc_app.button if button.label == "Analyser l'email")
-    analyze.click().run()
+    open_page(poc_app, "Résilience", "nav_resilience")
+    trigger = next(button for button in poc_app.button if button.label == "Déclencher l’incident")
+    trigger.click().run()
 
-    assert any("Classification impossible" in error.value for error in poc_app.error)
-    assert "last_result" in poc_app.session_state
-    assert poc_app.session_state["last_result"] is None
+    assert any("Indisponibilité contrôlée" in error.value for error in poc_app.error)
+    recover = next(button for button in poc_app.button if button.label == "Rétablir le service")
+    recover.click().run()
+    assert poc_app.session_state["controlled_incident_active"] is False
+
+
+def test_database_evidence_is_admin_only_and_readable(poc_app: AppTest) -> None:
+    login(poc_app)
+    open_page(poc_app, "État SQLite", "nav_database")
+    assert any("Preuves de persistance SQLite" in title.value for title in poc_app.title)
+    assert not poc_app.exception
 
 
 def test_successful_simulation_populates_operational_pages(poc_app: AppTest) -> None:
@@ -289,7 +296,8 @@ def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
     assert poc_app.session_state["authenticated"] is True
     assert poc_app.session_state["user"]["role"] == "viewer"
 
-    assert not any(btn.label == "Flux de données" for btn in poc_app.button)
+    for admin_page in ("Flux de données", "Résilience", "État SQLite"):
+        assert not any(btn.label == admin_page for btn in poc_app.button)
     poc_app.session_state["page"] = "nav_pipeline"
     poc_app.run()
     assert poc_app.session_state["page"] == "nav_home"

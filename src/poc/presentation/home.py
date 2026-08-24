@@ -123,7 +123,12 @@ def render_home(
     st.markdown("<div style='margin-bottom:8px;'></div>", unsafe_allow_html=True)
 
     second_row = st.columns(4)
-    _metric_card(second_row[0], translate("label_accuracy"), f"{metrics.label_accuracy:.1f}%")
+    _metric_card(
+        second_row[0],
+        translate("label_accuracy"),
+        f"{metrics.label_accuracy:.1f}%",
+        help_text=translate("label_accuracy_help"),
+    )
     _metric_card(second_row[1], translate("false_positive"), str(metrics.false_positives))
     _metric_card(second_row[2], translate("false_negative"), str(metrics.false_negatives))
     _metric_card(

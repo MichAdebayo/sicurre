@@ -18,8 +18,12 @@ NAVIGATION_KEYS = (
     "nav_playground",
     "nav_pipeline",
     "nav_datasets",
+    "nav_resilience",
+    "nav_database",
     "nav_settings",
 )
+
+ADMIN_NAVIGATION_KEYS = {"nav_pipeline", "nav_resilience", "nav_database"}
 
 
 def _logo_html(logo_path: Path, width: int, *, login: bool = False) -> str:
@@ -113,7 +117,7 @@ def render_sidebar(
         navigation_keys = (
             NAVIGATION_KEYS
             if user["role"] == "admin"
-            else tuple(key for key in NAVIGATION_KEYS if key != "nav_pipeline")
+            else tuple(key for key in NAVIGATION_KEYS if key not in ADMIN_NAVIGATION_KEYS)
         )
         for navigation_key in navigation_keys:
             is_active = navigation_key == current_page

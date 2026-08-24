@@ -331,18 +331,21 @@ seed-frozen-dataset:
 
 poc-replay-frozen:
 	@echo "Running deterministic POC replay from frozen provenance (with local data DB reset)..."
-	@db_url="$${SICURRE_DATA_PLATFORM_DATABASE_URL:-sqlite+aiosqlite:///$$(pwd)/data/local/sicurre_dataplatform.db}"; \
+	@uv run --env-file .env sh -c 'set -eu; \
+	db_url="$$SICURRE_POC_DATA_PLATFORM_DATABASE_URL"; \
 	case "$$db_url" in \
 	  sqlite+aiosqlite:///*) reset_path="$${db_url#sqlite+aiosqlite:///}" ;; \
 	  sqlite:///*) reset_path="$${db_url#sqlite:///}" ;; \
 	  *) echo "Refusing to reset non-SQLite data-platform DB: $$db_url"; exit 1 ;; \
 	esac; \
 	echo "Resetting $$reset_path"; \
-	rm -f "$$reset_path" "$$reset_path-shm" "$$reset_path-wal"
-	uv run alembic upgrade head
-	$(MAKE) normalize
-	$(MAKE) annotate
-	$(MAKE) seed-frozen-dataset SEED_ARGS="--materialize-missing --sync-existing-version"
+	rm -f "$$reset_path" "$$reset_path-shm" "$$reset_path-wal"; \
+	export PYTHONPATH=src SICURRE_POC_MODE=true SICURRE_DATA_PLATFORM_DATABASE_URL="$$db_url"; \
+	uv run alembic upgrade head; \
+	$(MAKE) normalize; \
+	$(MAKE) annotate; \
+	$(MAKE) seed-frozen-dataset SEED_ARGS="--materialize-missing --sync-existing-version"; \
+	uv run --no-sync python -m poc.seed_api_evidence'
 	@echo "POC frozen replay completed: deterministic parity synced to current_frozen."
 
 poc-cron-demo:
@@ -353,10 +356,17 @@ poc-cron-demo:
 		python src/data_platform/cron_schedulers/scraping/run_sekoia_ioc.py'
 
 poc-release-preview:
-	@uv run --env-file .env sh -c 'SICURRE_POC_MODE=true \
+	@uv run --env-file .env sh -c 'set -eu; SICURRE_POC_MODE=true \
 		SICURRE_DATA_PLATFORM_DATABASE_URL="$$SICURRE_POC_DATA_PLATFORM_DATABASE_URL" \
 		SICURRE_TRAINING_DATASET_SNAPSHOT_STORAGE_BACKEND=local \
-		$(MAKE) pipeline-push DATASET_TAG_PREFIX=poc-preview'
+		$(MAKE) normalize annotate; \
+		set +e; PYTHONPATH=src python -m poc.release_preflight; code=$$?; set -e; \
+		if [ $$code -eq 3 ]; then exit 0; fi; \
+		test $$code -eq 0; \
+		SICURRE_POC_MODE=true \
+		SICURRE_DATA_PLATFORM_DATABASE_URL="$$SICURRE_POC_DATA_PLATFORM_DATABASE_URL" \
+		SICURRE_TRAINING_DATASET_SNAPSHOT_STORAGE_BACKEND=local \
+		$(MAKE) dataset-build dataset-export DATASET_TAG_PREFIX=poc-preview'
 	@echo "POC release preview completed locally. No Kaggle publication or ML dispatch occurred."
 
 poc-staging-publish:
