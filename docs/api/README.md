@@ -6,10 +6,14 @@ The API surfaces remain organized by runtime responsibility, while planning and 
 
 ## Canonical contract
 
-The source of truth is [openapi.yaml](openapi.yaml).
+FastAPI route metadata and Pydantic request/response models are the source of truth.
+[openapi.yaml](openapi.yaml) is the deterministic, reviewed artifact generated from
+that runtime contract with `make openapi`.
 
-The contract should track the implemented runtime. If the architecture changes, update
-the OpenAPI contract and the runtime docs in the same change.
+CI runs `make openapi-check` and rejects any change where the checked-in OpenAPI 3.1
+document differs from `create_app().openapi()`. Update the route models and metadata,
+regenerate the artifact, and commit both in the same change. Do not edit generated
+schemas directly.
 
 ## API surfaces
 
