@@ -9,18 +9,18 @@ import yaml
 from data_platform.api.main import create_app
 
 
-def test_documented_openapi_paths_match_runtime() -> None:
-    """Keep the hand-authored public contract aligned with every runtime route."""
+def test_checked_in_openapi_matches_runtime() -> None:
+    """Keep every published operation and schema aligned with FastAPI."""
     repository_root = Path(__file__).resolve().parents[3]
     documented = yaml.safe_load(
         (repository_root / "docs/api/openapi.yaml").read_text(encoding="utf-8")
     )
 
-    assert set(documented["paths"]) == set(create_app().openapi()["paths"])
+    assert documented == create_app().openapi()
 
 
-def test_documented_ml_context_preserves_three_class_calibration_signals() -> None:
-    """Document trusted intent separately from untrusted subscription claims."""
+def test_email_scan_contract_preserves_safety_and_three_class_label() -> None:
+    """Keep delivery safety separate from the three-class model decision."""
 
     repository_root = Path(__file__).resolve().parents[3]
     documented = yaml.safe_load(
@@ -28,14 +28,32 @@ def test_documented_ml_context_preserves_three_class_calibration_signals() -> No
     )
     schemas = documented["components"]["schemas"]
 
-    assert schemas["ClassifyRequest"]["properties"]["mail_context"] == {
-        "$ref": "#/components/schemas/MailContextRequest"
-    }
-    context_properties = schemas["MailContextRequest"]["properties"]
-    assert context_properties["recipient_expected"]["default"] is False
-    assert context_properties["transactional_evidence"]["default"] is False
-    assert schemas["ClassifyResponse"]["properties"]["label"]["enum"] == [
+    assert schemas["EmailScanResponse"]["properties"]["verdict"]["enum"] == [
+        "safe",
+        "phishing",
+        "quarantine",
+    ]
+    assert schemas["EmailScanResponse"]["properties"]["label"]["enum"] == [
         "phishing",
         "spam",
         "legitimate",
     ]
+
+
+def test_successful_json_responses_are_explicitly_typed() -> None:
+    """Prevent generic dictionaries from weakening generated response contracts."""
+    runtime = create_app().openapi()
+    generic_responses: list[str] = []
+
+    for path, path_item in runtime["paths"].items():
+        for method, operation in path_item.items():
+            if method not in {"get", "post", "put", "patch", "delete"}:
+                continue
+            for status_code, response in operation.get("responses", {}).items():
+                if not str(status_code).startswith("2") or status_code == "204":
+                    continue
+                schema = response.get("content", {}).get("application/json", {}).get("schema")
+                if not schema or schema == {} or schema.get("additionalProperties") is True:
+                    generic_responses.append(f"{method.upper()} {path} ({status_code})")
+
+    assert generic_responses == []

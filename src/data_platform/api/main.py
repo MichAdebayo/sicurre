@@ -24,8 +24,23 @@ from data_platform.api.routers.app_routes import router as app_routes_router
 from data_platform.api.routers.integrations import router as integrations_router
 from data_platform.api.routers.internal import router as internal_router
 from data_platform.api.routers.reported_email import router as reported_email_router
+from data_platform.api.schemas.integration_responses import HealthResponse
 
 logger = logging.getLogger(__name__)
+
+OPENAPI_TAGS = [
+    {"name": "system", "description": "Process health and deployment metadata."},
+    {"name": "data-sources", "description": "Registered dataset source systems."},
+    {"name": "data-ingestion", "description": "Source ingestion run lineage."},
+    {"name": "data-raw-records", "description": "Authorized raw-record retrieval."},
+    {"name": "data-messages", "description": "Normalized message curation."},
+    {"name": "data-annotations", "description": "Human and automated annotations."},
+    {"name": "data-datasets", "description": "Versioned dataset assembly and publication."},
+    {"name": "internal", "description": "Bearer-protected service-to-service contracts."},
+    {"name": "app-ui-flows", "description": "Authenticated workspace and administration flows."},
+    {"name": "integrations", "description": "Cloudflare routing and email scan gateways."},
+    {"name": "reported-email", "description": "False-negative and DMARC report ingestion."},
+]
 
 
 def configure_tracing(app: FastAPI) -> None:
@@ -108,8 +123,16 @@ def create_app() -> FastAPI:
     settings = get_settings()
 
     app = FastAPI(
-        title=settings.app_name,
-        version="0.1.0",
+        title="Sicurre Platform API",
+        summary="Data, application, and integration contracts for Sicurre.",
+        description=(
+            "Generated from the deployed FastAPI routes and Pydantic models. "
+            "Authenticated customer operations use Better Auth sessions or bearer tokens; "
+            "internal and email-gateway routes require their documented service credentials."
+        ),
+        version="1.0.0",
+        openapi_tags=OPENAPI_TAGS,
+        servers=[{"url": "/", "description": "Current Sicurre deployment"}],
         lifespan=lifespan,
     )
     app.state.limiter = limiter
@@ -122,7 +145,7 @@ def create_app() -> FastAPI:
     app.include_router(reported_email_router)
     configure_tracing(app)
 
-    @app.get("/health", tags=["system"])
+    @app.get("/health", tags=["system"], response_model=HealthResponse)
     @limiter.exempt
     async def healthcheck() -> dict[str, str]:
         return {"status": "ok", "environment": settings.environment}
