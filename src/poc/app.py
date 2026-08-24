@@ -163,7 +163,8 @@ def update_display_name(user_id: str, display_name: str) -> None:
 
 
 def inference_status() -> tuple[bool, str]:
-    return INFERENCE_CLIENT.health()
+    healthy, status_key = INFERENCE_CLIENT.health()
+    return healthy, tr(status_key)
 
 
 def classify_email(
@@ -197,6 +198,7 @@ def classify_email_for_ui(
     try:
         return classify_email(subject, sender, text_value, use_llm, use_virustotal)
     except PocInferenceError as exc:
+        st.session_state["last_result"] = None
         st.session_state["last_inference_error"] = str(exc)
         st.error(f"{tr('inference_request_failed')} {exc}")
         return None
@@ -255,6 +257,9 @@ render_sidebar(
 
 events = EVENT_STORE.list_for_user(user["email"], limit=2000)
 page = st.session_state.get("page", "nav_home")
+if page == "nav_pipeline" and user["role"] != "admin":
+    page = "nav_home"
+    st.session_state["page"] = page
 
 # ── Accueil ──────────────────────────────────────────────────────────────────
 if page == "nav_home":

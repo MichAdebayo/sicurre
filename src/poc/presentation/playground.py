@@ -92,11 +92,9 @@ def render_playground(
     st.caption(translate(f"inference_mode_{selected.value}_help"))
 
     st.markdown("<div style='margin-bottom:8px;'></div>", unsafe_allow_html=True)
-    llm_column, virustotal_column = st.columns(2)
-    with llm_column:
-        use_llm = st.checkbox(translate("enable_llm"), value=True, key="pg_use_llm")
-    with virustotal_column:
-        use_virustotal = st.checkbox(translate("enable_vt"), value=True, key="pg_use_vt")
+    st.caption(translate("local_enrichment_disabled"))
+    use_llm = False
+    use_virustotal = False
     st.markdown("---")
 
     left, right = st.columns([1, 1])

@@ -219,7 +219,16 @@ def test_home_metrics_distinguish_safety_and_classifier_quality() -> None:
     assert metrics.false_positives == 0
     assert metrics.false_negatives == 1
     assert metrics.label_accuracy == pytest.approx(66.67, rel=0.01)
-    assert metrics.latency_p95_ms == 200
+    assert metrics.latency_p95_ms == 300
+
+
+def test_home_latency_uses_only_real_successful_inference() -> None:
+    events = [
+        {"latency_ms": 120, "inference_source": "live"},
+        {"latency_ms": 900, "inference_source": "simulation"},
+        {"latency_ms": 0, "inference_source": "live"},
+    ]
+    assert calculate_home_metrics(events).latency_p95_ms == 120
 
 
 def test_remediation_partitions_delivered_mail_and_honors_overrides() -> None:

@@ -37,9 +37,14 @@ def test_classifier_contract_requires_classify_route() -> None:
         settings(inference_api_url="http://127.0.0.1:8000/v1/email/scan")
 
 
+def test_classifier_contract_rejects_remote_hosts() -> None:
+    with pytest.raises(ValidationError, match="must target the local machine"):
+        settings(inference_api_url="https://api.sicurre.com/v1/classify")
+
+
 def test_external_namespace_must_be_a_demonstration_prefix() -> None:
     with pytest.raises(ValidationError, match="must start with demonstrations"):
-        settings(r2_prefix="production/monthly")
+        settings(snapshot_prefix="production/monthly")
 
 
 def test_required_demo_credentials_are_reported_together() -> None:
