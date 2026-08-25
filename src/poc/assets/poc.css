@@ -329,6 +329,25 @@ div[data-baseweb="popover"] span,
   color: var(--primary) !important;
 }
 
+/* Button help is a tooltip, not a dropdown menu. Keep its contrast stable. */
+[role="tooltip"],
+[role="tooltip"] div,
+[role="tooltip"] span,
+[role="tooltip"] p {
+  background-color: #10243E !important;
+  color: #FFFFFF !important;
+  opacity: 1 !important;
+}
+[role="tooltip"] div[data-testid="stMarkdownContainer"] > p {
+  color: #FFFFFF !important;
+  -webkit-text-fill-color: #FFFFFF !important;
+}
+[role="tooltip"] {
+  border: 1px solid #2E6BB5 !important;
+  border-radius: 6px !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.24) !important;
+}
+
 /* ── Checkboxes ───────────────────────────────────────── */
 input[type="checkbox"] {
   accent-color: var(--primary) !important;
