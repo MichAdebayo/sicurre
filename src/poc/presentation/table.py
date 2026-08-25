@@ -19,7 +19,7 @@ def render_evidence_table(
     headers = "".join(f"<th scope='col'>{escape(column)}</th>" for column in columns)
     body = "".join(
         "<tr>"
-        + "".join(f"<td>{escape(str(row.get(column, '—')))}</td>" for column in columns)
+        + "".join(f"<td>{escape(str(row.get(column, '-')))}</td>" for column in columns)
         + "</tr>"
         for row in rows
     )

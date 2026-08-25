@@ -194,6 +194,11 @@ def test_resilience_page_exposes_selectable_real_fault_evidence(poc_app: AppTest
     inject = next(button for button in poc_app.button if button.label == "Injecter la panne")
     inject.click().run()
     assert any("Panne active" in warning.value for warning in poc_app.warning)
+
+    open_page(poc_app, "Espace d'essai", "nav_playground")
+    open_page(poc_app, "Résilience", "nav_resilience")
+    assert any("Panne active" in warning.value for warning in poc_app.warning)
+    assert next(button for button in poc_app.button if button.label == "Injecter la panne").disabled
     restore = next(button for button in poc_app.button if button.label == "Rétablir le service")
     restore.click().run()
     assert any("Service rétabli" in success.value for success in poc_app.success)
@@ -278,7 +283,7 @@ def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
     # Verify seeded counts are shown
     assert any("base-20260715" in md.value for md in poc_app.markdown)
     assert any("PhishTank" in markdown.value for markdown in poc_app.markdown)
-    assert any("totaux V1 sont reconstruits" in caption.value for caption in poc_app.caption)
+    assert any("Base V1 issue" in caption.value for caption in poc_app.caption)
 
     # 2. Test Pipeline Page - Admin Successful Run
     open_page(poc_app, "Flux de données", "nav_pipeline")

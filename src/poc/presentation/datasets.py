@@ -104,7 +104,7 @@ def _render_incremental_run(evidence: DataEvidence, translate: Callable[[str], s
 def _run_label(row: dict[str, Any], translate: Callable[[str], str]) -> str:
     """Build a concise selector label for one ingestion run."""
     finished_at = str(row.get("finished_at") or row.get("started_at") or "")[:16].replace("T", " ")
-    name = _source_label(str(row.get("name") or "—"), translate)
+    name = _source_label(str(row.get("name") or "-"), translate)
     records = format_number(int(row.get("raw_record_count") or 0))
     return f"{finished_at} · {name} · {records} {translate('records')}"
 
@@ -301,7 +301,7 @@ def _render_sources(evidence: DataEvidence, translate: Callable[[str], str]) -> 
         )
     provider_rows.extend(
         {
-            translate("source"): _source_label(str(row.get("name") or "—"), translate),
+            translate("source"): _source_label(str(row.get("name") or "-"), translate),
             translate("source_method"): translate(
                 f"source_family_{_source_family(str(row.get('name') or ''), str(row.get('source_type') or ''))}"
             ),
@@ -345,7 +345,7 @@ def _render_versions(evidence: DataEvidence, translate: Callable[[str], str]) ->
         item_count = int(row.get("item_count") or 0)
         st.markdown(
             "<div class='card'>"
-            f"<strong>{row.get('version_tag', '—')}</strong>"
+            f"<strong>{row.get('version_tag', '-')}</strong>"
             "<span style='margin-left:12px;font-size:0.82rem;color:var(--text-2);'>"
             f"{format_number(item_count)} {translate('rows')} &middot; {created_at} "
             f"&middot; {row.get('status', '')}</span></div>",

@@ -129,33 +129,32 @@ def render_sidebar(
                 st.session_state["page"] = navigation_key
                 st.rerun()
 
-        st.markdown("<div class='sidebar-spacer'></div>", unsafe_allow_html=True)
-        st.markdown(
-            "<hr style='margin:0.8rem 0!important;border:none!important;"
-            "border-top:1px solid var(--border-line)!important;opacity:1!important;' />",
-            unsafe_allow_html=True,
-        )
-        settings_active = current_page == "nav_settings"
-        settings_selected = st.button(
-            translate("nav_settings"),
-            key="_nav_nav_settings",
-            type="primary" if settings_active else "secondary",
-            use_container_width=True,
-        )
-        if settings_selected and not settings_active:
-            st.session_state["page"] = "nav_settings"
-            st.rerun()
+        with st.container(key="sidebar_utilities"):
+            st.markdown(
+                "<hr style='margin:0.8rem 0!important;border:none!important;"
+                "border-top:1px solid var(--border-line)!important;opacity:1!important;' />",
+                unsafe_allow_html=True,
+            )
+            settings_active = current_page == "nav_settings"
+            settings_selected = st.button(
+                translate("nav_settings"),
+                key="_nav_nav_settings",
+                type="primary" if settings_active else "secondary",
+                use_container_width=True,
+            )
+            if settings_selected and not settings_active:
+                st.session_state["page"] = "nav_settings"
+                st.rerun()
 
-        is_healthy, status_text = inference_health()
-        dot_class = "dot-green" if is_healthy else "dot-red"
-        st.markdown(
-            "<div class='inference-status'><div class='status-heading'>"
-            f"<span class='status-dot {dot_class}'></span>"
-            f"<span class='status-label'>{translate('inference_status')}</span></div>"
-            f"<span class='status-value'>{status_text}</span></div>",
-            unsafe_allow_html=True,
-        )
-        st.markdown("<div style='margin-top:8px;'></div>", unsafe_allow_html=True)
-        if st.button(translate("sign_out"), key="_sidebar_signout"):
-            sign_out()
-            st.rerun()
+            is_healthy, status_text = inference_health()
+            dot_class = "dot-green" if is_healthy else "dot-red"
+            st.markdown(
+                "<div class='inference-status'><div class='status-heading'>"
+                f"<span class='status-dot {dot_class}'></span>"
+                f"<span class='status-label'>{translate('inference_status')}</span></div>"
+                f"<span class='status-value'>{status_text}</span></div>",
+                unsafe_allow_html=True,
+            )
+            if st.button(translate("sign_out"), key="_sidebar_signout"):
+                sign_out()
+                st.rerun()

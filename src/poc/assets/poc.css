@@ -427,7 +427,7 @@ div[data-baseweb="tab-highlight"] {
   padding-bottom: 0.4rem !important;
   display: flex !important;
   flex-direction: column !important;
-  height: 100% !important;
+  min-height: calc(100vh - 11.5rem) !important;
 }
 /* Show header but make it transparent so collapse button is visible */
 [data-testid="stSidebarHeader"] {
@@ -961,13 +961,10 @@ div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid=
   display: none !important;
 }
 
-/* ── Sidebar flex bottom push ─────────────────────────── */
-.sidebar-spacer {
-  flex-grow: 1 !important;
-  min-height: 2rem !important;
-}
-[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-spacer) {
+/* ── Sidebar utility group ────────────────────────────── */
+[data-testid="stSidebar"] .st-key-sidebar_utilities {
   margin-top: auto !important;
+  padding-bottom: 0.35rem !important;
 }
 
 /* ── Login page center fix ────────────────────────────── */
