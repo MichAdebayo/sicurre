@@ -54,30 +54,30 @@ def test_fault_probes_exercise_real_request_boundaries(
     configured_settings: PocSettings,
 ) -> None:
     classify_route = respx.post(configured_settings.inference_api_url)
-    classify_route.mock(return_value=httpx.Response(401))
+    classify_route.mock(return_value=httpx.Response(503))
     client = PocInferenceClient(configured_settings)
 
+    outage_result = client.run_fault_probe(FaultScenario.SERVICE_UNAVAILABLE)
+    assert outage_result.passed
+    assert outage_result.observed == "503"
+
+    classify_route.mock(return_value=httpx.Response(401))
     auth_result = client.run_fault_probe(FaultScenario.INVALID_BEARER)
     assert auth_result.passed
     assert auth_result.observed == "401"
-    assert classify_route.calls[-1].request.headers["Authorization"].endswith("invalid-probe")
-
-    classify_route.mock(return_value=httpx.Response(422))
-    payload_result = client.run_fault_probe(FaultScenario.INVALID_PAYLOAD)
-    assert payload_result.passed
-    assert payload_result.observed == "422"
+    assert classify_route.calls[-1].request.headers["Authorization"] == "Bearer internal-test-key"
 
 
 @respx.mock
-def test_unreachable_fault_probe_records_connection_failure(
+def test_invalid_contract_probe_records_safe_rejection(
     configured_settings: PocSettings,
 ) -> None:
-    respx.post("http://127.0.0.1:1/v1/classify").mock(side_effect=httpx.ConnectError("offline"))
-    result = PocInferenceClient(configured_settings).run_fault_probe(
-        FaultScenario.UNREACHABLE_ENDPOINT
+    respx.post(configured_settings.inference_api_url).mock(
+        return_value=httpx.Response(200, json={"unexpected": True})
     )
+    result = PocInferenceClient(configured_settings).run_fault_probe(FaultScenario.INVALID_CONTRACT)
     assert result.passed
-    assert result.observed == "ConnectError"
+    assert result.observed == "contract_rejected"
 
 
 @respx.mock

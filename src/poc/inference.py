@@ -22,9 +22,9 @@ class InferenceMode(StrEnum):
 class FaultScenario(StrEnum):
     """Bounded local API failures available to the resilience demonstration."""
 
+    SERVICE_UNAVAILABLE = "service_unavailable"
     INVALID_BEARER = "invalid_bearer"
-    INVALID_PAYLOAD = "invalid_payload"
-    UNREACHABLE_ENDPOINT = "unreachable_endpoint"
+    INVALID_CONTRACT = "invalid_contract"
 
 
 class PocInferenceError(RuntimeError):
@@ -204,43 +204,47 @@ class PocInferenceClient:
         return result
 
     def run_fault_probe(self, scenario: FaultScenario) -> FaultProbeResult:
-        """Exercise one real request failure without stopping the shared service."""
-        if scenario is FaultScenario.UNREACHABLE_ENDPOINT:
-            try:
-                httpx.post("http://127.0.0.1:1/v1/classify", json={}, timeout=0.5)
-            except httpx.HTTPError as error:
-                return FaultProbeResult(
-                    scenario=scenario,
-                    expected="connection_error",
-                    observed=type(error).__name__,
-                    passed=True,
-                )
-            return FaultProbeResult(scenario, "connection_error", "request_succeeded", False)
-
-        headers = self._headers()
-        if scenario is FaultScenario.INVALID_BEARER:
-            headers = {"Authorization": "Bearer sicurre-poc-invalid-probe"}
+        """Observe the fault currently injected into the local POC gateway."""
+        payload = {
+            "subject": "Contrôle de résilience Sicurre",
+            "sender": "probe@sicurre.test",
+            "text": "Message local sans donnée utilisateur.",
+            "use_llm": False,
+            "use_virustotal": False,
+        }
         try:
             response = httpx.post(
                 self.settings.inference_api_url,
-                json={},
-                headers=headers,
+                json=payload,
+                headers=self._headers(),
                 timeout=5.0,
             )
         except httpx.HTTPError as error:
             return FaultProbeResult(
                 scenario=scenario,
-                expected="401" if scenario is FaultScenario.INVALID_BEARER else "422",
+                expected=self._fault_expectation(scenario),
                 observed=type(error).__name__,
                 passed=False,
             )
-        expected_status = 401 if scenario is FaultScenario.INVALID_BEARER else 422
+        if scenario is FaultScenario.INVALID_CONTRACT:
+            try:
+                normalize_inference_result(response.json())
+            except (PocInferenceContractError, ValueError, TypeError):
+                return FaultProbeResult(scenario, "contract_rejected", "contract_rejected", True)
+            return FaultProbeResult(scenario, "contract_rejected", "contract_accepted", False)
+        expected_status = 503 if scenario is FaultScenario.SERVICE_UNAVAILABLE else 401
         return FaultProbeResult(
             scenario=scenario,
             expected=str(expected_status),
             observed=str(response.status_code),
             passed=response.status_code == expected_status,
         )
+
+    @staticmethod
+    def _fault_expectation(scenario: FaultScenario) -> str:
+        if scenario is FaultScenario.INVALID_CONTRACT:
+            return "contract_rejected"
+        return "503" if scenario is FaultScenario.SERVICE_UNAVAILABLE else "401"
 
     def _headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.settings.inference_api_key}"}

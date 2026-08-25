@@ -12,6 +12,7 @@ from typing import Any, Protocol
 import streamlit as st
 
 from poc.presentation.formatting import format_number
+from poc.presentation.table import render_evidence_table
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 FROZEN_METADATA_PATH = (
@@ -96,9 +97,7 @@ def _render_incremental_run(evidence: DataEvidence, translate: Callable[[str], s
 
     raw_count = int(selected.get("raw_record_count") or 0)
     normalized_count = int(selected.get("normalized_count") or 0)
-    if raw_count == 0 and str(selected.get("status")) == "completed":
-        st.info(translate("incremental_run_idempotent"))
-    elif raw_count > 0 and normalized_count == 0:
+    if raw_count > 0 and normalized_count == 0:
         st.info(translate("incremental_run_reference_only"))
 
 
@@ -314,7 +313,16 @@ def _render_sources(evidence: DataEvidence, translate: Callable[[str], str]) -> 
     )
     if provider_rows:
         with st.expander(translate("source_provider_details")):
-            st.dataframe(provider_rows, hide_index=True, width="stretch")
+            columns = (
+                translate("source"),
+                translate("source_method"),
+                translate("records"),
+            )
+            render_evidence_table(
+                provider_rows,
+                columns,
+                caption=translate("source_provider_table_caption"),
+            )
 
 
 def _render_versions(evidence: DataEvidence, translate: Callable[[str], str]) -> None:
@@ -358,18 +366,22 @@ def render_datasets(evidence: DataEvidence, translate: Callable[[str], str]) -> 
         """
     )
     latest_item_count = int(latest_dataset[0]["item_count"]) if latest_dataset else 0
+    raw_total = evidence.count("data_raw_record")
+    normalized_total = evidence.count("data_normalized_message")
+    st.markdown(f"#### {translate('dataset_current_state')}")
     columns = st.columns(3)
-    _metric(columns[0], translate("total_raw"), evidence.count("data_raw_record"))
-    _metric(
-        columns[1],
-        translate("total_normalized"),
-        evidence.count("data_normalized_message"),
-    )
+    _metric(columns[0], translate("total_raw"), raw_total)
+    _metric(columns[1], translate("total_normalized"), normalized_total)
     _metric(
         columns[2],
         translate("total_dataset_items"),
         latest_item_count,
     )
+    excluded_count = max(raw_total - normalized_total, 0)
+    if excluded_count:
+        st.caption(
+            translate("dataset_reference_only_summary").format(count=format_number(excluded_count))
+        )
     st.markdown("<div style='margin-bottom:16px;'></div>", unsafe_allow_html=True)
     _render_incremental_run(evidence, translate)
     _render_sources(evidence, translate)
