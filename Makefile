@@ -17,7 +17,7 @@
         annotate \
         generate-data dataset-build dataset-export publish-latest dataset-release monthly-release \
         seed-frozen-dataset \
-		poc-replay-frozen poc-inference \
+		poc-replay-frozen poc-inference poc-stop \
 		poc-cron-demo poc-release-preview poc-staging-publish \
         pipeline-push run-pipeline demo-v1 demo-v2 \
         poc db-seed r2-freeze-proof dev-api dev-app dev-stop dev
@@ -87,6 +87,7 @@ help:
 	@echo ""
 	@echo "  POC"
 	@echo "  make poc                       - Launch Streamlit POC dashboard"
+	@echo "  make poc-stop                  - Stop the POC and free port 8501"
 	@echo "  make poc-inference             - Launch Sicurre-ML with the POC bearer key"
 	@echo ""
 	@echo "  Dev"
@@ -439,7 +440,31 @@ poc-seed:
 	@echo "Seeding POC users (admin + demo)..."
 	PYTHONPATH=src uv run python -m poc.seed_users
 
+poc-stop:
+	@pids=$$(lsof -tiTCP:8501 -sTCP:LISTEN 2>/dev/null | sort -u); \
+	if [ -z "$$pids" ]; then \
+		echo "Sicurre POC is not running; port 8501 is free."; \
+		exit 0; \
+	fi; \
+	echo "Stopping Sicurre POC on port 8501 (PID: $$(echo $$pids | tr '\n' ' '))..."; \
+	kill $$pids 2>/dev/null || true; \
+	for attempt in 1 2 3 4 5 6 7 8 9 10; do \
+		lsof -tiTCP:8501 -sTCP:LISTEN >/dev/null 2>&1 || break; \
+		sleep 0.2; \
+	done; \
+	remaining=$$(lsof -tiTCP:8501 -sTCP:LISTEN 2>/dev/null | sort -u); \
+	if [ -n "$$remaining" ]; then \
+		echo "POC did not stop gracefully; forcing shutdown..."; \
+		kill -KILL $$remaining 2>/dev/null || true; \
+	fi; \
+	if lsof -tiTCP:8501 -sTCP:LISTEN >/dev/null 2>&1; then \
+		echo "ERROR: port 8501 is still occupied."; \
+		exit 1; \
+	fi; \
+	echo "Sicurre POC stopped; port 8501 is free."
+
 poc: poc-seed
+	@$(MAKE) poc-stop
 	@echo "Starting Sicurre POC Streamlit Dashboard..."
 	PYTHONPATH=src uv run streamlit run src/poc/app.py --server.port 8501
 
