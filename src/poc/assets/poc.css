@@ -428,6 +428,11 @@ div[data-baseweb="tab-highlight"] {
   display: flex !important;
   flex-direction: column !important;
   min-height: calc(100vh - 11.5rem) !important;
+  position: relative !important;
+}
+.sidebar-identity {
+  margin-top: -1.5rem;
+  margin-bottom: 1.2rem;
 }
 /* Show header but make it transparent so collapse button is visible */
 [data-testid="stSidebarHeader"] {
@@ -961,10 +966,59 @@ div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid=
   display: none !important;
 }
 
-/* ── Sidebar utility group ────────────────────────────── */
-[data-testid="stSidebar"] .st-key-sidebar_utilities {
+/* ── Sidebar actions and bottom status ───────────────── */
+[data-testid="stSidebar"] .st-key-sidebar_actions {
+  margin-top: clamp(2.25rem, 7vh, 4.5rem) !important;
+}
+[data-testid="stSidebar"] .st-key-sidebar_inference_status {
   margin-top: auto !important;
   padding-bottom: 0.35rem !important;
+}
+
+@media (min-height: 680px) {
+  [data-testid="stSidebar"] .st-key-sidebar_actions {
+    position: absolute !important;
+    right: 0 !important;
+    bottom: 3.5rem !important;
+    left: 0 !important;
+    margin-top: 0 !important;
+  }
+  [data-testid="stSidebar"] .st-key-sidebar_inference_status {
+    position: absolute !important;
+    right: 0 !important;
+    bottom: 0.4rem !important;
+    left: 0 !important;
+    margin-top: 0 !important;
+  }
+}
+
+@media (max-height: 800px) {
+  [data-testid="stSidebarUserContent"] {
+    padding-top: 1rem !important;
+    min-height: calc(100vh - 5rem) !important;
+  }
+  .sidebar-identity {
+    margin-top: -0.75rem;
+    margin-bottom: 0.45rem;
+  }
+  .sidebar-identity .logo-container {
+    margin-bottom: 0.35rem !important;
+  }
+  .sidebar-identity .logo-container img {
+    width: 64px !important;
+  }
+  [data-testid="stSidebar"] .st-key-sidebar_actions {
+    margin-top: 1.75rem !important;
+  }
+  [data-testid="stSidebar"] .stButton > button {
+    min-height: 2rem !important;
+    padding-top: 0.1rem !important;
+    padding-bottom: 0.1rem !important;
+  }
+  .inference-status {
+    padding-top: 0.25rem !important;
+    margin-bottom: 0.35rem !important;
+  }
 }
 
 /* ── Login page center fix ────────────────────────────── */

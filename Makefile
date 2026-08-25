@@ -17,7 +17,7 @@
         annotate \
         generate-data dataset-build dataset-export publish-latest dataset-release monthly-release \
         seed-frozen-dataset \
-		poc-replay-frozen poc-inference poc-stop \
+		poc-replay-frozen poc-inference poc-inference-stop poc-stop \
 		poc-cron-demo poc-release-preview poc-staging-publish \
         pipeline-push run-pipeline demo-v1 demo-v2 \
         poc db-seed r2-freeze-proof dev-api dev-app dev-stop dev
@@ -89,6 +89,7 @@ help:
 	@echo "  make poc                       - Launch Streamlit POC dashboard"
 	@echo "  make poc-stop                  - Stop the POC and free port 8501"
 	@echo "  make poc-inference             - Launch Sicurre-ML with the POC bearer key"
+	@echo "  make poc-inference-stop        - Stop local Sicurre-ML and free port 8000"
 	@echo ""
 	@echo "  Dev"
 	@echo "  make db-seed                   - Manually seed external_threats.db (dev utility)"
@@ -435,6 +436,29 @@ poc-inference:
 		fi; \
 		cd "$(SICURRE_ML_REPO)"; \
 		INFERENCE_API_KEY="$$SICURRE_POC_INFERENCE_API_KEY" $(MAKE) serve-reload
+
+poc-inference-stop:
+	@pids=$$(lsof -tiTCP:8000 -sTCP:LISTEN 2>/dev/null | sort -u); \
+	if [ -z "$$pids" ]; then \
+		echo "Sicurre-ML is not running; port 8000 is free."; \
+		exit 0; \
+	fi; \
+	echo "Stopping local Sicurre-ML on port 8000 (PID: $$pids)..."; \
+	kill $$pids 2>/dev/null || true; \
+	for attempt in 1 2 3 4 5 6 7 8 9 10; do \
+		lsof -tiTCP:8000 -sTCP:LISTEN >/dev/null 2>&1 || break; \
+		sleep 0.2; \
+	done; \
+	remaining=$$(lsof -tiTCP:8000 -sTCP:LISTEN 2>/dev/null | sort -u); \
+	if [ -n "$$remaining" ]; then \
+		echo "Sicurre-ML did not stop gracefully; forcing shutdown..."; \
+		kill -KILL $$remaining 2>/dev/null || true; \
+	fi; \
+	if lsof -tiTCP:8000 -sTCP:LISTEN >/dev/null 2>&1; then \
+		echo "ERROR: port 8000 is still occupied."; \
+		exit 1; \
+	fi; \
+	echo "Sicurre-ML stopped; port 8000 is free."
 
 poc-seed:
 	@echo "Seeding POC users (admin + demo)..."
