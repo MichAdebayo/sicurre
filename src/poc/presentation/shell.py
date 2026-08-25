@@ -146,11 +146,12 @@ def render_sidebar(
                 st.session_state["page"] = "nav_settings"
                 st.rerun()
 
-            if st.button(translate("sign_out"), key="_sidebar_signout"):
-                sign_out()
-                st.rerun()
+            with st.container(key="sidebar_signout_group"):
+                if st.button(translate("sign_out"), key="_sidebar_signout"):
+                    sign_out()
+                    st.rerun()
 
-        with st.container(key="sidebar_inference_status"):
+        with st.container(key="sidebar_inference_footer"):
             is_healthy, status_text = inference_health()
             dot_class = "dot-green" if is_healthy else "dot-red"
             st.markdown(
