@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 from collections.abc import Iterator
 
 import httpx
@@ -14,7 +13,7 @@ from poc.inference import FaultScenario
 
 @pytest.fixture
 def gateway() -> Iterator[PocFaultGateway]:
-    instance = PocFaultGateway("http://127.0.0.1:8765/v1/classify", fault_ttl_seconds=0.03).start()
+    instance = PocFaultGateway("http://127.0.0.1:8765/v1/classify").start()
     try:
         yield instance
     finally:
@@ -69,7 +68,7 @@ def test_gateway_injects_each_fault_and_restores(
     assert httpx.post(gateway.classify_url, json={}).status_code == 422
 
 
-def test_gateway_fault_expires_and_unknown_routes_are_rejected(
+def test_gateway_fault_persists_and_unknown_routes_are_rejected(
     gateway: PocFaultGateway, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(
@@ -78,11 +77,10 @@ def test_gateway_fault_expires_and_unknown_routes_are_rejected(
         lambda *args, **kwargs: httpx.Response(200, json={"status": "ok"}),
     )
     gateway.inject(FaultScenario.SERVICE_UNAVAILABLE)
-    time.sleep(0.04)
 
-    assert gateway.active_scenario is None
+    assert gateway.active_scenario is FaultScenario.SERVICE_UNAVAILABLE
     health_url = gateway.classify_url.removesuffix("/v1/classify") + "/health"
-    assert httpx.get(health_url).status_code == 200
+    assert httpx.get(health_url).status_code == 503
     assert httpx.get(health_url.removesuffix("/health") + "/missing").status_code == 404
 
 

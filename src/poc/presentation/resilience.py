@@ -30,18 +30,6 @@ def render_resilience(
 
     current_fault = active_fault()
     incident = st.session_state.get("resilience_incident")
-    if (
-        current_fault is None
-        and isinstance(incident, dict)
-        and incident.get("phase") == "fault_active"
-    ):
-        incident["phase"] = "recovered"
-        incident["recovered"] = True
-        incident["recovery_status"] = translate("resilience_auto_restored")
-        incident.setdefault("log", []).append(
-            f"{_timestamp()}  {translate('resilience_log_auto_restore')}"
-        )
-        st.session_state["resilience_incident"] = incident
     selected_index = 0
     if isinstance(incident, dict):
         selected_value = incident.get("scenario")
@@ -88,10 +76,10 @@ def render_resilience(
             "expected": result.expected,
             "observed": result.observed,
             "log": [
-                f"{injected_at}  {translate('resilience_log_baseline')} — {baseline_status}",
-                f"{injected_at}  {translate('resilience_log_injected')} — "
+                f"{injected_at}  {translate('resilience_log_baseline')}: {baseline_status}",
+                f"{injected_at}  {translate('resilience_log_injected')}: "
                 f"{translate(f'resilience_scenario_{scenario.value}')}",
-                f"{_timestamp()}  {translate('resilience_log_observed')} — "
+                f"{_timestamp()}  {translate('resilience_log_observed')}: "
                 f"{result.observed} ({translate('resilience_expected')}: {result.expected})",
             ],
         }
@@ -108,7 +96,7 @@ def render_resilience(
         incident.setdefault("log", []).extend(
             [
                 f"{_timestamp()}  {translate('resilience_log_repair')}",
-                f"{_timestamp()}  {translate('resilience_log_recovery')} — {recovery_status}",
+                f"{_timestamp()}  {translate('resilience_log_recovery')}: {recovery_status}",
             ]
         )
         st.session_state["resilience_incident"] = incident

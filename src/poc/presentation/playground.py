@@ -96,8 +96,6 @@ def render_playground(
     st.session_state["inference_mode"] = selected.value
     st.caption(translate(f"inference_mode_{selected.value}_help"))
 
-    st.markdown("<div style='margin-bottom:8px;'></div>", unsafe_allow_html=True)
-    st.caption(translate("local_enrichment_disabled"))
     use_llm = False
     use_virustotal = False
     st.markdown("---")

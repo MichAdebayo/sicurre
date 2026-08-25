@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import threading
-import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import ClassVar
 from urllib.parse import urlsplit
@@ -16,12 +15,10 @@ from poc.inference import FaultScenario
 class PocFaultGateway:
     """Proxy local inference while supporting reversible bounded failures."""
 
-    def __init__(self, upstream_classify_url: str, *, fault_ttl_seconds: float = 120.0) -> None:
+    def __init__(self, upstream_classify_url: str) -> None:
         self._upstream_classify_url = upstream_classify_url
         self._upstream_health_url = upstream_classify_url.removesuffix("/v1/classify") + "/health"
-        self._fault_ttl_seconds = fault_ttl_seconds
         self._scenario: FaultScenario | None = None
-        self._fault_expires_at = 0.0
         self._lock = threading.Lock()
         self._server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
@@ -36,10 +33,8 @@ class PocFaultGateway:
 
     @property
     def active_scenario(self) -> FaultScenario | None:
-        """Return the active fault, restoring nominal mode after its TTL."""
+        """Return the fault that remains active until explicit restoration."""
         with self._lock:
-            if self._scenario is not None and time.monotonic() >= self._fault_expires_at:
-                self._scenario = None
             return self._scenario
 
     def start(self) -> PocFaultGateway:
@@ -71,16 +66,14 @@ class PocFaultGateway:
         return self
 
     def inject(self, scenario: FaultScenario) -> None:
-        """Activate one bounded fault until explicit or automatic restoration."""
+        """Activate one local fault until the presenter restores it."""
         with self._lock:
             self._scenario = scenario
-            self._fault_expires_at = time.monotonic() + self._fault_ttl_seconds
 
     def restore(self) -> None:
         """Restore nominal proxy behavior immediately."""
         with self._lock:
             self._scenario = None
-            self._fault_expires_at = 0.0
 
     def close(self) -> None:
         """Stop the local proxy when explicitly requested by tests or tooling."""
@@ -95,13 +88,17 @@ class PocFaultGateway:
 
     def _handle(self, handler: BaseHTTPRequestHandler, method: str) -> None:
         scenario = self.active_scenario
+        scenario_value = str(scenario) if scenario is not None else ""
         if handler.path not in {"/health", "/v1/classify"}:
             self._write(handler, 404, b'{"detail":"Not found"}')
             return
-        if scenario is FaultScenario.SERVICE_UNAVAILABLE:
+        if scenario_value == FaultScenario.SERVICE_UNAVAILABLE.value:
             self._write(handler, 503, b'{"detail":"Injected inference outage"}')
             return
-        if handler.path == "/v1/classify" and scenario is FaultScenario.INVALID_CONTRACT:
+        if (
+            handler.path == "/v1/classify"
+            and scenario_value == FaultScenario.INVALID_CONTRACT.value
+        ):
             self._write(handler, 200, b'{"unexpected":true}')
             return
 
@@ -113,7 +110,7 @@ class PocFaultGateway:
             "Content-Type": handler.headers.get("Content-Type", "application/json"),
             "Authorization": handler.headers.get("Authorization", ""),
         }
-        if handler.path == "/v1/classify" and scenario is FaultScenario.INVALID_BEARER:
+        if handler.path == "/v1/classify" and scenario_value == FaultScenario.INVALID_BEARER.value:
             headers["Authorization"] = "Bearer sicurre-poc-injected-invalid-key"
         upstream_url = (
             self._upstream_health_url if handler.path == "/health" else self._upstream_classify_url

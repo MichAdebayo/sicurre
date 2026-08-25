@@ -1,1 +1,1 @@
-# Sicurre POC — Streamlit Dashboard
+# Sicurre POC: Streamlit dashboard
