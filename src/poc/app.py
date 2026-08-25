@@ -10,6 +10,7 @@ from poc.authentication import PocAuthStore
 from poc.config import get_poc_settings
 from poc.data_evidence import PocDataEvidenceStore
 from poc.events import PocEventStore
+from poc.fault_gateway import PocFaultGateway, gateway_settings_url
 from poc.inference import (
     ClassificationRequest,
     InferenceMode,
@@ -39,7 +40,19 @@ try:
     ensure_local_auth_db()
 except RuntimeError as error:
     STARTUP_ERROR = str(error)
-INFERENCE_CLIENT = PocInferenceClient(POC_SETTINGS)
+
+
+@st.cache_resource
+def _start_fault_gateway(upstream_url: str) -> PocFaultGateway:
+    """Start one loopback-only fault gateway for the Streamlit process."""
+    return PocFaultGateway(upstream_url).start()
+
+
+INFERENCE_GATEWAY = _start_fault_gateway(POC_SETTINGS.inference_api_url)
+POC_INFERENCE_SETTINGS = POC_SETTINGS.model_copy(
+    update={"inference_api_url": gateway_settings_url(INFERENCE_GATEWAY)}
+)
+INFERENCE_CLIENT = PocInferenceClient(POC_INFERENCE_SETTINGS)
 AUTH_STORE = PocAuthStore(POC_AUTH_DB_PATH)
 DATA_EVIDENCE_STORE = PocDataEvidenceStore(POC_DATA_DB_PATH)
 EVENT_STORE = PocEventStore(AUTH_STORE)
@@ -303,7 +316,14 @@ elif page == "nav_datasets":
 
 # ── Résilience contrôlée ─────────────────────────────────────────────────────
 elif page == "nav_resilience":
-    render_resilience(tr, inference_status, INFERENCE_CLIENT.run_fault_probe)
+    render_resilience(
+        tr,
+        inference_status,
+        INFERENCE_CLIENT.run_fault_probe,
+        INFERENCE_GATEWAY.inject,
+        INFERENCE_GATEWAY.restore,
+        lambda: INFERENCE_GATEWAY.active_scenario,
+    )
 
 # ── Paramètres ────────────────────────────────────────────────────────────────
 elif page == "nav_settings":

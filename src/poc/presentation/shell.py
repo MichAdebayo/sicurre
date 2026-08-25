@@ -19,7 +19,6 @@ NAVIGATION_KEYS = (
     "nav_pipeline",
     "nav_datasets",
     "nav_resilience",
-    "nav_settings",
 )
 
 ADMIN_NAVIGATION_KEYS = {"nav_pipeline", "nav_resilience"}
@@ -136,6 +135,17 @@ def render_sidebar(
             "border-top:1px solid var(--border-line)!important;opacity:1!important;' />",
             unsafe_allow_html=True,
         )
+        settings_active = current_page == "nav_settings"
+        settings_selected = st.button(
+            translate("nav_settings"),
+            key="_nav_nav_settings",
+            type="primary" if settings_active else "secondary",
+            use_container_width=True,
+        )
+        if settings_selected and not settings_active:
+            st.session_state["page"] = "nav_settings"
+            st.rerun()
+
         is_healthy, status_text = inference_health()
         dot_class = "dot-green" if is_healthy else "dot-red"
         st.markdown(
@@ -145,7 +155,7 @@ def render_sidebar(
             f"<span class='status-value'>{status_text}</span></div>",
             unsafe_allow_html=True,
         )
-        st.markdown("<div style='margin-top:12px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top:8px;'></div>", unsafe_allow_html=True)
         if st.button(translate("sign_out"), key="_sidebar_signout"):
             sign_out()
             st.rerun()
