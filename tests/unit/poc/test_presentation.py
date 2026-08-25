@@ -182,6 +182,15 @@ def test_theme_stylesheet_rejects_missing_override_marker(tmp_path: Path) -> Non
         load_theme_css(path)
 
 
+def test_poc_stylesheet_keeps_button_tooltips_high_contrast() -> None:
+    """Button help must not inherit the low-contrast dropdown menu palette."""
+    stylesheet = Path("src/poc/assets/poc.css").read_text(encoding="utf-8")
+
+    assert '[role="tooltip"]' in stylesheet
+    assert "background-color: #10243E !important" in stylesheet
+    assert "color: #FFFFFF !important" in stylesheet
+
+
 def test_home_metrics_distinguish_safety_and_classifier_quality() -> None:
     """Home evidence separates remediation outcomes from model labels."""
     events = [
