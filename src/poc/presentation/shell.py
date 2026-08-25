@@ -97,9 +97,9 @@ def render_sidebar(
     """Render deterministic navigation, inference health, and sign-out controls."""
     with st.sidebar:
         st.markdown(
-            "<div style='margin-top:-1.5rem;margin-bottom:1.2rem;'>"
+            "<div class='sidebar-identity'>"
             f"<div class='logo-container' style='margin-bottom:1rem;'>"
-            f"{_logo_html(logo_path, 100)}</div>"
+            f"{_logo_html(logo_path, 88)}</div>"
             f"<div style='font-size:0.82rem;color:var(--text-2);margin-top:0.5rem;"
             f"margin-bottom:0.1rem;'>{translate('welcome')}</div>"
             f"<div style='font-weight:700;font-size:1.05rem;color:var(--text);'>"
@@ -129,9 +129,9 @@ def render_sidebar(
                 st.session_state["page"] = navigation_key
                 st.rerun()
 
-        with st.container(key="sidebar_utilities"):
+        with st.container(key="sidebar_actions"):
             st.markdown(
-                "<hr style='margin:0.8rem 0!important;border:none!important;"
+                "<hr style='margin:0!important;border:none!important;"
                 "border-top:1px solid var(--border-line)!important;opacity:1!important;' />",
                 unsafe_allow_html=True,
             )
@@ -146,6 +146,11 @@ def render_sidebar(
                 st.session_state["page"] = "nav_settings"
                 st.rerun()
 
+            if st.button(translate("sign_out"), key="_sidebar_signout"):
+                sign_out()
+                st.rerun()
+
+        with st.container(key="sidebar_inference_status"):
             is_healthy, status_text = inference_health()
             dot_class = "dot-green" if is_healthy else "dot-red"
             st.markdown(
@@ -155,6 +160,3 @@ def render_sidebar(
                 f"<span class='status-value'>{status_text}</span></div>",
                 unsafe_allow_html=True,
             )
-            if st.button(translate("sign_out"), key="_sidebar_signout"):
-                sign_out()
-                st.rerun()
