@@ -42,13 +42,20 @@ except RuntimeError as error:
     STARTUP_ERROR = str(error)
 
 
+FAULT_GATEWAY_IMPLEMENTATION_VERSION = 2
+
+
 @st.cache_resource
-def _start_fault_gateway(upstream_url: str) -> PocFaultGateway:
+def _start_fault_gateway(upstream_url: str, implementation_version: int) -> PocFaultGateway:
     """Start one loopback-only fault gateway for the Streamlit process."""
+    del implementation_version
     return PocFaultGateway(upstream_url).start()
 
 
-INFERENCE_GATEWAY = _start_fault_gateway(POC_SETTINGS.inference_api_url)
+INFERENCE_GATEWAY = _start_fault_gateway(
+    POC_SETTINGS.inference_api_url,
+    FAULT_GATEWAY_IMPLEMENTATION_VERSION,
+)
 POC_INFERENCE_SETTINGS = POC_SETTINGS.model_copy(
     update={"inference_api_url": gateway_settings_url(INFERENCE_GATEWAY)}
 )

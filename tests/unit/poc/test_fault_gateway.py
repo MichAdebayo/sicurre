@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from enum import StrEnum
 
 import httpx
 import pytest
@@ -82,6 +83,21 @@ def test_gateway_fault_persists_and_unknown_routes_are_rejected(
     health_url = gateway.classify_url.removesuffix("/v1/classify") + "/health"
     assert httpx.get(health_url).status_code == 503
     assert httpx.get(health_url.removesuffix("/health") + "/missing").status_code == 404
+
+
+def test_gateway_matches_fault_value_after_module_reload(
+    gateway: PocFaultGateway,
+) -> None:
+    """A cached gateway must accept an equivalent enum from reloaded app code."""
+
+    class ReloadedFaultScenario(StrEnum):
+        SERVICE_UNAVAILABLE = "service_unavailable"
+
+    gateway.inject(ReloadedFaultScenario.SERVICE_UNAVAILABLE)  # type: ignore[arg-type]
+
+    health_url = gateway.classify_url.removesuffix("/v1/classify") + "/health"
+    assert httpx.get(health_url).status_code == 503
+    assert httpx.post(gateway.classify_url, json={}).status_code == 503
 
 
 def test_closed_gateway_has_no_runtime_url(gateway: PocFaultGateway) -> None:
