@@ -136,9 +136,14 @@ def poc_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AppTest:
         yield "API_KEY=mysecret\n"
         yield "Done.\n"
 
-    from poc.presentation import pipeline_page
+    from poc.presentation import datasets, pipeline_page
 
     monkeypatch.setattr(pipeline_page, "stream_operation", mock_stream_operation)
+    monkeypatch.setattr(
+        datasets,
+        "_load_frozen_source_distribution",
+        lambda: {"phishtank_api": 100, "kaggle_multilingual_spam": 20},
+    )
     monkeypatch.setattr(
         PocInferenceClient,
         "health",
