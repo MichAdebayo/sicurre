@@ -3,16 +3,23 @@
 from __future__ import annotations
 
 import json
+import zipfile
 from collections.abc import AsyncIterator
+from io import BytesIO
 
 import pytest
 import pytest_asyncio
+import respx
+from httpx import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
 from core.database import Base
 from data_platform.extractors.sekoia_ioc import (
+    DEFAULT_ARCHIVE_URL,
+    DEFAULT_RAW_ROOT,
+    SekoiaCommunityClient,
     SekoiaFetchedPayload,
     SekoiaIoc,
     SekoiaIocIngestionService,
@@ -111,6 +118,93 @@ def test_parse_sekoia_csv_with_tycoon2fa_headers() -> None:
     assert rows[0].ioc_type == "url"
     assert rows[0].first_seen == "2024-03-25"
     assert rows[0].valid_until == "2024-04-25"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_sekoia_client_discovers_files_with_one_tree_request() -> None:
+    api_root = "https://api.github.test/repos/community/git/trees/main"
+    tree_route = respx.get(f"{api_root}?recursive=1").mock(
+        return_value=Response(
+            200,
+            json={
+                "truncated": False,
+                "tree": [
+                    "malformed-entry",
+                    {
+                        "type": "blob",
+                        "path": "IOCs/sneaky2fa/iocs.csv",
+                    },
+                    {"type": "blob", "path": "IOCs/unselected/iocs.csv"},
+                ],
+            },
+        )
+    )
+    respx.get(f"{DEFAULT_RAW_ROOT}/IOCs/sneaky2fa/iocs.csv").mock(
+        return_value=Response(200, text="ioc\nmalicious.example\n")
+    )
+
+    payload = await SekoiaCommunityClient(
+        api_root=api_root,
+        target_paths=("sneaky2fa",),
+    ).fetch_iocs()
+
+    assert tree_route.call_count == 1
+    assert [ioc.value for ioc in payload.iocs] == ["malicious.example"]
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_sekoia_client_falls_back_to_public_archive_on_rate_limit() -> None:
+    archive_buffer = BytesIO()
+    with zipfile.ZipFile(archive_buffer, mode="w") as archive:
+        archive.writestr(
+            "Community-main/IOCs/sneaky2fa/iocs.csv",
+            "ioc\narchive-malicious.example\n",
+        )
+        archive.writestr(
+            "Community-main/IOCs/unselected/iocs.csv",
+            "ioc\nignored.example\n",
+        )
+
+    api_root = "https://api.github.test/repos/community/git/trees/main"
+    respx.get(f"{api_root}?recursive=1").mock(return_value=Response(403))
+    archive_route = respx.get(DEFAULT_ARCHIVE_URL).mock(
+        return_value=Response(200, content=archive_buffer.getvalue())
+    )
+
+    payload = await SekoiaCommunityClient(
+        api_root=api_root,
+        target_paths=("sneaky2fa",),
+    ).fetch_iocs()
+
+    assert archive_route.call_count == 1
+    assert [ioc.value for ioc in payload.iocs] == ["archive-malicious.example"]
+
+
+@pytest.mark.asyncio
+async def test_sekoia_ingestion_persists_failure_status(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async def failed_fetch() -> SekoiaFetchedPayload:
+        raise RuntimeError("source unavailable")
+
+    service = SekoiaIocIngestionService(
+        fetch_iocs=failed_fetch,
+        snapshot_store=RecordingSnapshotStore(),
+    )
+
+    async with session_factory() as session:
+        with pytest.raises(RuntimeError, match="source unavailable"):
+            await service.run(session, trigger_mode="manual")
+
+        from db.models import DataIngestionRun
+
+        run = await session.scalar(select(DataIngestionRun))
+
+    assert run is not None
+    assert run.status == "failed"
+    assert run.finished_at is not None
 
 
 @pytest.mark.asyncio
