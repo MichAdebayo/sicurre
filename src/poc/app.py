@@ -318,7 +318,13 @@ elif page == "nav_pipeline":
     render_pipeline_page(
         user,
         tr,
-        lambda title, operation: execute_pipeline_action(title, operation, tr, POC_SETTINGS),
+        lambda title, operation: execute_pipeline_action(
+            title,
+            operation,
+            tr,
+            POC_SETTINGS,
+            DATA_EVIDENCE_STORE.latest_incremental_run_id,
+        ),
     )
 
 
@@ -326,7 +332,7 @@ elif page == "nav_pipeline":
 elif page == "nav_datasets":
     render_datasets(DATA_EVIDENCE_STORE, tr)
 
-# ── Résilience contrôlée ─────────────────────────────────────────────────────
+# ── Incident technique ───────────────────────────────────────────────────────
 elif page == "nav_resilience":
     render_resilience(
         tr,
