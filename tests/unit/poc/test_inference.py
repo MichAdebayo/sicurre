@@ -7,6 +7,7 @@ import respx
 from poc.config import PocSettings
 from poc.inference import (
     ClassificationRequest,
+    FaultScenario,
     InferenceMode,
     PocInferenceClient,
     PocInferenceContractError,
@@ -21,7 +22,7 @@ def configured_settings() -> PocSettings:
         _env_file=None,
         database_url="sqlite:////tmp/poc-auth.db",
         data_platform_database_url="sqlite:////tmp/poc-data.db",
-        inference_api_url="http://model.test/v1/classify",
+        inference_api_url="http://127.0.0.1:8765/v1/classify",
         inference_api_key="internal-test-key",
         admin_password="admin-secret",
         viewer_password="viewer-secret",
@@ -48,16 +49,81 @@ def test_simulation_is_deterministic_and_explicit(
     assert first["composite_score"] == second["composite_score"]
 
 
-def test_incident_mode_never_calls_the_network(
-    configured_settings: PocSettings, classification_request: ClassificationRequest
+@respx.mock
+def test_fault_probes_exercise_real_request_boundaries(
+    configured_settings: PocSettings,
 ) -> None:
-    with respx.mock(assert_all_called=False) as router:
-        route = router.post(configured_settings.inference_api_url)
-        with pytest.raises(PocInferenceUnavailable, match="Incident contrôlé"):
-            PocInferenceClient(configured_settings).classify(
-                classification_request, mode=InferenceMode.INCIDENT
-            )
-        assert not route.called
+    classify_route = respx.post(configured_settings.inference_api_url)
+    classify_route.mock(return_value=httpx.Response(503))
+    client = PocInferenceClient(configured_settings)
+
+    outage_result = client.run_fault_probe(FaultScenario.SERVICE_UNAVAILABLE)
+    assert outage_result.passed
+    assert outage_result.observed == "503"
+
+    classify_route.mock(return_value=httpx.Response(401))
+    auth_result = client.run_fault_probe(FaultScenario.INVALID_BEARER)
+    assert auth_result.passed
+    assert auth_result.observed == "401"
+    assert classify_route.calls[-1].request.headers["Authorization"] == "Bearer internal-test-key"
+
+
+@respx.mock
+def test_invalid_contract_probe_records_safe_rejection(
+    configured_settings: PocSettings,
+) -> None:
+    respx.post(configured_settings.inference_api_url).mock(
+        return_value=httpx.Response(200, json={"unexpected": True})
+    )
+    result = PocInferenceClient(configured_settings).run_fault_probe(FaultScenario.INVALID_CONTRACT)
+    assert result.passed
+    assert result.observed == "contract_rejected"
+    assert result.response_status == 200
+    assert result.response_body == {"unexpected": True}
+    assert result.validation == "rejected"
+    assert result.application_outcome == "response_rejected_not_persisted"
+    terminal = "\n".join(result.trace_lines)
+    assert "INFO  http.request" in terminal
+    assert 'authorization="Bearer [REDACTED]"' in terminal
+    assert "status=200" in terminal
+    assert 'body={"unexpected":true}' in terminal
+    assert 'contract.validation result="rejected"' in terminal
+    assert 'persistence.skipped reason="invalid_inference_contract"' in terminal
+    assert result.request_body == {
+        "subject": "Contrôle de résilience Sicurre",
+        "sender": "probe@sicurre.test",
+        "text": "Message local synthétique sans donnée utilisateur.",
+        "use_llm": False,
+        "use_virustotal": False,
+    }
+
+
+@respx.mock
+def test_recovery_probe_requires_a_valid_response_contract(
+    configured_settings: PocSettings,
+) -> None:
+    route = respx.post(configured_settings.inference_api_url)
+    route.mock(return_value=httpx.Response(200, json={"unexpected": True}))
+    client = PocInferenceClient(configured_settings)
+
+    failed = client.run_recovery_probe()
+    assert not failed.passed
+    assert failed.application_outcome == "recovery_failed"
+
+    route.mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "verdict": "safe",
+                "label_verdict": "legitimate",
+                "is_phishing": False,
+            },
+        )
+    )
+    recovered = client.run_recovery_probe()
+    assert recovered.passed
+    assert recovered.validation == "accepted"
+    assert recovered.application_outcome == "recovery_verified_not_persisted"
 
 
 @respx.mock
@@ -106,7 +172,7 @@ def test_missing_key_reports_unavailable_health(
     settings_without_key = configured_settings.model_copy(update={"inference_api_key": ""})
     assert PocInferenceClient(settings_without_key).health() == (
         False,
-        "Clé d'inférence POC absente",
+        "inference_health_missing_key",
     )
 
 
@@ -114,37 +180,50 @@ def test_missing_key_reports_unavailable_health(
 def test_health_reports_success_and_http_failure(
     configured_settings: PocSettings,
 ) -> None:
-    health_url = "http://model.test/health"
+    health_url = "http://127.0.0.1:8765/health"
     health_route = respx.get(health_url).mock(return_value=httpx.Response(200))
     auth_route = respx.post(configured_settings.inference_api_url).mock(
         return_value=httpx.Response(422)
     )
     client = PocInferenceClient(configured_settings)
-    assert client.health() == (True, "Service local disponible et authentifié")
+    assert client.health() == (True, "inference_health_ready")
     assert auth_route.calls[0].request.content == b"{}"
     health_route.mock(return_value=httpx.Response(503))
-    assert client.health() == (False, "HTTP 503")
+    assert client.health() == (False, "inference_health_unavailable")
 
 
 @respx.mock
 def test_health_reports_rejected_bearer_key(
     configured_settings: PocSettings,
 ) -> None:
-    respx.get("http://model.test/health").mock(return_value=httpx.Response(200))
+    respx.get("http://127.0.0.1:8765/health").mock(return_value=httpx.Response(200))
     respx.post(configured_settings.inference_api_url).mock(return_value=httpx.Response(401))
 
     assert PocInferenceClient(configured_settings).health() == (
         False,
-        "Clé d'inférence locale refusée",
+        "inference_health_rejected",
+    )
+
+
+@respx.mock
+def test_health_reports_unexpected_contract_status(
+    configured_settings: PocSettings,
+) -> None:
+    respx.get("http://127.0.0.1:8765/health").mock(return_value=httpx.Response(200))
+    respx.post(configured_settings.inference_api_url).mock(return_value=httpx.Response(200))
+
+    assert PocInferenceClient(configured_settings).health() == (
+        False,
+        "inference_health_unexpected",
     )
 
 
 @respx.mock
 def test_health_reports_network_failure(configured_settings: PocSettings) -> None:
-    respx.get("http://model.test/health").mock(side_effect=httpx.ConnectError("offline"))
+    respx.get("http://127.0.0.1:8765/health").mock(side_effect=httpx.ConnectError("offline"))
     available, detail = PocInferenceClient(configured_settings).health()
     assert available is False
-    assert "ConnectError" in detail
+    assert detail == "inference_health_unavailable"
 
 
 @respx.mock

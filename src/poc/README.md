@@ -17,18 +17,31 @@ SICURRE_POC_VIEWER_PASSWORD="..."
 SICURRE_POC_VIEWER_NAME="Utilisateur Démo"
 ```
 
-Les deux URL de base doivent être SQLite. L'URL d'inférence doit cibler exactement `/v1/classify`.
+Les deux URL de base doivent être SQLite. L'URL d'inférence doit cibler
+`/v1/classify` sur `localhost`, `127.0.0.1` ou `::1`.
 
-## Variables externes optionnelles
+## Stockage local optionnel
 
 ```dotenv
-SICURRE_POC_ALLOW_EXTERNAL_WRITES=false
+SICURRE_POC_SNAPSHOT_PREFIX="demonstrations/poc"
+SICURRE_POC_SNAPSHOT_DIR="data/local/poc/snapshots"
+```
+
+Le cron de démonstration lit le flux public SEKOIA, puis écrit son snapshot,
+sa lignée et ses nouveaux enregistrements uniquement dans ce répertoire et la
+base SQLite POC. Une seconde exécution ignore les indicateurs déjà présents.
+
+## Publication de staging optionnelle
+
+```dotenv
+SICURRE_POC_ALLOW_STAGING_PUBLICATION=false
 SICURRE_POC_ALLOW_ML_DISPATCH=false
-SICURRE_POC_R2_PREFIX="demonstrations/poc"
 SICURRE_POC_KAGGLE_DATASET_SLUG=""
 ```
 
-Par défaut, aucune écriture externe n'est autorisée. Le cron de démonstration SEKOIA exige l'activation explicite des écritures et stocke uniquement sous `demonstrations/...`. La publication Kaggle exige un slug de staging distinct. Le dispatch ML est interdit depuis la publication de démonstration.
+La publication Kaggle n'appartient pas aux trois actions standard du POC. Elle
+exige ce consentement dédié et un slug de staging distinct. Le dispatch ML reste
+interdit depuis cette publication de démonstration.
 
 ## Démarrage
 

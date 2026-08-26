@@ -1,4 +1,4 @@
-.PHONY: help install test dev-api test-inference openapi openapi-check \
+.PHONY: help install test dev-api poc-inference-smoke poc-ui-smoke openapi openapi-check \
         ingest-all-base \
         data-platform-staging-smoke \
         app-stack-smoke \
@@ -17,7 +17,7 @@
         annotate \
         generate-data dataset-build dataset-export publish-latest dataset-release monthly-release \
         seed-frozen-dataset \
-		poc-replay-frozen poc-inference \
+		poc-replay-frozen poc-inference poc-inference-stop poc-stop \
 		poc-cron-demo poc-release-preview poc-staging-publish \
         pipeline-push run-pipeline demo-v1 demo-v2 \
         poc db-seed r2-freeze-proof dev-api dev-app dev-stop dev
@@ -42,7 +42,8 @@ help:
 	@echo "  make test                      - Run backend test suite"
 	@echo "  make openapi                   - Regenerate docs/api/openapi.yaml from FastAPI"
 	@echo "  make openapi-check             - Fail when the generated OpenAPI contract is stale"
-	@echo "  make test-inference            - Smoke-test the inference API (localhost:8000)"
+	@echo "  make poc-inference-smoke       - Test authenticated local POC inference"
+	@echo "  make poc-ui-smoke              - Run the deterministic POC UI logic suite"
 	@echo "  make dev-api                   - Start data platform API on http://localhost:8001"
 	@echo "  make data-platform-staging-smoke - Build and smoke-test data platform container"
 	@echo "  make app-stack-smoke           - Build and smoke-test app + auth + API containers"
@@ -86,7 +87,9 @@ help:
 	@echo ""
 	@echo "  POC"
 	@echo "  make poc                       - Launch Streamlit POC dashboard"
+	@echo "  make poc-stop                  - Stop the POC and free port 8501"
 	@echo "  make poc-inference             - Launch Sicurre-ML with the POC bearer key"
+	@echo "  make poc-inference-stop        - Stop local Sicurre-ML and free port 8000"
 	@echo ""
 	@echo "  Dev"
 	@echo "  make db-seed                   - Manually seed external_threats.db (dev utility)"
@@ -160,8 +163,11 @@ ci-data-quality:
 	uv run --group backend --group dev --group storage pytest tests/unit tests/integration --cov=src/core --cov=src/db --cov-branch --cov-report=term-missing --cov-fail-under=90
 	npm run test:coverage
 
-test-inference:
-	uv run tests/e2e/app/smoke_inference_api.py
+poc-inference-smoke:
+	PYTHONPATH=src uv run python tests/e2e/poc/smoke_local_inference.py
+
+poc-ui-smoke:
+	uv run pytest tests/unit/poc -q
 
 # ── Base Ingestion ─────────────────────────────────────────────────────────────
 
@@ -327,37 +333,54 @@ seed-frozen-dataset:
 
 poc-replay-frozen:
 	@echo "Running deterministic POC replay from frozen provenance (with local data DB reset)..."
-	@db_url="$${SICURRE_DATA_PLATFORM_DATABASE_URL:-sqlite+aiosqlite:///$$(pwd)/data/local/sicurre_dataplatform.db}"; \
+	@uv run --env-file .env sh -c 'set -eu; \
+	db_url="$$SICURRE_POC_DATA_PLATFORM_DATABASE_URL"; \
 	case "$$db_url" in \
 	  sqlite+aiosqlite:///*) reset_path="$${db_url#sqlite+aiosqlite:///}" ;; \
 	  sqlite:///*) reset_path="$${db_url#sqlite:///}" ;; \
 	  *) echo "Refusing to reset non-SQLite data-platform DB: $$db_url"; exit 1 ;; \
 	esac; \
 	echo "Resetting $$reset_path"; \
-	rm -f "$$reset_path" "$$reset_path-shm" "$$reset_path-wal"
-	uv run alembic upgrade head
-	$(MAKE) normalize
-	$(MAKE) annotate
-	$(MAKE) seed-frozen-dataset SEED_ARGS="--materialize-missing --sync-existing-version"
+	rm -f "$$reset_path" "$$reset_path-shm" "$$reset_path-wal"; \
+	export PYTHONPATH=src SICURRE_POC_MODE=true SICURRE_DATA_PLATFORM_DATABASE_URL="$$db_url"; \
+	uv run alembic upgrade head; \
+	$(MAKE) normalize; \
+	$(MAKE) annotate; \
+	$(MAKE) seed-frozen-dataset SEED_ARGS="--materialize-missing --sync-existing-version"; \
+	uv run --no-sync python -m poc.seed_api_evidence'
 	@echo "POC frozen replay completed: deterministic parity synced to current_frozen."
 
 poc-cron-demo:
-	@test "$${SICURRE_POC_MODE}" = "true" || (echo "Refusing cron demo outside SICURRE_POC_MODE."; exit 1)
-	@test "$${SICURRE_POC_ALLOW_EXTERNAL_WRITES}" = "true" || (echo "Set SICURRE_POC_ALLOW_EXTERNAL_WRITES=true for the sandbox feed snapshot."; exit 1)
-	@echo "Running isolated SEKOIA cron under $${SICURRE_POC_R2_PREFIX}/scraping/sekoia_ioc..."
-	PYTHONPATH=src uv run python src/data_platform/cron_schedulers/scraping/run_sekoia_ioc.py
+	@echo "Running SEKOIA read-only fetch with local POC snapshot and SQLite persistence..."
+	@uv run --env-file .env sh -c 'SICURRE_POC_MODE=true \
+		SICURRE_DATA_PLATFORM_DATABASE_URL="$$SICURRE_POC_DATA_PLATFORM_DATABASE_URL" \
+		SICURRE_SEKOIA_SNAPSHOT_STORAGE_BACKEND=local PYTHONPATH=src \
+		python src/data_platform/cron_schedulers/scraping/run_sekoia_ioc.py'
 
 poc-release-preview:
-	@test "$${SICURRE_POC_MODE}" = "true" || (echo "Refusing POC release preview outside SICURRE_POC_MODE."; exit 1)
-	$(MAKE) pipeline-push DATASET_TAG_PREFIX=poc-preview
+	@uv run --env-file .env sh -c 'set -eu; SICURRE_POC_MODE=true \
+		SICURRE_DATA_PLATFORM_DATABASE_URL="$$SICURRE_POC_DATA_PLATFORM_DATABASE_URL" \
+		SICURRE_TRAINING_DATASET_SNAPSHOT_STORAGE_BACKEND=local \
+		$(MAKE) normalize annotate; \
+		set +e; PYTHONPATH=src python -m poc.release_preflight; code=$$?; set -e; \
+		if [ $$code -eq 3 ]; then exit 0; fi; \
+		test $$code -eq 0; \
+		SICURRE_POC_MODE=true \
+		SICURRE_DATA_PLATFORM_DATABASE_URL="$$SICURRE_POC_DATA_PLATFORM_DATABASE_URL" \
+		SICURRE_TRAINING_DATASET_SNAPSHOT_STORAGE_BACKEND=local \
+		$(MAKE) dataset-build dataset-export DATASET_TAG_PREFIX=poc-preview'
 	@echo "POC release preview completed locally. No Kaggle publication or ML dispatch occurred."
 
 poc-staging-publish:
-	@test "$${SICURRE_POC_MODE}" = "true" || (echo "Refusing staging publication outside SICURRE_POC_MODE."; exit 1)
-	@test "$${SICURRE_POC_ALLOW_EXTERNAL_WRITES}" = "true" || (echo "Set SICURRE_POC_ALLOW_EXTERNAL_WRITES=true for staging publication."; exit 1)
-	@test -n "$${SICURRE_POC_KAGGLE_DATASET_SLUG}" || (echo "SICURRE_POC_KAGGLE_DATASET_SLUG is required."; exit 1)
-	@test "$${SICURRE_POC_ALLOW_ML_DISPATCH}" != "true" || (echo "ML dispatch is forbidden from the POC staging publisher."; exit 1)
-	KAGGLE_DATASET_SLUG="$${SICURRE_POC_KAGGLE_DATASET_SLUG}" uv run --no-sync python scripts/data_platform/publish_latest.py --skip-github-dispatch
+	@uv run --env-file .env sh -c 'set -eu; \
+		test "$${SICURRE_POC_ALLOW_STAGING_PUBLICATION:-false}" = "true" || \
+		{ echo "Set SICURRE_POC_ALLOW_STAGING_PUBLICATION=true for staging publication."; exit 1; }; \
+		test -n "$${SICURRE_POC_KAGGLE_DATASET_SLUG:-}" || \
+		{ echo "SICURRE_POC_KAGGLE_DATASET_SLUG is required."; exit 1; }; \
+		test "$${SICURRE_POC_ALLOW_ML_DISPATCH:-false}" != "true" || \
+		{ echo "ML dispatch is forbidden from the POC staging publisher."; exit 1; }; \
+		SICURRE_POC_MODE=true KAGGLE_DATASET_SLUG="$$SICURRE_POC_KAGGLE_DATASET_SLUG" \
+		python scripts/data_platform/publish_latest.py --skip-github-dispatch'
 
 # ── Pipeline & Demos ──────────────────────────────────────────────────────────
 
@@ -414,11 +437,58 @@ poc-inference:
 		cd "$(SICURRE_ML_REPO)"; \
 		INFERENCE_API_KEY="$$SICURRE_POC_INFERENCE_API_KEY" $(MAKE) serve-reload
 
+poc-inference-stop:
+	@pids=$$(lsof -tiTCP:8000 -sTCP:LISTEN 2>/dev/null | sort -u); \
+	if [ -z "$$pids" ]; then \
+		echo "Sicurre-ML is not running; port 8000 is free."; \
+		exit 0; \
+	fi; \
+	echo "Stopping local Sicurre-ML on port 8000 (PID: $$pids)..."; \
+	kill $$pids 2>/dev/null || true; \
+	for attempt in 1 2 3 4 5 6 7 8 9 10; do \
+		lsof -tiTCP:8000 -sTCP:LISTEN >/dev/null 2>&1 || break; \
+		sleep 0.2; \
+	done; \
+	remaining=$$(lsof -tiTCP:8000 -sTCP:LISTEN 2>/dev/null | sort -u); \
+	if [ -n "$$remaining" ]; then \
+		echo "Sicurre-ML did not stop gracefully; forcing shutdown..."; \
+		kill -KILL $$remaining 2>/dev/null || true; \
+	fi; \
+	if lsof -tiTCP:8000 -sTCP:LISTEN >/dev/null 2>&1; then \
+		echo "ERROR: port 8000 is still occupied."; \
+		exit 1; \
+	fi; \
+	echo "Sicurre-ML stopped; port 8000 is free."
+
 poc-seed:
 	@echo "Seeding POC users (admin + demo)..."
 	PYTHONPATH=src uv run python -m poc.seed_users
 
+poc-stop:
+	@pids=$$(lsof -tiTCP:8501 -sTCP:LISTEN 2>/dev/null | sort -u); \
+	if [ -z "$$pids" ]; then \
+		echo "Sicurre POC is not running; port 8501 is free."; \
+		exit 0; \
+	fi; \
+	echo "Stopping Sicurre POC on port 8501 (PID: $$(echo $$pids | tr '\n' ' '))..."; \
+	kill $$pids 2>/dev/null || true; \
+	for attempt in 1 2 3 4 5 6 7 8 9 10; do \
+		lsof -tiTCP:8501 -sTCP:LISTEN >/dev/null 2>&1 || break; \
+		sleep 0.2; \
+	done; \
+	remaining=$$(lsof -tiTCP:8501 -sTCP:LISTEN 2>/dev/null | sort -u); \
+	if [ -n "$$remaining" ]; then \
+		echo "POC did not stop gracefully; forcing shutdown..."; \
+		kill -KILL $$remaining 2>/dev/null || true; \
+	fi; \
+	if lsof -tiTCP:8501 -sTCP:LISTEN >/dev/null 2>&1; then \
+		echo "ERROR: port 8501 is still occupied."; \
+		exit 1; \
+	fi; \
+	echo "Sicurre POC stopped; port 8501 is free."
+
 poc: poc-seed
+	@$(MAKE) poc-stop
 	@echo "Starting Sicurre POC Streamlit Dashboard..."
 	PYTHONPATH=src uv run streamlit run src/poc/app.py --server.port 8501
 

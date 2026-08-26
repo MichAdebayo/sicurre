@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -17,6 +18,20 @@ class RuntimeCheck:
     blocking: bool
 
 
+def sqlite_has_tables(database_path: Path, required_tables: set[str]) -> bool:
+    """Check a local SQLite schema without creating or mutating the database."""
+    if not database_path.is_file():
+        return False
+    try:
+        with sqlite3.connect(f"file:{database_path}?mode=ro", uri=True) as connection:
+            rows = connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ).fetchall()
+    except sqlite3.Error:
+        return False
+    return required_tables.issubset({str(row[0]) for row in rows})
+
+
 def build_runtime_checks(
     settings: PocSettings,
     auth_database_path: Path,
@@ -29,7 +44,14 @@ def build_runtime_checks(
         RuntimeCheck("preflight_viewer_credentials", bool(settings.viewer_password), True),
         RuntimeCheck("preflight_inference_key", bool(settings.inference_api_key), True),
         RuntimeCheck("preflight_auth_database", auth_database_path.is_file(), True),
-        RuntimeCheck("preflight_data_database", data_database_path.is_file(), False),
+        RuntimeCheck(
+            "preflight_data_database",
+            sqlite_has_tables(
+                data_database_path,
+                {"data_source_system", "data_ingestion_run", "data_raw_record"},
+            ),
+            False,
+        ),
         RuntimeCheck(
             "preflight_local_isolation",
             settings.database_url.startswith("sqlite")
