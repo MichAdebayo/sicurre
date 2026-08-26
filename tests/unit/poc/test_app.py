@@ -64,7 +64,8 @@ def _seed_data_evidence(data_path: Path) -> None:
         """)
         conn.execute(
             "CREATE TABLE IF NOT EXISTS data_raw_record "
-            "(id TEXT PRIMARY KEY, source_system_id TEXT, raw_object_id TEXT)"
+            "(id TEXT PRIMARY KEY, source_system_id TEXT, raw_object_id TEXT, "
+            "rejection_reason TEXT)"
         )
         conn.execute(
             "CREATE TABLE IF NOT EXISTS data_normalized_message "
@@ -99,8 +100,11 @@ def _seed_data_evidence(data_path: Path) -> None:
             "INSERT INTO data_raw_object (id, ingestion_run_id) VALUES ('ro-1', 'ir-1'), ('ro-2', 'ir-2')"
         )
         conn.execute(
-            "INSERT INTO data_raw_record (id, source_system_id, raw_object_id) "
-            "VALUES ('1', 'ss-1', 'ro-1'), ('2', 'ss-2', 'ro-2'), ('3', 'ss-3', NULL)"
+            "INSERT INTO data_raw_record "
+            "(id, source_system_id, raw_object_id, rejection_reason) VALUES "
+            "('1', 'ss-1', 'ro-1', NULL), ('2', 'ss-2', 'ro-2', NULL), "
+            "('3', 'ss-3', NULL, NULL), "
+            "('4', 'ss-1', 'ro-1', 'ioc_reference_only_not_email_training_text')"
         )
         conn.execute(
             "INSERT INTO data_normalized_message (id, raw_record_id) VALUES ('nm-1', '1'), ('nm-2', '2')"
@@ -132,9 +136,14 @@ def poc_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AppTest:
         yield "API_KEY=mysecret\n"
         yield "Done.\n"
 
-    from poc.presentation import pipeline_page
+    from poc.presentation import datasets, pipeline_page
 
     monkeypatch.setattr(pipeline_page, "stream_operation", mock_stream_operation)
+    monkeypatch.setattr(
+        datasets,
+        "_load_frozen_source_distribution",
+        lambda: {"phishtank_api": 100, "kaggle_multilingual_spam": 20},
+    )
     monkeypatch.setattr(
         PocInferenceClient,
         "health",
@@ -208,19 +217,21 @@ def test_invalid_and_valid_login_are_contextual(poc_app: AppTest) -> None:
 
 def test_resilience_page_exposes_selectable_real_fault_evidence(poc_app: AppTest) -> None:
     login(poc_app)
-    open_page(poc_app, "Résilience", "nav_resilience")
+    open_page(poc_app, "Incidence technique", "nav_resilience")
     assert any(selectbox.label == "Scénario à exercer" for selectbox in poc_app.selectbox)
     inject = next(button for button in poc_app.button if button.label == "Injecter la panne")
     inject.click().run()
     assert any("Panne active" in error.value for error in poc_app.error)
+    assert len(poc_app.code) == 1
 
     open_page(poc_app, "Espace d'essai", "nav_playground")
-    open_page(poc_app, "Résilience", "nav_resilience")
+    open_page(poc_app, "Incidence technique", "nav_resilience")
     assert any("Panne active" in error.value for error in poc_app.error)
     assert next(button for button in poc_app.button if button.label == "Injecter la panne").disabled
     restore = next(button for button in poc_app.button if button.label == "Rétablir le service")
     restore.click().run()
     assert any("Service rétabli" in success.value for success in poc_app.success)
+    assert len(poc_app.code) == 1
 
 
 def test_successful_simulation_populates_operational_pages(poc_app: AppTest) -> None:
@@ -301,7 +312,14 @@ def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
     assert not poc_app.exception
     # Verify seeded counts are shown
     assert any("base-20260715" in md.value for md in poc_app.markdown)
-    assert any("PhishTank" in markdown.value for markdown in poc_app.markdown)
+    assert any(
+        "Composition du corpus d'entraînement" in markdown.value
+        for markdown in poc_app.markdown
+    )
+    assert any(
+        "Flux de renseignement de référence" in markdown.value
+        for markdown in poc_app.markdown
+    )
     assert any("Base V1 issue" in caption.value for caption in poc_app.caption)
 
     # 2. Test Pipeline Page - Admin Successful Run
@@ -344,7 +362,7 @@ def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
     assert poc_app.session_state["authenticated"] is True
     assert poc_app.session_state["user"]["role"] == "viewer"
 
-    for admin_page in ("Flux de données", "Résilience"):
+    for admin_page in ("Flux de données", "Incidence technique"):
         assert not any(btn.label == admin_page for btn in poc_app.button)
     poc_app.session_state["page"] = "nav_pipeline"
     poc_app.run()

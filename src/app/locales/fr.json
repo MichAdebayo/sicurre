@@ -21,6 +21,9 @@
     "close_navigation": "Fermer la navigation"
   },
   "login": {
+    "email_verified_sign_in": "Votre adresse e-mail est confirmée. Connectez-vous pour accéder à votre espace.",
+    "verification_expired": "Ce lien de vérification a expiré. Demandez un nouveau lien depuis la connexion.",
+    "verification_invalid": "Ce lien de vérification est invalide ou a déjà été utilisé.",
     "title": "Connectez-vous à votre espace Sicurre",
     "subtitle": "Vos emails, protégés en 2 secondes.",
     "email_label": "Adresse email professionnelle",
@@ -42,6 +45,13 @@
       "login_failed": "Connexion impossible pour le moment. Vérifiez vos informations ou réessayez dans quelques instants.",
       "signup_failed": "Création du compte impossible pour le moment. Vérifiez vos informations ou réessayez dans quelques instants."
     }
+  },
+  "verify_email": {
+    "title": "Confirmez votre adresse e-mail",
+    "description": "Confirmez que vous êtes à l’origine de cette demande pour activer votre compte Sicurre.",
+    "confirm": "Confirmer mon adresse",
+    "invalid_link": "Ce lien ne contient pas de jeton de vérification valide. Demandez un nouveau lien depuis la page de connexion.",
+    "back_to_login": "Retour à la connexion"
   },
   "sidebar": {
     "status_active": "Bouclier actif",

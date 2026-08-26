@@ -56,17 +56,27 @@ def execute_pipeline_action(
     operation_key: str,
     translate: Callable[[str], str],
     settings: PocSettings,
+    latest_ingestion_run_id: Callable[[], str | None] | None = None,
 ) -> None:
     """Execute one fixed pipeline action while maintaining stable UI state."""
     if st.session_state.get("pipeline_busy", False):
         st.warning(translate("pipeline_busy"))
         return
+    previous_run_id = (
+        latest_ingestion_run_id()
+        if operation_key == "incremental_demo" and latest_ingestion_run_id
+        else None
+    )
     st.session_state["pipeline_busy"] = True
     try:
         with st.spinner(f"{title}..."):
             success, output = _stream_pipeline(operation_key, translate, settings)
         st.session_state["last_pipeline_output"] = output
         st.session_state["last_pipeline_success"] = success
+        if success and operation_key == "incremental_demo" and latest_ingestion_run_id:
+            run_id = latest_ingestion_run_id()
+            if run_id and run_id != previous_run_id:
+                st.session_state["pending_dataset_run_id"] = run_id
     finally:
         st.session_state["pipeline_busy"] = False
 
