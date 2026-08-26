@@ -176,3 +176,5 @@ build*.py
 skills/
 
 ui-inspiration.png
+
+docs/architecture/diagrams/claude/
