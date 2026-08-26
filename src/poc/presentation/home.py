@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import html
+import math
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -52,8 +54,9 @@ def calculate_home_metrics(events: list[dict[str, Any]]) -> HomeMetrics:
         float(event.get("latency_ms") or 0.0)
         for event in events
         if float(event.get("latency_ms") or 0.0) > 0
+        and str(event.get("inference_source") or "api") in {"api", "live"}
     )
-    p95_index = max(int(len(latencies) * 0.95) - 1, 0)
+    p95_index = max(math.ceil(len(latencies) * 0.95) - 1, 0)
     return HomeMetrics(
         total=len(events),
         blocked=sum(effective_verdict(event) == "phishing" for event in events),
@@ -69,10 +72,17 @@ def calculate_home_metrics(events: list[dict[str, Any]]) -> HomeMetrics:
     )
 
 
-def _metric_card(column: Any, label: str, value: str, color: str = "") -> None:
+def _metric_card(
+    column: Any,
+    label: str,
+    value: str,
+    color: str = "",
+    help_text: str = "",
+) -> None:
     color_style = f" style='color:{color};'" if color else ""
+    title = f" title='{html.escape(help_text)}'" if help_text else ""
     column.markdown(
-        f"<div class='kpi'><div class='label'>{label}</div>"
+        f"<div class='kpi'{title}><div class='label'>{label}</div>"
         f"<div class='value'{color_style}>{value}</div></div>",
         unsafe_allow_html=True,
     )
@@ -113,10 +123,20 @@ def render_home(
     st.markdown("<div style='margin-bottom:8px;'></div>", unsafe_allow_html=True)
 
     second_row = st.columns(4)
-    _metric_card(second_row[0], translate("label_accuracy"), f"{metrics.label_accuracy:.1f}%")
+    _metric_card(
+        second_row[0],
+        translate("label_accuracy"),
+        f"{metrics.label_accuracy:.1f}%",
+        help_text=translate("label_accuracy_help"),
+    )
     _metric_card(second_row[1], translate("false_positive"), str(metrics.false_positives))
     _metric_card(second_row[2], translate("false_negative"), str(metrics.false_negatives))
-    _metric_card(second_row[3], translate("latency_p95"), f"{metrics.latency_p95_ms:.0f} ms")
+    _metric_card(
+        second_row[3],
+        translate("latency_p95"),
+        f"{metrics.latency_p95_ms:.0f} ms",
+        help_text=translate("latency_p95_help"),
+    )
     st.markdown("<div style='margin-bottom:16px;'></div>", unsafe_allow_html=True)
 
     st.markdown(f"#### {translate('recent_activity')}")

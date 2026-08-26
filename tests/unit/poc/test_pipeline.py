@@ -29,27 +29,29 @@ def settings(**overrides: object) -> PocSettings:
 
 def test_local_operations_are_allowed_by_default() -> None:
     validate_operation(OPERATIONS["base_replay"], settings())
+    validate_operation(OPERATIONS["incremental_demo"], settings())
     validate_operation(OPERATIONS["release_preview"], settings())
 
 
-def test_external_operations_require_explicit_opt_in() -> None:
-    with pytest.raises(PermissionError, match="ALLOW_EXTERNAL_WRITES"):
-        validate_operation(OPERATIONS["incremental_demo"], settings())
+def test_staging_publication_requires_explicit_opt_in() -> None:
+    with pytest.raises(PermissionError, match="ALLOW_STAGING_PUBLICATION"):
+        validate_operation(OPERATIONS["staging_publish"], settings())
 
 
 def test_staging_publish_requires_a_separate_slug() -> None:
     with pytest.raises(PermissionError, match="KAGGLE_DATASET_SLUG"):
-        validate_operation(OPERATIONS["staging_publish"], settings(allow_external_writes=True))
+        validate_operation(OPERATIONS["staging_publish"], settings(allow_staging_publication=True))
 
 
 def test_process_environment_uses_only_poc_runtime_values() -> None:
-    configured = settings(r2_prefix="demonstrations/jury")
+    configured = settings(snapshot_prefix="demonstrations/jury")
     environment = build_poc_process_env(configured)
     assert environment["SICURRE_POC_MODE"] == "true"
     assert (
         environment["SICURRE_DATA_PLATFORM_DATABASE_URL"] == configured.data_platform_database_url
     )
-    assert environment["SICURRE_POC_R2_PREFIX"] == "demonstrations/jury"
+    assert environment["SICURRE_POC_SNAPSHOT_PREFIX"] == "demonstrations/jury"
+    assert environment["SICURRE_SEKOIA_SNAPSHOT_STORAGE_BACKEND"] == "local"
     assert environment["SICURRE_POC_ALLOW_ML_DISPATCH"] == "false"
     assert environment["SICURRE_TRAINING_DATASET_SNAPSHOT_STORAGE_BACKEND"] == "local"
 
@@ -58,7 +60,7 @@ def test_staging_publish_is_allowed_with_explicit_sandbox_contract() -> None:
     validate_operation(
         OPERATIONS["staging_publish"],
         settings(
-            allow_external_writes=True,
+            allow_staging_publication=True,
             kaggle_dataset_slug="owner/sicurre-poc-staging",
         ),
     )

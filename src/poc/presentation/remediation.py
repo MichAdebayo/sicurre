@@ -148,16 +148,20 @@ def _render_threat_card(
     correction = ""
     if event.get("override_verdict") == "phishing":
         correction = (
-            f" &nbsp;<span class='badge badge-phishing'>{translate('corrected_label')}</span>"
+            f" &nbsp;<span class='badge badge-phishing'>"
+            f"{translate('reported_phishing_label')}</span>"
         )
     elif event.get("override_verdict"):
-        correction = f" &nbsp;<span class='badge badge-safe'>{translate('corrected_label')}</span>"
+        correction = (
+            f" &nbsp;<span class='badge badge-safe'>{translate('restored_safe_label')}</span>"
+        )
     snippet = remove_links(safe_text(event.get("snippet") or "", 200))
     st.markdown(
         "<div class='threat-card'>"
         f"<div class='tc-subject'>{safe_text(event['subject'], 90)}</div>"
         f"<div class='tc-meta'>{safe_text(event['sender'], 70)} &middot; "
-        f"{timestamp} &middot; {score:.0f} %{correction}</div></div>",
+        f"{timestamp} &middot; {translate('initial_model_risk')} {score:.0f} %"
+        f"{correction}</div></div>",
         unsafe_allow_html=True,
     )
     with st.expander(translate("expand_body"), expanded=False):

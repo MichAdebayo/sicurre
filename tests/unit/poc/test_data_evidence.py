@@ -24,6 +24,7 @@ def test_evidence_store_is_lazy_and_reads_local_counts(tmp_path: Path) -> None:
     assert store.table_exists("data_raw_record")
     assert store.count("data_raw_record") == 2
     assert store.query("SELECT id FROM data_raw_record ORDER BY id") == [{"id": 1}, {"id": 2}]
+    assert store.integrity_status() == (True, 0)
 
 
 def test_evidence_store_handles_absent_tables_and_rejects_identifiers(tmp_path: Path) -> None:
