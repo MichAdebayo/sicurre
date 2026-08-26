@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import asdict
+from typing import Any
 
 import streamlit as st
 
@@ -62,21 +63,45 @@ def render_resilience(
         use_container_width=True,
     )
 
+    status_surface = st.empty()
+    st.markdown(f"#### {translate('resilience_evidence_title')}")
+    terminal_surface = st.empty()
+    st.caption(translate("resilience_scope"))
+
+    def render_incident(current: dict[str, Any] | None) -> None:
+        """Render the current state into the page's single evidence surface."""
+        if current is None:
+            status_surface.info(translate("resilience_no_incident"))
+            terminal_surface.empty()
+            return
+        phase = str(current.get("phase"))
+        if phase == "fault_active" and bool(current.get("passed")):
+            status_surface.error(translate("resilience_fault_confirmed"))
+        elif phase == "recovered" and bool(current.get("recovered")):
+            status_surface.success(translate("resilience_recovered"))
+        else:
+            status_surface.error(translate("resilience_probe_failed"))
+        terminal_surface.code(
+            "\n".join(str(line) for line in current.get("terminal", [])),
+            language="text",
+        )
+
+    render_incident(incident if isinstance(incident, dict) else None)
+
     if inject_requested:
         baseline_state, baseline_status = inference_health()
         if baseline_state != "ready":
             st.error(translate("resilience_baseline_failed"))
             return
-        terminal = st.empty()
         live_lines: list[str] = []
 
         def emit(line: str) -> None:
             live_lines.append(line)
-            terminal.code("\n".join(live_lines), language="text")
+            terminal_surface.code("\n".join(live_lines), language="text")
 
         inject_fault(scenario)
         result = run_probe(scenario, emit)
-        st.session_state["resilience_incident"] = {
+        updated_incident: dict[str, Any] = {
             "scenario": result.scenario.value,
             "phase": "fault_active",
             "passed": result.passed,
@@ -86,17 +111,18 @@ def render_resilience(
             "terminal": list(result.trace_lines),
             "baseline_status": baseline_status,
         }
+        st.session_state["resilience_incident"] = updated_incident
+        render_incident(updated_incident)
         st.rerun()
 
     if restore_requested:
         restore_fault()
         prior_lines = list(incident.get("terminal", [])) if isinstance(incident, dict) else []
-        terminal = st.empty()
         live_lines = [*prior_lines, ""]
 
         def emit_recovery(line: str) -> None:
             live_lines.append(line)
-            terminal.code("\n".join(live_lines), language="text")
+            terminal_surface.code("\n".join(live_lines), language="text")
 
         recovery_result = run_recovery_probe(emit_recovery)
         recovery_state, recovery_status = inference_health()
@@ -109,19 +135,5 @@ def render_resilience(
         incident["recovery_evidence"] = asdict(recovery_result)
         incident["terminal"] = [*prior_lines, "", *recovery_result.trace_lines]
         st.session_state["resilience_incident"] = incident
+        render_incident(incident)
         st.rerun()
-
-    incident = st.session_state.get("resilience_incident")
-    if not isinstance(incident, dict):
-        st.info(translate("resilience_no_incident"))
-        return
-    phase = str(incident.get("phase"))
-    if phase == "fault_active" and bool(incident.get("passed")):
-        st.error(translate("resilience_fault_confirmed"))
-    elif phase == "recovered" and bool(incident.get("recovered")):
-        st.success(translate("resilience_recovered"))
-    else:
-        st.error(translate("resilience_probe_failed"))
-    st.markdown(f"#### {translate('resilience_evidence_title')}")
-    st.code("\n".join(str(line) for line in incident.get("terminal", [])), language="text")
-    st.caption(translate("resilience_scope"))
