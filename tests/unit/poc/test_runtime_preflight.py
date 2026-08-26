@@ -1,9 +1,26 @@
 """Tests for secret-safe local POC readiness checks."""
 
+import sqlite3
 from pathlib import Path
 
 from poc.config import PocSettings
-from poc.runtime_preflight import blocking_failures, build_runtime_checks
+from poc.runtime_preflight import blocking_failures, build_runtime_checks, sqlite_has_tables
+
+
+def test_sqlite_schema_check_requires_expected_tables(tmp_path: Path) -> None:
+    database_path = tmp_path / "data.db"
+    with sqlite3.connect(database_path) as connection:
+        connection.execute("CREATE TABLE data_source_system (id TEXT)")
+    assert sqlite_has_tables(database_path, {"data_source_system"}) is True
+    assert sqlite_has_tables(database_path, {"data_raw_record"}) is False
+    assert sqlite_has_tables(tmp_path / "missing.db", {"data_raw_record"}) is False
+
+
+def test_sqlite_schema_check_fails_closed_for_corrupt_file(tmp_path: Path) -> None:
+    database_path = tmp_path / "corrupt.db"
+    database_path.write_text("not a sqlite database", encoding="utf-8")
+
+    assert sqlite_has_tables(database_path, {"data_raw_record"}) is False
 
 
 def settings(tmp_path: Path, **overrides: object) -> PocSettings:
