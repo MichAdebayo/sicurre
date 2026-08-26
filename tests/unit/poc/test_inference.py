@@ -82,6 +82,13 @@ def test_invalid_contract_probe_records_safe_rejection(
     assert result.response_body == {"unexpected": True}
     assert result.validation == "rejected"
     assert result.application_outcome == "response_rejected_not_persisted"
+    terminal = "\n".join(result.trace_lines)
+    assert "INFO  http.request" in terminal
+    assert 'authorization="Bearer [REDACTED]"' in terminal
+    assert "status=200" in terminal
+    assert 'body={"unexpected":true}' in terminal
+    assert 'contract.validation result="rejected"' in terminal
+    assert 'persistence.skipped reason="invalid_inference_contract"' in terminal
     assert result.request_body == {
         "subject": "Contrôle de résilience Sicurre",
         "sender": "probe@sicurre.test",

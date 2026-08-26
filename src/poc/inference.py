@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 from typing import Any
 from urllib.parse import urlsplit
@@ -56,6 +59,7 @@ class FaultProbeResult:
     validation: str = "not_evaluated"
     validation_detail: str = ""
     application_outcome: str = "request_rejected"
+    trace_lines: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -214,9 +218,31 @@ class PocInferenceClient:
         result["source"] = InferenceMode.LIVE.value
         return result
 
-    def run_fault_probe(self, scenario: FaultScenario) -> FaultProbeResult:
+    def run_fault_probe(
+        self,
+        scenario: FaultScenario,
+        emit: Callable[[str], None] | None = None,
+    ) -> FaultProbeResult:
         """Observe the fault currently injected into the local POC gateway."""
         payload = self._probe_payload()
+        trace: list[str] = []
+        self._emit_trace(trace, emit, "INFO", "probe.start", scenario=scenario.value)
+        self._emit_trace(
+            trace,
+            emit,
+            "INFO",
+            "http.request",
+            method="POST",
+            path=self._classify_path(),
+        )
+        self._emit_trace(
+            trace,
+            emit,
+            "DEBUG",
+            "http.request.headers",
+            authorization="Bearer [REDACTED]",
+        )
+        self._emit_trace(trace, emit, "DEBUG", "http.request.body", body=payload)
         try:
             response = httpx.post(
                 self.settings.inference_api_url,
@@ -225,6 +251,13 @@ class PocInferenceClient:
                 timeout=5.0,
             )
         except httpx.HTTPError as error:
+            self._emit_trace(
+                trace,
+                emit,
+                "ERROR",
+                "http.request.failed",
+                error=type(error).__name__,
+            )
             return FaultProbeResult(
                 scenario=scenario,
                 expected=self._fault_expectation(scenario),
@@ -233,12 +266,37 @@ class PocInferenceClient:
                 request_path=self._classify_path(),
                 request_body=payload,
                 validation_detail=type(error).__name__,
+                trace_lines=tuple(trace),
             )
         response_body = self._safe_response_body(response)
+        self._emit_trace(
+            trace,
+            emit,
+            "INFO",
+            "http.response",
+            status=response.status_code,
+        )
+        self._emit_trace(trace, emit, "DEBUG", "http.response.body", body=response_body)
         if scenario == FaultScenario.INVALID_CONTRACT:
             try:
                 normalize_inference_result(response.json())
             except (PocInferenceContractError, ValueError, TypeError):
+                self._emit_trace(
+                    trace,
+                    emit,
+                    "ERROR",
+                    "contract.validation",
+                    result="rejected",
+                    detail="required_fields_missing_or_invalid",
+                )
+                self._emit_trace(
+                    trace,
+                    emit,
+                    "WARN",
+                    "persistence.skipped",
+                    reason="invalid_inference_contract",
+                )
+                self._emit_trace(trace, emit, "INFO", "probe.complete", result="passed")
                 return FaultProbeResult(
                     scenario,
                     "contract_rejected",
@@ -251,7 +309,16 @@ class PocInferenceClient:
                     validation="rejected",
                     validation_detail="required_fields_missing_or_invalid",
                     application_outcome="response_rejected_not_persisted",
+                    trace_lines=tuple(trace),
                 )
+            self._emit_trace(
+                trace,
+                emit,
+                "ERROR",
+                "contract.validation",
+                result="unexpected_acceptance",
+            )
+            self._emit_trace(trace, emit, "ERROR", "probe.complete", result="failed")
             return FaultProbeResult(
                 scenario,
                 "contract_rejected",
@@ -263,13 +330,29 @@ class PocInferenceClient:
                 response_body=response_body,
                 validation="accepted",
                 application_outcome="unexpected_acceptance",
+                trace_lines=tuple(trace),
             )
         expected_status = 503 if scenario == FaultScenario.SERVICE_UNAVAILABLE else 401
+        passed = response.status_code == expected_status
+        self._emit_trace(
+            trace,
+            emit,
+            "ERROR" if passed else "WARN",
+            "classification.interrupted",
+            reason=("route_unavailable" if expected_status == 503 else "authentication_rejected"),
+        )
+        self._emit_trace(
+            trace,
+            emit,
+            "INFO" if passed else "ERROR",
+            "probe.complete",
+            result="passed" if passed else "failed",
+        )
         return FaultProbeResult(
             scenario=scenario,
             expected=str(expected_status),
             observed=str(response.status_code),
-            passed=response.status_code == expected_status,
+            passed=passed,
             request_path=self._classify_path(),
             request_body=payload,
             response_status=response.status_code,
@@ -279,14 +362,36 @@ class PocInferenceClient:
             application_outcome=(
                 "service_unavailable" if expected_status == 503 else "authentication_rejected"
             ),
+            trace_lines=tuple(trace),
         )
 
-    def run_recovery_probe(self) -> FaultProbeResult:
+    def run_recovery_probe(
+        self,
+        emit: Callable[[str], None] | None = None,
+    ) -> FaultProbeResult:
         """Verify restored inference with one synthetic contract-valid request."""
         payload = self._probe_payload()
         scenario = FaultScenario.INVALID_CONTRACT
         response: httpx.Response | None = None
         response_body: Any = None
+        trace: list[str] = []
+        self._emit_trace(trace, emit, "INFO", "recovery.start")
+        self._emit_trace(
+            trace,
+            emit,
+            "INFO",
+            "http.request",
+            method="POST",
+            path=self._classify_path(),
+        )
+        self._emit_trace(
+            trace,
+            emit,
+            "DEBUG",
+            "http.request.headers",
+            authorization="Bearer [REDACTED]",
+        )
+        self._emit_trace(trace, emit, "DEBUG", "http.request.body", body=payload)
         try:
             response = httpx.post(
                 self.settings.inference_api_url,
@@ -295,9 +400,24 @@ class PocInferenceClient:
                 timeout=self.timeout_seconds,
             )
             response_body = self._safe_response_body(response)
+            self._emit_trace(
+                trace,
+                emit,
+                "INFO",
+                "http.response",
+                status=response.status_code,
+            )
+            self._emit_trace(trace, emit, "DEBUG", "http.response.body", body=response_body)
             response.raise_for_status()
             normalize_inference_result(response.json())
         except (httpx.HTTPError, PocInferenceContractError, ValueError, TypeError) as error:
+            self._emit_trace(
+                trace,
+                emit,
+                "ERROR",
+                "recovery.failed",
+                error=type(error).__name__,
+            )
             return FaultProbeResult(
                 scenario,
                 "contract_accepted",
@@ -310,7 +430,17 @@ class PocInferenceClient:
                 validation="rejected",
                 validation_detail=f"recovery_error:{type(error).__name__}",
                 application_outcome="recovery_failed",
+                trace_lines=tuple(trace),
             )
+        self._emit_trace(trace, emit, "INFO", "contract.validation", result="accepted")
+        self._emit_trace(
+            trace,
+            emit,
+            "INFO",
+            "persistence.skipped",
+            reason="synthetic_recovery_probe",
+        )
+        self._emit_trace(trace, emit, "INFO", "recovery.complete", result="passed")
         return FaultProbeResult(
             scenario,
             "contract_accepted",
@@ -323,6 +453,7 @@ class PocInferenceClient:
             validation="accepted",
             validation_detail="required_fields_accepted",
             application_outcome="recovery_verified_not_persisted",
+            trace_lines=tuple(trace),
         )
 
     @staticmethod
@@ -353,3 +484,23 @@ class PocInferenceClient:
             return response.json()
         except ValueError:
             return response.text[:1000]
+
+    @staticmethod
+    def _emit_trace(
+        trace: list[str],
+        emit: Callable[[str], None] | None,
+        level: str,
+        event: str,
+        **fields: Any,
+    ) -> None:
+        """Record and optionally stream one real probe execution event."""
+        suffix = " ".join(
+            f"{key}={json.dumps(value, ensure_ascii=False, separators=(',', ':'))}"
+            for key, value in fields.items()
+        )
+        line = f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]} {level:<5} {event}"
+        if suffix:
+            line = f"{line} {suffix}"
+        trace.append(line)
+        if emit is not None:
+            emit(line)
