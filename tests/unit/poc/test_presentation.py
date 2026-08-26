@@ -9,6 +9,7 @@ import streamlit as st
 
 from poc.presentation.datasets import (
     _load_frozen_source_distribution,
+    _local_run_time,
     _reference_provider_rows,
     _source_family,
     _source_label,
@@ -112,6 +113,12 @@ def test_dataset_provider_rows_separate_training_and_reference_evidence() -> Non
 
     assert training_totals == {"kaggle": 4, "common_crawl": 1}
     assert reference_totals == {"phishtank": 3, "sekoia": 2}
+
+
+def test_run_time_formatting_handles_absent_and_legacy_values() -> None:
+    """Incomplete legacy evidence remains readable without crashing the page."""
+    assert _local_run_time(None) == "-"
+    assert _local_run_time("legacy timestamp") == "legacy timestamp"
 
 
 def test_presentation_formatting_preserves_existing_contract() -> None:
