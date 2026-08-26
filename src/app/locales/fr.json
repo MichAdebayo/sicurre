@@ -21,6 +21,7 @@
     "close_navigation": "Fermer la navigation"
   },
   "login": {
+    "email_verified_sign_in": "Votre adresse e-mail est confirmée. Connectez-vous pour accéder à votre espace.",
     "title": "Connectez-vous à votre espace Sicurre",
     "subtitle": "Vos emails, protégés en 2 secondes.",
     "email_label": "Adresse email professionnelle",

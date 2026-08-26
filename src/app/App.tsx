@@ -68,7 +68,32 @@ const getInitialLoginState = () => {
   return false;
 };
 
+// Verification returns here with ?verified=1. When the session cookie set on
+// the verify-email response is lost in transit (an edge challenge on
+// /api/auth/* will do it), the user arrives authenticated-in-name-only, so
+// send them to the sign-in form with a confirmation rather than the marketing
+// page, where the only visible control is a Turnstile checkbox that submits
+// nothing.
+const consumeEmailVerifiedFlag = (): boolean => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("verified") !== "1") return false;
+  params.delete("verified");
+  const query = params.toString();
+  window.history.replaceState(
+    {},
+    document.title,
+    `${window.location.pathname}${query ? `?${query}` : ""}`,
+  );
+  return true;
+};
+
+const emailJustVerified = consumeEmailVerifiedFlag();
+
 const getInitialViewState = (): ViewState => {
+  if (emailJustVerified) {
+    sessionStorage.setItem("sicurre_view_state", "login");
+    return "login";
+  }
   const pathView = getViewStateFromPath();
   if (pathView) {
     sessionStorage.setItem("sicurre_view_state", pathView);
@@ -256,6 +281,7 @@ function AppContent() {
         onLoginSuccess={handleLoginSuccess}
         initialMode={viewState === "signup" ? "signup" : "login"}
         onNavigateToLanding={() => setViewState("landing")}
+        emailJustVerified={emailJustVerified}
       />
     );
   }
