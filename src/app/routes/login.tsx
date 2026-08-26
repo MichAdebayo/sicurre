@@ -16,6 +16,7 @@ interface LoginRouteProps {
   onLoginSuccess: () => void;
   initialMode?: "login" | "signup";
   onNavigateToLanding?: () => void;
+  emailJustVerified?: boolean;
 }
 
 const getAuthFailureReason = (error: unknown, fallback: AuthFailureReason): AuthFailureReason => {
@@ -29,6 +30,7 @@ export default function LoginRoute({
   onLoginSuccess,
   initialMode = "login",
   onNavigateToLanding,
+  emailJustVerified = false,
 }: LoginRouteProps) {
   const { t } = useTranslation();
   const [isSignUp, setIsSignUp] = useState(initialMode === "signup");
@@ -37,7 +39,9 @@ export default function LoginRoute({
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState("");
-  const [authNotice, setAuthNotice] = useState("");
+  const [authNotice, setAuthNotice] = useState(
+    emailJustVerified ? t("login.email_verified_sign_in") : "",
+  );
   const [verificationEmailSent, setVerificationEmailSent] = useState(false);
   const [isResendingVerification, setIsResendingVerification] = useState(false);
   const [resetToken, setResetToken] = useState(
@@ -168,7 +172,7 @@ export default function LoginRoute({
     try {
       const result = await authClient.sendVerificationEmail({
         email,
-        callbackURL: `${window.location.origin}/`,
+        callbackURL: `${window.location.origin}/?verified=1`,
       });
       if (result.error) throw new Error("VERIFICATION_EMAIL_FAILED");
       setAuthNotice("Un nouveau lien de vérification vient d’être envoyé.");

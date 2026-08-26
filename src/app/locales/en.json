@@ -21,6 +21,7 @@
     "close_navigation": "Close navigation"
   },
   "login": {
+    "email_verified_sign_in": "Your email address is confirmed. Sign in to reach your workspace.",
     "title": "Sign in to your Sicurre account",
     "subtitle": "Your emails, protected in 2 seconds.",
     "email_label": "Professional email address",
