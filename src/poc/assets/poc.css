@@ -777,6 +777,7 @@ div[data-testid="stMarkdownContainer"] h6 {
 }
 .dot-green { background: #10B981; }
 .dot-red   { background: #EF4444; }
+.dot-amber { background: #D97706; }
 .dot-grey  { background: var(--text-muted); }
 
 /* ── Inference status inline ──────────────────────────── */
@@ -990,7 +991,7 @@ div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid=
   margin-top: clamp(2.25rem, 7vh, 4.5rem) !important;
 }
 [data-testid="stSidebar"] .st-key-sidebar_signout_group {
-  margin-top: 0.65rem !important;
+  margin-top: 0 !important;
 }
 [data-testid="stSidebar"] .st-key-sidebar_inference_footer {
   margin-top: auto !important;

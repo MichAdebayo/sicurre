@@ -6,6 +6,7 @@ import time
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -47,6 +48,14 @@ class FaultProbeResult:
     expected: str
     observed: str
     passed: bool
+    request_method: str = "POST"
+    request_path: str = "/v1/classify"
+    request_body: dict[str, Any] | None = None
+    response_status: int | None = None
+    response_body: Any = None
+    validation: str = "not_evaluated"
+    validation_detail: str = ""
+    application_outcome: str = "request_rejected"
 
 
 @dataclass(frozen=True)
@@ -198,20 +207,16 @@ class PocInferenceClient:
             raise PocInferenceUnavailable("Le service d'inférence local ne répond pas.") from exc
         try:
             result = normalize_inference_result(response.json())
-        except (ValueError, TypeError) as exc:
-            raise PocInferenceContractError("La réponse du modèle local est invalide.") from exc
+        except (PocInferenceContractError, ValueError, TypeError) as exc:
+            raise PocInferenceContractError(
+                "La réponse du modèle local ne respecte pas le contrat attendu."
+            ) from exc
         result["source"] = InferenceMode.LIVE.value
         return result
 
     def run_fault_probe(self, scenario: FaultScenario) -> FaultProbeResult:
         """Observe the fault currently injected into the local POC gateway."""
-        payload = {
-            "subject": "Contrôle de résilience Sicurre",
-            "sender": "probe@sicurre.test",
-            "text": "Message local sans donnée utilisateur.",
-            "use_llm": False,
-            "use_virustotal": False,
-        }
+        payload = self._probe_payload()
         try:
             response = httpx.post(
                 self.settings.inference_api_url,
@@ -225,26 +230,126 @@ class PocInferenceClient:
                 expected=self._fault_expectation(scenario),
                 observed=type(error).__name__,
                 passed=False,
+                request_path=self._classify_path(),
+                request_body=payload,
+                validation_detail=type(error).__name__,
             )
-        if scenario is FaultScenario.INVALID_CONTRACT:
+        response_body = self._safe_response_body(response)
+        if scenario == FaultScenario.INVALID_CONTRACT:
             try:
                 normalize_inference_result(response.json())
             except (PocInferenceContractError, ValueError, TypeError):
-                return FaultProbeResult(scenario, "contract_rejected", "contract_rejected", True)
-            return FaultProbeResult(scenario, "contract_rejected", "contract_accepted", False)
-        expected_status = 503 if scenario is FaultScenario.SERVICE_UNAVAILABLE else 401
+                return FaultProbeResult(
+                    scenario,
+                    "contract_rejected",
+                    "contract_rejected",
+                    True,
+                    request_path=self._classify_path(),
+                    request_body=payload,
+                    response_status=response.status_code,
+                    response_body=response_body,
+                    validation="rejected",
+                    validation_detail="required_fields_missing_or_invalid",
+                    application_outcome="response_rejected_not_persisted",
+                )
+            return FaultProbeResult(
+                scenario,
+                "contract_rejected",
+                "contract_accepted",
+                False,
+                request_path=self._classify_path(),
+                request_body=payload,
+                response_status=response.status_code,
+                response_body=response_body,
+                validation="accepted",
+                application_outcome="unexpected_acceptance",
+            )
+        expected_status = 503 if scenario == FaultScenario.SERVICE_UNAVAILABLE else 401
         return FaultProbeResult(
             scenario=scenario,
             expected=str(expected_status),
             observed=str(response.status_code),
             passed=response.status_code == expected_status,
+            request_path=self._classify_path(),
+            request_body=payload,
+            response_status=response.status_code,
+            response_body=response_body,
+            validation="not_evaluated",
+            validation_detail="http_rejected_before_validation",
+            application_outcome=(
+                "service_unavailable" if expected_status == 503 else "authentication_rejected"
+            ),
+        )
+
+    def run_recovery_probe(self) -> FaultProbeResult:
+        """Verify restored inference with one synthetic contract-valid request."""
+        payload = self._probe_payload()
+        scenario = FaultScenario.INVALID_CONTRACT
+        response: httpx.Response | None = None
+        response_body: Any = None
+        try:
+            response = httpx.post(
+                self.settings.inference_api_url,
+                json=payload,
+                headers=self._headers(),
+                timeout=self.timeout_seconds,
+            )
+            response_body = self._safe_response_body(response)
+            response.raise_for_status()
+            normalize_inference_result(response.json())
+        except (httpx.HTTPError, PocInferenceContractError, ValueError, TypeError) as error:
+            return FaultProbeResult(
+                scenario,
+                "contract_accepted",
+                type(error).__name__,
+                False,
+                request_path=self._classify_path(),
+                request_body=payload,
+                response_status=response.status_code if response is not None else None,
+                response_body=response_body,
+                validation="rejected",
+                validation_detail=f"recovery_error:{type(error).__name__}",
+                application_outcome="recovery_failed",
+            )
+        return FaultProbeResult(
+            scenario,
+            "contract_accepted",
+            "contract_accepted",
+            True,
+            request_path=self._classify_path(),
+            request_body=payload,
+            response_status=response.status_code,
+            response_body=response_body,
+            validation="accepted",
+            validation_detail="required_fields_accepted",
+            application_outcome="recovery_verified_not_persisted",
         )
 
     @staticmethod
     def _fault_expectation(scenario: FaultScenario) -> str:
-        if scenario is FaultScenario.INVALID_CONTRACT:
+        if scenario == FaultScenario.INVALID_CONTRACT:
             return "contract_rejected"
         return "503" if scenario is FaultScenario.SERVICE_UNAVAILABLE else "401"
 
     def _headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.settings.inference_api_key}"}
+
+    @staticmethod
+    def _probe_payload() -> dict[str, Any]:
+        return {
+            "subject": "Contrôle de résilience Sicurre",
+            "sender": "probe@sicurre.test",
+            "text": "Message local synthétique sans donnée utilisateur.",
+            "use_llm": False,
+            "use_virustotal": False,
+        }
+
+    def _classify_path(self) -> str:
+        return urlsplit(self.settings.inference_api_url).path
+
+    @staticmethod
+    def _safe_response_body(response: httpx.Response) -> Any:
+        try:
+            return response.json()
+        except ValueError:
+            return response.text[:1000]
