@@ -18,8 +18,10 @@ NAVIGATION_KEYS = (
     "nav_playground",
     "nav_pipeline",
     "nav_datasets",
-    "nav_settings",
+    "nav_resilience",
 )
+
+ADMIN_NAVIGATION_KEYS = {"nav_pipeline", "nav_resilience"}
 
 
 def _logo_html(logo_path: Path, width: int, *, login: bool = False) -> str:
@@ -89,15 +91,15 @@ def render_sidebar(
     logo_path: Path,
     user: dict[str, Any],
     translate: Translator,
-    inference_health: Callable[[], tuple[bool, str]],
+    inference_health: Callable[[], tuple[str, str]],
     sign_out: Callable[[], None],
 ) -> None:
     """Render deterministic navigation, inference health, and sign-out controls."""
     with st.sidebar:
         st.markdown(
-            "<div style='margin-top:-1.5rem;margin-bottom:1.2rem;'>"
+            "<div class='sidebar-identity'>"
             f"<div class='logo-container' style='margin-bottom:1rem;'>"
-            f"{_logo_html(logo_path, 100)}</div>"
+            f"{_logo_html(logo_path, 88)}</div>"
             f"<div style='font-size:0.82rem;color:var(--text-2);margin-top:0.5rem;"
             f"margin-bottom:0.1rem;'>{translate('welcome')}</div>"
             f"<div style='font-weight:700;font-size:1.05rem;color:var(--text);'>"
@@ -110,7 +112,12 @@ def render_sidebar(
             unsafe_allow_html=True,
         )
         current_page = st.session_state.get("page", "nav_home")
-        for navigation_key in NAVIGATION_KEYS:
+        navigation_keys = (
+            NAVIGATION_KEYS
+            if user["role"] == "admin"
+            else tuple(key for key in NAVIGATION_KEYS if key not in ADMIN_NAVIGATION_KEYS)
+        )
+        for navigation_key in navigation_keys:
             is_active = navigation_key == current_page
             selected = st.button(
                 translate(navigation_key),
@@ -122,22 +129,39 @@ def render_sidebar(
                 st.session_state["page"] = navigation_key
                 st.rerun()
 
-        st.markdown("<div class='sidebar-spacer'></div>", unsafe_allow_html=True)
-        st.markdown(
-            "<hr style='margin:0.8rem 0!important;border:none!important;"
-            "border-top:1px solid var(--border-line)!important;opacity:1!important;' />",
-            unsafe_allow_html=True,
-        )
-        is_healthy, status_text = inference_health()
-        dot_class = "dot-green" if is_healthy else "dot-red"
-        st.markdown(
-            "<div class='inference-status'><div class='status-heading'>"
-            f"<span class='status-dot {dot_class}'></span>"
-            f"<span class='status-label'>{translate('inference_status')}</span></div>"
-            f"<span class='status-value'>{status_text}</span></div>",
-            unsafe_allow_html=True,
-        )
-        st.markdown("<div style='margin-top:12px;'></div>", unsafe_allow_html=True)
-        if st.button(translate("sign_out"), key="_sidebar_signout"):
-            sign_out()
-            st.rerun()
+        with st.container(key="sidebar_actions"):
+            st.markdown(
+                "<hr style='margin:0!important;border:none!important;"
+                "border-top:1px solid var(--border-line)!important;opacity:1!important;' />",
+                unsafe_allow_html=True,
+            )
+            settings_active = current_page == "nav_settings"
+            settings_selected = st.button(
+                translate("nav_settings"),
+                key="_nav_nav_settings",
+                type="primary" if settings_active else "secondary",
+                use_container_width=True,
+            )
+            if settings_selected and not settings_active:
+                st.session_state["page"] = "nav_settings"
+                st.rerun()
+
+            with st.container(key="sidebar_signout_group"):
+                if st.button(translate("sign_out"), key="_sidebar_signout"):
+                    sign_out()
+                    st.rerun()
+
+        with st.container(key="sidebar_inference_footer"):
+            status_state, status_text = inference_health()
+            dot_class = {
+                "ready": "dot-green",
+                "authentication_rejected": "dot-amber",
+                "contract_invalid": "dot-amber",
+            }.get(status_state, "dot-red")
+            st.markdown(
+                "<div class='inference-status'><div class='status-heading'>"
+                f"<span class='status-dot {dot_class}'></span>"
+                f"<span class='status-label'>{translate('inference_status')}</span></div>"
+                f"<span class='status-value'>{status_text}</span></div>",
+                unsafe_allow_html=True,
+            )

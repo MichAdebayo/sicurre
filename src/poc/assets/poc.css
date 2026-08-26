@@ -171,24 +171,12 @@ button[data-testid="stBaseButton-primaryFormSubmit"]:active,
 button[kind="primaryFormSubmit"]:hover,
 button[kind="primaryFormSubmit"]:focus,
 button[kind="primaryFormSubmit"]:active,
-button[data-testid^="stBaseButton-primary"]:hover *,
-button[data-testid^="stBaseButton-primary"]:focus *,
-button[data-testid^="stBaseButton-primary"]:active *,
-button[kind="primaryFormSubmit"]:hover *,
-button[kind="primaryFormSubmit"]:focus *,
-button[kind="primaryFormSubmit"]:active *,
 .stButton > button[kind^="primary"]:hover,
 .stButton > button[kind^="primary"]:focus,
 .stButton > button[kind^="primary"]:active,
-.stButton > button[kind^="primary"]:hover *,
-.stButton > button[kind^="primary"]:focus *,
-.stButton > button[kind^="primary"]:active *,
 div[data-testid="stFormSubmitButton"] button:hover,
 div[data-testid="stFormSubmitButton"] button:focus,
-div[data-testid="stFormSubmitButton"] button:active,
-div[data-testid="stFormSubmitButton"] button:hover *,
-div[data-testid="stFormSubmitButton"] button:focus *,
-div[data-testid="stFormSubmitButton"] button:active * {
+div[data-testid="stFormSubmitButton"] button:active {
   background: var(--cta-hover) !important;
   border-color: var(--cta-hover) !important;
   color: var(--cta-text) !important;
@@ -341,6 +329,25 @@ div[data-baseweb="popover"] span,
   color: var(--primary) !important;
 }
 
+/* Button help is a tooltip, not a dropdown menu. Keep its contrast stable. */
+[role="tooltip"],
+[role="tooltip"] div,
+[role="tooltip"] span,
+[role="tooltip"] p {
+  background-color: #10243E !important;
+  color: #FFFFFF !important;
+  opacity: 1 !important;
+}
+[role="tooltip"] div[data-testid="stMarkdownContainer"] > p {
+  color: #FFFFFF !important;
+  -webkit-text-fill-color: #FFFFFF !important;
+}
+[role="tooltip"] {
+  border: 1px solid #2E6BB5 !important;
+  border-radius: 6px !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.24) !important;
+}
+
 /* ── Checkboxes ───────────────────────────────────────── */
 input[type="checkbox"] {
   accent-color: var(--primary) !important;
@@ -439,7 +446,12 @@ div[data-baseweb="tab-highlight"] {
   padding-bottom: 0.4rem !important;
   display: flex !important;
   flex-direction: column !important;
-  height: 100% !important;
+  min-height: calc(100vh - 11.5rem) !important;
+  position: relative !important;
+}
+.sidebar-identity {
+  margin-top: -1.5rem;
+  margin-bottom: 1.2rem;
 }
 /* Show header but make it transparent so collapse button is visible */
 [data-testid="stSidebarHeader"] {
@@ -460,7 +472,8 @@ div[data-baseweb="tab-highlight"] {
   border: none !important;
 }
 [data-testid="stSidebarCollapseButton"] [data-testid="stIconMaterial"],
-[data-testid="stSidebarCollapsedControl"] [data-testid="stIconMaterial"] {
+[data-testid="stSidebarCollapsedControl"] [data-testid="stIconMaterial"],
+button[data-testid="stExpandSidebarButton"] [data-testid="stIconMaterial"] {
   color: var(--text-2) !important;
 }
 [data-testid="stSidebarCollapseButton"] button:hover {
@@ -558,6 +571,8 @@ div[data-testid="stMarkdownContainer"] h6 {
   border-radius: 12px;
   padding: 12px 14px;
   box-shadow: var(--shadow);
+  min-height: 92px;
+  height: 100%;
 }
 .kpi .label {
   font-size: 0.72rem;
@@ -577,6 +592,81 @@ div[data-testid="stMarkdownContainer"] h6 {
   font-size: 0.78rem;
   color: var(--text-muted);
   margin-top: 2px;
+}
+
+.evidence-funnel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  margin: 0.65rem 0 0.8rem;
+}
+
+.evidence-step {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 60px;
+  padding: 0.85rem 1rem;
+  color: var(--text-2);
+}
+
+.evidence-step:nth-child(odd) { border-right: 1px solid var(--border); }
+.evidence-step:nth-child(-n + 2) { border-bottom: 1px solid var(--border); }
+.evidence-step strong { color: var(--text); font-size: 1.2rem; }
+
+.evidence-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.evidence-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--text);
+  font-size: 0.86rem;
+}
+
+.evidence-table caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.evidence-table th {
+  padding: 0.72rem 0.8rem;
+  color: var(--text);
+  background: var(--nav-hover);
+  border-bottom: 1px solid var(--border);
+  font-weight: 700;
+  text-align: left;
+}
+
+.evidence-table td {
+  padding: 0.68rem 0.8rem;
+  color: var(--text-2);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.evidence-table tbody tr:last-child td { border-bottom: 0; }
+.evidence-table tbody tr:hover td { background: var(--nav-hover); color: var(--text); }
+
+@media (max-width: 640px) {
+  .evidence-funnel { grid-template-columns: 1fr; }
+  .evidence-step:nth-child(odd) { border-right: 0; }
+  .evidence-step:nth-child(-n + 3) { border-bottom: 1px solid var(--border); }
 }
 
 /* ── Verdict badges ────────────────────────────────────── */
@@ -687,6 +777,7 @@ div[data-testid="stMarkdownContainer"] h6 {
 }
 .dot-green { background: #10B981; }
 .dot-red   { background: #EF4444; }
+.dot-amber { background: #D97706; }
 .dot-grey  { background: var(--text-muted); }
 
 /* ── Inference status inline ──────────────────────────── */
@@ -879,6 +970,15 @@ div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid=
 [data-testid="stSidebarCollapsedControl"] button:focus [data-testid="stIconMaterial"] {
   color: #FFFFFF !important;
 }
+[data-theme="dark"] [data-testid="stSidebarCollapsedControl"] button,
+[data-theme="dark"] [data-testid="stSidebarCollapsedControl"] button svg,
+[data-theme="dark"] [data-testid="stSidebarCollapsedControl"] button svg *,
+[data-theme="dark"] [data-testid="stSidebarCollapsedControl"] [data-testid="stIconMaterial"],
+[data-theme="dark"] button[data-testid="stExpandSidebarButton"] [data-testid="stIconMaterial"] {
+  color: #FFFFFF !important;
+  fill: #FFFFFF !important;
+  stroke: #FFFFFF !important;
+}
 
 /* Local development file-watch state is tooling chrome, not product copy. */
 [data-testid="stStatusWidget"],
@@ -886,10 +986,62 @@ div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid=
   display: none !important;
 }
 
-/* ── Sidebar flex bottom push ─────────────────────────── */
-.sidebar-spacer {
-  flex-grow: 1 !important;
-  min-height: 2rem !important;
+/* ── Sidebar actions and bottom status ───────────────── */
+[data-testid="stSidebar"] .st-key-sidebar_actions {
+  margin-top: clamp(2.25rem, 7vh, 4.5rem) !important;
+}
+[data-testid="stSidebar"] .st-key-sidebar_signout_group {
+  margin-top: 0 !important;
+}
+[data-testid="stSidebar"] .st-key-sidebar_inference_footer {
+  margin-top: auto !important;
+  padding-bottom: 0.35rem !important;
+}
+
+@media (min-height: 680px) {
+  [data-testid="stSidebar"] .st-key-sidebar_actions {
+    position: absolute !important;
+    right: 0 !important;
+    bottom: 6.5rem !important;
+    left: 0 !important;
+    margin-top: 0 !important;
+  }
+  [data-testid="stSidebar"] .st-key-sidebar_inference_footer {
+    position: absolute !important;
+    right: 0 !important;
+    bottom: 0.75rem !important;
+    left: 0 !important;
+    margin-top: 0 !important;
+  }
+}
+
+@media (max-height: 800px) {
+  [data-testid="stSidebarUserContent"] {
+    padding-top: 1rem !important;
+    min-height: calc(100vh - 5rem) !important;
+  }
+  .sidebar-identity {
+    margin-top: -0.75rem;
+    margin-bottom: 0.45rem;
+  }
+  .sidebar-identity .logo-container {
+    margin-bottom: 0.35rem !important;
+  }
+  .sidebar-identity .logo-container img {
+    width: 64px !important;
+  }
+  [data-testid="stSidebar"] .st-key-sidebar_actions {
+    margin-top: 1.75rem !important;
+  }
+  [data-testid="stSidebar"] .stButton > button {
+    min-height: 2rem !important;
+    padding-top: 0.1rem !important;
+    padding-bottom: 0.1rem !important;
+  }
+  .inference-status {
+    padding-top: 0.25rem !important;
+    margin-bottom: 0.35rem !important;
+  }
 }
 
 /* ── Login page center fix ────────────────────────────── */

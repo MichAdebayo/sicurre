@@ -23,15 +23,12 @@ _reserved_args, _ = _parser.parse_known_args()
 def configure_snapshot_environment(environ: MutableMapping[str, str], *, reserved: bool) -> None:
     """Route scheduled snapshots to production or an approved POC namespace."""
     poc_mode = environ.get("SICURRE_POC_MODE", "false").lower() == "true"
-    external_writes = environ.get("SICURRE_POC_ALLOW_EXTERNAL_WRITES", "false").lower() == "true"
-    if poc_mode and not external_writes:
-        raise RuntimeError("POC SEKOIA cron requires explicit sandbox external-write approval.")
-
-    environ["SICURRE_SEKOIA_SNAPSHOT_STORAGE_BACKEND"] = "prod"
     if poc_mode:
-        poc_prefix = environ.get("SICURRE_POC_R2_PREFIX", "demonstrations/poc")
+        environ["SICURRE_SEKOIA_SNAPSHOT_STORAGE_BACKEND"] = "local"
+        poc_prefix = environ.get("SICURRE_POC_SNAPSHOT_PREFIX", "demonstrations/poc")
         environ["SICURRE_SEKOIA_SNAPSHOT_PREFIX"] = f"{poc_prefix}/scraping/sekoia_ioc"
         return
+    environ["SICURRE_SEKOIA_SNAPSHOT_STORAGE_BACKEND"] = "prod"
     environ["SICURRE_SEKOIA_SNAPSHOT_PREFIX"] = (
         "cron/reserved/scraping/sekoia_ioc" if reserved else "cron/scraping/sekoia_ioc"
     )
@@ -74,7 +71,11 @@ async def run_ingestion(*, trigger_mode: str = "scheduled") -> object:
         expire_on_commit=False,
         class_=AsyncSession,
     )
-    service = SekoiaIocIngestionService(snapshot_prefix=settings.sekoia_snapshot_prefix)
+    poc_snapshot_dir = os.environ.get("SICURRE_POC_SNAPSHOT_DIR")
+    service = SekoiaIocIngestionService(
+        snapshot_dir=Path(poc_snapshot_dir) if poc_snapshot_dir else None,
+        snapshot_prefix=settings.sekoia_snapshot_prefix,
+    )
     try:
         async with session_factory() as session:
             return await service.run(session, trigger_mode=trigger_mode)
@@ -83,8 +84,13 @@ async def run_ingestion(*, trigger_mode: str = "scheduled") -> object:
 
 
 async def main() -> None:
-    r2_prefix = os.environ["SICURRE_SEKOIA_SNAPSHOT_PREFIX"]
-    logger.info("Starting SEKOIA IOC cron (R2 target: %s)", r2_prefix)
+    snapshot_prefix = os.environ["SICURRE_SEKOIA_SNAPSHOT_PREFIX"]
+    snapshot_backend = os.environ["SICURRE_SEKOIA_SNAPSHOT_STORAGE_BACKEND"]
+    logger.info(
+        "Starting SEKOIA IOC cron (snapshot backend: %s, prefix: %s)",
+        snapshot_backend,
+        snapshot_prefix,
+    )
     result = await run_ingestion(trigger_mode="scheduled")
     logger.info("SEKOIA IOC cron completed: %s", result)
 
