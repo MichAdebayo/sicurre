@@ -91,7 +91,7 @@ def render_sidebar(
     logo_path: Path,
     user: dict[str, Any],
     translate: Translator,
-    inference_health: Callable[[], tuple[bool, str]],
+    inference_health: Callable[[], tuple[str, str]],
     sign_out: Callable[[], None],
 ) -> None:
     """Render deterministic navigation, inference health, and sign-out controls."""
@@ -152,8 +152,12 @@ def render_sidebar(
                     st.rerun()
 
         with st.container(key="sidebar_inference_footer"):
-            is_healthy, status_text = inference_health()
-            dot_class = "dot-green" if is_healthy else "dot-red"
+            status_state, status_text = inference_health()
+            dot_class = {
+                "ready": "dot-green",
+                "authentication_rejected": "dot-amber",
+                "contract_invalid": "dot-amber",
+            }.get(status_state, "dot-red")
             st.markdown(
                 "<div class='inference-status'><div class='status-heading'>"
                 f"<span class='status-dot {dot_class}'></span>"

@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+import streamlit as st
 
 from poc.presentation.datasets import (
     _load_frozen_source_distribution,
@@ -23,7 +24,9 @@ from poc.presentation.formatting import (
 from poc.presentation.home import calculate_home_metrics
 from poc.presentation.i18n import PocTranslator
 from poc.presentation.pipeline_page import redact_terminal_line
+from poc.presentation.playground import _run_inference
 from poc.presentation.remediation import filter_threats, partition_delivered_events
+from poc.presentation.resilience import format_probe_evidence
 from poc.presentation.result import confidence_bar, result_style
 from poc.presentation.theme import initialize_theme, load_theme_css, set_theme
 
@@ -189,6 +192,76 @@ def test_poc_stylesheet_keeps_button_tooltips_high_contrast() -> None:
     assert '[role="tooltip"]' in stylesheet
     assert "background-color: #10243E !important" in stylesheet
     assert "color: #FFFFFF !important" in stylesheet
+
+
+def test_resilience_evidence_redacts_auth_and_exposes_wire_contract() -> None:
+    translations = {
+        "resilience_request": "requête",
+        "resilience_response": "réponse",
+        "resilience_decision": "décision",
+        "resilience_validation": "validation",
+        "resilience_detail": "détail",
+        "resilience_outcome": "conséquence",
+        "resilience_expected": "Attendu",
+        "resilience_observed": "Observé",
+        "resilience_validation_rejected": "Rejeté",
+        "resilience_detail_required_fields_missing_or_invalid": "Champs invalides.",
+        "resilience_outcome_response_rejected_not_persisted": "Non enregistré.",
+    }
+    translate = lambda key: translations.get(key, key)  # noqa: E731
+
+    rendered = format_probe_evidence(
+        {
+            "request_method": "POST",
+            "request_path": "/v1/classify",
+            "request_body": {"text": "synthetic"},
+            "response_status": 200,
+            "response_body": {"unexpected": True},
+            "validation": "rejected",
+            "validation_detail": "required_fields_missing_or_invalid",
+            "application_outcome": "response_rejected_not_persisted",
+            "expected": "contract_rejected",
+            "observed": "contract_rejected",
+        },
+        translate,
+    )
+
+    assert '"Authorization": "Bearer [REDACTED]"' in rendered
+    assert '"status": 200' in rendered
+    assert '"unexpected": true' in rendered
+    assert "Non enregistré." in rendered
+
+
+def test_failed_playground_inference_is_not_persisted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    persisted: list[dict[str, object]] = []
+
+    class Spinner:
+        def __enter__(self) -> None:
+            return None
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    monkeypatch.setattr(st, "spinner", lambda _label: Spinner())
+    monkeypatch.setattr(st, "rerun", lambda: pytest.fail("failed inference reran the app"))
+
+    _run_inference(
+        subject="Test local",
+        sender="probe@sicurre.test",
+        text="Corps synthétique",
+        expected_label=None,
+        context="playground",
+        user_email="admin@example.test",
+        use_llm=False,
+        use_virustotal=False,
+        classify=lambda *_args, **_kwargs: None,
+        persist=lambda **evidence: persisted.append(evidence),
+        translate=lambda key: key,
+    )
+
+    assert persisted == []
 
 
 def test_home_metrics_distinguish_safety_and_classifier_quality() -> None:

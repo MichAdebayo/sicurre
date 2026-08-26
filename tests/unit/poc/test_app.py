@@ -6,7 +6,7 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 from poc import config, local_runtime
-from poc.inference import FaultProbeResult, PocInferenceClient
+from poc.inference import FaultProbeResult, FaultScenario, PocInferenceClient
 
 APP_PATH = Path(__file__).resolve().parents[3] / "src" / "poc" / "app.py"
 
@@ -135,11 +135,30 @@ def poc_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AppTest:
     from poc.presentation import pipeline_page
 
     monkeypatch.setattr(pipeline_page, "stream_operation", mock_stream_operation)
-    monkeypatch.setattr(PocInferenceClient, "health", lambda self: (True, "Prêt"))
+    monkeypatch.setattr(
+        PocInferenceClient,
+        "health",
+        lambda self: (True, "inference_health_ready"),
+    )
     monkeypatch.setattr(
         PocInferenceClient,
         "run_fault_probe",
         lambda self, scenario: FaultProbeResult(scenario, "401", "401", True),
+    )
+    monkeypatch.setattr(
+        PocInferenceClient,
+        "run_recovery_probe",
+        lambda self: FaultProbeResult(
+            FaultScenario.INVALID_CONTRACT,
+            "contract_accepted",
+            "contract_accepted",
+            True,
+            response_status=200,
+            response_body={"verdict": "safe", "label_verdict": "legitimate"},
+            validation="accepted",
+            validation_detail="required_fields_accepted",
+            application_outcome="recovery_verified_not_persisted",
+        ),
     )
 
     environment = {

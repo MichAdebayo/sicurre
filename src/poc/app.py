@@ -183,9 +183,14 @@ def update_display_name(user_id: str, display_name: str) -> None:
     AUTH_STORE.execute("UPDATE poc_user SET display_name = ? WHERE id = ?", (display_name, user_id))
 
 
-def inference_status() -> tuple[bool, str]:
+def inference_status() -> tuple[str, str]:
     healthy, status_key = INFERENCE_CLIENT.health()
-    return healthy, tr(status_key)
+    states = {
+        "inference_health_ready": "ready",
+        "inference_health_rejected": "authentication_rejected",
+        "inference_health_unexpected": "contract_invalid",
+    }
+    return states.get(status_key, "unreachable"), tr(status_key)
 
 
 def classify_email(
@@ -327,6 +332,7 @@ elif page == "nav_resilience":
         tr,
         inference_status,
         INFERENCE_CLIENT.run_fault_probe,
+        INFERENCE_CLIENT.run_recovery_probe,
         INFERENCE_GATEWAY.inject,
         INFERENCE_GATEWAY.restore,
         lambda: INFERENCE_GATEWAY.active_scenario,
@@ -334,7 +340,8 @@ elif page == "nav_resilience":
 
 # ── Paramètres ────────────────────────────────────────────────────────────────
 elif page == "nav_settings":
-    runtime_ready, _ = inference_status()
+    runtime_state, _ = inference_status()
+    runtime_ready = runtime_state == "ready"
     render_settings(
         user,
         tr,

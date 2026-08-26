@@ -78,6 +78,45 @@ def test_invalid_contract_probe_records_safe_rejection(
     result = PocInferenceClient(configured_settings).run_fault_probe(FaultScenario.INVALID_CONTRACT)
     assert result.passed
     assert result.observed == "contract_rejected"
+    assert result.response_status == 200
+    assert result.response_body == {"unexpected": True}
+    assert result.validation == "rejected"
+    assert result.application_outcome == "response_rejected_not_persisted"
+    assert result.request_body == {
+        "subject": "Contrôle de résilience Sicurre",
+        "sender": "probe@sicurre.test",
+        "text": "Message local synthétique sans donnée utilisateur.",
+        "use_llm": False,
+        "use_virustotal": False,
+    }
+
+
+@respx.mock
+def test_recovery_probe_requires_a_valid_response_contract(
+    configured_settings: PocSettings,
+) -> None:
+    route = respx.post(configured_settings.inference_api_url)
+    route.mock(return_value=httpx.Response(200, json={"unexpected": True}))
+    client = PocInferenceClient(configured_settings)
+
+    failed = client.run_recovery_probe()
+    assert not failed.passed
+    assert failed.application_outcome == "recovery_failed"
+
+    route.mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "verdict": "safe",
+                "label_verdict": "legitimate",
+                "is_phishing": False,
+            },
+        )
+    )
+    recovered = client.run_recovery_probe()
+    assert recovered.passed
+    assert recovered.validation == "accepted"
+    assert recovered.application_outcome == "recovery_verified_not_persisted"
 
 
 @respx.mock
