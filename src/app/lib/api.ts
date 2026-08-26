@@ -367,7 +367,9 @@ export function useSignup() {
         name: payload.name,
         email: payload.email,
         password: payload.password,
-        callbackURL: `${window.location.origin}/`,
+        // Marked so the app can confirm verification even when the session
+        // cookie set on the verify-email response never reaches the browser.
+        callbackURL: `${window.location.origin}/?verified=1`,
         fetchOptions: payload.turnstileToken
           ? { headers: { "x-turnstile-token": payload.turnstileToken } }
           : undefined,

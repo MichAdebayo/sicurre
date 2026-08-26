@@ -13,9 +13,11 @@ import {
   sidebarPagePaths,
 } from "./lib/navigation";
 import { useTranslation } from "react-i18next";
+import { parseVerificationCallback } from "./lib/email-verification";
 
 const LandingRoute = lazy(() => import("./routes/landing"));
 const LoginRoute = lazy(() => import("./routes/login"));
+const VerifyEmailRoute = lazy(() => import("./routes/verify-email"));
 const DashboardRoute = lazy(() => import("./routes/dashboard"));
 const ThreatsRoute = lazy(() => import("./routes/threats"));
 const LogsRoute = lazy(() => import("./routes/logs"));
@@ -29,12 +31,13 @@ const ConfidentialiteRoute = lazy(() => import("./routes/confidentialite"));
 const ContactRoute = lazy(() => import("./routes/contact"));
 const CGURoute = lazy(() => import("./routes/cgu"));
 
-type ViewState = "landing" | "login" | "signup" | "cgu" | "mentions-legales" | "confidentialite" | "contact";
+type ViewState = "landing" | "login" | "signup" | "verify-email" | "cgu" | "mentions-legales" | "confidentialite" | "contact";
 
 const publicViewPaths: Record<ViewState, string> = {
   landing: "/",
   login: "/login",
   signup: "/signup",
+  "verify-email": "/verify-email",
   cgu: "/cgu",
   "mentions-legales": "/mentions-legales",
   confidentialite: "/confidentialite",
@@ -68,7 +71,28 @@ const getInitialLoginState = () => {
   return false;
 };
 
+const consumeVerificationCallback = () => {
+  const callback = parseVerificationCallback(window.location.search);
+  if (callback.status === "none") return callback;
+  const params = new URLSearchParams(window.location.search);
+  params.delete("verified");
+  params.delete("error");
+  const query = params.toString();
+  window.history.replaceState(
+    {},
+    document.title,
+    `${window.location.pathname}${query ? `?${query}` : ""}`,
+  );
+  return callback;
+};
+
+const verificationCallback = consumeVerificationCallback();
+
 const getInitialViewState = (): ViewState => {
+  if (verificationCallback.status !== "none") {
+    sessionStorage.setItem("sicurre_view_state", "login");
+    return "login";
+  }
   const pathView = getViewStateFromPath();
   if (pathView) {
     sessionStorage.setItem("sicurre_view_state", pathView);
@@ -228,6 +252,9 @@ function AppContent() {
   }
 
   if (!hasStoredSession || !session) {
+    if (viewState === "verify-email") {
+      return <VerifyEmailRoute onNavigateToLogin={() => setViewState("login")} />;
+    }
     if (viewState === "landing") {
       return (
         <LandingRoute
@@ -256,6 +283,10 @@ function AppContent() {
         onLoginSuccess={handleLoginSuccess}
         initialMode={viewState === "signup" ? "signup" : "login"}
         onNavigateToLanding={() => setViewState("landing")}
+        emailJustVerified={verificationCallback.status === "verified"}
+        emailVerificationError={
+          verificationCallback.status === "error" ? verificationCallback.reason : undefined
+        }
       />
     );
   }

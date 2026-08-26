@@ -9,9 +9,11 @@ import streamlit as st
 
 from poc.presentation.datasets import (
     _load_frozen_source_distribution,
+    _local_run_time,
+    _reference_provider_rows,
     _source_family,
     _source_label,
-    _source_provider_rows,
+    _training_provider_rows,
 )
 from poc.presentation.formatting import (
     effective_label,
@@ -37,7 +39,8 @@ def test_dataset_source_labels_preserve_real_sources_and_shorten_reconstruction(
     }
     translate = lambda key: translations.get(key, key)  # noqa: E731
 
-    assert _source_label("PhishTank", translate) == "PhishTank"
+    translations["source_provider_phishtank"] = "PhishTank API"
+    assert _source_label("PhishTank API (rejeu local)", translate) == "PhishTank API"
     assert (
         _source_label("reconstructed/current_frozen/native_external", translate)
         == "Recovered external sources"
@@ -80,22 +83,42 @@ def test_frozen_source_distribution_is_validated(tmp_path: Path) -> None:
     assert _load_frozen_source_distribution(metadata) == {"kaggle_multilingual_spam": 4}
 
 
-def test_dataset_provider_rows_make_api_evidence_visible() -> None:
+def test_dataset_provider_rows_separate_training_and_reference_evidence() -> None:
     sources = [
         {
             "name": "reconstructed/current_frozen/native_external",
             "source_type": "manual",
             "total_records": 6,
+            "reference_records": 0,
         },
-        {"name": "PhishTank API (rejeu local)", "source_type": "api", "total_records": 3},
-        {"name": "sekoia-community-ioc", "source_type": "scraping", "total_records": 2},
+        {
+            "name": "PhishTank API (rejeu local)",
+            "source_type": "api",
+            "total_records": 3,
+            "reference_records": 3,
+        },
+        {
+            "name": "sekoia-community-ioc",
+            "source_type": "scraping",
+            "total_records": 2,
+            "reference_records": 2,
+        },
     ]
     frozen = {"kaggle_multilingual_spam": 4, "common-crawl-bigdata": 1}
 
-    rows = _source_provider_rows(sources, frozen)
-    totals = {row["provider"]: row["count"] for row in rows}
+    training_totals = {row["provider"]: row["count"] for row in _training_provider_rows(frozen)}
+    reference_totals = {
+        row["provider"]: row["count"] for row in _reference_provider_rows(sources)
+    }
 
-    assert totals == {"kaggle": 4, "phishtank": 3, "sekoia": 2, "common_crawl": 1}
+    assert training_totals == {"kaggle": 4, "common_crawl": 1}
+    assert reference_totals == {"phishtank": 3, "sekoia": 2}
+
+
+def test_run_time_formatting_handles_absent_and_legacy_values() -> None:
+    """Incomplete legacy evidence remains readable without crashing the page."""
+    assert _local_run_time(None) == "-"
+    assert _local_run_time("legacy timestamp") == "legacy timestamp"
 
 
 def test_presentation_formatting_preserves_existing_contract() -> None:
