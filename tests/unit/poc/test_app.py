@@ -212,11 +212,11 @@ def test_resilience_page_exposes_selectable_real_fault_evidence(poc_app: AppTest
     assert any(selectbox.label == "Scénario à exercer" for selectbox in poc_app.selectbox)
     inject = next(button for button in poc_app.button if button.label == "Injecter la panne")
     inject.click().run()
-    assert any("Panne active" in warning.value for warning in poc_app.warning)
+    assert any("Panne active" in error.value for error in poc_app.error)
 
     open_page(poc_app, "Espace d'essai", "nav_playground")
     open_page(poc_app, "Résilience", "nav_resilience")
-    assert any("Panne active" in warning.value for warning in poc_app.warning)
+    assert any("Panne active" in error.value for error in poc_app.error)
     assert next(button for button in poc_app.button if button.label == "Injecter la panne").disabled
     restore = next(button for button in poc_app.button if button.label == "Rétablir le service")
     restore.click().run()

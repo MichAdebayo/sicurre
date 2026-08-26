@@ -117,7 +117,7 @@ def render_resilience(
         return
     phase = str(incident.get("phase"))
     if phase == "fault_active" and bool(incident.get("passed")):
-        st.warning(translate("resilience_fault_confirmed"))
+        st.error(translate("resilience_fault_confirmed"))
     elif phase == "recovered" and bool(incident.get("recovered")):
         st.success(translate("resilience_recovered"))
     else:
