@@ -143,12 +143,12 @@ def poc_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AppTest:
     monkeypatch.setattr(
         PocInferenceClient,
         "run_fault_probe",
-        lambda self, scenario: FaultProbeResult(scenario, "401", "401", True),
+        lambda self, scenario, emit=None: FaultProbeResult(scenario, "401", "401", True),
     )
     monkeypatch.setattr(
         PocInferenceClient,
         "run_recovery_probe",
-        lambda self: FaultProbeResult(
+        lambda self, emit=None: FaultProbeResult(
             FaultScenario.INVALID_CONTRACT,
             "contract_accepted",
             "contract_accepted",
