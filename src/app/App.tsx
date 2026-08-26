@@ -13,9 +13,11 @@ import {
   sidebarPagePaths,
 } from "./lib/navigation";
 import { useTranslation } from "react-i18next";
+import { parseVerificationCallback } from "./lib/email-verification";
 
 const LandingRoute = lazy(() => import("./routes/landing"));
 const LoginRoute = lazy(() => import("./routes/login"));
+const VerifyEmailRoute = lazy(() => import("./routes/verify-email"));
 const DashboardRoute = lazy(() => import("./routes/dashboard"));
 const ThreatsRoute = lazy(() => import("./routes/threats"));
 const LogsRoute = lazy(() => import("./routes/logs"));
@@ -29,12 +31,13 @@ const ConfidentialiteRoute = lazy(() => import("./routes/confidentialite"));
 const ContactRoute = lazy(() => import("./routes/contact"));
 const CGURoute = lazy(() => import("./routes/cgu"));
 
-type ViewState = "landing" | "login" | "signup" | "cgu" | "mentions-legales" | "confidentialite" | "contact";
+type ViewState = "landing" | "login" | "signup" | "verify-email" | "cgu" | "mentions-legales" | "confidentialite" | "contact";
 
 const publicViewPaths: Record<ViewState, string> = {
   landing: "/",
   login: "/login",
   signup: "/signup",
+  "verify-email": "/verify-email",
   cgu: "/cgu",
   "mentions-legales": "/mentions-legales",
   confidentialite: "/confidentialite",
@@ -68,29 +71,25 @@ const getInitialLoginState = () => {
   return false;
 };
 
-// Verification returns here with ?verified=1. When the session cookie set on
-// the verify-email response is lost in transit (an edge challenge on
-// /api/auth/* will do it), the user arrives authenticated-in-name-only, so
-// send them to the sign-in form with a confirmation rather than the marketing
-// page, where the only visible control is a Turnstile checkbox that submits
-// nothing.
-const consumeEmailVerifiedFlag = (): boolean => {
+const consumeVerificationCallback = () => {
+  const callback = parseVerificationCallback(window.location.search);
+  if (callback.status === "none") return callback;
   const params = new URLSearchParams(window.location.search);
-  if (params.get("verified") !== "1") return false;
   params.delete("verified");
+  params.delete("error");
   const query = params.toString();
   window.history.replaceState(
     {},
     document.title,
     `${window.location.pathname}${query ? `?${query}` : ""}`,
   );
-  return true;
+  return callback;
 };
 
-const emailJustVerified = consumeEmailVerifiedFlag();
+const verificationCallback = consumeVerificationCallback();
 
 const getInitialViewState = (): ViewState => {
-  if (emailJustVerified) {
+  if (verificationCallback.status !== "none") {
     sessionStorage.setItem("sicurre_view_state", "login");
     return "login";
   }
@@ -253,6 +252,9 @@ function AppContent() {
   }
 
   if (!hasStoredSession || !session) {
+    if (viewState === "verify-email") {
+      return <VerifyEmailRoute onNavigateToLogin={() => setViewState("login")} />;
+    }
     if (viewState === "landing") {
       return (
         <LandingRoute
@@ -281,7 +283,10 @@ function AppContent() {
         onLoginSuccess={handleLoginSuccess}
         initialMode={viewState === "signup" ? "signup" : "login"}
         onNavigateToLanding={() => setViewState("landing")}
-        emailJustVerified={emailJustVerified}
+        emailJustVerified={verificationCallback.status === "verified"}
+        emailVerificationError={
+          verificationCallback.status === "error" ? verificationCallback.reason : undefined
+        }
       />
     );
   }

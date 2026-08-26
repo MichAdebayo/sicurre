@@ -11,9 +11,10 @@ const mocks = vi.hoisted(() => ({
   login: vi.fn(),
   resend: vi.fn(),
 }));
+const translate = (key: string) => key;
 
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({ t: translate }),
 }));
 
 vi.mock("../../../src/app/lib/api", () => ({
@@ -49,6 +50,19 @@ afterEach(() => {
 });
 
 describe("signup verification", () => {
+  it("shows a verified notice only for a successful callback", () => {
+    const { rerender } = render(
+      <LoginRoute onLoginSuccess={vi.fn()} emailJustVerified />,
+    );
+    expect(screen.getByText("login.email_verified_sign_in")).toBeInTheDocument();
+
+    rerender(
+      <LoginRoute onLoginSuccess={vi.fn()} emailVerificationError="expired" />,
+    );
+    expect(screen.getByText("login.verification_expired")).toBeInTheDocument();
+    expect(screen.queryByText("login.email_verified_sign_in")).not.toBeInTheDocument();
+  });
+
   it("asks the user to verify email instead of entering the app", async () => {
     mocks.signup.mockResolvedValue({ user: { email: "new@example.test" }, token: null });
     const onLoginSuccess = vi.fn();

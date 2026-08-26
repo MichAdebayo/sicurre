@@ -17,6 +17,7 @@ interface LoginRouteProps {
   initialMode?: "login" | "signup";
   onNavigateToLanding?: () => void;
   emailJustVerified?: boolean;
+  emailVerificationError?: "expired" | "invalid";
 }
 
 const getAuthFailureReason = (error: unknown, fallback: AuthFailureReason): AuthFailureReason => {
@@ -31,6 +32,7 @@ export default function LoginRoute({
   initialMode = "login",
   onNavigateToLanding,
   emailJustVerified = false,
+  emailVerificationError,
 }: LoginRouteProps) {
   const { t } = useTranslation();
   const [isSignUp, setIsSignUp] = useState(initialMode === "signup");
@@ -38,7 +40,9 @@ export default function LoginRoute({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [authError, setAuthError] = useState("");
+  const [authError, setAuthError] = useState(
+    emailVerificationError ? t(`login.verification_${emailVerificationError}`) : "",
+  );
   const [authNotice, setAuthNotice] = useState(
     emailJustVerified ? t("login.email_verified_sign_in") : "",
   );
@@ -60,11 +64,11 @@ export default function LoginRoute({
 
   useEffect(() => {
     setIsSignUp(initialMode === "signup");
-    setAuthError("");
-    setAuthNotice("");
+    setAuthError(emailVerificationError ? t(`login.verification_${emailVerificationError}`) : "");
+    setAuthNotice(emailJustVerified ? t("login.email_verified_sign_in") : "");
     setVerificationEmailSent(false);
     setTurnstileToken("");
-  }, [initialMode]);
+  }, [emailJustVerified, emailVerificationError, initialMode, t]);
 
   useEffect(() => {
     if (!isSignUp || turnstileConfig.status !== "idle") return;
@@ -172,7 +176,7 @@ export default function LoginRoute({
     try {
       const result = await authClient.sendVerificationEmail({
         email,
-        callbackURL: `${window.location.origin}/?verified=1`,
+        callbackURL: `${window.location.origin}/login?verified=1`,
       });
       if (result.error) throw new Error("VERIFICATION_EMAIL_FAILED");
       setAuthNotice("Un nouveau lien de vérification vient d’être envoyé.");

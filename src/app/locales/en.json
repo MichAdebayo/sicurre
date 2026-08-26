@@ -22,6 +22,8 @@
   },
   "login": {
     "email_verified_sign_in": "Your email address is confirmed. Sign in to reach your workspace.",
+    "verification_expired": "This verification link has expired. Request a new link from the sign-in page.",
+    "verification_invalid": "This verification link is invalid or has already been used.",
     "title": "Sign in to your Sicurre account",
     "subtitle": "Your emails, protected in 2 seconds.",
     "email_label": "Professional email address",
@@ -43,6 +45,13 @@
       "login_failed": "Sign-in is unavailable right now. Check your details or try again in a moment.",
       "signup_failed": "Account creation is unavailable right now. Check your details or try again in a moment."
     }
+  },
+  "verify_email": {
+    "title": "Confirm your email address",
+    "description": "Confirm that you requested this action to activate your Sicurre account.",
+    "confirm": "Confirm my address",
+    "invalid_link": "This link does not contain a valid verification token. Request a new link from the sign-in page.",
+    "back_to_login": "Back to sign in"
   },
   "sidebar": {
     "status_active": "Shield Active",
