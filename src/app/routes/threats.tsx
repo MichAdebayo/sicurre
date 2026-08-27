@@ -433,7 +433,7 @@ export default function ThreatsRoute() {
                 setCurrentPage(1);
               }}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${filterVerdict === v
-                  ? "bg-primary text-on-primary border-primary shadow-sm"
+                  ? "bg-navy-dark text-on-primary border-navy-dark shadow-sm"
                   : "bg-white text-on-surface-variant hover:bg-surface-low border-border-subtle"
                 }`}
             >

@@ -17,7 +17,7 @@ const toneStyles: Record<AppToastTone, string> = {
   success: "bg-safe text-white",
   error: "bg-error text-on-error",
   warning: "bg-warning text-white dark:bg-[#F59E0B] dark:text-slate-950",
-  info: "bg-primary text-on-primary",
+  info: "bg-navy-dark text-on-primary",
 };
 
 const toneIcons = {
