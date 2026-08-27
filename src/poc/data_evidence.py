@@ -45,7 +45,6 @@ class PocDataEvidenceStore:
         for attempt in range(self._retries):
             try:
                 with self.engine.connect() as connection:
-                    connection.execute(text("PRAGMA journal_mode=WAL"))
                     result = connection.execute(text(query), params or {})
                     return [dict(row._mapping) for row in result]
             except OperationalError as error:
@@ -66,3 +65,24 @@ class PocDataEvidenceStore:
             return 0
         rows = self.query(f'SELECT COUNT(*) AS cnt FROM "{table_name}"')
         return int(rows[0]["cnt"]) if rows else 0
+
+    def integrity_status(self) -> tuple[bool, int]:
+        """Return SQLite integrity and foreign-key violation evidence."""
+        integrity = self.query("PRAGMA integrity_check")
+        foreign_key_errors = self.query("PRAGMA foreign_key_check")
+        is_valid = bool(integrity) and next(iter(integrity[0].values()), "") == "ok"
+        return is_valid, len(foreign_key_errors)
+
+    def latest_incremental_run_id(self) -> str | None:
+        """Return the newest non-reconstructed ingestion-run identifier."""
+        rows = self.query(
+            """
+            SELECT ir.id
+            FROM data_ingestion_run ir
+            JOIN data_source_system ss ON ss.id = ir.source_system_id
+            WHERE ss.name NOT LIKE 'reconstructed/%'
+            ORDER BY datetime(COALESCE(ir.finished_at, ir.started_at)) DESC
+            LIMIT 1
+            """
+        )
+        return str(rows[0]["id"]) if rows else None

@@ -1,4 +1,4 @@
-"""Sicurre POC — Pipeline runner subprocess helper.
+"""Sicurre POC: pipeline runner subprocess helper.
 
 Runs Makefile targets as subprocesses and yields structured JSON trace lines
 back to the Streamlit app for real-time rendering.

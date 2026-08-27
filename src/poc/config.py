@@ -70,17 +70,21 @@ class PocSettings(BaseSettings):
         default="Utilisateur Démo",
         validation_alias="SICURRE_POC_VIEWER_NAME",
     )
-    allow_external_writes: bool = Field(
+    allow_staging_publication: bool = Field(
         default=False,
-        validation_alias="SICURRE_POC_ALLOW_EXTERNAL_WRITES",
+        validation_alias="SICURRE_POC_ALLOW_STAGING_PUBLICATION",
     )
     allow_ml_dispatch: bool = Field(
         default=False,
         validation_alias="SICURRE_POC_ALLOW_ML_DISPATCH",
     )
-    r2_prefix: str = Field(
+    snapshot_prefix: str = Field(
         default="demonstrations/poc",
-        validation_alias="SICURRE_POC_R2_PREFIX",
+        validation_alias="SICURRE_POC_SNAPSHOT_PREFIX",
+    )
+    snapshot_dir: Path = Field(
+        default=LOCAL_DATA_DIR / "poc" / "snapshots",
+        validation_alias="SICURRE_POC_SNAPSHOT_DIR",
     )
     kaggle_dataset_slug: str | None = Field(
         default=None,
@@ -101,15 +105,17 @@ class PocSettings(BaseSettings):
         parsed = urlsplit(value)
         if parsed.scheme not in {"http", "https"} or parsed.path.rstrip("/") != "/v1/classify":
             raise ValueError("SICURRE_POC_INFERENCE_API_URL must end with /v1/classify.")
+        if parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
+            raise ValueError("SICURRE_POC_INFERENCE_API_URL must target the local machine.")
         return value.rstrip("/")
 
-    @field_validator("r2_prefix")
+    @field_validator("snapshot_prefix")
     @classmethod
     def validate_demo_prefix(cls, value: str) -> str:
         """Keep POC snapshots outside production cron namespaces."""
         normalized = value.strip().strip("/")
         if not normalized.startswith("demonstrations/"):
-            raise ValueError("SICURRE_POC_R2_PREFIX must start with demonstrations/.")
+            raise ValueError("SICURRE_POC_SNAPSHOT_PREFIX must start with demonstrations/.")
         return normalized
 
     @property

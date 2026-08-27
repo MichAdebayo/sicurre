@@ -28,6 +28,33 @@ from core.rate_limit import limiter
 from core.secret_cipher import decrypt_secret
 from data_platform.api.auth import AuthUser, get_current_user
 from data_platform.api.auth import async_query as auth_query
+from data_platform.api.schemas.app_responses import (
+    AdminDomainPageResponse,
+    AdminOverviewResponse,
+    AdminRuntimeHealthResponse,
+    AlertHistoryResponse,
+    AlertPreferenceResponse,
+    AuthSessionResponse,
+    CloudflareIntegrationResponse,
+    DatasetSummaryResponse,
+    DmarcImportResponse,
+    DmarcSummaryResponse,
+    DomainShieldResponse,
+    FeedbackResponse,
+    KpiResponse,
+    OperationalExerciseResponse,
+    OperationalExerciseStateResponse,
+    PipelineRunResponse,
+    QuarantineItemResponse,
+    QuarantineReleaseResponse,
+    QuarantineWhitelistResponse,
+    SecurityRuleResponse,
+    StatusResponse,
+    SupportResponse,
+    ThreatLogResponse,
+    ThreatPageResponse,
+    ThreatVisibilityResponse,
+)
 from data_platform.services.quarantine_delivery import (
     QuarantineDeliveryError,
     prepare_restoration_mime,
@@ -241,12 +268,12 @@ async def async_query_auth_db(query: str, params: tuple = ()) -> list[dict]:
     return await execute_runtime_query(query, params)
 
 
-@router.get("/v1/auth/session")
+@router.get("/v1/auth/session", response_model=AuthSessionResponse)
 async def get_session(current_user: AuthUser = Depends(get_current_user)) -> dict:
     return await _session_payload(current_user)
 
 
-@router.patch("/v1/auth/profile")
+@router.patch("/v1/auth/profile", response_model=AuthSessionResponse)
 async def patch_profile(
     payload: UpdateProfileRequest,
     current_user: AuthUser = Depends(get_current_user),
@@ -272,7 +299,7 @@ async def patch_profile(
     return await _session_payload(refreshed)
 
 
-@router.get("/v1/stats/kpi")
+@router.get("/v1/stats/kpi", response_model=KpiResponse)
 async def get_kpis(
     session: AsyncSession = Depends(get_async_session),
     current_user: AuthUser = Depends(get_current_user),
@@ -341,7 +368,7 @@ def _serialize_threat(row: dict[str, object]) -> dict[str, object]:
     }
 
 
-@router.get("/v1/threats")
+@router.get("/v1/threats", response_model=ThreatPageResponse)
 async def get_threats(
     current_user: AuthUser = Depends(get_current_user),
     page: int = 1,
@@ -432,7 +459,7 @@ async def get_threats(
     }
 
 
-@router.post("/v1/threats/visibility")
+@router.post("/v1/threats/visibility", response_model=ThreatVisibilityResponse)
 async def update_threat_visibility(
     payload: ThreatVisibilityUpdate,
     current_user: AuthUser = Depends(get_current_user),
@@ -453,7 +480,11 @@ async def update_threat_visibility(
     return {"updated": len(existing_ids), "hidden": payload.hidden}
 
 
-@router.post("/v1/threats/{id}/status")
+@router.post(
+    "/v1/threats/{id}/status",
+    response_model=ThreatLogResponse,
+    response_model_exclude_unset=True,
+)
 async def update_threat_status(
     id: str,
     payload: StatusUpdate,
@@ -508,7 +539,7 @@ async def update_threat_status(
         raise HTTPException(status_code=500, detail="Unable to update threat status") from exc
 
 
-@router.post("/v1/feedback", status_code=201)
+@router.post("/v1/feedback", status_code=201, response_model=FeedbackResponse)
 async def create_feedback(
     payload: FeedbackCreate,
     current_user: AuthUser = Depends(get_current_user),
@@ -589,7 +620,7 @@ async def create_feedback(
     }
 
 
-@router.post("/v1/support/requests", status_code=201)
+@router.post("/v1/support/requests", status_code=201, response_model=SupportResponse)
 @limiter.limit("10/hour")
 async def create_support_request(
     request: Request,
@@ -1003,7 +1034,7 @@ def _quarantine_storage_status() -> dict:
     )
 
 
-@router.get("/v1/admin/runtime-health")
+@router.get("/v1/admin/runtime-health", response_model=AdminRuntimeHealthResponse)
 async def get_admin_runtime_health(current_user: AuthUser = Depends(get_current_user)):
     if not current_user.is_platform_admin:
         raise HTTPException(status_code=403, detail="Platform admin access required")
@@ -1038,7 +1069,7 @@ async def get_admin_runtime_health(current_user: AuthUser = Depends(get_current_
     }
 
 
-@router.get("/v1/admin/overview")
+@router.get("/v1/admin/overview", response_model=AdminOverviewResponse)
 async def get_admin_overview(current_user: AuthUser = Depends(get_current_user)):
     if not current_user.is_platform_admin:
         raise HTTPException(status_code=403, detail="Platform admin access required")
@@ -1138,7 +1169,7 @@ async def get_admin_overview(current_user: AuthUser = Depends(get_current_user))
     }
 
 
-@router.get("/v1/admin/domains")
+@router.get("/v1/admin/domains", response_model=AdminDomainPageResponse)
 async def get_admin_domains(
     current_user: AuthUser = Depends(get_current_user),
     page: int = 1,
@@ -1187,7 +1218,11 @@ async def _mark_exercise_recovered(exercise_id: str, duration_seconds: int) -> N
     )
 
 
-@router.get("/v1/admin/operational-exercises")
+@router.get(
+    "/v1/admin/operational-exercises",
+    response_model=OperationalExerciseStateResponse,
+    response_model_exclude_unset=True,
+)
 async def get_operational_exercises(current_user: AuthUser = Depends(get_current_user)):
     """Return active state and recent audit records for platform administrators."""
     if not current_user.is_platform_admin:
@@ -1204,7 +1239,12 @@ async def get_operational_exercises(current_user: AuthUser = Depends(get_current
     }
 
 
-@router.post("/v1/admin/operational-exercises", status_code=201)
+@router.post(
+    "/v1/admin/operational-exercises",
+    status_code=201,
+    response_model=OperationalExerciseResponse,
+    response_model_exclude_unset=True,
+)
 @limiter.limit("2/hour")
 async def start_operational_exercise(
     request: Request,
@@ -1264,7 +1304,11 @@ async def start_operational_exercise(
     return active
 
 
-@router.post("/v1/admin/operational-exercises/{exercise_id}/recover")
+@router.post(
+    "/v1/admin/operational-exercises/{exercise_id}/recover",
+    response_model=OperationalExerciseResponse,
+    response_model_exclude_unset=True,
+)
 @limiter.limit("6/hour")
 async def recover_operational_exercise(
     request: Request,
@@ -1290,7 +1334,7 @@ async def recover_operational_exercise(
     return {**recovered, "status": "recovered", "recovered_at": recovered_at}
 
 
-@router.get("/v1/datasets")
+@router.get("/v1/datasets", response_model=list[DatasetSummaryResponse])
 async def list_datasets_alias(
     session: AsyncSession = Depends(get_async_session),
     current_user: AuthUser = Depends(get_current_user),
@@ -1325,7 +1369,7 @@ def execute_pipeline():
         logger.exception("Scheduled pipeline execution failed")
 
 
-@router.post("/v1/pipeline/run")
+@router.post("/v1/pipeline/run", response_model=PipelineRunResponse)
 async def run_pipeline(
     background_tasks: BackgroundTasks,
     current_user: AuthUser = Depends(get_current_user),
@@ -1382,7 +1426,7 @@ async def _purge_expired_quarantine(workspace_id: str):
     )
 
 
-@router.get("/v1/quarantine")
+@router.get("/v1/quarantine", response_model=list[QuarantineItemResponse])
 async def list_quarantine(current_user: AuthUser = Depends(get_current_user)):
     await _purge_expired_quarantine(current_user.workspace_id)
     rows = await async_query_auth_db(
@@ -1406,7 +1450,11 @@ async def list_quarantine(current_user: AuthUser = Depends(get_current_user)):
     ]
 
 
-@router.post("/v1/quarantine/{id}/release")
+@router.post(
+    "/v1/quarantine/{id}/release",
+    response_model=QuarantineReleaseResponse,
+    response_model_exclude_unset=True,
+)
 async def release_quarantine_item(id: str, current_user: AuthUser = Depends(get_current_user)):
     return await _release_quarantine_item(id=id, current_user=current_user)
 
@@ -1550,7 +1598,7 @@ async def _record_release_feedback(*, item: dict, current_user: AuthUser) -> Non
         )
 
 
-@router.delete("/v1/quarantine/{id}")
+@router.delete("/v1/quarantine/{id}", response_model=StatusResponse)
 async def delete_quarantine_item(id: str, current_user: AuthUser = Depends(get_current_user)):
     rows = await async_query_auth_db(
         "SELECT raw_storage_uri FROM app_quarantine_item WHERE id = ? AND workspace_id = ? LIMIT 1",
@@ -1578,7 +1626,11 @@ async def delete_quarantine_item(id: str, current_user: AuthUser = Depends(get_c
     return {"status": "deleted"}
 
 
-@router.post("/v1/quarantine/{id}/whitelist")
+@router.post(
+    "/v1/quarantine/{id}/whitelist",
+    response_model=QuarantineWhitelistResponse,
+    response_model_exclude_unset=True,
+)
 async def release_and_whitelist_item(id: str, current_user: AuthUser = Depends(get_current_user)):
     rows = await async_query_auth_db(
         "SELECT * FROM app_quarantine_item WHERE id = ? AND workspace_id = ? "
@@ -1609,7 +1661,7 @@ async def release_and_whitelist_item(id: str, current_user: AuthUser = Depends(g
     return {**result, "whitelisted_pattern": sender}
 
 
-@router.get("/v1/alerts/preferences")
+@router.get("/v1/alerts/preferences", response_model=AlertPreferenceResponse)
 async def get_alert_preferences(current_user: AuthUser = Depends(get_current_user)):
     rows = await async_query_auth_db(
         "SELECT * FROM app_alert_preference WHERE workspace_id = ? LIMIT 1",
@@ -1635,7 +1687,7 @@ async def get_alert_preferences(current_user: AuthUser = Depends(get_current_use
     }
 
 
-@router.put("/v1/alerts/preferences")
+@router.put("/v1/alerts/preferences", response_model=StatusResponse)
 async def update_alert_preferences(
     payload: AlertPreferenceUpdate, current_user: AuthUser = Depends(get_current_user)
 ):
@@ -1665,7 +1717,7 @@ async def update_alert_preferences(
     return {"status": "updated"}
 
 
-@router.get("/v1/alerts/rules")
+@router.get("/v1/alerts/rules", response_model=list[SecurityRuleResponse])
 async def list_security_rules(current_user: AuthUser = Depends(get_current_user)):
     rows = await async_query_auth_db(
         "SELECT * FROM app_security_rule WHERE workspace_id = ? ORDER BY created_at DESC",
@@ -1682,7 +1734,11 @@ async def list_security_rules(current_user: AuthUser = Depends(get_current_user)
     ]
 
 
-@router.post("/v1/alerts/rules")
+@router.post(
+    "/v1/alerts/rules",
+    response_model=SecurityRuleResponse,
+    response_model_exclude_unset=True,
+)
 async def create_security_rule(
     payload: SecurityRuleCreate, current_user: AuthUser = Depends(get_current_user)
 ):
@@ -1695,7 +1751,7 @@ async def create_security_rule(
     return {"id": rule_id, "rule_type": payload.rule_type, "pattern": payload.pattern}
 
 
-@router.delete("/v1/alerts/rules/{id}")
+@router.delete("/v1/alerts/rules/{id}", response_model=StatusResponse)
 async def delete_security_rule(id: str, current_user: AuthUser = Depends(get_current_user)):
     rows = await async_query_auth_db(
         "SELECT 1 FROM app_security_rule WHERE id = ? AND workspace_id = ? LIMIT 1",
@@ -1710,7 +1766,7 @@ async def delete_security_rule(id: str, current_user: AuthUser = Depends(get_cur
     return {"status": "deleted"}
 
 
-@router.get("/v1/alerts/history")
+@router.get("/v1/alerts/history", response_model=list[AlertHistoryResponse])
 async def list_alert_history(current_user: AuthUser = Depends(get_current_user)):
     rows = await async_query_auth_db(
         "SELECT * FROM app_alert_history WHERE workspace_id = ? AND is_dismissed = 0 ORDER BY created_at DESC LIMIT 50",
@@ -1727,7 +1783,7 @@ async def list_alert_history(current_user: AuthUser = Depends(get_current_user))
     ]
 
 
-@router.post("/v1/alerts/history/{id}/dismiss")
+@router.post("/v1/alerts/history/{id}/dismiss", response_model=StatusResponse)
 async def dismiss_alert(id: str, current_user: AuthUser = Depends(get_current_user)):
     rows = await async_query_auth_db(
         "SELECT 1 FROM app_alert_history WHERE id = ? AND workspace_id = ? LIMIT 1",
@@ -1742,7 +1798,10 @@ async def dismiss_alert(id: str, current_user: AuthUser = Depends(get_current_us
     return {"status": "dismissed"}
 
 
-@router.get("/v1/integrations/cloudflare/list")
+@router.get(
+    "/v1/integrations/cloudflare/list",
+    response_model=list[CloudflareIntegrationResponse],
+)
 async def list_cloudflare_integrations(current_user: AuthUser = Depends(get_current_user)):
     rows = await async_query_auth_db(
         "SELECT * FROM cloudflare_integration WHERE workspace_id = ? ORDER BY created_at DESC",
@@ -1857,7 +1916,11 @@ async def _check_domain_blacklists(
     return listed_on, unavailable
 
 
-@router.get("/v1/domain-shield/{domain}/status")
+@router.get(
+    "/v1/domain-shield/{domain}/status",
+    response_model=DomainShieldResponse,
+    response_model_exclude_unset=True,
+)
 async def check_domain_shield_status(
     domain: str, refresh: bool = False, current_user: AuthUser = Depends(get_current_user)
 ):
@@ -2232,7 +2295,10 @@ async def check_domain_shield_status(
     return status
 
 
-@router.get("/v1/domain-shield/{domain}/dmarc-reports")
+@router.get(
+    "/v1/domain-shield/{domain}/dmarc-reports",
+    response_model=DmarcSummaryResponse,
+)
 async def get_dmarc_report_summary(
     domain: str,
     current_user: AuthUser = Depends(get_current_user),
@@ -2287,7 +2353,10 @@ async def get_dmarc_report_summary(
     }
 
 
-@router.post("/v1/domain-shield/{domain}/dmarc-reports/import")
+@router.post(
+    "/v1/domain-shield/{domain}/dmarc-reports/import",
+    response_model=DmarcImportResponse,
+)
 async def import_dmarc_report(
     domain: str,
     request: Request,

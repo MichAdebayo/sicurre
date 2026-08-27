@@ -32,5 +32,6 @@ make test-unit
 make test-integration
 make app-stack-smoke
 make data-platform-staging-smoke
-make test-inference
+make poc-inference-smoke
+make poc-ui-smoke
 ```

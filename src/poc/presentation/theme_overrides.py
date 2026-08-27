@@ -165,7 +165,8 @@ div[data-testid="stFormSubmitButton"] button:active * { color: var(--cta-text) !
 [data-testid="stSidebarCollapseButton"] button svg,
 [data-testid="stSidebarCollapsedControl"] button svg,
 [data-testid="stSidebarCollapseButton"] [data-testid="stIconMaterial"],
-[data-testid="stSidebarCollapsedControl"] [data-testid="stIconMaterial"] {
+[data-testid="stSidebarCollapsedControl"] [data-testid="stIconMaterial"],
+button[data-testid="stExpandSidebarButton"] [data-testid="stIconMaterial"] {
   fill: #FFFFFF !important;
   color: #FFFFFF !important;
 }

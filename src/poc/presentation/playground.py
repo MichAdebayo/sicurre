@@ -74,12 +74,17 @@ def render_playground(
     persist: PersistInference,
     render_result: Callable[[dict[str, Any]], None],
 ) -> None:
-    """Render the three-mode local inference evidence journey."""
+    """Render real local inference and deterministic simulation journeys."""
     st.title(translate("playground_title"))
     st.caption(translate("playground_subtitle"))
-    modes = [InferenceMode.LIVE, InferenceMode.SIMULATION, InferenceMode.INCIDENT]
+    modes = [InferenceMode.LIVE, InferenceMode.SIMULATION]
     labels = {mode: translate(f"inference_mode_{mode.value}") for mode in modes}
-    current = InferenceMode(st.session_state.get("inference_mode", InferenceMode.LIVE.value))
+    stored_mode = st.session_state.get("inference_mode", InferenceMode.LIVE.value)
+    current = (
+        InferenceMode(stored_mode)
+        if stored_mode in {mode.value for mode in modes}
+        else InferenceMode.LIVE
+    )
     selected = st.segmented_control(
         translate("inference_mode"),
         options=modes,
@@ -91,12 +96,8 @@ def render_playground(
     st.session_state["inference_mode"] = selected.value
     st.caption(translate(f"inference_mode_{selected.value}_help"))
 
-    st.markdown("<div style='margin-bottom:8px;'></div>", unsafe_allow_html=True)
-    llm_column, virustotal_column = st.columns(2)
-    with llm_column:
-        use_llm = st.checkbox(translate("enable_llm"), value=True, key="pg_use_llm")
-    with virustotal_column:
-        use_virustotal = st.checkbox(translate("enable_vt"), value=True, key="pg_use_vt")
+    use_llm = False
+    use_virustotal = False
     st.markdown("---")
 
     left, right = st.columns([1, 1])

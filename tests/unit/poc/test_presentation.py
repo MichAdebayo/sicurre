@@ -5,12 +5,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+import streamlit as st
 
 from poc.presentation.datasets import (
     _load_frozen_source_distribution,
+    _local_run_time,
+    _reference_provider_rows,
     _source_family,
-    _source_family_rows,
     _source_label,
+    _training_provider_rows,
 )
 from poc.presentation.formatting import (
     effective_label,
@@ -23,6 +26,7 @@ from poc.presentation.formatting import (
 from poc.presentation.home import calculate_home_metrics
 from poc.presentation.i18n import PocTranslator
 from poc.presentation.pipeline_page import redact_terminal_line
+from poc.presentation.playground import _run_inference
 from poc.presentation.remediation import filter_threats, partition_delivered_events
 from poc.presentation.result import confidence_bar, result_style
 from poc.presentation.theme import initialize_theme, load_theme_css, set_theme
@@ -35,7 +39,8 @@ def test_dataset_source_labels_preserve_real_sources_and_shorten_reconstruction(
     }
     translate = lambda key: translations.get(key, key)  # noqa: E731
 
-    assert _source_label("PhishTank", translate) == "PhishTank"
+    translations["source_provider_phishtank"] = "PhishTank API"
+    assert _source_label("PhishTank API (rejeu local)", translate) == "PhishTank API"
     assert (
         _source_label("reconstructed/current_frozen/native_external", translate)
         == "Recovered external sources"
@@ -78,27 +83,42 @@ def test_frozen_source_distribution_is_validated(tmp_path: Path) -> None:
     assert _load_frozen_source_distribution(metadata) == {"kaggle_multilingual_spam": 4}
 
 
-def test_dataset_family_rows_conserve_frozen_base_and_add_live_lineage() -> None:
+def test_dataset_provider_rows_separate_training_and_reference_evidence() -> None:
     sources = [
         {
             "name": "reconstructed/current_frozen/native_external",
             "source_type": "manual",
             "total_records": 6,
+            "reference_records": 0,
         },
-        {"name": "PhishTank", "source_type": "api", "total_records": 3},
-        {"name": "SEKOIA Community IOC", "source_type": "scraping", "total_records": 2},
+        {
+            "name": "PhishTank API (rejeu local)",
+            "source_type": "api",
+            "total_records": 3,
+            "reference_records": 3,
+        },
+        {
+            "name": "sekoia-community-ioc",
+            "source_type": "scraping",
+            "total_records": 2,
+            "reference_records": 2,
+        },
     ]
-    frozen = {
-        "kaggle_multilingual_spam": 4,
-        "common-crawl-bigdata": 1,
-        "sap-labs-blog": 1,
+    frozen = {"kaggle_multilingual_spam": 4, "common-crawl-bigdata": 1}
+
+    training_totals = {row["provider"]: row["count"] for row in _training_provider_rows(frozen)}
+    reference_totals = {
+        row["provider"]: row["count"] for row in _reference_provider_rows(sources)
     }
 
-    rows = _source_family_rows(sources, frozen)
-    totals = {row["family"]: row["count"] for row in rows}
+    assert training_totals == {"kaggle": 4, "common_crawl": 1}
+    assert reference_totals == {"phishtank": 3, "sekoia": 2}
 
-    assert totals == {"file": 4, "api": 3, "scraping": 3, "bigdata": 1}
-    assert sum(totals.values()) == sum(frozen.values()) + 5
+
+def test_run_time_formatting_handles_absent_and_legacy_values() -> None:
+    """Incomplete legacy evidence remains readable without crashing the page."""
+    assert _local_run_time(None) == "-"
+    assert _local_run_time("legacy timestamp") == "legacy timestamp"
 
 
 def test_presentation_formatting_preserves_existing_contract() -> None:
@@ -187,6 +207,47 @@ def test_theme_stylesheet_rejects_missing_override_marker(tmp_path: Path) -> Non
         load_theme_css(path)
 
 
+def test_poc_stylesheet_keeps_button_tooltips_high_contrast() -> None:
+    """Button help must not inherit the low-contrast dropdown menu palette."""
+    stylesheet = Path("src/poc/assets/poc.css").read_text(encoding="utf-8")
+
+    assert '[role="tooltip"]' in stylesheet
+    assert "background-color: #10243E !important" in stylesheet
+    assert "color: #FFFFFF !important" in stylesheet
+
+
+def test_failed_playground_inference_is_not_persisted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    persisted: list[dict[str, object]] = []
+
+    class Spinner:
+        def __enter__(self) -> None:
+            return None
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    monkeypatch.setattr(st, "spinner", lambda _label: Spinner())
+    monkeypatch.setattr(st, "rerun", lambda: pytest.fail("failed inference reran the app"))
+
+    _run_inference(
+        subject="Test local",
+        sender="probe@sicurre.test",
+        text="Corps synthétique",
+        expected_label=None,
+        context="playground",
+        user_email="admin@example.test",
+        use_llm=False,
+        use_virustotal=False,
+        classify=lambda *_args, **_kwargs: None,
+        persist=lambda **evidence: persisted.append(evidence),
+        translate=lambda key: key,
+    )
+
+    assert persisted == []
+
+
 def test_home_metrics_distinguish_safety_and_classifier_quality() -> None:
     """Home evidence separates remediation outcomes from model labels."""
     events = [
@@ -219,7 +280,16 @@ def test_home_metrics_distinguish_safety_and_classifier_quality() -> None:
     assert metrics.false_positives == 0
     assert metrics.false_negatives == 1
     assert metrics.label_accuracy == pytest.approx(66.67, rel=0.01)
-    assert metrics.latency_p95_ms == 200
+    assert metrics.latency_p95_ms == 300
+
+
+def test_home_latency_uses_only_real_successful_inference() -> None:
+    events = [
+        {"latency_ms": 120, "inference_source": "live"},
+        {"latency_ms": 900, "inference_source": "simulation"},
+        {"latency_ms": 0, "inference_source": "live"},
+    ]
+    assert calculate_home_metrics(events).latency_p95_ms == 120
 
 
 def test_remediation_partitions_delivered_mail_and_honors_overrides() -> None:
