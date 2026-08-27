@@ -78,11 +78,13 @@
 
   /* ── Semantic Verdict Colors (from brand-identity.md) ── */
   --color-safe: #047857;
+  --color-on-safe: #ffffff;
   --color-safe-bg: #ecfdf5;
   --color-danger: #ef4444;
   --color-danger-bg: #fef2f2;
   /* Deep foreground in light mode; bright amber is reserved for dark surfaces. */
   --color-warning: #b45309;
+  --color-on-warning: #ffffff;
   --color-warning-bg: #fffbeb;
   --color-spam-text: #7a4700;
 
@@ -451,9 +453,11 @@ html.dark {
   --color-on-error-container: #ffe1e1;
   --color-safe-bg: #0d2c24;
   --color-safe: #34d399;
+  --color-on-safe: #06111f;
   --color-danger-bg: #3a1215;
   --color-warning-bg: #332508;
   --color-warning: #f59e0b;
+  --color-on-warning: #06111f;
   --color-spam-text: #fbbf24;
 }
 

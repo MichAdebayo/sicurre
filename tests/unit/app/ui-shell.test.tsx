@@ -176,3 +176,145 @@ describe("application toast", () => {
     vi.useRealTimers();
   });
 });
+
+describe("workspace context in the rail", () => {
+  it("reports a protected workspace with its analysed-email count", () => {
+    render(
+      <Sidebar
+        currentPage="dashboard"
+        onPageChange={vi.fn()}
+        onLogout={vi.fn()}
+        userRole="owner"
+        workspaceName="vinse.app"
+        threatCount={33}
+        hasIntegration
+      />,
+    );
+
+    expect(screen.getByText("vinse.app")).toBeInTheDocument();
+    expect(screen.getByText("sidebar.status_protected")).toBeInTheDocument();
+    expect(screen.getByText("sidebar.emails_analysed")).toBeInTheDocument();
+  });
+
+  it("reports setup as outstanding while onboarding is incomplete", () => {
+    render(
+      <Sidebar
+        currentPage="settings"
+        onPageChange={vi.fn()}
+        onLogout={vi.fn()}
+        userRole="owner"
+        workspaceName="mike-sicurre.com"
+        threatCount={0}
+        onboardingRequired
+      />,
+    );
+
+    expect(screen.getByText("sidebar.status_setup_required")).toBeInTheDocument();
+    expect(screen.queryByText("sidebar.status_protected")).not.toBeInTheDocument();
+  });
+
+  it("omits the workspace card for platform admins, who hold no mailbox", () => {
+    render(
+      <Sidebar
+        currentPage="logs"
+        onPageChange={vi.fn()}
+        onLogout={vi.fn()}
+        userRole="admin"
+        workspaceName="sicurre.com"
+        threatCount={12}
+        hasIntegration
+      />,
+    );
+
+    expect(screen.queryByText("sicurre.com")).not.toBeInTheDocument();
+    expect(screen.queryByText("sidebar.status_protected")).not.toBeInTheDocument();
+  });
+});
+
+describe("rail collapsing", () => {
+  it("keeps every control named once labels are hidden", () => {
+    render(
+      <Sidebar
+        currentPage="settings"
+        onPageChange={vi.fn()}
+        onLogout={vi.fn()}
+        userRole="owner"
+        workspaceName="vinse.app"
+        threatCount={4}
+        hasIntegration
+        collapsible
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /sidebar.collapse_rail/i }));
+
+    // Collapsed, the visible text is gone but the accessible name must remain.
+    for (const key of [
+      "sidebar.nav_dashboard",
+      "sidebar.nav_quarantine",
+      "sidebar.nav_settings",
+      "common.logout",
+    ]) {
+      expect(screen.getByRole("button", { name: new RegExp(key, "i") })).toBeInTheDocument();
+    }
+    // The theme control is a switch, and keeps its name collapsed too.
+    expect(screen.getByRole("switch", { name: /sidebar.dark_mode/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /sidebar.expand_rail/i })).toBeInTheDocument();
+  });
+
+  it("remembers the collapsed choice across mounts, and only when collapsible", () => {
+    const { unmount } = render(
+      <Sidebar
+        currentPage="settings"
+        onPageChange={vi.fn()}
+        onLogout={vi.fn()}
+        userRole="owner"
+        collapsible
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /sidebar.collapse_rail/i }));
+    expect(localStorage.getItem("sicurre_rail_collapsed")).toBe("1");
+    unmount();
+
+    render(
+      <Sidebar currentPage="settings" onPageChange={vi.fn()} onLogout={vi.fn()} userRole="owner" collapsible />,
+    );
+    expect(screen.getByRole("button", { name: /sidebar.expand_rail/i })).toBeInTheDocument();
+    cleanup();
+
+    // The mobile drawer is a transient overlay, so it never offers the control.
+    render(<Sidebar currentPage="settings" onPageChange={vi.fn()} onLogout={vi.fn()} userRole="owner" />);
+    expect(screen.queryByRole("button", { name: /sidebar.(collapse|expand)_rail/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("theme switching from the rail", () => {
+  it("toggles the document class and persists the choice", () => {
+    render(<Sidebar currentPage="settings" onPageChange={vi.fn()} onLogout={vi.fn()} userRole="owner" />);
+
+    const toggle = screen.getByRole("switch", { name: /sidebar.dark_mode/i });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+
+    fireEvent.click(toggle);
+    expect(document.documentElement).toHaveClass("dark");
+    expect(localStorage.getItem("sicurre_theme")).toBe("dark");
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+
+    fireEvent.click(toggle);
+    expect(document.documentElement).not.toHaveClass("dark");
+    expect(localStorage.getItem("sicurre_theme")).toBe("light");
+  });
+
+  it("emergency lockdown is offered only when a handler is supplied", () => {
+    const onLockdown = vi.fn();
+    const { unmount } = render(
+      <Sidebar currentPage="settings" onPageChange={vi.fn()} onLogout={vi.fn()} userRole="owner" onLockdown={onLockdown} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /sidebar.lockdown/i }));
+    expect(onLockdown).toHaveBeenCalledTimes(1);
+    unmount();
+
+    render(<Sidebar currentPage="settings" onPageChange={vi.fn()} onLogout={vi.fn()} userRole="owner" />);
+    expect(screen.queryByRole("button", { name: /sidebar.lockdown/i })).not.toBeInTheDocument();
+  });
+});

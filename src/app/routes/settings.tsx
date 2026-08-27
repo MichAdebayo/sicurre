@@ -25,6 +25,7 @@ import { CloudflareIntegrator } from "../components/common/cloudflare-integrator
 import { AppToast } from "../components/common/app-toast";
 import AlertsRoute from "./alerts";
 import cloudflareLogo from "../assets/cloudflare-svgrepo-com.svg";
+import { useTheme } from "../lib/theme";
 import {
   AuthSession,
   getStoredAuthProvider,
@@ -69,11 +70,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
   const [saveError, setSaveError] = useState("");
 
   const [lang, setLang] = useState(localStorage.getItem("sicurre_lang") || "fr");
-  const [theme, setTheme] = useState(() => {
-    const savedTheme = localStorage.getItem("sicurre_theme");
-    if (savedTheme) return savedTheme;
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  });
+  const [theme, setTheme] = useTheme();
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -131,13 +128,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
   };
 
   const handleThemeChange = (newTheme: string) => {
-    setTheme(newTheme);
-    localStorage.setItem("sicurre_theme", newTheme);
-    if (newTheme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
+    setTheme(newTheme === "dark" ? "dark" : "light");
   };
 
   const handlePasswordChange = async (e: React.FormEvent) => {
@@ -315,60 +306,76 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
       </div>
 
       {/* Two-Column Split Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Navigation Sidebar */}
-        <div className="col-span-12 flex gap-1.5 overflow-x-auto border-b border-border-subtle pb-3 lg:col-span-3 lg:block lg:space-y-1.5 lg:overflow-visible lg:rounded-xl lg:border lg:bg-surface-lowest lg:p-3.5 lg:shadow-sm">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-x-10 gap-y-6 items-start">
+        {/* Left Column: settings sub-navigation.
+            Rendered as a plain column rather than a bordered card so the page
+            reads rail → section list → content, instead of nesting three
+            levels of chrome. */}
+        <nav
+          aria-label={t("settings.title")}
+          className="col-span-12 flex gap-1 overflow-x-auto border-b border-border-subtle pb-3 lg:col-span-3 lg:block lg:space-y-1 lg:overflow-visible lg:border-b-0 lg:border-r lg:pb-1 lg:pr-8"
+        >
           {tabs.map((tab) => {
             const IconComp = tab.icon;
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
+                type="button"
+                aria-current={isActive ? "page" : undefined}
                 onClick={() => {
                   setActiveTab(tab.id as any);
                   setShowIntegrator(false);
                 }}
-                className={`flex shrink-0 items-center gap-2 rounded-lg border-b-2 px-3 py-2.5 text-left text-sm font-bold transition-all lg:w-full lg:gap-3 lg:border-b-0 lg:border-l-2 lg:px-4 ${isActive
-                  ? "bg-primary/[0.04] text-primary border-primary"
-                  : "text-on-surface-variant hover:bg-surface-low hover:text-on-surface border-transparent"
+                className={`flex shrink-0 items-center gap-3 rounded-lg px-3.5 py-3 text-left text-[15px] leading-6 transition-colors lg:w-full ${isActive
+                  ? "bg-surface-low text-on-surface font-semibold"
+                  : "text-on-surface-variant font-medium hover:bg-surface-low/60 hover:text-on-surface"
                   }`}
               >
-                <IconComp className={`w-4.5 h-4.5 ${isActive ? "text-primary" : "text-on-surface-variant/70"}`} />
+                <IconComp
+                  aria-hidden="true"
+                  className={`h-[18px] w-[18px] shrink-0 stroke-[1.5] ${isActive ? "text-primary" : "text-on-surface-variant/70"}`}
+                />
                 <span>{tab.label}</span>
               </button>
             );
           })}
-        </div>
+        </nav>
 
         {/* Right Column: Tab Content */}
         <div className="col-span-12 lg:col-span-9 space-y-6">
           {/* Profile Tab */}
           {activeTab === "profile" && (
-            <div className="bg-surface-lowest rounded-xl border border-border-subtle p-6 shadow-sm">
-              <div className="flex items-center gap-2.5 mb-5 pb-4 border-b border-border-subtle">
-                <User className="w-5 h-5 text-primary" />
-                <h3 className="font-display font-semibold text-[17px] text-on-surface">
-                  {t("settings.tab_profile")}
-                </h3>
-              </div>
-              <form onSubmit={saveSettings} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <section className="bg-surface-lowest rounded-xl border border-border-subtle p-7 shadow-sm">
+              <header className="mb-6 flex items-start justify-between gap-6">
+                <div>
+                  <h2 className="app-h2">{t("settings.tab_profile")}</h2>
+                  <p className="app-body-sub mt-1">{t("settings.profile_desc")}</p>
+                </div>
+                <Button type="submit" form="settings-profile-form" className="gap-2 shrink-0 cursor-pointer">
+                  <Save className="w-4 h-4" aria-hidden="true" />
+                  {t("common.save")}
+                </Button>
+              </header>
+              <form id="settings-profile-form" onSubmit={saveSettings} className="space-y-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <Input label={t("settings.first_name")} type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
                   <Input label={t("settings.last_name")} type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <Input label={t("settings.job_title")} type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
                   <Input label={t("settings.company")} type="text" value={company} onChange={(e) => setCompany(e.target.value)} />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <Input label={t("settings.email")} type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled />
 
                   {/* Default User Role Dropdown */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-label-caps text-on-surface-variant font-semibold">
+                    <label htmlFor="settings-user-role" className="text-label-caps text-on-surface-variant font-semibold">
                       {t("settings.user_role")}
                     </label>
                     <select
+                      id="settings-user-role"
                       value={role}
                       onChange={(e) => setRole(e.target.value)}
                       className="w-full px-4 py-2.5 bg-surface-lowest border border-border-subtle rounded-lg text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer h-[44px] font-semibold"
@@ -379,26 +386,17 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                     </select>
                   </div>
                 </div>
-
-                <div className="flex justify-end pt-2">
-                  <Button type="submit" className="gap-2 text-xs font-bold cursor-pointer">
-                    <Save className="w-4 h-4" />
-                    {t("common.save")}
-                  </Button>
-                </div>
               </form>
-            </div>
+            </section>
           )}
 
           {/* Security Tab */}
           {activeTab === "security" && (
-            <div className="bg-surface-lowest rounded-xl border border-border-subtle p-6 shadow-sm">
-              <div className="flex items-center gap-2.5 mb-5 pb-4 border-b border-border-subtle">
-                <ShieldCheck className="w-5 h-5 text-primary" />
-                <h3 className="font-display font-semibold text-[17px] text-on-surface">
-                  {t("settings.tab_security")}
-                </h3>
-              </div>
+            <section className="bg-surface-lowest rounded-xl border border-border-subtle p-7 shadow-sm">
+              <header className="mb-6">
+                <h2 className="app-h2">{t("settings.tab_security")}</h2>
+                <p className="app-body-sub mt-1">{t("settings.security_desc")}</p>
+              </header>
 
               {authProvider === "google" ? (
                 <div className="p-4 bg-primary/[0.04] border border-primary/10 rounded-xl space-y-2">
@@ -450,22 +448,20 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                   </div>
                 </form>
               )}
-            </div>
+            </section>
           )}
 
           {/* Preferences Tab */}
           {activeTab === "preferences" && (
-            <div className="bg-surface-lowest rounded-xl border border-border-subtle p-6 shadow-sm">
-              <div className="flex items-center gap-2.5 mb-5 pb-4 border-b border-border-subtle">
-                <Settings className="w-5 h-5 text-primary" />
-                <h3 className="font-display font-semibold text-[17px] text-on-surface">
-                  {t("settings.tab_preferences")}
-                </h3>
-              </div>
+            <section className="bg-surface-lowest rounded-xl border border-border-subtle p-7 shadow-sm">
+              <header className="mb-6">
+                <h2 className="app-h2">{t("settings.tab_preferences")}</h2>
+                <p className="app-body-sub mt-1">{t("settings.preferences_desc")}</p>
+              </header>
               <div className="space-y-6">
                 <div className="flex items-center justify-between py-2 border-b border-border-subtle/50">
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-sm font-bold text-on-surface">
+                    <span id="settings-language-label" className="text-sm font-bold text-on-surface">
                       {t("settings.interface_language")}
                     </span>
                     <span className="text-xs font-semibold text-on-surface-variant">
@@ -473,6 +469,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                     </span>
                   </div>
                   <select
+                    aria-labelledby="settings-language-label"
                     value={lang}
                     onChange={(e) => handleLanguageChange(e.target.value)}
                     className="px-3.5 py-2 bg-surface-lowest border border-border-subtle rounded-lg text-sm text-on-surface focus:outline-none focus:border-primary outline-none cursor-pointer font-semibold"
@@ -484,7 +481,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
 
                 <div className="flex items-center justify-between py-2">
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-sm font-bold text-on-surface">
+                    <span id="settings-theme-label" className="text-sm font-bold text-on-surface">
                       {t("settings.visual_theme")}
                     </span>
                     <span className="text-xs font-semibold text-on-surface-variant">
@@ -492,6 +489,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                     </span>
                   </div>
                   <select
+                    aria-labelledby="settings-theme-label"
                     value={theme}
                     onChange={(e) => handleThemeChange(e.target.value)}
                     className="px-3.5 py-2 bg-surface-lowest border border-border-subtle rounded-lg text-sm text-on-surface focus:outline-none focus:border-primary outline-none cursor-pointer font-semibold"
@@ -501,7 +499,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                   </select>
                 </div>
               </div>
-            </div>
+            </section>
           )}
 
           {activeTab === "notifications" && <AlertsRoute mode="settings" />}
