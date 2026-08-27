@@ -44,6 +44,11 @@
     }
   },
   "sidebar": {
+    "status_protected": "Protected",
+    "status_setup_required": "Setup required",
+    "emails_analysed_one": "{{count}} email analysed",
+    "emails_analysed_other": "{{count}} emails analysed",
+    "dark_mode": "Dark mode",
     "status_active": "Shield Active",
     "status_inactive": "Inactive",
     "connected_as": "Signed in as",

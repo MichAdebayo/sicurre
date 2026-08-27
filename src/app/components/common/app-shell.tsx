@@ -17,6 +17,9 @@ interface AppShellProps {
   userEmail?: string;
   userRole?: string;
   onboardingRequired?: boolean;
+  workspaceName?: string;
+  threatCount?: number;
+  hasIntegration?: boolean;
 }
 
 export function AppShell({
@@ -31,6 +34,9 @@ export function AppShell({
   userEmail,
   userRole,
   onboardingRequired = false,
+  workspaceName,
+  threatCount,
+  hasIntegration = false,
 }: AppShellProps) {
   const { t } = useTranslation();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
@@ -49,6 +55,9 @@ export function AppShell({
         onLockdown={onLockdown}
         userRole={userRole}
         onboardingRequired={onboardingRequired}
+        workspaceName={workspaceName}
+        threatCount={threatCount}
+        hasIntegration={hasIntegration}
         className="hidden md:flex"
       />
 

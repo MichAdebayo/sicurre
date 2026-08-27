@@ -12,8 +12,11 @@ import {
   Bell,
   Shield,
   LockKeyhole,
+  Moon,
+  Sun,
 } from "lucide-react";
 import sicurreLogo from "../../assets/sicurre.svg";
+import { useTheme } from "../../lib/theme";
 
 // Supported pages in the sidebar navigation
 export type SidebarPage =
@@ -33,6 +36,9 @@ interface SidebarProps {
   onLockdown?: () => void;
   userRole?: string;
   onboardingRequired?: boolean;
+  workspaceName?: string;
+  threatCount?: number;
+  hasIntegration?: boolean;
   className?: string;
 }
 
@@ -43,10 +49,18 @@ export function Sidebar({
   onLockdown,
   userRole = "owner",
   onboardingRequired = false,
+  workspaceName,
+  threatCount,
+  hasIntegration = false,
   className,
 }: SidebarProps) {
   const { t } = useTranslation();
+  const [theme, setTheme] = useTheme();
   const isOnboardingLocked = onboardingRequired && userRole !== "admin";
+  // Platform admins have no mailbox of their own, so the workspace card would
+  // be describing something they do not have.
+  const isCustomerWorkspace = userRole !== "admin";
+  const isProtected = hasIntegration && !onboardingRequired;
 
   const baseNav = [
     { id: "dashboard", label: t("sidebar.nav_dashboard"), icon: LayoutDashboard },
@@ -79,16 +93,48 @@ export function Sidebar({
       )}
     >
       {/* Logo */}
-      <div className="px-5 py-5">
-        <div className="flex items-center gap-3">
-          <img src={sicurreLogo} alt="Sicurre" className="w-16 h-16" />
-          <div className="flex flex-col">
-            <span className="font-display font-bold text-3xl text-on-surface leading-tight">
-              Sicurre
-            </span>
-          </div>
+      <div className="px-4 pt-5 pb-4">
+        <div className="flex items-center gap-2.5">
+          <img src={sicurreLogo} alt="Sicurre" className="h-9 w-9 shrink-0" />
+          <span className="font-display text-xl font-bold leading-none text-on-surface">
+            Sicurre
+          </span>
         </div>
       </div>
+
+      {/* Workspace context — which tenant am I in, and is it protected.
+          Visible on every page, so the answer never depends on the top bar. */}
+      {isCustomerWorkspace && workspaceName && (
+        <div className="px-4 pb-4">
+          <div className="rounded-xl border border-border-subtle bg-surface-low/60 px-3.5 py-3">
+            <div className="flex items-center gap-2">
+              <span
+                aria-hidden="true"
+                className={clsx(
+                  "h-2 w-2 shrink-0 rounded-full",
+                  isProtected ? "bg-safe" : "bg-warning",
+                )}
+              />
+              <span className="truncate text-[13px] font-bold text-on-surface" title={workspaceName}>
+                {workspaceName}
+              </span>
+            </div>
+            <p
+              className={clsx(
+                "mt-1.5 text-[11px] font-semibold",
+                isProtected ? "text-safe" : "text-warning",
+              )}
+            >
+              {isProtected ? t("sidebar.status_protected") : t("sidebar.status_setup_required")}
+            </p>
+            {typeof threatCount === "number" && (
+              <p className="mt-1 text-[11px] font-medium text-on-surface-variant tabular-nums">
+                {t("sidebar.emails_analysed", { count: threatCount })}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Main Navigation */}
       <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
@@ -108,7 +154,7 @@ export function Sidebar({
               title={isLocked ? "Connectez Cloudflare pour déverrouiller cette page" : undefined}
               aria-disabled={isLocked}
               className={clsx(
-                "w-full flex items-center gap-3 px-3.5 py-3 text-[14px] font-semibold rounded-lg transition-all duration-150 select-none",
+                "w-full flex items-center gap-2.5 px-3.5 py-3 text-[14px] font-semibold rounded-lg transition-all duration-150 select-none",
                 isLocked
                   ? "cursor-not-allowed text-on-surface-variant/35 opacity-70"
                   : isActive
@@ -116,9 +162,9 @@ export function Sidebar({
                   : "cursor-pointer text-on-surface-variant hover:bg-surface-low hover:text-on-surface",
               )}
             >
-              <Icon className="w-[18px] h-[18px] stroke-[1.5]" />
-              <span className="flex-1 text-left">{item.label}</span>
-              {isLocked && <LockKeyhole className="h-3.5 w-3.5" />}
+              <Icon className="w-[18px] h-[18px] shrink-0 stroke-[1.5]" />
+              <span className="flex-1 truncate text-left">{item.label}</span>
+              {isLocked && <LockKeyhole className="h-3.5 w-3.5 shrink-0" />}
             </button>
           );
         })}
@@ -157,6 +203,33 @@ export function Sidebar({
             <span>{t("sidebar.lockdown")}</span>
           </button>
         )}
+
+        <button
+          type="button"
+          role="switch"
+          aria-checked={theme === "dark"}
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          className="flex w-full cursor-pointer items-center gap-3 rounded-lg px-3.5 py-3 text-[14px] font-semibold text-on-surface-variant transition-colors hover:bg-surface-low hover:text-on-surface"
+        >
+          {theme === "dark"
+            ? <Moon className="h-[18px] w-[18px] stroke-[1.5]" aria-hidden="true" />
+            : <Sun className="h-[18px] w-[18px] stroke-[1.5]" aria-hidden="true" />}
+          <span className="flex-1 text-left">{t("sidebar.dark_mode")}</span>
+          <span
+            aria-hidden="true"
+            className={clsx(
+              "flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors",
+              theme === "dark" ? "bg-primary" : "bg-surface-highest",
+            )}
+          >
+            <span
+              className={clsx(
+                "h-4 w-4 rounded-full bg-surface-lowest transition-transform",
+                theme === "dark" && "translate-x-4",
+              )}
+            />
+          </span>
+        </button>
 
         <div className="border-t border-border-subtle pt-3">
           <button
