@@ -13,10 +13,13 @@ interface AppToastProps {
   durationMs?: number;
 }
 
+// Every tone pairs a surface token with its matching on- token. safe and
+// warning invert between themes (deep in light, bright in dark), so a
+// hardcoded text colour is readable in one theme and not the other.
 const toneStyles: Record<AppToastTone, string> = {
-  success: "bg-safe text-white",
+  success: "bg-safe text-on-safe",
   error: "bg-error text-on-error",
-  warning: "bg-warning text-white dark:bg-[#F59E0B] dark:text-slate-950",
+  warning: "bg-warning text-on-warning",
   info: "bg-navy-dark text-on-primary",
 };
 
@@ -73,7 +76,7 @@ export function AppToast({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md p-1 text-current/85 transition-colors hover:bg-white/15 hover:text-current focus:outline-none focus:ring-2 focus:ring-white/55"
+              className="rounded-md p-1 text-current/85 transition-colors hover:bg-current/15 hover:text-current focus:outline-none focus:ring-2 focus:ring-current/55"
               aria-label="Fermer la notification"
             >
               <X className="h-5 w-5" />
@@ -83,7 +86,7 @@ export function AppToast({
             <motion.span
               key={`${tone}-${message}`}
               aria-hidden="true"
-              className="absolute inset-x-0 bottom-0 h-1 origin-left bg-white/45"
+              className="absolute inset-x-0 bottom-0 h-1 origin-left bg-current/40"
               initial={{ scaleX: 1 }}
               animate={{ scaleX: 0 }}
               transition={{ duration: durationMs / 1000, ease: "linear" }}
