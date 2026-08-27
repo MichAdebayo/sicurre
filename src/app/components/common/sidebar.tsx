@@ -90,7 +90,7 @@ function RailButton({
         disabled
           ? "cursor-not-allowed text-on-surface-variant/35 opacity-70"
           : active
-            ? "bg-primary text-on-primary shadow-sm shadow-primary/20"
+            ? "bg-navy-dark text-on-primary shadow-sm shadow-primary/20"
             : tone === "danger"
               ? "cursor-pointer text-on-surface-variant hover:bg-error/5 hover:text-error"
               : "cursor-pointer text-on-surface-variant hover:bg-surface-low hover:text-on-surface",
