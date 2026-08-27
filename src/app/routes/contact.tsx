@@ -211,7 +211,7 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
 
                       <button
                         type="submit"
-                        className="w-full py-3.5 bg-primary text-white hover:bg-navy-dark font-semibold rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-md shadow-primary/20 cursor-pointer active:scale-[0.98]"
+                        className="w-full py-3.5 bg-navy-dark text-white hover:brightness-95 font-semibold rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-md shadow-primary/20 cursor-pointer active:scale-[0.98]"
                       >
                         <Send className="w-4 h-4" />
                         <span>Ouvrir ma messagerie</span>

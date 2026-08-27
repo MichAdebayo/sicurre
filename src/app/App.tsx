@@ -14,6 +14,7 @@ import {
 } from "./lib/navigation";
 import { useTranslation } from "react-i18next";
 import { parseVerificationCallback } from "./lib/email-verification";
+import { applyTheme, getStoredTheme } from "./lib/theme";
 
 const LandingRoute = lazy(() => import("./routes/landing"));
 const LoginRoute = lazy(() => import("./routes/login"));
@@ -162,9 +163,9 @@ function AppContent() {
   };
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem("sicurre_theme");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    document.documentElement.classList.toggle("dark", savedTheme === "dark" || (!savedTheme && prefersDark));
+    // Single source of truth: the same helper the rail toggle and the
+    // Préférences select write through.
+    applyTheme(getStoredTheme());
   }, []);
 
   useEffect(() => {
@@ -313,6 +314,9 @@ function AppContent() {
       userEmail={session.email}
       userRole={session.is_platform_admin ? "admin" : session.role}
       onboardingRequired={session.onboarding_required}
+      workspaceName={session.workspace_name}
+      threatCount={session.threat_count}
+      hasIntegration={session.has_cloudflare_integration}
     >
       <Suspense fallback={<PageRouteFallback />}>
           {activePage === "dashboard" && !session.is_platform_admin && <DashboardRoute session={session} onGoToSettings={handleGoToSettings} />}
