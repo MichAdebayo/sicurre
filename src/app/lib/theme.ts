@@ -8,7 +8,12 @@ const THEME_EVENT = "sicurre:theme-change";
 export function getStoredTheme(): Theme {
   const saved = localStorage.getItem(THEME_KEY);
   if (saved === "light" || saved === "dark") return saved;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  // matchMedia is absent in jsdom and in any non-browser host. Falling back to
+  // light keeps the shell mountable rather than throwing out of a render.
+  const prefersDark =
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches;
+  return prefersDark ? "dark" : "light";
 }
 
 /**
