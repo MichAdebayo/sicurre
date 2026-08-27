@@ -13,6 +13,7 @@ import {
   sidebarPagePaths,
 } from "./lib/navigation";
 import { useTranslation } from "react-i18next";
+import { applyTheme, getStoredTheme } from "./lib/theme";
 
 const LandingRoute = lazy(() => import("./routes/landing"));
 const LoginRoute = lazy(() => import("./routes/login"));
@@ -138,9 +139,9 @@ function AppContent() {
   };
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem("sicurre_theme");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    document.documentElement.classList.toggle("dark", savedTheme === "dark" || (!savedTheme && prefersDark));
+    // Single source of truth: the same helper the rail toggle and the
+    // Préférences select write through.
+    applyTheme(getStoredTheme());
   }, []);
 
   useEffect(() => {

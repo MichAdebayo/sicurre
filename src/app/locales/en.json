@@ -44,6 +44,9 @@
     }
   },
   "sidebar": {
+    "collapse_rail": "Collapse menu",
+    "expand_rail": "Expand menu",
+    "locked_hint": "Connect Cloudflare to unlock this page",
     "status_protected": "Protected",
     "status_setup_required": "Setup required",
     "emails_analysed_one": "{{count}} email analysed",
