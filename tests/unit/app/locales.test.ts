@@ -43,7 +43,13 @@ describe("application locale dictionaries", () => {
     const sourceFiles = readApplicationSources();
     const keys = [...sourceFiles.matchAll(/\bt\("([^"]+)"/g)].map((match) => match[1]);
 
-    expect(keys.filter((key) => !(key in translations))).toEqual([]);
+    // i18next v4 resolves a counted key through its _one / _other forms, so the
+    // bare key legitimately has no entry of its own.
+    const isDefined = (key: string) =>
+      key in translations ||
+      (`${key}_one` in translations && `${key}_other` in translations);
+
+    expect(keys.filter((key) => !isDefined(key))).toEqual([]);
   });
 
   it("does not keep translated copy in inline locale ternaries", () => {
