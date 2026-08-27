@@ -10,6 +10,7 @@ from poc.authentication import PocAuthStore
 from poc.config import get_poc_settings
 from poc.data_evidence import PocDataEvidenceStore
 from poc.events import PocEventStore
+from poc.fault_gateway import PocFaultGateway, gateway_settings_url
 from poc.inference import (
     ClassificationRequest,
     InferenceMode,
@@ -23,6 +24,7 @@ from poc.presentation.i18n import PocTranslator
 from poc.presentation.pipeline_page import execute_pipeline_action, render_pipeline_page
 from poc.presentation.playground import render_playground
 from poc.presentation.remediation import render_smail, render_threat_log
+from poc.presentation.resilience import render_resilience
 from poc.presentation.result import render_inference_result
 from poc.presentation.settings import render_settings
 from poc.presentation.shell import render_login, render_sidebar
@@ -38,7 +40,26 @@ try:
     ensure_local_auth_db()
 except RuntimeError as error:
     STARTUP_ERROR = str(error)
-INFERENCE_CLIENT = PocInferenceClient(POC_SETTINGS)
+
+
+FAULT_GATEWAY_IMPLEMENTATION_VERSION = 2
+
+
+@st.cache_resource
+def _start_fault_gateway(upstream_url: str, implementation_version: int) -> PocFaultGateway:
+    """Start one loopback-only fault gateway for the Streamlit process."""
+    del implementation_version
+    return PocFaultGateway(upstream_url).start()
+
+
+INFERENCE_GATEWAY = _start_fault_gateway(
+    POC_SETTINGS.inference_api_url,
+    FAULT_GATEWAY_IMPLEMENTATION_VERSION,
+)
+POC_INFERENCE_SETTINGS = POC_SETTINGS.model_copy(
+    update={"inference_api_url": gateway_settings_url(INFERENCE_GATEWAY)}
+)
+INFERENCE_CLIENT = PocInferenceClient(POC_INFERENCE_SETTINGS)
 AUTH_STORE = PocAuthStore(POC_AUTH_DB_PATH)
 DATA_EVIDENCE_STORE = PocDataEvidenceStore(POC_DATA_DB_PATH)
 EVENT_STORE = PocEventStore(AUTH_STORE)
@@ -61,7 +82,7 @@ st.set_page_config(
     page_title="Sicurre - POC",
     page_icon="S",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 st.markdown(
@@ -162,8 +183,14 @@ def update_display_name(user_id: str, display_name: str) -> None:
     AUTH_STORE.execute("UPDATE poc_user SET display_name = ? WHERE id = ?", (display_name, user_id))
 
 
-def inference_status() -> tuple[bool, str]:
-    return INFERENCE_CLIENT.health()
+def inference_status() -> tuple[str, str]:
+    healthy, status_key = INFERENCE_CLIENT.health()
+    states = {
+        "inference_health_ready": "ready",
+        "inference_health_rejected": "authentication_rejected",
+        "inference_health_unexpected": "contract_invalid",
+    }
+    return states.get(status_key, "unreachable"), tr(status_key)
 
 
 def classify_email(
@@ -197,6 +224,7 @@ def classify_email_for_ui(
     try:
         return classify_email(subject, sender, text_value, use_llm, use_virustotal)
     except PocInferenceError as exc:
+        st.session_state["last_result"] = None
         st.session_state["last_inference_error"] = str(exc)
         st.error(f"{tr('inference_request_failed')} {exc}")
         return None
@@ -255,6 +283,9 @@ render_sidebar(
 
 events = EVENT_STORE.list_for_user(user["email"], limit=2000)
 page = st.session_state.get("page", "nav_home")
+if page in {"nav_pipeline", "nav_resilience"} and user["role"] != "admin":
+    page = "nav_home"
+    st.session_state["page"] = page
 
 # ── Accueil ──────────────────────────────────────────────────────────────────
 if page == "nav_home":
@@ -287,7 +318,13 @@ elif page == "nav_pipeline":
     render_pipeline_page(
         user,
         tr,
-        lambda title, operation: execute_pipeline_action(title, operation, tr, POC_SETTINGS),
+        lambda title, operation: execute_pipeline_action(
+            title,
+            operation,
+            tr,
+            POC_SETTINGS,
+            DATA_EVIDENCE_STORE.latest_incremental_run_id,
+        ),
     )
 
 
@@ -295,9 +332,22 @@ elif page == "nav_pipeline":
 elif page == "nav_datasets":
     render_datasets(DATA_EVIDENCE_STORE, tr)
 
+# ── Incident technique ───────────────────────────────────────────────────────
+elif page == "nav_resilience":
+    render_resilience(
+        tr,
+        inference_status,
+        INFERENCE_CLIENT.run_fault_probe,
+        INFERENCE_CLIENT.run_recovery_probe,
+        INFERENCE_GATEWAY.inject,
+        INFERENCE_GATEWAY.restore,
+        lambda: INFERENCE_GATEWAY.active_scenario,
+    )
+
 # ── Paramètres ────────────────────────────────────────────────────────────────
 elif page == "nav_settings":
-    runtime_ready, _ = inference_status()
+    runtime_state, _ = inference_status()
+    runtime_ready = runtime_state == "ready"
     render_settings(
         user,
         tr,

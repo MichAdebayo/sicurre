@@ -16,6 +16,7 @@ class PipelineScope(StrEnum):
     """External impact classification for a POC operation."""
 
     LOCAL = "local"
+    EXTERNAL_READ_LOCAL_WRITE = "external_read_local_write"
     SANDBOX_EXTERNAL = "sandbox_external"
     PRODUCTION_FORBIDDEN = "production_forbidden"
 
@@ -38,7 +39,7 @@ OPERATIONS = {
     "incremental_demo": PipelineOperation(
         key="incremental_demo",
         command=("make", "poc-cron-demo"),
-        scope=PipelineScope.SANDBOX_EXTERNAL,
+        scope=PipelineScope.EXTERNAL_READ_LOCAL_WRITE,
     ),
     "release_preview": PipelineOperation(
         key="release_preview",
@@ -63,8 +64,12 @@ def build_poc_process_env(settings: PocSettings) -> dict[str, str]:
             "SICURRE_DATA_PLATFORM_DATABASE_URL": settings.data_platform_database_url,
             "INFERENCE_API_URL": settings.inference_api_url,
             "INFERENCE_API_KEY": settings.inference_api_key,
-            "SICURRE_POC_R2_PREFIX": settings.r2_prefix,
-            "SICURRE_POC_ALLOW_EXTERNAL_WRITES": str(settings.allow_external_writes).lower(),
+            "SICURRE_POC_SNAPSHOT_PREFIX": settings.snapshot_prefix,
+            "SICURRE_POC_SNAPSHOT_DIR": str(settings.snapshot_dir),
+            "SICURRE_SEKOIA_SNAPSHOT_STORAGE_BACKEND": "local",
+            "SICURRE_POC_ALLOW_STAGING_PUBLICATION": str(
+                settings.allow_staging_publication
+            ).lower(),
             "SICURRE_POC_ALLOW_ML_DISPATCH": str(settings.allow_ml_dispatch).lower(),
             "SICURRE_POC_KAGGLE_DATASET_SLUG": settings.kaggle_dataset_slug or "",
             "SICURRE_TRAINING_DATASET_SNAPSHOT_STORAGE_BACKEND": "local",
@@ -79,9 +84,9 @@ def validate_operation(operation: PipelineOperation, settings: PocSettings) -> N
     """Reject operations whose external impact has not been explicitly enabled."""
     if operation.scope is PipelineScope.PRODUCTION_FORBIDDEN:
         raise PermissionError("Production operations are never available from the POC.")
-    if operation.scope is PipelineScope.SANDBOX_EXTERNAL and not settings.allow_external_writes:
+    if operation.scope is PipelineScope.SANDBOX_EXTERNAL and not settings.allow_staging_publication:
         raise PermissionError(
-            "Enable SICURRE_POC_ALLOW_EXTERNAL_WRITES for sandbox external operations."
+            "Enable SICURRE_POC_ALLOW_STAGING_PUBLICATION for staging publication."
         )
     if operation.key == "staging_publish" and not settings.kaggle_dataset_slug:
         raise PermissionError("SICURRE_POC_KAGGLE_DATASET_SLUG is required for staging publish.")

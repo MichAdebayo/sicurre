@@ -5,12 +5,15 @@ from __future__ import annotations
 import json
 from collections import Counter
 from collections.abc import Callable
+from datetime import UTC, datetime
+from html import escape
 from pathlib import Path
 from typing import Any, Protocol
 
 import streamlit as st
 
 from poc.presentation.formatting import format_number
+from poc.presentation.table import render_evidence_table
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 FROZEN_METADATA_PATH = (
@@ -44,8 +47,112 @@ def _metric(column: Any, label: str, value: int) -> None:
     )
 
 
+def _render_incremental_run(evidence: DataEvidence, translate: Callable[[str], str]) -> None:
+    """Show one selected ingestion run from collection through dataset membership."""
+    runs = evidence.query(
+        """
+        SELECT ir.id, ss.name, ir.status, ir.trigger_mode,
+               ir.raw_object_count, ir.raw_record_count, ir.started_at, ir.finished_at,
+               COUNT(DISTINCT nm.id) AS normalized_count,
+               COUNT(DISTINCT di.normalized_message_id) AS dataset_item_count
+        FROM data_ingestion_run ir
+        JOIN data_source_system ss ON ss.id = ir.source_system_id
+        LEFT JOIN data_raw_object ro ON ro.ingestion_run_id = ir.id
+        LEFT JOIN data_raw_record rr ON rr.raw_object_id = ro.id
+        LEFT JOIN data_normalized_message nm ON nm.raw_record_id = rr.id
+        LEFT JOIN data_dataset_item di
+          ON di.normalized_message_id = nm.id
+         AND di.dataset_id = (
+             SELECT id FROM data_dataset ORDER BY created_at DESC LIMIT 1
+         )
+        WHERE ss.name NOT LIKE 'reconstructed/%'
+        GROUP BY ir.id, ss.name
+        ORDER BY ir.finished_at DESC
+        LIMIT 20
+        """
+    )
+    st.markdown(f"#### {translate('incremental_run_title')}")
+    if not runs:
+        st.info(translate("no_incremental_runs"))
+        return
+
+    run_index = {str(row["id"]): row for row in runs}
+    preferred_id = st.session_state.pop("pending_dataset_run_id", None)
+    current_id = st.session_state.get("dataset_run_selection")
+    if preferred_id in run_index:
+        st.session_state["dataset_run_selection"] = preferred_id
+    elif current_id not in run_index:
+        st.session_state["dataset_run_selection"] = next(iter(run_index))
+    selected_id = st.selectbox(
+        translate("incremental_run_select"),
+        list(run_index),
+        format_func=lambda run_id: _run_label(run_index[run_id], translate),
+        key="dataset_run_selection",
+    )
+    selected = run_index[selected_id]
+    st.caption(
+        translate(
+            "run_scope_initialization"
+            if str(selected.get("trigger_mode") or "").lower() == "poc_replay"
+            else "run_scope_incremental"
+        )
+    )
+    values = (
+        (translate("run_raw_objects"), int(selected.get("raw_object_count") or 0)),
+        (translate("run_raw_records"), int(selected.get("raw_record_count") or 0)),
+        (translate("run_normalized"), int(selected.get("normalized_count") or 0)),
+        (translate("run_dataset_items"), int(selected.get("dataset_item_count") or 0)),
+    )
+    cells = "".join(
+        "<div class='evidence-step'>"
+        f"<span>{escape(label)}</span><strong>{format_number(value)}</strong></div>"
+        for label, value in values
+    )
+    st.markdown(f"<div class='evidence-funnel'>{cells}</div>", unsafe_allow_html=True)
+
+    raw_count = int(selected.get("raw_record_count") or 0)
+    normalized_count = int(selected.get("normalized_count") or 0)
+    if raw_count > 0 and normalized_count == 0:
+        st.info(translate("incremental_run_reference_only"))
+
+
+def _run_label(row: dict[str, Any], translate: Callable[[str], str]) -> str:
+    """Build a concise selector label for one ingestion run."""
+    finished_at = _local_run_time(row.get("finished_at") or row.get("started_at"))
+    name = _source_label(str(row.get("name") or "-"), translate)
+    operation = _run_operation_label(row, translate)
+    records = format_number(int(row.get("raw_record_count") or 0))
+    return f"{finished_at} · {operation} · {name} · {records} {translate('records')}"
+
+
+def _run_operation_label(row: dict[str, Any], translate: Callable[[str], str]) -> str:
+    """Describe a run by its demonstration operation rather than its storage trigger."""
+    trigger_mode = str(row.get("trigger_mode") or "").lower()
+    if trigger_mode == "poc_replay":
+        return translate("run_operation_initialization")
+    if trigger_mode == "scheduled":
+        return translate("run_operation_incremental")
+    return translate("run_operation_manual")
+
+
+def _local_run_time(value: object) -> str:
+    """Format a persisted UTC timestamp in the POC host's local timezone."""
+    raw_value = str(value or "").strip()
+    if not raw_value:
+        return "-"
+    try:
+        parsed = datetime.fromisoformat(raw_value.replace("Z", "+00:00"))
+    except ValueError:
+        return raw_value[:16].replace("T", " ")
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone().strftime("%Y-%m-%d %H:%M")
+
+
 def _source_label(source: str, translate: Callable[[str], str]) -> str:
     """Return a concise label while retaining canonical lineage separately."""
+    if "phishtank" in source.lower():
+        return translate("source_provider_phishtank")
     reconstruction_key = source.rsplit("/", maxsplit=1)[-1]
     if source.startswith("reconstructed/current_frozen/"):
         return translate(f"reconstructed_source_{reconstruction_key}")
@@ -94,34 +201,106 @@ def _load_frozen_source_distribution(
     }
 
 
-def _source_family_rows(
-    sources: list[dict[str, Any]], frozen_distribution: dict[str, int]
-) -> list[dict[str, Any]]:
-    """Combine recovered V1 totals with real post-V1 source lineage."""
-    totals: Counter[str] = Counter()
-    provider_counts: Counter[str] = Counter()
-    has_reconstructed_base = any(
-        str(row.get("name", "")).startswith("reconstructed/current_frozen/") for row in sources
-    )
-    if has_reconstructed_base:
-        for source, count in frozen_distribution.items():
-            family = _source_family(source)
-            totals[family] += count
-            provider_counts[family] += 1
+def _source_provider(source: str) -> str:
+    """Group detailed lineage into concise, truthful provider bars."""
+    normalized = source.lower().replace("_", "-")
+    if normalized.startswith("kaggle"):
+        return "kaggle"
+    if normalized.startswith("database/faker"):
+        return "faker"
+    if "adapted" in normalized:
+        return "adapted"
+    if "common-crawl" in normalized:
+        return "common_crawl"
+    if normalized.startswith("sap-labs"):
+        return "sap_labs"
+    if "phishtank" in normalized:
+        return "phishtank"
+    if "sekoia" in normalized:
+        return "sekoia"
+    return "other"
 
-    for row in sources:
-        source = str(row.get("name", ""))
-        count = int(row.get("total_records") or 0)
-        if count <= 0 or source.startswith("reconstructed/current_frozen/"):
-            continue
-        family = _source_family(source, str(row.get("source_type") or ""))
-        totals[family] += count
-        provider_counts[family] += 1
+
+def _training_provider_rows(frozen_distribution: dict[str, int]) -> list[dict[str, Any]]:
+    """Build provider totals for the active training corpus only."""
+    totals: Counter[tuple[str, str]] = Counter()
+    for source, count in frozen_distribution.items():
+        totals[(_source_provider(source), _source_family(source))] += count
 
     return [
-        {"family": family, "count": count, "provider_count": provider_counts[family]}
-        for family, count in totals.most_common()
+        {"provider": provider, "family": family, "count": count}
+        for (provider, family), count in totals.most_common()
     ]
+
+
+def _reference_provider_rows(sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Build provider totals for reference-only threat indicators."""
+    rows = []
+    for source in sources:
+        count = int(source.get("reference_records") or 0)
+        name = str(source.get("name") or "")
+        if count <= 0:
+            continue
+        rows.append(
+            {
+                "provider": _source_provider(name),
+                "family": _source_family(name, str(source.get("source_type") or "")),
+                "count": count,
+            }
+        )
+    return rows
+
+
+def _render_source_chart(
+    rows: list[dict[str, Any]], title: str, translate: Callable[[str], str]
+) -> None:
+    """Render one source chart whose records share the same semantic scope."""
+    if not rows:
+        return
+    chart_rows = [dict(row) for row in rows]
+    for row in chart_rows:
+        row["family_label"] = translate(f"source_family_{row['family']}")
+        row["provider_label"] = translate(f"source_provider_{row['provider']}")
+    st.markdown(f"#### {title}")
+    present_families = {str(row["family"]) for row in chart_rows}
+    family_order = [family for family in SOURCE_FAMILY_COLORS if family in present_families]
+    specification = {
+        "height": max(180, len(chart_rows) * 38),
+        "mark": {"type": "bar", "cornerRadiusTopRight": 3, "cornerRadiusBottomRight": 3},
+        "encoding": {
+            "y": {
+                "field": "provider_label",
+                "type": "nominal",
+                "sort": "-x",
+                "axis": {"title": None, "labelFontSize": 13, "labelLimit": 220},
+            },
+            "x": {
+                "field": "count",
+                "type": "quantitative",
+                "axis": {"title": None, "grid": False, "labelFontSize": 12},
+            },
+            "color": {
+                "field": "family_label",
+                "type": "nominal",
+                "legend": {"title": None, "orient": "bottom", "columns": 3},
+                "scale": {
+                    "domain": [translate(f"source_family_{family}") for family in family_order],
+                    "range": [SOURCE_FAMILY_COLORS[family] for family in family_order],
+                },
+            },
+            "tooltip": [
+                {"field": "provider_label", "type": "nominal", "title": translate("source")},
+                {
+                    "field": "family_label",
+                    "type": "nominal",
+                    "title": translate("source_method"),
+                },
+                {"field": "count", "type": "quantitative", "title": translate("records")},
+            ],
+        },
+        "config": {"background": "transparent", "view": {"stroke": "transparent"}},
+    }
+    st.vega_lite_chart(chart_rows, specification, width="stretch")
 
 
 def _render_sources(evidence: DataEvidence, translate: Callable[[str], str]) -> None:
@@ -136,6 +315,8 @@ def _render_sources(evidence: DataEvidence, translate: Callable[[str], str]) -> 
         """
         SELECT ss.name, ss.source_type,
                COUNT(rr.id) AS total_records,
+               SUM(CASE WHEN rr.rejection_reason = 'ioc_reference_only_not_email_training_text'
+                        THEN 1 ELSE 0 END) AS reference_records,
                (SELECT MAX(ir.finished_at)
                 FROM data_ingestion_run ir
                 WHERE ir.source_system_id = ss.id) AS last_run
@@ -147,93 +328,52 @@ def _render_sources(evidence: DataEvidence, translate: Callable[[str], str]) -> 
         """
     )
     frozen_distribution = _load_frozen_source_distribution()
-    chart_rows = _source_family_rows(sources, frozen_distribution)
-    for row in chart_rows:
-        row["family_label"] = translate(f"source_family_{row['family']}")
-    if chart_rows:
-        st.markdown(f"#### {translate('source_breakdown')}")
-        if any(str(row["name"]).startswith("reconstructed/") for row in sources):
-            st.caption(translate("reconstructed_lineage_note"))
-        present_families = {str(row["family"]) for row in chart_rows}
-        family_order = [family for family in SOURCE_FAMILY_COLORS if family in present_families]
-        family_labels = [translate(f"source_family_{family}") for family in family_order]
-        specification = {
-            "height": 220,
-            "mark": {
-                "type": "bar",
-                "cornerRadiusTopRight": 3,
-                "cornerRadiusBottomRight": 3,
-            },
-            "encoding": {
-                "y": {
-                    "field": "family_label",
-                    "type": "nominal",
-                    "sort": "-x",
-                    "axis": {"title": None, "labelFontSize": 13, "labelOverlap": False},
-                },
-                "x": {
-                    "field": "count",
-                    "type": "quantitative",
-                    "axis": {"title": None, "grid": False, "labelFontSize": 12},
-                },
-                "color": {
-                    "field": "family_label",
-                    "type": "nominal",
-                    "legend": {"title": None, "orient": "bottom", "columns": 3},
-                    "scale": {
-                        "domain": family_labels,
-                        "range": [SOURCE_FAMILY_COLORS[family] for family in family_order],
-                    },
-                },
-                "tooltip": [
-                    {
-                        "field": "family_label",
-                        "type": "nominal",
-                        "title": translate("source_method"),
-                    },
-                    {"field": "count", "type": "quantitative", "title": translate("records")},
-                    {
-                        "field": "provider_count",
-                        "type": "quantitative",
-                        "title": translate("source_count"),
-                    },
-                ],
-            },
-            "config": {"background": "transparent", "view": {"stroke": "transparent"}},
-        }
-        st.vega_lite_chart(chart_rows, specification, width="stretch")
-
-    st.markdown(f"#### {translate('recent_ingestion')}")
-    runs = evidence.query(
-        """
-        SELECT ss.name, ir.status, ir.raw_record_count, ir.finished_at
-        FROM data_ingestion_run ir
-        JOIN data_source_system ss ON ss.id = ir.source_system_id
-        WHERE ir.finished_at IS NOT NULL
-        ORDER BY ir.finished_at DESC
-        LIMIT 20
-        """
+    if frozen_distribution:
+        st.caption(translate("reconstructed_lineage_note"))
+    _render_source_chart(
+        _training_provider_rows(frozen_distribution),
+        translate("training_source_breakdown"),
+        translate,
     )
-    if not runs:
-        st.info(translate("no_ingestion"))
-        return
-    for row in runs:
-        finished_at = str(row.get("finished_at") or "")[:16].replace("T", " ")
-        count = int(row.get("raw_record_count") or 0)
-        status = str(row.get("status") or "")
-        badge_class = (
-            "badge-ok" if status.lower() in {"success", "completed", "done"} else "badge-danger"
+    _render_source_chart(
+        _reference_provider_rows(sources),
+        translate("reference_source_breakdown"),
+        translate,
+    )
+
+    provider_rows = []
+    for source, count in frozen_distribution.items():
+        provider_rows.append(
+            {
+                translate("source"): _source_label(source, translate),
+                translate("source_method"): translate(f"source_family_{_source_family(source)}"),
+                translate("records"): count,
+            }
         )
-        st.markdown(
-            "<div class='card' style='padding:9px 12px;margin-bottom:4px;'>"
-            "<div style='display:flex;justify-content:space-between;align-items:center;'>"
-            f"<span style='font-size:0.9rem;font-weight:600;color:var(--text);'>"
-            f"{_source_label(str(row.get('name', '')), translate)}</span>"
-            f"<span class='badge {badge_class}'>{status}</span></div>"
-            f"<div style='font-size:0.78rem;color:var(--text-muted);'>"
-            f"{format_number(count)} {translate('records')} &middot; {finished_at}</div></div>",
-            unsafe_allow_html=True,
-        )
+    reference_rows = [
+        {
+            translate("source"): _source_label(str(row.get("name") or "-"), translate),
+            translate("source_method"): translate(
+                f"source_family_{_source_family(str(row.get('name') or ''), str(row.get('source_type') or ''))}"
+            ),
+            translate("records"): int(row.get("reference_records") or 0),
+        }
+        for row in sources
+        if int(row.get("reference_records") or 0) > 0
+    ]
+    provider_rows.extend(reference_rows)
+    if provider_rows:
+        with st.expander(translate("source_provider_details")):
+            columns = (
+                translate("source"),
+                translate("source_method"),
+                translate("records"),
+            )
+            render_evidence_table(
+                provider_rows,
+                columns,
+                caption=translate("source_provider_table_caption"),
+            )
 
 
 def _render_versions(evidence: DataEvidence, translate: Callable[[str], str]) -> None:
@@ -256,7 +396,7 @@ def _render_versions(evidence: DataEvidence, translate: Callable[[str], str]) ->
         item_count = int(row.get("item_count") or 0)
         st.markdown(
             "<div class='card'>"
-            f"<strong>{row.get('version_tag', '—')}</strong>"
+            f"<strong>{row.get('version_tag', '-')}</strong>"
             "<span style='margin-left:12px;font-size:0.82rem;color:var(--text-2);'>"
             f"{format_number(item_count)} {translate('rows')} &middot; {created_at} "
             f"&middot; {row.get('status', '')}</span></div>",
@@ -268,18 +408,35 @@ def render_datasets(evidence: DataEvidence, translate: Callable[[str], str]) -> 
     """Render local record volumes, source lineage, runs, and dataset versions."""
     st.title(translate("data_platform_title"))
     st.caption(translate("data_platform_subtitle"))
+    latest_dataset = evidence.query(
+        """
+        SELECT item_count
+        FROM data_dataset
+        ORDER BY created_at DESC
+        LIMIT 1
+        """
+    )
+    latest_item_count = int(latest_dataset[0]["item_count"]) if latest_dataset else 0
+    normalized_total = evidence.count("data_normalized_message")
+    reference_rows = evidence.query(
+        """
+        SELECT COUNT(*) AS count
+        FROM data_raw_record
+        WHERE rejection_reason = 'ioc_reference_only_not_email_training_text'
+        """
+    )
+    reference_total = int(reference_rows[0]["count"]) if reference_rows else 0
+    st.markdown(f"#### {translate('dataset_current_state')}")
     columns = st.columns(3)
-    _metric(columns[0], translate("total_raw"), evidence.count("data_raw_record"))
+    _metric(columns[0], translate("training_corpus_items"), normalized_total)
     _metric(
         columns[1],
-        translate("total_normalized"),
-        evidence.count("data_normalized_message"),
-    )
-    _metric(
-        columns[2],
         translate("total_dataset_items"),
-        evidence.count("data_dataset_item"),
+        latest_item_count,
     )
+    _metric(columns[2], translate("reference_ioc_total"), reference_total)
+    st.caption(translate("dataset_scope_summary"))
     st.markdown("<div style='margin-bottom:16px;'></div>", unsafe_allow_html=True)
+    _render_incremental_run(evidence, translate)
     _render_sources(evidence, translate)
     _render_versions(evidence, translate)

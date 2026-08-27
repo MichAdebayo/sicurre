@@ -6,6 +6,7 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 from poc import config, local_runtime
+from poc.inference import FaultProbeResult, FaultScenario, PocInferenceClient
 
 APP_PATH = Path(__file__).resolve().parents[3] / "src" / "poc" / "app.py"
 
@@ -38,25 +39,42 @@ def _seed_data_evidence(data_path: Path) -> None:
             CREATE TABLE IF NOT EXISTS data_ingestion_run (
                 id TEXT PRIMARY KEY,
                 source_system_id TEXT NOT NULL,
+                raw_object_count INTEGER NOT NULL,
                 raw_record_count INTEGER NOT NULL,
+                started_at TEXT NOT NULL,
                 finished_at TEXT NOT NULL,
+                trigger_mode TEXT NOT NULL,
                 status TEXT NOT NULL
             )
         """)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS data_dataset (
-                version_tag TEXT PRIMARY KEY,
+                id TEXT PRIMARY KEY,
+                version_tag TEXT NOT NULL,
                 status TEXT NOT NULL,
                 item_count INTEGER NOT NULL,
                 created_at TEXT NOT NULL
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS data_raw_object (
+                id TEXT PRIMARY KEY,
+                ingestion_run_id TEXT NOT NULL
+            )
+        """)
         conn.execute(
             "CREATE TABLE IF NOT EXISTS data_raw_record "
-            "(id TEXT PRIMARY KEY, source_system_id TEXT)"
+            "(id TEXT PRIMARY KEY, source_system_id TEXT, raw_object_id TEXT, "
+            "rejection_reason TEXT)"
         )
-        conn.execute("CREATE TABLE IF NOT EXISTS data_normalized_message (id TEXT PRIMARY KEY)")
-        conn.execute("CREATE TABLE IF NOT EXISTS data_dataset_item (id TEXT PRIMARY KEY)")
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS data_normalized_message "
+            "(id TEXT PRIMARY KEY, raw_record_id TEXT)"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS data_dataset_item "
+            "(id TEXT PRIMARY KEY, dataset_id TEXT, normalized_message_id TEXT)"
+        )
 
         # Seed data
         conn.execute(
@@ -70,20 +88,31 @@ def _seed_data_evidence(data_path: Path) -> None:
             "('ss-3', 'reconstructed/current_frozen/native_external', 'manual')"
         )
         conn.execute(
-            "INSERT INTO data_ingestion_run (id, source_system_id, raw_record_count, finished_at, status) VALUES ('ir-1', 'ss-1', 100, '2026-07-15T12:00:00Z', 'success')"
+            "INSERT INTO data_ingestion_run (id, source_system_id, raw_object_count, raw_record_count, started_at, finished_at, trigger_mode, status) VALUES ('ir-1', 'ss-1', 1, 100, '2026-07-15T11:59:00Z', '2026-07-15T12:00:00Z', 'manual', 'completed')"
         )
         conn.execute(
-            "INSERT INTO data_ingestion_run (id, source_system_id, raw_record_count, finished_at, status) VALUES ('ir-2', 'ss-2', 50, '2026-07-15T13:00:00Z', 'success')"
+            "INSERT INTO data_ingestion_run (id, source_system_id, raw_object_count, raw_record_count, started_at, finished_at, trigger_mode, status) VALUES ('ir-2', 'ss-2', 1, 50, '2026-07-15T12:59:00Z', '2026-07-15T13:00:00Z', 'scheduled', 'completed')"
         )
         conn.execute(
-            "INSERT INTO data_dataset (version_tag, status, item_count, created_at) VALUES ('base-20260715', 'frozen', 120, '2026-07-15T14:00:00Z')"
+            "INSERT INTO data_dataset (id, version_tag, status, item_count, created_at) VALUES ('ds-1', 'base-20260715', 'frozen', 120, '2026-07-15T14:00:00Z')"
         )
         conn.execute(
-            "INSERT INTO data_raw_record (id, source_system_id) "
-            "VALUES ('1', 'ss-1'), ('2', 'ss-2'), ('3', 'ss-3')"
+            "INSERT INTO data_raw_object (id, ingestion_run_id) VALUES ('ro-1', 'ir-1'), ('ro-2', 'ir-2')"
         )
-        conn.execute("INSERT INTO data_normalized_message (id) VALUES ('1'), ('2')")
-        conn.execute("INSERT INTO data_dataset_item (id) VALUES ('1'), ('2')")
+        conn.execute(
+            "INSERT INTO data_raw_record "
+            "(id, source_system_id, raw_object_id, rejection_reason) VALUES "
+            "('1', 'ss-1', 'ro-1', NULL), ('2', 'ss-2', 'ro-2', NULL), "
+            "('3', 'ss-3', NULL, NULL), "
+            "('4', 'ss-1', 'ro-1', 'ioc_reference_only_not_email_training_text')"
+        )
+        conn.execute(
+            "INSERT INTO data_normalized_message (id, raw_record_id) VALUES ('nm-1', '1'), ('nm-2', '2')"
+        )
+        conn.execute(
+            "INSERT INTO data_dataset_item (id, dataset_id, normalized_message_id) "
+            "VALUES ('di-1', 'ds-1', 'nm-1'), ('di-2', 'ds-1', 'nm-2')"
+        )
         conn.commit()
     finally:
         conn.close()
@@ -107,9 +136,39 @@ def poc_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AppTest:
         yield "API_KEY=mysecret\n"
         yield "Done.\n"
 
-    from poc.presentation import pipeline_page
+    from poc.presentation import datasets, pipeline_page
 
     monkeypatch.setattr(pipeline_page, "stream_operation", mock_stream_operation)
+    monkeypatch.setattr(
+        datasets,
+        "_load_frozen_source_distribution",
+        lambda: {"phishtank_api": 100, "kaggle_multilingual_spam": 20},
+    )
+    monkeypatch.setattr(
+        PocInferenceClient,
+        "health",
+        lambda self: (True, "inference_health_ready"),
+    )
+    monkeypatch.setattr(
+        PocInferenceClient,
+        "run_fault_probe",
+        lambda self, scenario, emit=None: FaultProbeResult(scenario, "401", "401", True),
+    )
+    monkeypatch.setattr(
+        PocInferenceClient,
+        "run_recovery_probe",
+        lambda self, emit=None: FaultProbeResult(
+            FaultScenario.INVALID_CONTRACT,
+            "contract_accepted",
+            "contract_accepted",
+            True,
+            response_status=200,
+            response_body={"verdict": "safe", "label_verdict": "legitimate"},
+            validation="accepted",
+            validation_detail="required_fields_accepted",
+            application_outcome="recovery_verified_not_persisted",
+        ),
+    )
 
     environment = {
         "SICURRE_POC_DATABASE_URL": f"sqlite+aiosqlite:///{auth_path}",
@@ -156,16 +215,23 @@ def test_invalid_and_valid_login_are_contextual(poc_app: AppTest) -> None:
     assert poc_app.session_state["user"]["display_name"] == "Admin Test"
 
 
-def test_controlled_incident_is_visible_and_not_persisted(poc_app: AppTest) -> None:
+def test_resilience_page_exposes_selectable_real_fault_evidence(poc_app: AppTest) -> None:
     login(poc_app)
-    open_page(poc_app, "Espace d'essai", "nav_playground")
-    poc_app.button_group[0].set_value("incident").run()
-    analyze = next(button for button in poc_app.button if button.label == "Analyser l'email")
-    analyze.click().run()
+    open_page(poc_app, "Incidence technique", "nav_resilience")
+    assert any(selectbox.label == "Scénario à exercer" for selectbox in poc_app.selectbox)
+    inject = next(button for button in poc_app.button if button.label == "Injecter la panne")
+    inject.click().run()
+    assert any("Panne active" in error.value for error in poc_app.error)
+    assert len(poc_app.code) == 1
 
-    assert any("Classification impossible" in error.value for error in poc_app.error)
-    assert "last_result" in poc_app.session_state
-    assert poc_app.session_state["last_result"] is None
+    open_page(poc_app, "Espace d'essai", "nav_playground")
+    open_page(poc_app, "Incidence technique", "nav_resilience")
+    assert any("Panne active" in error.value for error in poc_app.error)
+    assert next(button for button in poc_app.button if button.label == "Injecter la panne").disabled
+    restore = next(button for button in poc_app.button if button.label == "Rétablir le service")
+    restore.click().run()
+    assert any("Service rétabli" in success.value for success in poc_app.success)
+    assert len(poc_app.code) == 1
 
 
 def test_successful_simulation_populates_operational_pages(poc_app: AppTest) -> None:
@@ -238,7 +304,7 @@ def test_false_negative_report_moves_delivered_message_to_threat_log(poc_app: Ap
 
 
 def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
-    """Test successful and failing pipeline runs, observer warning, and datasets display."""
+    """Test every pipeline action, failure handling, datasets, and viewer isolation."""
     login(poc_app)
 
     # 1. Test Datasets Page (showing metrics and seeded database)
@@ -246,20 +312,32 @@ def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
     assert not poc_app.exception
     # Verify seeded counts are shown
     assert any("base-20260715" in md.value for md in poc_app.markdown)
-    assert any("PhishTank" in md.value for md in poc_app.markdown)
-    assert any("totaux V1 sont reconstruits" in caption.value for caption in poc_app.caption)
+    assert any(
+        "Composition du corpus d'entraînement" in markdown.value
+        for markdown in poc_app.markdown
+    )
+    assert any(
+        "Flux de renseignement de référence" in markdown.value
+        for markdown in poc_app.markdown
+    )
+    assert any("Base V1 issue" in caption.value for caption in poc_app.caption)
 
     # 2. Test Pipeline Page - Admin Successful Run
     open_page(poc_app, "Flux de données", "nav_pipeline")
     assert any(btn.label == "1. Reconstruire la base" for btn in poc_app.button)
     assert any(btn.label == "3. Normaliser + construire" for btn in poc_app.button)
-    cron_btn = next(btn for btn in poc_app.button if btn.label == "2. Collecter SEKOIA")
-    cron_btn.click().run()
-    assert not poc_app.exception
-    assert any("Dernière opération terminée avec succès" in info.value for info in poc_app.info)
+    for label in (
+        "1. Reconstruire la base",
+        "2. Collecter SEKOIA",
+        "3. Normaliser + construire",
+    ):
+        next(btn for btn in poc_app.button if btn.label == label).click().run()
+        assert not poc_app.exception
+        assert any("Dernière opération terminée avec succès" in info.value for info in poc_app.info)
 
     # 3. Test Pipeline Page - Permission Error Handler
     pytest._pipeline_fail_type = "permission"  # type: ignore[attr-defined]
+    cron_btn = next(btn for btn in poc_app.button if btn.label == "2. Collecter SEKOIA")
     cron_btn.click().run()
     assert not poc_app.exception
     assert any("Dernière opération en erreur" in warning.value for warning in poc_app.warning)
@@ -271,7 +349,7 @@ def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
     assert any("Dernière opération en erreur" in warning.value for warning in poc_app.warning)
     pytest._pipeline_fail_type = None  # type: ignore[attr-defined]
 
-    # 5. Test Pipeline Page - Observer Restriction
+    # 5. Test Pipeline Page - Viewer Restriction
     # Logout and login as viewer/observer
     open_page(poc_app, "Paramètres", "nav_settings")
     logout_btn = next(btn for btn in poc_app.button if btn.label == "Déconnexion")
@@ -284,5 +362,9 @@ def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
     assert poc_app.session_state["authenticated"] is True
     assert poc_app.session_state["user"]["role"] == "viewer"
 
-    open_page(poc_app, "Flux de données", "nav_pipeline")
-    assert any("Accès réservé" in warning.value for warning in poc_app.warning)
+    for admin_page in ("Flux de données", "Incidence technique"):
+        assert not any(btn.label == admin_page for btn in poc_app.button)
+    poc_app.session_state["page"] = "nav_pipeline"
+    poc_app.run()
+    assert poc_app.session_state["page"] == "nav_home"
+    assert not any(btn.label == "Flux de données" for btn in poc_app.button)

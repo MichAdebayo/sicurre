@@ -24,6 +24,7 @@ def test_evidence_store_is_lazy_and_reads_local_counts(tmp_path: Path) -> None:
     assert store.table_exists("data_raw_record")
     assert store.count("data_raw_record") == 2
     assert store.query("SELECT id FROM data_raw_record ORDER BY id") == [{"id": 1}, {"id": 2}]
+    assert store.integrity_status() == (True, 0)
 
 
 def test_evidence_store_handles_absent_tables_and_rejects_identifiers(tmp_path: Path) -> None:
@@ -54,3 +55,37 @@ def test_evidence_store_retries_locked_database_then_raises(
         store.query("SELECT 1")
 
     assert sleeps == [0]
+
+
+def test_latest_incremental_run_excludes_reconstruction_and_returns_newest(
+    tmp_path: Path,
+) -> None:
+    """The cross-page handoff identifies the newest real collection run."""
+    database_path = tmp_path / "runs.db"
+    connection = sqlite3.connect(database_path)
+    connection.executescript(
+        """
+        CREATE TABLE data_source_system (id TEXT PRIMARY KEY, name TEXT NOT NULL);
+        CREATE TABLE data_ingestion_run (
+            id TEXT PRIMARY KEY,
+            source_system_id TEXT NOT NULL,
+            started_at TEXT,
+            finished_at TEXT
+        );
+        INSERT INTO data_source_system VALUES ('base', 'reconstructed/current_frozen/api');
+        INSERT INTO data_source_system VALUES ('sekoia', 'SEKOIA Community IOC');
+        INSERT INTO data_ingestion_run VALUES (
+            'base-newest', 'base', '2026-08-26T13:00:00Z', '2026-08-26T13:01:00Z'
+        );
+        INSERT INTO data_ingestion_run VALUES (
+            'cron-old', 'sekoia', '2026-08-26T12:00:00Z', '2026-08-26T12:01:00Z'
+        );
+        INSERT INTO data_ingestion_run VALUES (
+            'cron-new', 'sekoia', '2026-08-26T12:30:00Z', '2026-08-26T12:31:00Z'
+        );
+        """
+    )
+    connection.commit()
+    connection.close()
+
+    assert PocDataEvidenceStore(database_path).latest_incremental_run_id() == "cron-new"

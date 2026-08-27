@@ -12,13 +12,14 @@ import hashlib
 import json
 import logging
 import re
+import zipfile
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from io import StringIO
+from datetime import UTC, datetime
+from io import BytesIO, StringIO
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import httpx
 from sqlalchemy import select
@@ -50,9 +51,9 @@ REPO_ROOT = ROOT_DIR
 DEFAULT_SOURCE_NAME = "sekoia-community-ioc"
 DEFAULT_SNAPSHOT_DIR = REPO_ROOT / "data" / "raw" / "scraping" / "sekoia_ioc"
 DEFAULT_SNAPSHOT_PREFIX = "sekoia-community-ioc"
-DEFAULT_GITHUB_API_ROOT = (
-    "https://api.github.com/repos/SEKOIA-IO/Community/contents/IOCs"
-)
+DEFAULT_GITHUB_API_ROOT = "https://api.github.com/repos/SEKOIA-IO/Community/git/trees/main"
+DEFAULT_RAW_ROOT = "https://raw.githubusercontent.com/SEKOIA-IO/Community/main"
+DEFAULT_ARCHIVE_URL = "https://codeload.github.com/SEKOIA-IO/Community/zip/refs/heads/main"
 
 DEFAULT_TARGET_PATHS: tuple[str, ...] = (
     "sneaky2fa",
@@ -77,9 +78,7 @@ DATE_FIELD_CANDIDATES = ("first seen", "valid from", "valid_from", "date")
 VALID_UNTIL_FIELD_CANDIDATES = ("valid until", "valid_until", "expires")
 DESCRIPTION_FIELD_CANDIDATES = ("description", "comment", "link", "source")
 
-_DOMAIN_RE = re.compile(
-    r"^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$"
-)
+_DOMAIN_RE = re.compile(r"^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$")
 _IPV4_RE = re.compile(
     r"^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}"
     r"(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$"
@@ -136,31 +135,20 @@ class SekoiaCommunityClient:
         self.timeout_seconds = timeout_seconds
 
     async def fetch_iocs(self) -> SekoiaFetchedPayload:
-        files: list[dict[str, str]] = []
         async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
-            for target_path in self.target_paths:
-                files.extend(await self._list_files(client, target_path))
-
-            iocs: list[SekoiaIoc] = []
-            for file_info in files:
-                download_url = file_info.get("download_url")
-                path = file_info.get("path", "")
-                if not download_url:
-                    continue
-                response = await client.get(download_url)
-                response.raise_for_status()
-                iocs.extend(
-                    parse_ioc_file(
-                        response.text,
-                        source_path=path,
-                        source_url=download_url,
-                    )
-                )
+            try:
+                files = await self._list_files(client)
+                iocs = await self._fetch_listed_iocs(client, files)
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code not in {403, 429}:
+                    raise
+                logger.warning("GitHub tree API rate-limited; using the public archive fallback.")
+                iocs = await self._fetch_archive_iocs(client)
 
         unique_iocs = _dedupe_iocs(iocs)
         snapshot = {
             "source": "sekoia_ioc",
-            "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "fetched_at": datetime.now(UTC).isoformat(),
             "target_paths": list(self.target_paths),
             "ioc_count": len(unique_iocs),
             "records": [ioc_to_payload(ioc) for ioc in unique_iocs],
@@ -172,32 +160,77 @@ class SekoiaCommunityClient:
             ).encode("utf-8"),
         )
 
-    async def _list_files(
-        self, client: httpx.AsyncClient, relative_path: str
-    ) -> list[dict[str, str]]:
-        response = await client.get(f"{self.api_root}/{relative_path.strip('/')}")
+    async def _fetch_listed_iocs(
+        self,
+        client: httpx.AsyncClient,
+        files: list[dict[str, str]],
+    ) -> list[SekoiaIoc]:
+        """Fetch and parse files discovered through the GitHub tree API."""
+        iocs: list[SekoiaIoc] = []
+        for file_info in files:
+            download_url = file_info.get("download_url")
+            path = file_info.get("path", "")
+            if not download_url:
+                continue
+            response = await client.get(download_url)
+            response.raise_for_status()
+            iocs.extend(
+                parse_ioc_file(
+                    response.text,
+                    source_path=path,
+                    source_url=download_url,
+                )
+            )
+        return iocs
+
+    async def _fetch_archive_iocs(self, client: httpx.AsyncClient) -> list[SekoiaIoc]:
+        """Fetch selected files from GitHub's public archive after API throttling."""
+        response = await client.get(DEFAULT_ARCHIVE_URL)
+        response.raise_for_status()
+        target_prefixes = tuple(
+            f"Community-main/IOCs/{path.strip('/')}/" for path in self.target_paths
+        )
+        iocs: list[SekoiaIoc] = []
+        with zipfile.ZipFile(BytesIO(response.content)) as archive:
+            for archive_path in archive.namelist():
+                if not archive_path.startswith(target_prefixes):
+                    continue
+                if not archive_path.lower().endswith(CSV_EXTENSIONS):
+                    continue
+                source_path = archive_path.removeprefix("Community-main/")
+                content = archive.read(archive_path).decode("utf-8-sig", errors="replace")
+                iocs.extend(
+                    parse_ioc_file(
+                        content,
+                        source_path=source_path,
+                        source_url=f"{DEFAULT_ARCHIVE_URL}#{source_path}",
+                    )
+                )
+        return iocs
+
+    async def _list_files(self, client: httpx.AsyncClient) -> list[dict[str, str]]:
+        """Discover selected IOC files with one bounded GitHub API request."""
+        response = await client.get(f"{self.api_root}?recursive=1")
         response.raise_for_status()
         payload = response.json()
-        if not isinstance(payload, list):
+        if not isinstance(payload, dict) or payload.get("truncated") is True:
             return []
 
         files: list[dict[str, str]] = []
-        for item in payload:
+        target_prefixes = tuple(f"IOCs/{path.strip('/')}/" for path in self.target_paths)
+        for item in payload.get("tree", []):
+            if not isinstance(item, dict):
+                continue
             item_type = str(item.get("type") or "")
             item_path = str(item.get("path") or "")
-            if item_type == "dir":
-                nested = item_path.removeprefix("IOCs/").strip("/")
-                files.extend(await self._list_files(client, nested))
+            if item_type != "blob" or not item_path.startswith(target_prefixes):
                 continue
-            if item_type != "file":
-                continue
-            name = str(item.get("name") or "").lower()
-            if not name.endswith(CSV_EXTENSIONS):
+            if not item_path.lower().endswith(CSV_EXTENSIONS):
                 continue
             files.append(
                 {
                     "path": item_path,
-                    "download_url": str(item.get("download_url") or ""),
+                    "download_url": f"{DEFAULT_RAW_ROOT}/{quote(item_path, safe='/')}",
                 }
             )
         return files
@@ -241,7 +274,7 @@ class SekoiaIocIngestionService:
         trigger_mode: str = "scheduled",
         started_at: datetime | None = None,
     ) -> SekoiaIocIngestionResult:
-        run_started_at = started_at or datetime.now(timezone.utc)
+        run_started_at = started_at or datetime.now(UTC)
         trace = SemanticTraceLogger(
             parent_type="Web Scraping",
             child_target="SEKOIA Community IOC",
@@ -269,13 +302,11 @@ class SekoiaIocIngestionService:
         try:
             payload = await self.fetch_iocs()
             existing_keys = await self._existing_record_keys(session)
-            new_iocs = [
-                ioc for ioc in payload.iocs if self._entry_key(ioc) not in existing_keys
-            ]
+            new_iocs = [ioc for ioc in payload.iocs if self._entry_key(ioc) not in existing_keys]
             skipped_count = len(payload.iocs) - len(new_iocs)
 
             if not new_iocs:
-                ingestion_run.finished_at = datetime.now(timezone.utc)
+                ingestion_run.finished_at = datetime.now(UTC)
                 ingestion_run.status = IngestionStatus.COMPLETED
                 ingestion_run.log_message = (
                     f"SEKOIA IOC feed returned {len(payload.iocs)} IOC(s); "
@@ -317,7 +348,7 @@ class SekoiaIocIngestionService:
                 f"SEKOIA IOC ingestion completed: {len(raw_records)} new IOC(s), "
                 f"{skipped_count} dedup-skipped."
             )
-            ingestion_run.finished_at = datetime.now(timezone.utc)
+            ingestion_run.finished_at = datetime.now(UTC)
             ingestion_run.status = IngestionStatus.COMPLETED
             ingestion_run.raw_object_count = 1
             ingestion_run.raw_record_count = len(raw_records)
@@ -342,7 +373,7 @@ class SekoiaIocIngestionService:
                 log_message=log_message,
             )
         except Exception as exc:
-            ingestion_run.finished_at = datetime.now(timezone.utc)
+            ingestion_run.finished_at = datetime.now(UTC)
             ingestion_run.status = IngestionStatus.FAILED
             ingestion_run.log_message = f"SEKOIA IOC ingestion failed: {exc}"
             await session.commit()
@@ -384,12 +415,8 @@ class SekoiaIocIngestionService:
         rows = await session.scalars(stmt)
         return set(rows)
 
-    async def _get_or_create_source_system(
-        self, session: AsyncSession
-    ) -> DataSourceSystem:
-        source_system = await self.source_repository.get_by_name(
-            session, self.source_name
-        )
+    async def _get_or_create_source_system(self, session: AsyncSession) -> DataSourceSystem:
+        source_system = await self.source_repository.get_by_name(session, self.source_name)
         if source_system is not None:
             return source_system
 
@@ -458,15 +485,13 @@ class SekoiaIocIngestionService:
         iocs: list[SekoiaIoc],
         source_system: DataSourceSystem,
     ) -> list[DataRawRecord]:
-        extracted_at = datetime.now(timezone.utc)
+        extracted_at = datetime.now(UTC)
         return [
             DataRawRecord(
                 raw_object_id=raw_object.id,
                 source_system_id=source_system.id,
                 record_key=self._entry_key(ioc),
-                raw_content=json.dumps(
-                    ioc_to_payload(ioc), ensure_ascii=False, sort_keys=True
-                ),
+                raw_content=json.dumps(ioc_to_payload(ioc), ensure_ascii=False, sort_keys=True),
                 detected_language=None,
                 is_usable=True,
                 rejection_reason=None,

@@ -114,6 +114,9 @@ jobs:
       - name: Enforce critical docstring coverage
         run: uv run --no-sync interrogate -f 90 src/core/config.py src/data_platform/extractors/incremental_cc_extractor.py src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py
 
+      - name: Verify generated OpenAPI contract
+        run: make openapi-check
+
       - name: Run Python tests with repository coverage ratchet
         run: |
           mkdir -p coverage/python

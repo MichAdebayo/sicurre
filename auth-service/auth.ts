@@ -13,6 +13,7 @@ import {
   directMigrationUrl,
   normalizePostgresUrl,
 } from "./database.js";
+import { buildEmailVerificationEntryUrl } from "./email-verification.js";
 import { sendLoopsTransactional } from "./loops.js";
 import "./env.js";
 
@@ -184,6 +185,7 @@ const trustedOrigins = [
   "http://127.0.0.1:5173",
   "http://localhost:5173",
 ].filter(Boolean) as string[];
+const frontendOrigin = process.env.SICURRE_FRONTEND_ORIGIN?.trim() || new URL(authBaseUrl).origin;
 
 export const auth = betterAuth({
   secret: authSecret,
@@ -251,8 +253,8 @@ export const auth = betterAuth({
   emailVerification: {
     sendOnSignUp: true,
     sendOnSignIn: true,
-    autoSignInAfterVerification: true,
-    sendVerificationEmail: async ({ user, url }) => {
+    autoSignInAfterVerification: false,
+    sendVerificationEmail: async ({ user, token }) => {
       if (internalAdminSeedActive) return;
 
       const transactionalId = process.env.LOOPS_SIGN_UP_TRANSACTION_ID?.trim() ?? "";
@@ -262,7 +264,7 @@ export const auth = betterAuth({
           email: user.email,
           dataVariables: {
             firstName: user.name.split(" ")[0] || "Utilisateur",
-            verificationUrl: url,
+            verificationUrl: buildEmailVerificationEntryUrl(frontendOrigin, token),
           },
         });
       } catch (error) {
