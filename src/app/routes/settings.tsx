@@ -25,6 +25,7 @@ import { CloudflareIntegrator } from "../components/common/cloudflare-integrator
 import { AppToast } from "../components/common/app-toast";
 import AlertsRoute from "./alerts";
 import cloudflareLogo from "../assets/cloudflare-svgrepo-com.svg";
+import { useTheme } from "../lib/theme";
 import {
   AuthSession,
   getStoredAuthProvider,
@@ -69,11 +70,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
   const [saveError, setSaveError] = useState("");
 
   const [lang, setLang] = useState(localStorage.getItem("sicurre_lang") || "fr");
-  const [theme, setTheme] = useState(() => {
-    const savedTheme = localStorage.getItem("sicurre_theme");
-    if (savedTheme) return savedTheme;
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  });
+  const [theme, setTheme] = useTheme();
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -131,13 +128,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
   };
 
   const handleThemeChange = (newTheme: string) => {
-    setTheme(newTheme);
-    localStorage.setItem("sicurre_theme", newTheme);
-    if (newTheme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
+    setTheme(newTheme === "dark" ? "dark" : "light");
   };
 
   const handlePasswordChange = async (e: React.FormEvent) => {
