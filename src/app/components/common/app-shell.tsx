@@ -58,6 +58,7 @@ export function AppShell({
         workspaceName={workspaceName}
         threatCount={threatCount}
         hasIntegration={hasIntegration}
+        collapsible
         className="hidden md:flex"
       />
 
@@ -76,6 +77,9 @@ export function AppShell({
             onLockdown={onLockdown}
             userRole={userRole}
             onboardingRequired={onboardingRequired}
+            workspaceName={workspaceName}
+            threatCount={threatCount}
+            hasIntegration={hasIntegration}
             className="relative z-10 flex shadow-2xl"
           />
           <button
