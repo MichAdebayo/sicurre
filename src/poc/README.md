@@ -31,17 +31,9 @@ Le cron de démonstration lit le flux public SEKOIA, puis écrit son snapshot,
 sa lignée et ses nouveaux enregistrements uniquement dans ce répertoire et la
 base SQLite POC. Une seconde exécution ignore les indicateurs déjà présents.
 
-## Publication de staging optionnelle
-
-```dotenv
-SICURRE_POC_ALLOW_STAGING_PUBLICATION=false
-SICURRE_POC_ALLOW_ML_DISPATCH=false
-SICURRE_POC_KAGGLE_DATASET_SLUG=""
-```
-
-La publication Kaggle n'appartient pas aux trois actions standard du POC. Elle
-exige ce consentement dédié et un slug de staging distinct. Le dispatch ML reste
-interdit depuis cette publication de démonstration.
+Le POC ne contient aucun chemin de publication Kaggle ni de dispatch ML. Ses
+trois opérations de données sont limitées à SQLite et au stockage local ; seul
+le cron SEKOIA effectue une lecture externe du flux public.
 
 ## Démarrage
 

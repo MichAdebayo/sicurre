@@ -4,34 +4,34 @@ import logging
 import re
 from collections import Counter
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from difflib import SequenceMatcher
 from enum import StrEnum
-from uuid import UUID
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from data_platform.cleaning.normalization import TextNormalizationService
-from data_platform.services.database.source_naming import (
-    DATABASE_PARENT_SOURCE,
-    canonical_database_source,
-)
 from data_platform.services.certfr.stage_two import CertFRStageTwoService
 from data_platform.services.common_crawl.content import CommonCrawlContentService
 from data_platform.services.common_crawl.stage_two import CommonCrawlStageTwoService
 from data_platform.services.database.historical_stage_two import (
     HistoricalStageTwoService,
 )
+from data_platform.services.database.source_naming import (
+    DATABASE_PARENT_SOURCE,
+    canonical_database_source,
+)
 from db.models.lineage import (
-    DataRawRecord,
     DataNormalizedMessage,
     DataProcessingRun,
+    DataRawRecord,
     DataSourceSystem,
+    IngestionStatus,
     NormalizedLabel,
     RedactionStatus,
-    IngestionStatus,
 )
 
 logger = logging.getLogger(__name__)
@@ -199,6 +199,12 @@ class NormalizationPipeline:
             requires_french=False,
             reason="url_intelligence_source",
         ),
+        "sekoia-community-ioc": SourceNormalizationPolicy(
+            lane=NormalizationLane.URL_INTELLIGENCE,
+            normalize_messages=False,
+            requires_french=False,
+            reason="ioc_reference_only_not_email_training_text",
+        ),
     }
 
     def __init__(self, session: AsyncSession):
@@ -277,7 +283,7 @@ class NormalizationPipeline:
 
     @staticmethod
     def _utc_now() -> datetime:
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
 
     @staticmethod
     def _join_subject_and_body(raw_content: dict[str, Any]) -> str:
@@ -803,7 +809,6 @@ class NormalizationPipeline:
         sources_result = await self.session.execute(sources_query)
         sources = {s.id: s.name for s in sources_result.scalars().all()}
 
-        target_source_id = None
         target_source_ids: set[str] | None = None
         target_source_policy: SourceNormalizationPolicy | None = None
         if source_system_name:
@@ -812,7 +817,6 @@ class NormalizationPipeline:
                 source_system_name,
             )
             if target_source_ids:
-                target_source_id = next(iter(target_source_ids))
                 target_source_policy = self.get_source_policy(source_system_name)
 
             if not target_source_ids:
@@ -882,9 +886,6 @@ class NormalizationPipeline:
                 payload = self.extract_payload(source_name, raw_dict)
                 source_policy = self.get_source_policy(source_name)
                 lane = source_policy.lane.value if source_policy else "unknown"
-                raw_preview = self._preview_text(
-                    str(raw_dict.get("text") or self._join_subject_and_body(raw_dict))
-                )
                 if payload.text:
                     samples.append(
                         self._build_dry_run_sample(

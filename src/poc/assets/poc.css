@@ -231,17 +231,74 @@ button[data-testid="stBaseButton-secondary"]:hover {
 }
 
 /* ── Phishing Red Alert Button (Smail simulation) ──────── */
-button[aria-label="Signaler comme phishing"],
-button[aria-label="Report as phishing"] {
-  background-color: var(--danger-semantic) !important;
-  border-color: var(--danger-semantic) !important;
-  color: #FFFFFF !important;
+[class*="st-key-fn_"] button {
+  background-color: #FEF2F2 !important;
+  border-color: #FECACA !important;
+  color: #B91C1C !important;
+  font-weight: 600 !important;
 }
-button[aria-label="Signaler comme phishing"]:hover,
-button[aria-label="Report as phishing"]:hover {
+[class*="st-key-fn_"] button *,
+[class*="st-key-fp_"] button * {
+  color: inherit !important;
+}
+[class*="st-key-fn_"] button:hover {
   background-color: #DC2626 !important;
   border-color: #DC2626 !important;
   color: #FFFFFF !important;
+}
+[class*="st-key-fp_"] button {
+  background-color: #047857 !important;
+  border-color: #047857 !important;
+  color: #FFFFFF !important;
+  font-weight: 600 !important;
+}
+[class*="st-key-fp_"] button:hover {
+  background-color: #065F46 !important;
+  border-color: #065F46 !important;
+  color: #FFFFFF !important;
+}
+/* Expander detail rules must not erase remediation semantics. */
+[data-testid="stExpander"] [data-testid="stExpanderDetails"] [class*="st-key-fn_"] button {
+  background-color: #FEF2F2 !important;
+  border-color: #FECACA !important;
+  color: #B91C1C !important;
+}
+[data-testid="stExpander"] [data-testid="stExpanderDetails"] [class*="st-key-fp_"] button {
+  background-color: #047857 !important;
+  border-color: #047857 !important;
+  color: #FFFFFF !important;
+}
+[data-testid="stExpander"] [data-testid="stExpanderDetails"] [class*="st-key-fn_"] button:hover {
+  background-color: #DC2626 !important;
+  border-color: #DC2626 !important;
+  color: #FFFFFF !important;
+}
+[data-testid="stExpander"] [data-testid="stExpanderDetails"] [class*="st-key-fp_"] button:hover {
+  background-color: #065F46 !important;
+  border-color: #065F46 !important;
+  color: #FFFFFF !important;
+}
+[data-theme="dark"] [class*="st-key-fn_"] button {
+  background-color: #450A0A !important;
+  border-color: #7F1D1D !important;
+  color: #FCA5A5 !important;
+}
+[data-theme="dark"] [class*="st-key-fp_"] button {
+  background-color: #047857 !important;
+  border-color: #047857 !important;
+  color: #FFFFFF !important;
+}
+@media (prefers-color-scheme: dark) {
+  [class*="st-key-fn_"] button {
+    background-color: #450A0A !important;
+    border-color: #7F1D1D !important;
+    color: #FCA5A5 !important;
+  }
+  [class*="st-key-fp_"] button {
+    background-color: #047857 !important;
+    border-color: #047857 !important;
+    color: #FFFFFF !important;
+  }
 }
 
 /* ── Forms ────────────────────────────────────────────── */
@@ -249,23 +306,6 @@ button[aria-label="Report as phishing"]:hover {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-}
-
-/* ── Focus rings & Text Contrast on input fields ─────── */
-div[data-baseweb="input"] > div {
-  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
-}
-div[data-baseweb="input"]:focus-within,
-div[data-baseweb="textarea"]:focus-within,
-div[data-baseweb="input"]:focus-within > div,
-div[data-baseweb="textarea"]:focus-within > div {
-  border-color: var(--accent) !important;
-  box-shadow: 0 0 0 1px var(--accent) !important;
-}
-input[data-testid="stTextInput-Input"]:focus,
-textarea[data-testid="stTextArea-Input"]:focus {
-  border-color: var(--accent) !important;
-  box-shadow: 0 0 0 1px var(--accent) !important;
 }
 
 input[data-testid="stTextInput-Input"],
@@ -564,6 +604,13 @@ div[data-testid="stMarkdownContainer"] h6 {
   color: var(--text) !important;
 }
 
+/* Keep the insertion caret visible against both explicit theme surfaces. */
+input,
+textarea,
+[contenteditable="true"] {
+  caret-color: var(--text) !important;
+}
+
 /* ── KPI cards ─────────────────────────────────────────── */
 .kpi {
   background: var(--surface);
@@ -858,88 +905,6 @@ button[aria-label*="password"]:hover svg *,
   background-color: transparent !important;
 }
 
-/* ── Semantic button: Phishing report (red) ───────────── */
-div[data-testid="stElementContainer"]:has(.semantic-btn-danger) + div[data-testid="stElementContainer"] button {
-  background-color: #FEF2F2 !important;
-  border: 1px solid #FECACA !important;
-  color: #DC2626 !important;
-  font-weight: 600 !important;
-  border-radius: 8px !important;
-  transition: all 0.15s ease !important;
-}
-div[data-testid="stElementContainer"]:has(.semantic-btn-danger) + div[data-testid="stElementContainer"] button *,
-div[data-testid="stElementContainer"]:has(.semantic-btn-danger) + div[data-testid="stElementContainer"] button:hover * {
-  color: inherit !important;
-}
-div[data-testid="stElementContainer"]:has(.semantic-btn-danger) + div[data-testid="stElementContainer"] button:hover {
-  background-color: #DC2626 !important;
-  border-color: #DC2626 !important;
-  color: #FFFFFF !important;
-}
-@media (prefers-color-scheme: dark) {
-  div[data-testid="stElementContainer"]:has(.semantic-btn-danger) + div[data-testid="stElementContainer"] button {
-    background-color: #450A0A !important;
-    border-color: #7F1D1D !important;
-    color: #F87171 !important;
-  }
-  div[data-testid="stElementContainer"]:has(.semantic-btn-danger) + div[data-testid="stElementContainer"] button:hover {
-    background-color: #DC2626 !important;
-    border-color: #DC2626 !important;
-    color: #FFFFFF !important;
-  }
-}
-[data-theme="dark"] div[data-testid="stElementContainer"]:has(.semantic-btn-danger) + div[data-testid="stElementContainer"] button {
-  background-color: #450A0A !important;
-  border-color: #7F1D1D !important;
-  color: #F87171 !important;
-}
-[data-theme="dark"] div[data-testid="stElementContainer"]:has(.semantic-btn-danger) + div[data-testid="stElementContainer"] button:hover {
-  background-color: #DC2626 !important;
-  border-color: #DC2626 !important;
-  color: #FFFFFF !important;
-}
-
-/* ── Semantic button: Safe / false positive (green) ───── */
-div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid="stElementContainer"] button {
-  background-color: #ECFDF5 !important;
-  border: 1px solid #A7F3D0 !important;
-  color: #059669 !important;
-  font-weight: 600 !important;
-  border-radius: 8px !important;
-  transition: all 0.15s ease !important;
-}
-div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid="stElementContainer"] button *,
-div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid="stElementContainer"] button:hover * {
-  color: inherit !important;
-}
-div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid="stElementContainer"] button:hover {
-  background-color: #059669 !important;
-  border-color: #059669 !important;
-  color: #FFFFFF !important;
-}
-@media (prefers-color-scheme: dark) {
-  div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid="stElementContainer"] button {
-    background-color: #022C22 !important;
-    border-color: #064E3B !important;
-    color: #34D399 !important;
-  }
-  div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid="stElementContainer"] button:hover {
-    background-color: #059669 !important;
-    border-color: #059669 !important;
-    color: #FFFFFF !important;
-  }
-}
-[data-theme="dark"] div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid="stElementContainer"] button {
-  background-color: #022C22 !important;
-  border-color: #064E3B !important;
-  color: #34D399 !important;
-}
-[data-theme="dark"] div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid="stElementContainer"] button:hover {
-  background-color: #059669 !important;
-  border-color: #059669 !important;
-  color: #FFFFFF !important;
-}
-
 /* ── Dropdown affordance uses the interaction color ──── */
 [data-baseweb="select"] svg {
   fill: var(--primary-dark) !important;
@@ -1094,20 +1059,114 @@ div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid=
 }
 [data-testid="stStatus"] code,
 [data-testid="stStatus"] pre,
+[data-testid="stStatus"] [data-testid="stCode"],
+[data-testid="stStatus"] .stCode,
 [data-testid="stStatus"] .stCodeBlock,
+[data-testid="stExpander"] [data-testid="stCode"],
+[data-testid="stExpander"] .stCode,
 [role="status"] code,
 [role="status"] pre,
+[role="status"] [data-testid="stCode"],
+[role="status"] .stCode,
 [role="status"] .stCodeBlock {
-    background-color: var(--bg) !important;
-    color: var(--text) !important;
-    border: 1px solid var(--border) !important;
+    background-color: #050A12 !important;
+    color: #DCE7F5 !important;
+    border: 1px solid #60738F !important;
     border-radius: 8px !important;
+    box-shadow: inset 0 0 0 1px rgba(220, 231, 245, 0.06) !important;
+}
+[data-testid="stStatus"] code *,
+[data-testid="stStatus"] pre *,
+[data-testid="stStatus"] [data-testid="stCode"] *,
+[data-testid="stStatus"] .stCode *,
+[data-testid="stStatus"] .stCodeBlock *,
+[data-testid="stExpander"] [data-testid="stCode"] *,
+[data-testid="stExpander"] .stCode *,
+[role="status"] code *,
+[role="status"] pre *,
+[role="status"] [data-testid="stCode"] *,
+[role="status"] .stCode *,
+[role="status"] .stCodeBlock * {
+    background-color: transparent !important;
+    color: #DCE7F5 !important;
 }
 [data-testid="stSpinner"],
 [data-testid="stSpinner"] *,
 .stSpinner, .stSpinner * {
     color: var(--text) !important;
     background-color: transparent !important;
+}
+
+/* Confirmation dialogs own their surface instead of inheriting Streamlit's theme. */
+[role="dialog"] {
+  background-color: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+}
+[role="dialog"] h1,
+[role="dialog"] h2,
+[role="dialog"] h3,
+[role="dialog"] p,
+[role="dialog"] [data-testid="stMarkdownContainer"] {
+  color: var(--text) !important;
+}
+[role="dialog"] button[data-testid="stBaseButton-secondary"] {
+  background-color: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text-2) !important;
+}
+[data-baseweb="modal"] button[aria-label="Close"],
+[data-baseweb="modal"] button[aria-label="Close"] * {
+  color: var(--text) !important;
+  fill: var(--text) !important;
+  opacity: 1 !important;
+}
+
+/* Icon-free success feedback with an explicit accessible surface. */
+[data-testid="stToast"],
+[data-baseweb="toast"] {
+  background-color: var(--safe-bg) !important;
+  border: 1px solid var(--safe-border) !important;
+  color: var(--safe) !important;
+}
+[data-testid="stToast"] *,
+[data-baseweb="toast"] * {
+  color: var(--safe) !important;
+}
+.poc-success-notice {
+  margin-top: 1rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--safe-border);
+  border-radius: 8px;
+  background: var(--safe-bg);
+  color: var(--safe);
+  font-weight: 600;
+}
+
+/* Primary CTA labels must inherit the CTA token, not generic paragraph text. */
+.stButton > button[kind="primary"],
+.stButton > button[kind="primary"] p,
+.stButton > button[kind="primary"] span,
+button[data-testid^="stBaseButton-primary"],
+button[data-testid^="stBaseButton-primary"] p,
+button[data-testid^="stBaseButton-primary"] span {
+  color: var(--cta-text) !important;
+}
+
+/* Semantic child labels must survive Streamlit's expander text rules. */
+[data-testid="stExpander"] [data-testid="stExpanderDetails"] [class*="st-key-fp_"] button,
+[data-testid="stExpander"] [data-testid="stExpanderDetails"] [class*="st-key-fp_"] button p,
+[data-testid="stExpander"] [data-testid="stExpanderDetails"] [class*="st-key-fp_"] button span {
+  background-color: #047857 !important;
+  border-color: #047857 !important;
+  color: #FFFFFF !important;
+}
+[data-testid="stExpander"] [data-testid="stExpanderDetails"] [class*="st-key-fp_"] button:hover,
+[data-testid="stExpander"] [data-testid="stExpanderDetails"] [class*="st-key-fp_"] button:hover p,
+[data-testid="stExpander"] [data-testid="stExpanderDetails"] [class*="st-key-fp_"] button:hover span {
+  background-color: #065F46 !important;
+  border-color: #065F46 !important;
+  color: #FFFFFF !important;
 }
 
 /* Final primary-state contract shared by light and dark themes. */
@@ -1123,9 +1182,7 @@ div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid=
     background: var(--cta-hover) !important;
     color: var(--cta-text) !important;
 }
-input:focus,
-textarea:focus,
 [data-baseweb="select"]:focus-within > div {
     border-color: var(--primary) !important;
-    box-shadow: 0 0 0 1px var(--primary) !important;
+    box-shadow: none !important;
 }
