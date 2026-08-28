@@ -6,6 +6,7 @@ from typing import Any, cast
 
 import streamlit as st
 
+from poc.admin_analytics import PocAdminAnalytics
 from poc.authentication import PocAuthStore
 from poc.config import get_poc_settings
 from poc.data_evidence import PocDataEvidenceStore
@@ -19,6 +20,7 @@ from poc.inference import (
     PocInferenceError,
 )
 from poc.local_runtime import POC_AUTH_DB_PATH, POC_DATA_DB_PATH, ensure_local_auth_db
+from poc.presentation.admin import render_admin_overview
 from poc.presentation.datasets import render_datasets
 from poc.presentation.home import render_home
 from poc.presentation.i18n import PocTranslator
@@ -32,7 +34,7 @@ from poc.presentation.remediation import (
 from poc.presentation.resilience import render_resilience
 from poc.presentation.result import render_inference_result
 from poc.presentation.settings import render_settings
-from poc.presentation.shell import render_login, render_sidebar
+from poc.presentation.shell import page_is_allowed, render_login, render_sidebar
 from poc.presentation.theme import initialize_theme, load_theme_css, set_theme
 from poc.presentation.theme_overrides import get_theme_override_css
 from poc.runtime_preflight import blocking_failures, build_runtime_checks
@@ -68,6 +70,7 @@ INFERENCE_CLIENT = PocInferenceClient(POC_INFERENCE_SETTINGS)
 AUTH_STORE = PocAuthStore(POC_AUTH_DB_PATH)
 DATA_EVIDENCE_STORE = PocDataEvidenceStore(POC_DATA_DB_PATH)
 EVENT_STORE = PocEventStore(AUTH_STORE)
+ADMIN_ANALYTICS = PocAdminAnalytics(AUTH_STORE, DATA_EVIDENCE_STORE)
 SESSION_STATE = cast(MutableMapping[str, Any], st.session_state)
 QUERY_PARAMS = cast(MutableMapping[str, Any], st.query_params)
 SESSION_CONTROLLER = PocSessionController(AUTH_STORE, SESSION_STATE, QUERY_PARAMS)
@@ -306,12 +309,27 @@ render_sidebar(
 events = EVENT_STORE.list_for_user(user["email"], limit=2000)
 page = st.session_state.get("page", "nav_home")
 clear_stale_confirmation(page)
-if page in {"nav_pipeline", "nav_resilience"} and user["role"] != "admin":
+if not page_is_allowed(str(user["role"]), str(page)):
     page = "nav_home"
     st.session_state["page"] = page
 
+# ── Administration ────────────────────────────────────────────────────────────
+if page == "nav_admin":
+    runtime_state = inference_status()
+    render_admin_overview(
+        ADMIN_ANALYTICS.snapshot(),
+        build_runtime_checks(
+            POC_SETTINGS,
+            POC_AUTH_DB_PATH,
+            POC_DATA_DB_PATH,
+            inference_ready=runtime_state[0] == "ready",
+        ),
+        runtime_state,
+        tr,
+    )
+
 # ── Accueil ──────────────────────────────────────────────────────────────────
-if page == "nav_home":
+elif page == "nav_home":
     render_home(user, events, tr)
 
 # ── Smail ─────────────────────────────────────────────────────────────────────
@@ -381,18 +399,10 @@ elif page == "nav_resilience":
 
 # ── Paramètres ────────────────────────────────────────────────────────────────
 elif page == "nav_settings":
-    runtime_state, _ = inference_status()
-    runtime_ready = runtime_state == "ready"
     render_settings(
         user,
         tr,
         update_display_name,
         _set_lang,
         _set_theme,
-        build_runtime_checks(
-            POC_SETTINGS,
-            POC_AUTH_DB_PATH,
-            POC_DATA_DB_PATH,
-            inference_ready=runtime_ready,
-        ),
     )

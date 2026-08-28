@@ -28,6 +28,7 @@ class PocSessionController:
         self._session_state["user"] = {
             key: user[key] for key in ("id", "email", "display_name", "role")
         }
+        self._session_state["page"] = "nav_admin" if user["role"] == "admin" else "nav_home"
 
     def remember(self, user_id: str) -> str:
         """Create and return a persisted remembered-session token."""
@@ -60,6 +61,7 @@ class PocSessionController:
             "last_inference_error",
             "smail_inbox",
             "smail_blocked",
+            "page",
         ):
             self._session_state.pop(key, None)
         self._query_params.pop("sid", None)
