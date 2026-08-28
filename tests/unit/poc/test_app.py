@@ -213,7 +213,8 @@ def test_invalid_and_valid_login_are_contextual(poc_app: AppTest) -> None:
     poc_app.text_input[0].input("missing@example.test")
     poc_app.text_input[1].input("wrong-password")
     poc_app.button[0].click().run()
-    assert any("Identifiants invalides" in warning.value for warning in poc_app.warning)
+    assert any("Identifiants invalides" in error.value for error in poc_app.error)
+    assert not any("⚠️" in error.value for error in poc_app.error)
 
     poc_app.text_input[0].input("admin@example.test")
     poc_app.text_input[1].input("admin-password")
@@ -221,6 +222,10 @@ def test_invalid_and_valid_login_are_contextual(poc_app: AppTest) -> None:
     assert not poc_app.exception
     assert poc_app.session_state["authenticated"] is True
     assert poc_app.session_state["user"]["display_name"] == "Admin Test"
+    assert poc_app.session_state["page"] == "nav_admin"
+    assert any(title.value == "Administration du POC" for title in poc_app.title)
+    assert any(button.label == "Jeux de données" for button in poc_app.button)
+    assert not any(button.label == "Tester un email" for button in poc_app.button)
 
 
 def test_resilience_page_exposes_selectable_real_fault_evidence(poc_app: AppTest) -> None:
@@ -322,7 +327,9 @@ def test_smail_deletion_is_confirmed_and_permanent(poc_app: AppTest) -> None:
     poc_app.run()
 
     open_page(poc_app, "Smail", "nav_smail")
-    next(button for button in poc_app.button if button.label == "Supprimer de mon espace").click().run()
+    next(
+        button for button in poc_app.button if button.label == "Supprimer de mon espace"
+    ).click().run()
     confirm_action(poc_app)
     assert not any("Validation facture mars" in markdown.value for markdown in poc_app.markdown)
     open_page(poc_app, "Accueil", "nav_home")
@@ -381,10 +388,38 @@ def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
     poc_app.button[0].click().run()
     assert poc_app.session_state["authenticated"] is True
     assert poc_app.session_state["user"]["role"] == "viewer"
+    assert any(btn.label == "Tester un email" for btn in poc_app.button)
 
-    for admin_page in ("Flux de données", "Incidence technique"):
+    for admin_page in (
+        "Vue d'administration",
+        "Espace d'essai",
+        "Flux de données",
+        "Jeux de données",
+        "Incidence technique",
+    ):
         assert not any(btn.label == admin_page for btn in poc_app.button)
-    poc_app.session_state["page"] = "nav_pipeline"
-    poc_app.run()
-    assert poc_app.session_state["page"] == "nav_home"
+    assert not any("Inférence API" in markdown.value for markdown in poc_app.markdown)
+
+    open_page(poc_app, "Tester un email", "nav_test_email")
+    assert any(title.value == "Tester un email" for title in poc_app.title)
+    assert not poc_app.button_group
+    assert poc_app.session_state["inference_mode"] == "live"
+    assert any(selectbox.label == "Scénario" for selectbox in poc_app.selectbox)
+    assert len(
+        [button for button in poc_app.button if button.label == "Analyser l'email"]
+    ) == 2
+
+    for restricted_page in (
+        "nav_admin",
+        "nav_playground",
+        "nav_pipeline",
+        "nav_datasets",
+        "nav_resilience",
+    ):
+        poc_app.session_state["page"] = restricted_page
+        poc_app.run()
+        assert poc_app.session_state["page"] == "nav_home"
     assert not any(btn.label == "Flux de données" for btn in poc_app.button)
+
+    open_page(poc_app, "Paramètres", "nav_settings")
+    assert not any("État de préparation local" in markdown.value for markdown in poc_app.markdown)
