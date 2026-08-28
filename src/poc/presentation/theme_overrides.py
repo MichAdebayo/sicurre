@@ -16,7 +16,7 @@ LIGHT_OVERRIDES = """
   --text: #0F172A !important;
   --text-2: #475569 !important;
   --text-muted: #64748B !important;
-  --cta-text: #06111F !important;
+  --cta-text: #FFFFFF !important;
   --cta-bg: #2E6BB5 !important;
   --cta-hover: #245996 !important;
   --empty-text: #475569 !important;
@@ -66,11 +66,10 @@ DARK_OVERRIDES = """
 .badge-safe, .badge-ok { background: #022C22 !important; border-color: #064E3B !important; color: #34D399 !important; }
 .badge-danger { background: #450A0A !important; border-color: #7F1D1D !important; color: #F87171 !important; }
 
-/* Forced dark: semantic buttons */
-div[data-testid="stElementContainer"]:has(.semantic-btn-danger) + div[data-testid="stElementContainer"] button { background-color: #450A0A !important; border-color: #7F1D1D !important; color: #F87171 !important; }
-div[data-testid="stElementContainer"]:has(.semantic-btn-danger) + div[data-testid="stElementContainer"] button:hover { background-color: #DC2626 !important; border-color: #DC2626 !important; color: #FFFFFF !important; }
-div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid="stElementContainer"] button { background-color: #022C22 !important; border-color: #064E3B !important; color: #34D399 !important; }
-div[data-testid="stElementContainer"]:has(.semantic-btn-safe) + div[data-testid="stElementContainer"] button:hover { background-color: #059669 !important; border-color: #059669 !important; color: #FFFFFF !important; }
+/* Forced dark: record remediation actions */
+[class*="st-key-fn_"] button { background-color: #450A0A !important; border-color: #7F1D1D !important; color: #FCA5A5 !important; }
+[class*="st-key-fp_"] button { background-color: #022C22 !important; border-color: #065F46 !important; color: #6EE7B7 !important; }
+[class*="st-key-fn_"] button *, [class*="st-key-fp_"] button * { color: inherit !important; }
 
 /* Forced dark: CTA button text must follow theme tokens */
 button[data-testid^="stBaseButton-primary"],
@@ -159,6 +158,28 @@ div[data-testid="stFormSubmitButton"] button:active * { color: var(--cta-text) !
 [data-testid="stExpander"][open] summary,
 [data-testid="stExpander"][open] summary * {
   color: var(--text) !important;
+}
+
+/* Forced dark: preserve semantic remediation fills inside expander details. */
+[data-testid="stExpander"] [data-testid="stExpanderDetails"] [class*="st-key-fn_"] button {
+  background-color: #450A0A !important;
+  border-color: #7F1D1D !important;
+  color: #FCA5A5 !important;
+}
+[data-testid="stExpander"] [data-testid="stExpanderDetails"] [class*="st-key-fp_"] button {
+  background-color: #022C22 !important;
+  border-color: #065F46 !important;
+  color: #6EE7B7 !important;
+}
+[data-testid="stExpander"] [data-testid="stExpanderDetails"] [class*="st-key-fn_"] button:hover {
+  background-color: #DC2626 !important;
+  border-color: #DC2626 !important;
+  color: #FFFFFF !important;
+}
+[data-testid="stExpander"] [data-testid="stExpanderDetails"] [class*="st-key-fp_"] button:hover {
+  background-color: #047857 !important;
+  border-color: #047857 !important;
+  color: #FFFFFF !important;
 }
 
 /* Forced dark: collapsible sidebar button */

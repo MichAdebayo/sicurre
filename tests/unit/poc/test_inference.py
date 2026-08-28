@@ -181,13 +181,17 @@ def test_health_reports_success_and_http_failure(
     configured_settings: PocSettings,
 ) -> None:
     health_url = "http://127.0.0.1:8765/health"
+    manifest_url = "http://127.0.0.1:8765/v1/manifest"
     health_route = respx.get(health_url).mock(return_value=httpx.Response(200))
-    auth_route = respx.post(configured_settings.inference_api_url).mock(
-        return_value=httpx.Response(422)
+    auth_route = respx.get(manifest_url).mock(
+        return_value=httpx.Response(200, json={"service": {"api_contract": "v1"}})
     )
     client = PocInferenceClient(configured_settings)
     assert client.health() == (True, "inference_health_ready")
-    assert auth_route.calls[0].request.content == b"{}"
+    assert auth_route.calls[0].request.headers["Authorization"] == (
+        f"Bearer {configured_settings.inference_api_key}"
+    )
+    assert respx.calls.last.request.method != "POST"
     health_route.mock(return_value=httpx.Response(503))
     assert client.health() == (False, "inference_health_unavailable")
 
@@ -197,7 +201,9 @@ def test_health_reports_rejected_bearer_key(
     configured_settings: PocSettings,
 ) -> None:
     respx.get("http://127.0.0.1:8765/health").mock(return_value=httpx.Response(200))
-    respx.post(configured_settings.inference_api_url).mock(return_value=httpx.Response(401))
+    respx.get("http://127.0.0.1:8765/v1/manifest").mock(
+        return_value=httpx.Response(401)
+    )
 
     assert PocInferenceClient(configured_settings).health() == (
         False,
@@ -210,7 +216,9 @@ def test_health_reports_unexpected_contract_status(
     configured_settings: PocSettings,
 ) -> None:
     respx.get("http://127.0.0.1:8765/health").mock(return_value=httpx.Response(200))
-    respx.post(configured_settings.inference_api_url).mock(return_value=httpx.Response(200))
+    respx.get("http://127.0.0.1:8765/v1/manifest").mock(
+        return_value=httpx.Response(200, json={"unexpected": True})
+    )
 
     assert PocInferenceClient(configured_settings).health() == (
         False,

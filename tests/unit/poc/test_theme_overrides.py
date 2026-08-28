@@ -35,10 +35,9 @@ def test_light_and_dark_use_same_primary_token() -> None:
     assert "#4A90D9" in DARK_OVERRIDES
 
 
-def test_dark_overrides_include_forced_badge_and_button_rules() -> None:
-    """Dark mode includes component-level overrides not present in light mode."""
+def test_dark_overrides_include_forced_badge_rules() -> None:
+    """Dark mode includes badge overrides not present in light mode."""
     assert ".badge-phishing" in DARK_OVERRIDES
-    assert "semantic-btn-danger" in DARK_OVERRIDES
     assert ".badge-phishing" not in LIGHT_OVERRIDES
 
 

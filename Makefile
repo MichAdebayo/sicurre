@@ -18,7 +18,7 @@
         generate-data dataset-build dataset-export publish-latest dataset-release monthly-release \
         seed-frozen-dataset \
 		poc-replay-frozen poc-inference poc-inference-stop poc-stop \
-		poc-cron-demo poc-release-preview poc-staging-publish \
+		poc-cron-demo poc-release-preview \
         pipeline-push run-pipeline demo-v1 demo-v2 \
         poc db-seed r2-freeze-proof dev-api dev-app dev-stop dev
 
@@ -83,7 +83,6 @@ help:
 	@echo "  make poc-replay-frozen         - Idempotent replay of frozen production dataset lineage for POC"
 	@echo "  make poc-cron-demo             - Run the isolated SEKOIA scheduled ingestion demonstration"
 	@echo "  make poc-release-preview       - Build and export a local POC dataset without publication"
-	@echo "  make poc-staging-publish       - Publish only to the explicit POC staging Kaggle slug"
 	@echo ""
 	@echo "  POC"
 	@echo "  make poc                       - Launch Streamlit POC dashboard"
@@ -370,17 +369,6 @@ poc-release-preview:
 		SICURRE_TRAINING_DATASET_SNAPSHOT_STORAGE_BACKEND=local \
 		$(MAKE) dataset-build dataset-export DATASET_TAG_PREFIX=poc-preview'
 	@echo "POC release preview completed locally. No Kaggle publication or ML dispatch occurred."
-
-poc-staging-publish:
-	@uv run --env-file .env sh -c 'set -eu; \
-		test "$${SICURRE_POC_ALLOW_STAGING_PUBLICATION:-false}" = "true" || \
-		{ echo "Set SICURRE_POC_ALLOW_STAGING_PUBLICATION=true for staging publication."; exit 1; }; \
-		test -n "$${SICURRE_POC_KAGGLE_DATASET_SLUG:-}" || \
-		{ echo "SICURRE_POC_KAGGLE_DATASET_SLUG is required."; exit 1; }; \
-		test "$${SICURRE_POC_ALLOW_ML_DISPATCH:-false}" != "true" || \
-		{ echo "ML dispatch is forbidden from the POC staging publisher."; exit 1; }; \
-		SICURRE_POC_MODE=true KAGGLE_DATASET_SLUG="$$SICURRE_POC_KAGGLE_DATASET_SLUG" \
-		python scripts/data_platform/publish_latest.py --skip-github-dispatch'
 
 # ── Pipeline & Demos ──────────────────────────────────────────────────────────
 
