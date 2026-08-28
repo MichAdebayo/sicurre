@@ -11,17 +11,47 @@ import streamlit as st
 
 Translator = Callable[[str], str]
 
-NAVIGATION_KEYS = (
+PERSONAL_NAVIGATION_KEYS = (
     "nav_home",
     "nav_smail",
     "nav_threat_log",
+)
+
+VIEWER_NAVIGATION_KEYS = (
+    *PERSONAL_NAVIGATION_KEYS,
+    "nav_test_email",
+)
+
+ADMIN_NAVIGATION_KEYS = (
+    "nav_admin",
     "nav_playground",
     "nav_pipeline",
     "nav_datasets",
     "nav_resilience",
 )
 
-ADMIN_NAVIGATION_KEYS = {"nav_pipeline", "nav_resilience"}
+ADMIN_ONLY_PAGE_KEYS = frozenset(ADMIN_NAVIGATION_KEYS)
+
+
+def page_is_allowed(role: str, page: str) -> bool:
+    """Return whether a role may resolve the requested POC page."""
+    return role == "admin" or page not in ADMIN_ONLY_PAGE_KEYS
+
+
+def _render_navigation_button(
+    navigation_key: str, current_page: str, translate: Translator
+) -> None:
+    """Render one navigation button and persist a changed selection."""
+    is_active = navigation_key == current_page
+    selected = st.button(
+        translate(navigation_key),
+        key=f"_nav_{navigation_key}",
+        type="primary" if is_active else "secondary",
+        use_container_width=True,
+    )
+    if selected and not is_active:
+        st.session_state["page"] = navigation_key
+        st.rerun()
 
 
 def _logo_html(logo_path: Path, width: int, *, login: bool = False) -> str:
@@ -81,7 +111,7 @@ def render_login(
                     st.query_params["sid"] = remember_session(str(user["id"]))
                 st.rerun()
             else:
-                st.warning("⚠️ " + translate("invalid_credentials"))
+                st.error(translate("invalid_credentials"))
         st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
@@ -112,22 +142,21 @@ def render_sidebar(
             unsafe_allow_html=True,
         )
         current_page = st.session_state.get("page", "nav_home")
-        navigation_keys = (
-            NAVIGATION_KEYS
+        personal_navigation = (
+            PERSONAL_NAVIGATION_KEYS
             if user["role"] == "admin"
-            else tuple(key for key in NAVIGATION_KEYS if key not in ADMIN_NAVIGATION_KEYS)
+            else VIEWER_NAVIGATION_KEYS
         )
-        for navigation_key in navigation_keys:
-            is_active = navigation_key == current_page
-            selected = st.button(
-                translate(navigation_key),
-                key=f"_nav_{navigation_key}",
-                type="primary" if is_active else "secondary",
-                use_container_width=True,
+        for navigation_key in personal_navigation:
+            _render_navigation_button(navigation_key, current_page, translate)
+
+        if user["role"] == "admin":
+            st.markdown(
+                f"<div class='sidebar-section-label admin'>{translate('administration')}</div>",
+                unsafe_allow_html=True,
             )
-            if selected and not is_active:
-                st.session_state["page"] = navigation_key
-                st.rerun()
+            for navigation_key in ADMIN_NAVIGATION_KEYS:
+                _render_navigation_button(navigation_key, current_page, translate)
 
         with st.container(key="sidebar_actions"):
             st.markdown(
@@ -151,17 +180,18 @@ def render_sidebar(
                     sign_out()
                     st.rerun()
 
-        with st.container(key="sidebar_inference_footer"):
-            status_state, status_text = inference_health()
-            dot_class = {
-                "ready": "dot-green",
-                "authentication_rejected": "dot-amber",
-                "contract_invalid": "dot-amber",
-            }.get(status_state, "dot-red")
-            st.markdown(
-                "<div class='inference-status'><div class='status-heading'>"
-                f"<span class='status-dot {dot_class}'></span>"
-                f"<span class='status-label'>{translate('inference_status')}</span></div>"
-                f"<span class='status-value'>{status_text}</span></div>",
-                unsafe_allow_html=True,
-            )
+        if user["role"] == "admin":
+            with st.container(key="sidebar_inference_footer"):
+                status_state, status_text = inference_health()
+                dot_class = {
+                    "ready": "dot-green",
+                    "authentication_rejected": "dot-amber",
+                    "contract_invalid": "dot-amber",
+                }.get(status_state, "dot-red")
+                st.markdown(
+                    "<div class='inference-status'><div class='status-heading'>"
+                    f"<span class='status-dot {dot_class}'></span>"
+                    f"<span class='status-label'>{translate('inference_status')}</span></div>"
+                    f"<span class='status-value'>{status_text}</span></div>",
+                    unsafe_allow_html=True,
+                )

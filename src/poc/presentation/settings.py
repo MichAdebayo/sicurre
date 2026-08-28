@@ -7,8 +7,6 @@ from typing import Any
 
 import streamlit as st
 
-from poc.runtime_preflight import RuntimeCheck
-
 
 def _divider(margin: str) -> None:
     st.markdown(
@@ -24,7 +22,6 @@ def render_settings(
     update_display_name: Callable[[str, str], None],
     set_language: Callable[[str], None],
     set_theme: Callable[[str], None],
-    runtime_checks: list[RuntimeCheck],
 ) -> None:
     """Render profile, language, and theme controls with injected persistence."""
     if st.session_state.pop("settings_saved_notice", False):
@@ -109,18 +106,3 @@ def render_settings(
         if selected_theme[0] != current_theme:
             set_theme(selected_theme[0])
             st.rerun()
-
-    _divider("1.8rem 0 ")
-    st.write(f"**{translate('preflight_title')}**")
-    st.caption(translate("preflight_description"))
-    for check in runtime_checks:
-        status_key = "preflight_ready" if check.ready else "preflight_attention"
-        status_class = "badge-ok" if check.ready else "badge-danger"
-        st.markdown(
-            "<div class='card' style='padding:9px 12px;margin-bottom:4px;'>"
-            "<div style='display:flex;justify-content:space-between;align-items:center;'>"
-            f"<span>{translate(check.key)}</span>"
-            f"<span class='badge {status_class}'>{translate(status_key)}</span>"
-            "</div></div>",
-            unsafe_allow_html=True,
-        )
