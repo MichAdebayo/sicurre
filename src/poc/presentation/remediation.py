@@ -17,7 +17,74 @@ from poc.presentation.formatting import (
 
 Translator = Callable[[str], str]
 Reclassify = Callable[[str, str, str], None]
+DeleteEvent = Callable[[str, str], None]
 Period = Literal["all", "today", "week"]
+
+
+def _request_confirmation(action: str, event_id: str, surface: str) -> None:
+    """Persist one pending remediation action until the user confirms it."""
+    st.session_state["pending_remediation"] = {
+        "action": action,
+        "event_id": event_id,
+        "surface": surface,
+    }
+
+
+def _dismiss_confirmation() -> None:
+    """Clear a pending action when Streamlit's native close control is used."""
+    st.session_state.pop("pending_remediation", None)
+
+
+def clear_stale_confirmation(current_page: str) -> None:
+    """Discard a pending action after navigation leaves its owning page."""
+    pending = st.session_state.get("pending_remediation")
+    if pending and pending.get("surface") != current_page:
+        st.session_state.pop("pending_remediation", None)
+
+
+def _render_confirmation(
+    user_email: str,
+    translate: Translator,
+    reclassify: Reclassify,
+    delete_event: DeleteEvent,
+) -> None:
+    """Render the single confirmation gate for destructive-looking actions."""
+    pending = st.session_state.get("pending_remediation")
+    if not pending:
+        return
+
+    @st.dialog(translate("confirmation_title"), on_dismiss=_dismiss_confirmation)
+    def confirmation_dialog() -> None:
+        action = str(pending["action"])
+        st.write(translate(f"confirmation_{action}"))
+        cancel, confirm = st.columns(2)
+        if cancel.button(translate("cancel"), use_container_width=True):
+            st.session_state.pop("pending_remediation", None)
+            st.rerun()
+        if confirm.button(
+            translate("confirm"),
+            type="primary",
+            use_container_width=True,
+        ):
+            event_id = str(pending["event_id"])
+            if action == "report_phishing":
+                reclassify(event_id, "phishing", user_email)
+            elif action == "restore_safe":
+                reclassify(event_id, "safe", user_email)
+            elif action == "delete":
+                delete_event(event_id, user_email)
+            st.session_state.pop("pending_remediation", None)
+            st.session_state["remediation_completed"] = action
+            st.rerun()
+
+    confirmation_dialog()
+
+
+def _render_completed_notice(translate: Translator) -> None:
+    """Show one concise completion notice after a confirmed action."""
+    action = st.session_state.pop("remediation_completed", None)
+    if action:
+        st.toast(translate(f"remediation_{action}_done"))
 
 
 def partition_delivered_events(
@@ -53,6 +120,7 @@ def _render_delivered_card(
     user_email: str,
     translate: Translator,
     reclassify: Reclassify,
+    delete_event: DeleteEvent,
 ) -> None:
     timestamp = event["created_at"].replace("T", " ")[:16]
     correction = (
@@ -70,12 +138,19 @@ def _render_delivered_card(
         f"<div class='ec-snippet'>{snippet}</div></div>",
         unsafe_allow_html=True,
     )
-    st.markdown("<div class='semantic-btn-danger'>", unsafe_allow_html=True)
-    if st.button(translate("flag_false_negative"), key=f"fn_{tab_key}_{event['id']}"):
-        reclassify(str(event["id"]), "phishing", user_email)
-        st.toast(translate("reclassified_done"), icon="✅")
-        st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
+    with st.container(
+        key=f"smail_actions_{tab_key}_{event['id']}",
+        horizontal=True,
+        horizontal_alignment="left",
+        vertical_alignment="center",
+        gap="small",
+    ):
+        if st.button(translate("flag_false_negative"), key=f"fn_{tab_key}_{event['id']}"):
+            _request_confirmation("report_phishing", str(event["id"]), "nav_smail")
+            st.rerun()
+        if st.button(translate("delete_event"), key=f"delete_{tab_key}_{event['id']}"):
+            _request_confirmation("delete", str(event["id"]), "nav_smail")
+            st.rerun()
 
 
 def render_smail(
@@ -83,8 +158,10 @@ def render_smail(
     user_email: str,
     translate: Translator,
     reclassify: Reclassify,
+    delete_event: DeleteEvent,
 ) -> None:
     """Render delivered mail and the false-negative feedback action."""
+    _render_completed_notice(translate)
     st.title(translate("smail_title"))
     st.caption(translate("smail_inbox_subtitle"))
     legitimate, spam = partition_delivered_events(events)
@@ -98,12 +175,13 @@ def render_smail(
         if not legitimate:
             st.info(translate("smail_empty_inbox"))
         for event in legitimate:
-            _render_delivered_card(event, "inbox", user_email, translate, reclassify)
+            _render_delivered_card(event, "inbox", user_email, translate, reclassify, delete_event)
     with spam_tab:
         if not spam:
             st.info(translate("smail_empty_spam"))
         for event in spam:
-            _render_delivered_card(event, "spam", user_email, translate, reclassify)
+            _render_delivered_card(event, "spam", user_email, translate, reclassify, delete_event)
+    _render_confirmation(user_email, translate, reclassify, delete_event)
 
 
 def render_threat_log(
@@ -111,11 +189,13 @@ def render_threat_log(
     user_email: str,
     translate: Translator,
     reclassify: Reclassify,
+    delete_event: DeleteEvent,
 ) -> None:
     """Render blocked threats and the false-positive remediation action."""
+    _render_completed_notice(translate)
     st.title(translate("threat_title"))
     st.caption(translate("threat_reclassify_subtitle"))
-    filter_column, _, _ = st.columns([1, 2, 2])
+    filter_column, _ = st.columns([1, 3])
     options: list[tuple[Period, str]] = [
         ("all", translate("period_all")),
         ("today", translate("period_today")),
@@ -134,7 +214,14 @@ def render_threat_log(
         return
 
     for event in threats[:80]:
-        _render_threat_card(event, user_email, translate, reclassify)
+        _render_threat_card(
+            event,
+            user_email,
+            translate,
+            reclassify,
+            delete_event,
+        )
+    _render_confirmation(user_email, translate, reclassify, delete_event)
 
 
 def _render_threat_card(
@@ -142,6 +229,7 @@ def _render_threat_card(
     user_email: str,
     translate: Translator,
     reclassify: Reclassify,
+    delete_event: DeleteEvent,
 ) -> None:
     timestamp = event["created_at"].replace("T", " ")[:16]
     score = float(event.get("composite_score") or 0.0) * 100.0
@@ -170,9 +258,16 @@ def _render_threat_card(
             f"<p style='margin:0!important;'>{snippet}</p></div>",
             unsafe_allow_html=True,
         )
-        st.markdown("<div class='semantic-btn-safe'>", unsafe_allow_html=True)
-        if st.button(translate("reclassify_safe"), key=f"fp_{event['id']}"):
-            reclassify(str(event["id"]), "safe", user_email)
-            st.toast(translate("reclassified_done"), icon="✅")
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
+        with st.container(
+            key=f"threat_actions_{event['id']}",
+            horizontal=True,
+            horizontal_alignment="left",
+            vertical_alignment="center",
+            gap="small",
+        ):
+            if st.button(translate("reclassify_safe"), key=f"fp_{event['id']}"):
+                _request_confirmation("restore_safe", str(event["id"]), "nav_threat_log")
+                st.rerun()
+            if st.button(translate("delete_event"), key=f"delete_threat_{event['id']}"):
+                _request_confirmation("delete", str(event["id"]), "nav_threat_log")
+                st.rerun()

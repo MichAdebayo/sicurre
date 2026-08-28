@@ -25,6 +25,12 @@ def open_page(app: AppTest, label: str, page_key: str) -> None:
     assert app.session_state["page"] == page_key
 
 
+def confirm_action(app: AppTest) -> None:
+    """Confirm the currently open remediation dialog."""
+    next(button for button in app.button if button.label == "Confirmer").click().run()
+    app.run()
+
+
 def _seed_data_evidence(data_path: Path) -> None:
     conn = sqlite3.connect(str(data_path))
     try:
@@ -44,7 +50,8 @@ def _seed_data_evidence(data_path: Path) -> None:
                 started_at TEXT NOT NULL,
                 finished_at TEXT NOT NULL,
                 trigger_mode TEXT NOT NULL,
-                status TEXT NOT NULL
+                status TEXT NOT NULL,
+                log_message TEXT
             )
         """)
         conn.execute("""
@@ -59,7 +66,8 @@ def _seed_data_evidence(data_path: Path) -> None:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS data_raw_object (
                 id TEXT PRIMARY KEY,
-                ingestion_run_id TEXT NOT NULL
+                ingestion_run_id TEXT NOT NULL,
+                source_metadata TEXT
             )
         """)
         conn.execute(
@@ -262,7 +270,7 @@ def test_successful_simulation_populates_operational_pages(poc_app: AppTest) -> 
     assert not poc_app.exception
 
     open_page(poc_app, "Flux de données", "nav_pipeline")
-    assert any(button.label == "1. Reconstruire la base" for button in poc_app.button)
+    assert any(button.label == "Restaurer la base V1" for button in poc_app.button)
 
     open_page(poc_app, "Paramètres", "nav_settings")
     assert len(poc_app.selectbox) == 2
@@ -279,7 +287,8 @@ def test_false_positive_correction_delivers_message_to_smail(poc_app: AppTest) -
     open_page(poc_app, "Journal des menaces", "nav_threat_log")
     mark_safe = next(button for button in poc_app.button if button.label == "Marquer faux positif")
     mark_safe.click().run()
-    poc_app.run()
+    confirm_action(poc_app)
+    assert not any("URGENT" in markdown.value for markdown in poc_app.markdown)
 
     open_page(poc_app, "Smail", "nav_smail")
     assert any("URGENT" in markdown.value for markdown in poc_app.markdown)
@@ -297,10 +306,28 @@ def test_false_negative_report_moves_delivered_message_to_threat_log(poc_app: Ap
     open_page(poc_app, "Smail", "nav_smail")
     report = next(button for button in poc_app.button if button.label == "Signaler comme phishing")
     report.click().run()
-    poc_app.run()
+    confirm_action(poc_app)
 
     open_page(poc_app, "Journal des menaces", "nav_threat_log")
     assert any("Validation facture mars" in markdown.value for markdown in poc_app.markdown)
+
+
+def test_smail_deletion_is_confirmed_and_permanent(poc_app: AppTest) -> None:
+    """Confirmed POC deletion permanently removes the local event."""
+    login(poc_app)
+    open_page(poc_app, "Espace d'essai", "nav_playground")
+    poc_app.button_group[0].set_value("simulation").run()
+    poc_app.selectbox[0].set_value("Client facture").run()
+    next(button for button in poc_app.button if button.label == "Analyser l'email").click().run()
+    poc_app.run()
+
+    open_page(poc_app, "Smail", "nav_smail")
+    next(button for button in poc_app.button if button.label == "Supprimer de mon espace").click().run()
+    confirm_action(poc_app)
+    assert not any("Validation facture mars" in markdown.value for markdown in poc_app.markdown)
+    open_page(poc_app, "Accueil", "nav_home")
+    open_page(poc_app, "Smail", "nav_smail")
+    assert not any("Validation facture mars" in markdown.value for markdown in poc_app.markdown)
 
 
 def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
@@ -312,32 +339,25 @@ def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
     assert not poc_app.exception
     # Verify seeded counts are shown
     assert any("base-20260715" in md.value for md in poc_app.markdown)
-    assert any(
-        "Composition du corpus d'entraînement" in markdown.value
-        for markdown in poc_app.markdown
-    )
-    assert any(
-        "Flux de renseignement de référence" in markdown.value
-        for markdown in poc_app.markdown
-    )
+    assert any("Progression par source" in markdown.value for markdown in poc_app.markdown)
     assert any("Base V1 issue" in caption.value for caption in poc_app.caption)
 
     # 2. Test Pipeline Page - Admin Successful Run
     open_page(poc_app, "Flux de données", "nav_pipeline")
-    assert any(btn.label == "1. Reconstruire la base" for btn in poc_app.button)
-    assert any(btn.label == "3. Normaliser + construire" for btn in poc_app.button)
+    assert any(btn.label == "Restaurer la base V1" for btn in poc_app.button)
+    assert any(btn.label == "Prévisualiser le dataset" for btn in poc_app.button)
     for label in (
-        "1. Reconstruire la base",
-        "2. Collecter SEKOIA",
-        "3. Normaliser + construire",
+        "Restaurer la base V1",
+        "Collecter SEKOIA",
+        "Prévisualiser le dataset",
     ):
         next(btn for btn in poc_app.button if btn.label == label).click().run()
         assert not poc_app.exception
-        assert any("Dernière opération terminée avec succès" in info.value for info in poc_app.info)
+        assert any("Opération terminée." in markdown.value for markdown in poc_app.markdown)
 
     # 3. Test Pipeline Page - Permission Error Handler
     pytest._pipeline_fail_type = "permission"  # type: ignore[attr-defined]
-    cron_btn = next(btn for btn in poc_app.button if btn.label == "2. Collecter SEKOIA")
+    cron_btn = next(btn for btn in poc_app.button if btn.label == "Collecter SEKOIA")
     cron_btn.click().run()
     assert not poc_app.exception
     assert any("Dernière opération en erreur" in warning.value for warning in poc_app.warning)

@@ -22,7 +22,7 @@ from typing import Any
 from urllib.parse import quote, urlparse
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import ROOT_DIR, get_settings
@@ -301,6 +301,7 @@ class SekoiaIocIngestionService:
 
         try:
             payload = await self.fetch_iocs()
+            await self._mark_existing_records_reference_only(session, source_system)
             existing_keys = await self._existing_record_keys(session)
             new_iocs = [ioc for ioc in payload.iocs if self._entry_key(ioc) not in existing_keys]
             skipped_count = len(payload.iocs) - len(new_iocs)
@@ -415,6 +416,21 @@ class SekoiaIocIngestionService:
         rows = await session.scalars(stmt)
         return set(rows)
 
+    async def _mark_existing_records_reference_only(
+        self,
+        session: AsyncSession,
+        source_system: DataSourceSystem,
+    ) -> None:
+        """Repair legacy SEKOIA rows before applying incremental deduplication."""
+        await session.execute(
+            update(DataRawRecord)
+            .where(DataRawRecord.source_system_id == source_system.id)
+            .values(
+                is_usable=False,
+                rejection_reason="ioc_reference_only_not_email_training_text",
+            )
+        )
+
     async def _get_or_create_source_system(self, session: AsyncSession) -> DataSourceSystem:
         source_system = await self.source_repository.get_by_name(session, self.source_name)
         if source_system is not None:
@@ -493,8 +509,8 @@ class SekoiaIocIngestionService:
                 record_key=self._entry_key(ioc),
                 raw_content=json.dumps(ioc_to_payload(ioc), ensure_ascii=False, sort_keys=True),
                 detected_language=None,
-                is_usable=True,
-                rejection_reason=None,
+                is_usable=False,
+                rejection_reason="ioc_reference_only_not_email_training_text",
                 extracted_at=extracted_at,
             )
             for ioc in iocs

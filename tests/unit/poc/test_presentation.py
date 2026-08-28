@@ -8,11 +8,15 @@ import pytest
 import streamlit as st
 
 from poc.presentation.datasets import (
+    _aggregate_initialization_runs,
     _load_frozen_source_distribution,
     _local_run_time,
     _reference_provider_rows,
+    _render_source_stage_chart,
+    _run_fetch_counts,
     _source_family,
     _source_label,
+    _source_stage_rows,
     _training_provider_rows,
 )
 from poc.presentation.formatting import (
@@ -27,7 +31,14 @@ from poc.presentation.home import calculate_home_metrics
 from poc.presentation.i18n import PocTranslator
 from poc.presentation.pipeline_page import redact_terminal_line
 from poc.presentation.playground import _run_inference
-from poc.presentation.remediation import filter_threats, partition_delivered_events
+from poc.presentation.remediation import (
+    _dismiss_confirmation,
+    _render_completed_notice,
+    _request_confirmation,
+    clear_stale_confirmation,
+    filter_threats,
+    partition_delivered_events,
+)
 from poc.presentation.result import confidence_bar, result_style
 from poc.presentation.theme import initialize_theme, load_theme_css, set_theme
 
@@ -83,6 +94,71 @@ def test_frozen_source_distribution_is_validated(tmp_path: Path) -> None:
     assert _load_frozen_source_distribution(metadata) == {"kaggle_multilingual_spam": 4}
 
 
+def test_dataset_runs_collapse_baseline_and_keep_incremental_sources() -> None:
+    """The selector exposes one V1 operation followed by real source runs."""
+    runs = [
+        {
+            "id": "base-a",
+            "name": "reconstructed/current_frozen/native_external",
+            "raw_object_count": 1,
+            "raw_record_count": 6,
+            "normalized_count": 6,
+            "dataset_item_count": 6,
+            "started_at": "2026-01-01T10:00:00Z",
+            "finished_at": "2026-01-01T10:01:00Z",
+        },
+        {
+            "id": "base-b",
+            "name": "reconstructed/current_frozen/synthetic_db",
+            "raw_object_count": 1,
+            "raw_record_count": 4,
+            "normalized_count": 4,
+            "dataset_item_count": 4,
+            "started_at": "2026-01-01T10:00:00Z",
+            "finished_at": "2026-01-01T10:01:00Z",
+        },
+        {
+            "id": "phishtank",
+            "name": "PhishTank API (rejeu local)",
+            "trigger_mode": "poc_replay",
+            "raw_object_count": 1,
+            "raw_record_count": 3,
+            "normalized_count": 0,
+            "dataset_item_count": 0,
+            "started_at": "2026-01-01T10:01:00Z",
+            "finished_at": "2026-01-01T10:02:00Z",
+        },
+        {"id": "sekoia", "name": "sekoia-community-ioc", "raw_record_count": 3},
+    ]
+
+    displayed = _aggregate_initialization_runs(runs, lambda key: key)
+
+    assert [row["id"] for row in displayed] == ["sekoia", "base-initialization"]
+    assert displayed[-1]["raw_record_count"] == 13
+    assert displayed[-1]["dataset_item_count"] == 10
+
+
+def test_run_fetch_counts_use_source_metadata_without_double_counting() -> None:
+    """SEKOIA source volume separates fetched, new, and deduplicated IOCs."""
+    assert _run_fetch_counts(
+        {
+            "raw_record_count": 3,
+            "source_metadata": json.dumps({"total_ioc_count": 10, "new_ioc_count": 3}),
+        }
+    ) == (10, 7)
+
+
+def test_run_fetch_counts_use_log_for_fully_deduplicated_run() -> None:
+    """A no-write replay still reports its fetched and skipped evidence."""
+    assert _run_fetch_counts(
+        {
+            "raw_record_count": 0,
+            "source_metadata": None,
+            "log_message": "SEKOIA IOC feed returned 640 IOC(s); all were already ingested",
+        }
+    ) == (640, 640)
+
+
 def test_dataset_provider_rows_separate_training_and_reference_evidence() -> None:
     sources = [
         {
@@ -113,6 +189,87 @@ def test_dataset_provider_rows_separate_training_and_reference_evidence() -> Non
 
     assert training_totals == {"kaggle": 4, "common_crawl": 1}
     assert reference_totals == {"phishtank": 3, "sekoia": 2}
+
+
+def test_dataset_stage_rows_keep_each_provider_synchronized_across_stages() -> None:
+    """One projection drives the raw, normalized, and dataset bars per source."""
+    sources = [
+        {
+            "name": "reconstructed/current_frozen/native_external",
+            "source_type": "manual",
+            "total_records": 99,
+            "reference_records": 0,
+            "normalized_records": 99,
+            "dataset_records": 99,
+            "last_run": "2026-01-02T12:00:00Z",
+        },
+        {
+            "name": "PhishTank API (rejeu local)",
+            "source_type": "api",
+            "total_records": 3,
+            "reference_records": 3,
+            "normalized_records": 0,
+            "dataset_records": 0,
+            "last_run": "2026-01-01T12:00:00Z",
+        },
+        {
+            "name": "sekoia-community-ioc",
+            "source_type": "scraping",
+            "total_records": 2,
+            "reference_records": 2,
+            "normalized_records": 0,
+            "dataset_records": 0,
+        },
+    ]
+    rows = _source_stage_rows({"kaggle_multilingual_spam": 4}, sources)
+    counts = {
+        (row["provider"], row["stage"]): row["count"]
+        for row in rows
+    }
+
+    assert counts[("kaggle", "raw")] == 4
+    assert counts[("kaggle", "normalized")] == 4
+    assert counts[("kaggle", "dataset")] == 4
+    assert counts[("phishtank", "raw")] == 3
+    assert counts[("phishtank", "normalized")] == 0
+    assert counts[("sekoia", "dataset")] == 0
+    assert not any(row["provider"] == "other" for row in rows)
+    assert {
+        row["last_run"] for row in rows if row["provider"] == "kaggle"
+    } == {"2026-01-02T12:00:00Z"}
+
+
+def test_source_stage_chart_uses_quiet_axes_and_truthful_tooltip(monkeypatch) -> None:
+    """The grouped chart avoids repeated labels while retaining exact tooltips."""
+    captured = {}
+    monkeypatch.setitem(st.session_state, "theme_mode", "Dark")
+    monkeypatch.setattr(
+        st,
+        "vega_lite_chart",
+        lambda data, spec, **kwargs: captured.update(spec=spec),
+    )
+
+    _render_source_stage_chart(
+        [
+            {
+                "provider": "phishtank",
+                "family": "api",
+                "role": "reference",
+                "stage": "raw",
+                "count": 1139,
+                "raw_total": 1139,
+                "last_run": None,
+            }
+        ],
+        lambda key: key,
+    )
+
+    specification = captured["spec"]
+    assert specification["mark"]["type"] == "bar"
+    assert specification["encoding"]["x"]["axis"]["grid"] is False
+    assert specification["encoding"]["x"]["axis"]["tickCount"] == 6
+    assert "layer" not in specification
+    assert specification["encoding"]["tooltip"][-1]["title"] == "last_local_update"
 
 
 def test_run_time_formatting_handles_absent_and_legacy_values() -> None:
@@ -214,6 +371,55 @@ def test_poc_stylesheet_keeps_button_tooltips_high_contrast() -> None:
     assert '[role="tooltip"]' in stylesheet
     assert "background-color: #10243E !important" in stylesheet
     assert "color: #FFFFFF !important" in stylesheet
+
+
+def test_poc_stylesheet_themes_dialogs_remediation_and_terminal_surfaces() -> None:
+    """Critical POC interactions retain explicit contrast in both themes."""
+    stylesheet = Path("src/poc/assets/poc.css").read_text(encoding="utf-8")
+
+    assert '[role="dialog"]' in stylesheet
+    assert '[data-baseweb="modal"] button[aria-label="Close"]' in stylesheet
+    assert '[data-testid="stExpanderDetails"] [class*="st-key-fp_"] button' in stylesheet
+    assert "background-color: #047857 !important" in stylesheet
+    assert '[data-testid="stToast"]' in stylesheet
+    assert '[data-testid="stCode"]' in stylesheet
+    assert ".poc-success-notice" in stylesheet
+    assert "background-color: #050A12 !important" in stylesheet
+    assert "border: 1px solid #60738F !important" in stylesheet
+    assert "color: #DCE7F5 !important" in stylesheet
+
+
+def test_pending_remediation_is_owned_by_one_page_and_cleared_on_dismissal() -> None:
+    """Native dismissal and navigation cannot leave a stale action behind."""
+    _request_confirmation("delete", "event-1", "nav_smail")
+    assert st.session_state["pending_remediation"]["surface"] == "nav_smail"
+
+    clear_stale_confirmation("nav_smail")
+    assert "pending_remediation" in st.session_state
+    clear_stale_confirmation("nav_home")
+    assert "pending_remediation" not in st.session_state
+
+    _request_confirmation("delete", "event-2", "nav_smail")
+    _dismiss_confirmation()
+    assert "pending_remediation" not in st.session_state
+
+
+def test_remediation_completion_notice_is_concise_and_icon_free(monkeypatch) -> None:
+    """Confirmed remediation uses one accessible text-only success notice."""
+    notices: list[tuple[tuple[object, ...], dict[str, object]]] = []
+    monkeypatch.setitem(st.session_state, "remediation_completed", "delete")
+    monkeypatch.setattr(
+        st,
+        "toast",
+        lambda *args, **kwargs: notices.append((args, kwargs)),
+    )
+
+    _render_completed_notice(
+        lambda key: "Message supprimé." if key == "remediation_delete_done" else key
+    )
+
+    assert notices == [(('Message supprimé.',), {})]
+    assert "remediation_completed" not in st.session_state
 
 
 def test_failed_playground_inference_is_not_persisted(
