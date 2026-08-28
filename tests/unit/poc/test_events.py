@@ -89,3 +89,14 @@ def test_reclassification_is_tenant_scoped_and_validated(tmp_path: Path) -> None
     assert store.list_for_user("alice@example.test")[0]["override_verdict"] == "safe"
     with pytest.raises(ValueError, match="Unsupported remediation verdict"):
         store.reclassify(event_id, "spam", "alice@example.test")
+
+
+def test_event_deletion_is_permanent_and_tenant_scoped(tmp_path: Path) -> None:
+    """POC deletion removes owned evidence without crossing tenants."""
+    store = event_store(tmp_path / "events.db")
+    record(store, "alice@example.test", "Alice event")
+    event_id = str(store.list_for_user("alice@example.test")[0]["id"])
+
+    assert not store.delete(event_id, "bob@example.test")
+    assert store.delete(event_id, "alice@example.test")
+    assert store.list_for_user("alice@example.test") == []

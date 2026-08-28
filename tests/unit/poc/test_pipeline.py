@@ -33,16 +33,6 @@ def test_local_operations_are_allowed_by_default() -> None:
     validate_operation(OPERATIONS["release_preview"], settings())
 
 
-def test_staging_publication_requires_explicit_opt_in() -> None:
-    with pytest.raises(PermissionError, match="ALLOW_STAGING_PUBLICATION"):
-        validate_operation(OPERATIONS["staging_publish"], settings())
-
-
-def test_staging_publish_requires_a_separate_slug() -> None:
-    with pytest.raises(PermissionError, match="KAGGLE_DATASET_SLUG"):
-        validate_operation(OPERATIONS["staging_publish"], settings(allow_staging_publication=True))
-
-
 def test_process_environment_uses_only_poc_runtime_values() -> None:
     configured = settings(snapshot_prefix="demonstrations/jury")
     environment = build_poc_process_env(configured)
@@ -52,18 +42,7 @@ def test_process_environment_uses_only_poc_runtime_values() -> None:
     )
     assert environment["SICURRE_POC_SNAPSHOT_PREFIX"] == "demonstrations/jury"
     assert environment["SICURRE_SEKOIA_SNAPSHOT_STORAGE_BACKEND"] == "local"
-    assert environment["SICURRE_POC_ALLOW_ML_DISPATCH"] == "false"
     assert environment["SICURRE_TRAINING_DATASET_SNAPSHOT_STORAGE_BACKEND"] == "local"
-
-
-def test_staging_publish_is_allowed_with_explicit_sandbox_contract() -> None:
-    validate_operation(
-        OPERATIONS["staging_publish"],
-        settings(
-            allow_staging_publication=True,
-            kaggle_dataset_slug="owner/sicurre-poc-staging",
-        ),
-    )
 
 
 class FakeProcess:

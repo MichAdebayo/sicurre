@@ -17,7 +17,6 @@ class PipelineScope(StrEnum):
 
     LOCAL = "local"
     EXTERNAL_READ_LOCAL_WRITE = "external_read_local_write"
-    SANDBOX_EXTERNAL = "sandbox_external"
     PRODUCTION_FORBIDDEN = "production_forbidden"
 
 
@@ -46,11 +45,6 @@ OPERATIONS = {
         command=("make", "poc-release-preview"),
         scope=PipelineScope.LOCAL,
     ),
-    "staging_publish": PipelineOperation(
-        key="staging_publish",
-        command=("make", "poc-staging-publish"),
-        scope=PipelineScope.SANDBOX_EXTERNAL,
-    ),
 }
 
 
@@ -67,16 +61,9 @@ def build_poc_process_env(settings: PocSettings) -> dict[str, str]:
             "SICURRE_POC_SNAPSHOT_PREFIX": settings.snapshot_prefix,
             "SICURRE_POC_SNAPSHOT_DIR": str(settings.snapshot_dir),
             "SICURRE_SEKOIA_SNAPSHOT_STORAGE_BACKEND": "local",
-            "SICURRE_POC_ALLOW_STAGING_PUBLICATION": str(
-                settings.allow_staging_publication
-            ).lower(),
-            "SICURRE_POC_ALLOW_ML_DISPATCH": str(settings.allow_ml_dispatch).lower(),
-            "SICURRE_POC_KAGGLE_DATASET_SLUG": settings.kaggle_dataset_slug or "",
             "SICURRE_TRAINING_DATASET_SNAPSHOT_STORAGE_BACKEND": "local",
         }
     )
-    if settings.kaggle_dataset_slug:
-        env["KAGGLE_DATASET_SLUG"] = settings.kaggle_dataset_slug
     return env
 
 
@@ -84,12 +71,6 @@ def validate_operation(operation: PipelineOperation, settings: PocSettings) -> N
     """Reject operations whose external impact has not been explicitly enabled."""
     if operation.scope is PipelineScope.PRODUCTION_FORBIDDEN:
         raise PermissionError("Production operations are never available from the POC.")
-    if operation.scope is PipelineScope.SANDBOX_EXTERNAL and not settings.allow_staging_publication:
-        raise PermissionError(
-            "Enable SICURRE_POC_ALLOW_STAGING_PUBLICATION for staging publication."
-        )
-    if operation.key == "staging_publish" and not settings.kaggle_dataset_slug:
-        raise PermissionError("SICURRE_POC_KAGGLE_DATASET_SLUG is required for staging publish.")
 
 
 def stream_operation(
