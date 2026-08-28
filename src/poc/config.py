@@ -70,14 +70,6 @@ class PocSettings(BaseSettings):
         default="Utilisateur Démo",
         validation_alias="SICURRE_POC_VIEWER_NAME",
     )
-    allow_staging_publication: bool = Field(
-        default=False,
-        validation_alias="SICURRE_POC_ALLOW_STAGING_PUBLICATION",
-    )
-    allow_ml_dispatch: bool = Field(
-        default=False,
-        validation_alias="SICURRE_POC_ALLOW_ML_DISPATCH",
-    )
     snapshot_prefix: str = Field(
         default="demonstrations/poc",
         validation_alias="SICURRE_POC_SNAPSHOT_PREFIX",
@@ -86,11 +78,6 @@ class PocSettings(BaseSettings):
         default=LOCAL_DATA_DIR / "poc" / "snapshots",
         validation_alias="SICURRE_POC_SNAPSHOT_DIR",
     )
-    kaggle_dataset_slug: str | None = Field(
-        default=None,
-        validation_alias="SICURRE_POC_KAGGLE_DATASET_SLUG",
-    )
-
     @field_validator("database_url", "data_platform_database_url")
     @classmethod
     def validate_sqlite_url(cls, value: str) -> str:

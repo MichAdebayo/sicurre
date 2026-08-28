@@ -94,8 +94,22 @@ class PocEventStore:
         )
         return True
 
+    def delete(self, event_id: str, user_email: str) -> bool:
+        """Permanently delete one event owned by the authenticated local user."""
+        before = self._auth_store.query(
+            "SELECT id FROM app_inference_event WHERE id = ? AND user_email = ?",
+            (event_id, user_email),
+        )
+        if not before:
+            return False
+        self._auth_store.execute(
+            "DELETE FROM app_inference_event WHERE id = ? AND user_email = ?",
+            (event_id, user_email),
+        )
+        return True
+
     def list_for_user(self, user_email: str, limit: int = 500) -> list[dict[str, Any]]:
-        """Return newest evidence owned by one authenticated local user."""
+        """Return newest evidence owned by one local user."""
         rows = self._auth_store.query(
             """
             SELECT id, created_at, user_email, context, subject, sender, snippet,

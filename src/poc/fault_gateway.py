@@ -17,7 +17,9 @@ class PocFaultGateway:
 
     def __init__(self, upstream_classify_url: str) -> None:
         self._upstream_classify_url = upstream_classify_url
-        self._upstream_health_url = upstream_classify_url.removesuffix("/v1/classify") + "/health"
+        upstream_service_url = upstream_classify_url.removesuffix("/v1/classify")
+        self._upstream_health_url = f"{upstream_service_url}/health"
+        self._upstream_manifest_url = f"{upstream_service_url}/v1/manifest"
         self._scenario: FaultScenario | None = None
         self._lock = threading.Lock()
         self._server: ThreadingHTTPServer | None = None
@@ -89,7 +91,7 @@ class PocFaultGateway:
     def _handle(self, handler: BaseHTTPRequestHandler, method: str) -> None:
         scenario = self.active_scenario
         scenario_value = str(scenario) if scenario is not None else ""
-        if handler.path not in {"/health", "/v1/classify"}:
+        if handler.path not in {"/health", "/v1/classify", "/v1/manifest"}:
             self._write(handler, 404, b'{"detail":"Not found"}')
             return
         if scenario_value == FaultScenario.SERVICE_UNAVAILABLE.value:
@@ -110,11 +112,16 @@ class PocFaultGateway:
             "Content-Type": handler.headers.get("Content-Type", "application/json"),
             "Authorization": handler.headers.get("Authorization", ""),
         }
-        if handler.path == "/v1/classify" and scenario_value == FaultScenario.INVALID_BEARER.value:
+        if (
+            handler.path in {"/v1/classify", "/v1/manifest"}
+            and scenario_value == FaultScenario.INVALID_BEARER.value
+        ):
             headers["Authorization"] = "Bearer sicurre-poc-injected-invalid-key"
-        upstream_url = (
-            self._upstream_health_url if handler.path == "/health" else self._upstream_classify_url
-        )
+        upstream_url = {
+            "/health": self._upstream_health_url,
+            "/v1/classify": self._upstream_classify_url,
+            "/v1/manifest": self._upstream_manifest_url,
+        }[handler.path]
         try:
             response = httpx.request(
                 method,
