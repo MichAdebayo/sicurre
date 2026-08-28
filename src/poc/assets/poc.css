@@ -952,6 +952,19 @@ button[aria-label*="password"]:hover svg *,
 }
 
 /* ── Sidebar actions and bottom status ───────────────── */
+.sidebar-section-label {
+  margin: 0.15rem 0 0.45rem;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+.sidebar-section-label.admin {
+  margin-top: 1.35rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-line);
+}
 [data-testid="stSidebar"] .st-key-sidebar_actions {
   margin-top: clamp(2.25rem, 7vh, 4.5rem) !important;
 }
