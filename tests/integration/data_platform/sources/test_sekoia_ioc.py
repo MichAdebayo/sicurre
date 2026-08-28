@@ -250,6 +250,8 @@ async def test_sekoia_ingestion_persists_source_lineage(
     assert raw_object.source_metadata["source"] == "sekoia_ioc"
     assert raw_record is not None
     assert raw_record.source_system_id == source.id
+    assert raw_record.is_usable is False
+    assert raw_record.rejection_reason == "ioc_reference_only_not_email_training_text"
     assert json.loads(raw_record.raw_content)["label"] == "phishing"
     assert store.object_key is not None
     assert "cron/scraping/sekoia_ioc" in store.object_key

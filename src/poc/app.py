@@ -13,6 +13,7 @@ from poc.events import PocEventStore
 from poc.fault_gateway import PocFaultGateway, gateway_settings_url
 from poc.inference import (
     ClassificationRequest,
+    FaultScenario,
     InferenceMode,
     PocInferenceClient,
     PocInferenceError,
@@ -23,7 +24,11 @@ from poc.presentation.home import render_home
 from poc.presentation.i18n import PocTranslator
 from poc.presentation.pipeline_page import execute_pipeline_action, render_pipeline_page
 from poc.presentation.playground import render_playground
-from poc.presentation.remediation import render_smail, render_threat_log
+from poc.presentation.remediation import (
+    clear_stale_confirmation,
+    render_smail,
+    render_threat_log,
+)
 from poc.presentation.resilience import render_resilience
 from poc.presentation.result import render_inference_result
 from poc.presentation.settings import render_settings
@@ -42,7 +47,7 @@ except RuntimeError as error:
     STARTUP_ERROR = str(error)
 
 
-FAULT_GATEWAY_IMPLEMENTATION_VERSION = 2
+FAULT_GATEWAY_IMPLEMENTATION_VERSION = 3
 
 
 @st.cache_resource
@@ -184,6 +189,18 @@ def update_display_name(user_id: str, display_name: str) -> None:
 
 
 def inference_status() -> tuple[str, str]:
+    active_fault = INFERENCE_GATEWAY.active_scenario
+    fault_states = {
+        FaultScenario.SERVICE_UNAVAILABLE: ("unreachable", "inference_health_unavailable"),
+        FaultScenario.INVALID_BEARER: (
+            "authentication_rejected",
+            "inference_health_rejected",
+        ),
+        FaultScenario.INVALID_CONTRACT: ("contract_invalid", "inference_health_unexpected"),
+    }
+    if active_fault in fault_states:
+        state, status_key = fault_states[active_fault]
+        return state, tr(status_key)
     healthy, status_key = INFERENCE_CLIENT.health()
     states = {
         "inference_health_ready": "ready",
@@ -235,6 +252,11 @@ def reclassify_event(event_id: str, new_verdict: str, by_user: str) -> None:
     EVENT_STORE.reclassify(event_id, new_verdict, by_user)
 
 
+def delete_event(event_id: str, by_user: str) -> None:
+    """Permanently delete one event owned by the local POC user."""
+    EVENT_STORE.delete(event_id, by_user)
+
+
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 if "show_login" not in st.session_state:
@@ -283,6 +305,7 @@ render_sidebar(
 
 events = EVENT_STORE.list_for_user(user["email"], limit=2000)
 page = st.session_state.get("page", "nav_home")
+clear_stale_confirmation(page)
 if page in {"nav_pipeline", "nav_resilience"} and user["role"] != "admin":
     page = "nav_home"
     st.session_state["page"] = page
@@ -293,12 +316,24 @@ if page == "nav_home":
 
 # ── Smail ─────────────────────────────────────────────────────────────────────
 elif page == "nav_smail":
-    render_smail(events, user["email"], tr, reclassify_event)
+    render_smail(
+        events,
+        user["email"],
+        tr,
+        reclassify_event,
+        delete_event,
+    )
 
 
 # ── Journal des menaces ───────────────────────────────────────────────────────
 elif page == "nav_threat_log":
-    render_threat_log(events, user["email"], tr, reclassify_event)
+    render_threat_log(
+        events,
+        user["email"],
+        tr,
+        reclassify_event,
+        delete_event,
+    )
 
 # ── Playground ────────────────────────────────────────────────────────────────
 elif page == "nav_playground":

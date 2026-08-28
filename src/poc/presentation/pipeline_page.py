@@ -124,6 +124,9 @@ def render_pipeline_page(
     if "last_pipeline_success" not in st.session_state:
         return
     if st.session_state["last_pipeline_success"]:
-        st.info("✅ " + translate("pipeline_last_success"))
+        st.markdown(
+            f"<div class='poc-success-notice'>{translate('pipeline_last_success')}</div>",
+            unsafe_allow_html=True,
+        )
     else:
-        st.warning("⚠️ " + translate("pipeline_last_error"))
+        st.warning(translate("pipeline_last_error"))

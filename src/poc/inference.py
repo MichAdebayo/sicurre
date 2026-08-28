@@ -145,17 +145,16 @@ class PocInferenceClient:
         """Return local model API and bearer-contract availability."""
         if not self.settings.inference_api_key:
             return False, "inference_health_missing_key"
-        health_url = self.settings.inference_api_url.removesuffix("/v1/classify") + "/health"
+        service_url = self.settings.inference_api_url.removesuffix("/v1/classify")
         try:
             health_response = httpx.get(
-                health_url,
+                f"{service_url}/health",
                 timeout=5.0,
             )
             if not health_response.is_success:
                 return False, "inference_health_unavailable"
-            auth_response = httpx.post(
-                self.settings.inference_api_url,
-                json={},
+            auth_response = httpx.get(
+                f"{service_url}/v1/manifest",
                 headers=self._headers(),
                 timeout=5.0,
             )
@@ -163,8 +162,15 @@ class PocInferenceClient:
             return False, "inference_health_unavailable"
         if auth_response.status_code == 401:
             return False, "inference_health_rejected"
-        if auth_response.status_code == 422:
-            return True, "inference_health_ready"
+        if auth_response.is_success:
+            try:
+                manifest = auth_response.json()
+            except ValueError:
+                pass
+            else:
+                service = manifest.get("service") if isinstance(manifest, dict) else None
+                if isinstance(service, dict) and service.get("api_contract") == "v1":
+                    return True, "inference_health_ready"
         return False, "inference_health_unexpected"
 
     def classify(
