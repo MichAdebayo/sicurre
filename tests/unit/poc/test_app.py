@@ -225,6 +225,7 @@ def test_invalid_and_valid_login_are_contextual(poc_app: AppTest) -> None:
     assert poc_app.session_state["page"] == "nav_admin"
     assert any(title.value == "Administration du POC" for title in poc_app.title)
     assert any(button.label == "Jeux de données" for button in poc_app.button)
+    assert not any(button.label == "Tester un email" for button in poc_app.button)
 
 
 def test_resilience_page_exposes_selectable_real_fault_evidence(poc_app: AppTest) -> None:
@@ -387,6 +388,7 @@ def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
     poc_app.button[0].click().run()
     assert poc_app.session_state["authenticated"] is True
     assert poc_app.session_state["user"]["role"] == "viewer"
+    assert any(btn.label == "Tester un email" for btn in poc_app.button)
 
     for admin_page in (
         "Vue d'administration",
@@ -397,6 +399,16 @@ def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
     ):
         assert not any(btn.label == admin_page for btn in poc_app.button)
     assert not any("Inférence API" in markdown.value for markdown in poc_app.markdown)
+
+    open_page(poc_app, "Tester un email", "nav_test_email")
+    assert any(title.value == "Tester un email" for title in poc_app.title)
+    assert not poc_app.button_group
+    assert poc_app.session_state["inference_mode"] == "live"
+    assert any(selectbox.label == "Scénario" for selectbox in poc_app.selectbox)
+    assert len(
+        [button for button in poc_app.button if button.label == "Analyser l'email"]
+    ) == 2
+
     for restricted_page in (
         "nav_admin",
         "nav_playground",

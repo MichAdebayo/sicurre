@@ -17,6 +17,11 @@ PERSONAL_NAVIGATION_KEYS = (
     "nav_threat_log",
 )
 
+VIEWER_NAVIGATION_KEYS = (
+    *PERSONAL_NAVIGATION_KEYS,
+    "nav_test_email",
+)
+
 ADMIN_NAVIGATION_KEYS = (
     "nav_admin",
     "nav_playground",
@@ -137,7 +142,12 @@ def render_sidebar(
             unsafe_allow_html=True,
         )
         current_page = st.session_state.get("page", "nav_home")
-        for navigation_key in PERSONAL_NAVIGATION_KEYS:
+        personal_navigation = (
+            PERSONAL_NAVIGATION_KEYS
+            if user["role"] == "admin"
+            else VIEWER_NAVIGATION_KEYS
+        )
+        for navigation_key in personal_navigation:
             _render_navigation_button(navigation_key, current_page, translate)
 
         if user["role"] == "admin":

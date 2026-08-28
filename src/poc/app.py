@@ -353,12 +353,27 @@ elif page == "nav_threat_log":
         delete_event,
     )
 
+# ── Test d'un email ──────────────────────────────────────────────────────────
+elif page == "nav_test_email":
+    render_playground(
+        user_email=user["email"],
+        scenarios=DEMO_EMAILS,
+        translate=tr,
+        allow_simulation=False,
+        classify=lambda subject, sender, text, use_llm=True, use_virustotal=True: (
+            classify_email_for_ui(subject, sender, text, use_llm, use_virustotal)
+        ),
+        persist=lambda **evidence: EVENT_STORE.record(**evidence),
+        render_result=lambda result: render_inference_result(result, tr),
+    )
+
 # ── Playground ────────────────────────────────────────────────────────────────
 elif page == "nav_playground":
     render_playground(
         user_email=user["email"],
         scenarios=DEMO_EMAILS,
         translate=tr,
+        allow_simulation=True,
         classify=lambda subject, sender, text, use_llm=True, use_virustotal=True: (
             classify_email_for_ui(subject, sender, text, use_llm, use_virustotal)
         ),
