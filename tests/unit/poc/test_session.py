@@ -26,12 +26,30 @@ def test_session_restore_and_clear_are_explicit() -> None:
         "display_name": "User",
         "role": "viewer",
     }
+    assert state["page"] == "nav_home"
     store.resolve_session.assert_called_once_with("remembered-token")
 
     controller.clear()
     store.revoke_session.assert_called_once_with("user-1")
     assert "user" not in state
     assert "sid" not in query
+    assert "page" not in state
+
+
+def test_administrator_session_opens_the_administration_overview() -> None:
+    """An administrator enters the distinct aggregate platform surface."""
+    store = Mock()
+    state: dict[str, object] = {"page": "nav_home"}
+    controller = PocSessionController(store, state, {})
+    controller.establish(
+        {
+            "id": "admin-1",
+            "email": "admin@example.test",
+            "display_name": "Admin",
+            "role": "admin",
+        }
+    )
+    assert state["page"] == "nav_admin"
 
 
 def test_session_without_token_does_not_query_persistence() -> None:
