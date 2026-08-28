@@ -44,6 +44,26 @@ def test_gateway_proxies_nominal_requests(
     assert gateway_settings_url(gateway) == gateway.classify_url
 
 
+def test_gateway_proxies_authenticated_manifest(
+    gateway: PocFaultGateway, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    observed: dict[str, object] = {}
+
+    def fake_request(method: str, url: str, **kwargs: object) -> httpx.Response:
+        observed.update(method=method, url=url, kwargs=kwargs)
+        return httpx.Response(200, json={"service": {"api_contract": "v1"}})
+
+    monkeypatch.setattr(httpx, "request", fake_request)
+    manifest_url = gateway.classify_url.removesuffix("/v1/classify") + "/v1/manifest"
+    response = httpx.get(manifest_url, headers={"Authorization": "Bearer expected"})
+
+    assert response.status_code == 200
+    assert observed["method"] == "GET"
+    assert observed["url"] == "http://127.0.0.1:8765/v1/manifest"
+    forwarded_headers = observed["kwargs"]["headers"]  # type: ignore[index]
+    assert forwarded_headers["Authorization"] == "Bearer expected"
+
+
 def test_gateway_injects_each_fault_and_restores(
     gateway: PocFaultGateway, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -60,6 +80,8 @@ def test_gateway_injects_each_fault_and_restores(
 
     gateway.inject(FaultScenario.INVALID_BEARER)
     assert httpx.post(gateway.classify_url, json={}).status_code == 401
+    manifest_url = gateway.classify_url.removesuffix("/v1/classify") + "/v1/manifest"
+    assert httpx.get(manifest_url).status_code == 401
 
     gateway.inject(FaultScenario.INVALID_CONTRACT)
     assert httpx.post(gateway.classify_url, json={}).json() == {"unexpected": True}

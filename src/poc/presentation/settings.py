@@ -27,6 +27,8 @@ def render_settings(
     runtime_checks: list[RuntimeCheck],
 ) -> None:
     """Render profile, language, and theme controls with injected persistence."""
+    if st.session_state.pop("settings_saved_notice", False):
+        st.toast(translate("settings_saved"))
     st.title(translate("settings_title"))
     st.caption(translate("settings_subtitle"))
     language = st.session_state.get("lang", "fr")
@@ -47,7 +49,7 @@ def render_settings(
     if saved and normalized_name and normalized_name != user["display_name"]:
         update_display_name(str(user["id"]), normalized_name)
         st.session_state["user"]["display_name"] = normalized_name
-        st.toast(translate("settings_saved"), icon="✅")
+        st.session_state["settings_saved_notice"] = True
         st.rerun()
 
     _divider("1.8rem 0 ")
