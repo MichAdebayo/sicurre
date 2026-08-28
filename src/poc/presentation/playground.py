@@ -70,31 +70,39 @@ def render_playground(
     user_email: str,
     scenarios: list[dict[str, str]],
     translate: Translator,
+    allow_simulation: bool,
     classify: ClassifyForUi,
     persist: PersistInference,
     render_result: Callable[[dict[str, Any]], None],
 ) -> None:
     """Render real local inference and deterministic simulation journeys."""
-    st.title(translate("playground_title"))
-    st.caption(translate("playground_subtitle"))
-    modes = [InferenceMode.LIVE, InferenceMode.SIMULATION]
-    labels = {mode: translate(f"inference_mode_{mode.value}") for mode in modes}
-    stored_mode = st.session_state.get("inference_mode", InferenceMode.LIVE.value)
-    current = (
-        InferenceMode(stored_mode)
-        if stored_mode in {mode.value for mode in modes}
-        else InferenceMode.LIVE
-    )
-    selected = st.segmented_control(
-        translate("inference_mode"),
-        options=modes,
-        default=current,
-        format_func=lambda option: labels[option],
-        selection_mode="single",
-    )
-    selected = selected or current
-    st.session_state["inference_mode"] = selected.value
-    st.caption(translate(f"inference_mode_{selected.value}_help"))
+    title_key = "playground_title" if allow_simulation else "test_email_title"
+    subtitle_key = "playground_subtitle" if allow_simulation else "test_email_subtitle"
+    st.title(translate(title_key))
+    st.caption(translate(subtitle_key))
+
+    if allow_simulation:
+        modes = [InferenceMode.LIVE, InferenceMode.SIMULATION]
+        labels = {mode: translate(f"inference_mode_{mode.value}") for mode in modes}
+        stored_mode = st.session_state.get("inference_mode", InferenceMode.LIVE.value)
+        current = (
+            InferenceMode(stored_mode)
+            if stored_mode in {mode.value for mode in modes}
+            else InferenceMode.LIVE
+        )
+        selected = st.segmented_control(
+            translate("inference_mode"),
+            options=modes,
+            default=current,
+            format_func=lambda option: labels[option],
+            selection_mode="single",
+        )
+        selected = selected or current
+        st.session_state["inference_mode"] = selected.value
+        st.caption(translate(f"inference_mode_{selected.value}_help"))
+    else:
+        selected = InferenceMode.LIVE
+        st.session_state["inference_mode"] = selected.value
 
     use_llm = False
     use_virustotal = False
