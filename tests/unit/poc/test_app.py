@@ -213,7 +213,8 @@ def test_invalid_and_valid_login_are_contextual(poc_app: AppTest) -> None:
     poc_app.text_input[0].input("missing@example.test")
     poc_app.text_input[1].input("wrong-password")
     poc_app.button[0].click().run()
-    assert any("Identifiants invalides" in warning.value for warning in poc_app.warning)
+    assert any("Identifiants invalides" in error.value for error in poc_app.error)
+    assert not any("⚠️" in error.value for error in poc_app.error)
 
     poc_app.text_input[0].input("admin@example.test")
     poc_app.text_input[1].input("admin-password")
@@ -389,6 +390,7 @@ def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
 
     for admin_page in (
         "Vue d'administration",
+        "Espace d'essai",
         "Flux de données",
         "Jeux de données",
         "Incidence technique",
@@ -397,6 +399,7 @@ def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
     assert not any("Inférence API" in markdown.value for markdown in poc_app.markdown)
     for restricted_page in (
         "nav_admin",
+        "nav_playground",
         "nav_pipeline",
         "nav_datasets",
         "nav_resilience",

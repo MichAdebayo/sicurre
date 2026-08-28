@@ -15,11 +15,11 @@ PERSONAL_NAVIGATION_KEYS = (
     "nav_home",
     "nav_smail",
     "nav_threat_log",
-    "nav_playground",
 )
 
 ADMIN_NAVIGATION_KEYS = (
     "nav_admin",
+    "nav_playground",
     "nav_pipeline",
     "nav_datasets",
     "nav_resilience",
@@ -106,7 +106,7 @@ def render_login(
                     st.query_params["sid"] = remember_session(str(user["id"]))
                 st.rerun()
             else:
-                st.warning("⚠️ " + translate("invalid_credentials"))
+                st.error(translate("invalid_credentials"))
         st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
@@ -137,10 +137,6 @@ def render_sidebar(
             unsafe_allow_html=True,
         )
         current_page = st.session_state.get("page", "nav_home")
-        st.markdown(
-            f"<div class='sidebar-section-label'>{translate('personal_space')}</div>",
-            unsafe_allow_html=True,
-        )
         for navigation_key in PERSONAL_NAVIGATION_KEYS:
             _render_navigation_button(navigation_key, current_page, translate)
 
