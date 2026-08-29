@@ -40,6 +40,7 @@ class DataPlatformState:
     dataset_version: str | None
     dataset_status: str | None
     latest_ingestion_at: str | None
+    latest_ingestion_status: str | None
 
 
 @dataclass(frozen=True)
@@ -118,13 +119,15 @@ class PocAdminAnalytics:
 
     def _data_platform_state(self) -> DataPlatformState:
         latest_dataset = self._latest_dataset()
+        latest_ingestion = self._latest_ingestion()
         return DataPlatformState(
             raw_records=self._data_store.count("data_raw_record"),
             normalized_messages=self._data_store.count("data_normalized_message"),
             dataset_items=int(latest_dataset.get("item_count") or 0),
             dataset_version=_optional_text(latest_dataset.get("version_tag")),
             dataset_status=_optional_text(latest_dataset.get("status")),
-            latest_ingestion_at=self._latest_ingestion_at(),
+            latest_ingestion_at=_optional_text(latest_ingestion.get("observed_at")),
+            latest_ingestion_status=_optional_text(latest_ingestion.get("status")),
         )
 
     def _latest_dataset(self) -> dict[str, object]:
@@ -142,18 +145,18 @@ class PocAdminAnalytics:
         )
         return rows[0] if rows else {}
 
-    def _latest_ingestion_at(self) -> str | None:
+    def _latest_ingestion(self) -> dict[str, object]:
         if not self._data_store.table_exists("data_ingestion_run"):
-            return None
+            return {}
         rows = self._data_store.query(
             """
-            SELECT COALESCE(finished_at, started_at) AS observed_at
+            SELECT COALESCE(finished_at, started_at) AS observed_at, status
             FROM data_ingestion_run
             ORDER BY datetime(COALESCE(finished_at, started_at)) DESC
             LIMIT 1
             """
         )
-        return _optional_text(rows[0].get("observed_at")) if rows else None
+        return rows[0] if rows else {}
 
 
 def _optional_text(value: object) -> str | None:
