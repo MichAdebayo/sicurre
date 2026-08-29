@@ -46,6 +46,7 @@ from pydantic import BaseModel, Field
 from core.config import get_settings
 from core.loops import send_loops_transactional
 from core.rate_limit import limiter
+from core.scan_metrics import observe_scan, observe_stage
 from core.secret_cipher import decrypt_secret, encrypt_secret
 from data_platform.api.auth import AuthUser, ensure_runtime_tables, get_current_user
 from data_platform.api.schemas.app_responses import (
@@ -511,27 +512,29 @@ async def scan_email(
         # ── Call inference API ──────────────────────────────────────────────────
         inference_url = settings.inference_api_url or "http://localhost:8000/v1/classify"
         inference_key = settings.inference_api_key or ""
-        mail_context = derive_email_context(
-            subject=payload.subject,
-            sender=payload.sender,
-            text=payload.text,
-            recipient_expected=matched_rule_type == "whitelist",
-        )
+        with observe_stage("context"):
+            mail_context = derive_email_context(
+                subject=payload.subject,
+                sender=payload.sender,
+                text=payload.text,
+                recipient_expected=matched_rule_type == "whitelist",
+            )
 
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                resp = await client.post(
-                    inference_url,
-                    json={
-                        "subject": payload.subject,
-                        "sender": payload.sender,
-                        "text": payload.text,
-                        "use_llm": payload.use_llm,
-                        "use_virustotal": payload.use_virustotal,
-                        "mail_context": mail_context.as_payload(),
-                    },
-                    headers={"Authorization": f"Bearer {inference_key}"},
-                )
+            with observe_stage("inference"):
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    resp = await client.post(
+                        inference_url,
+                        json={
+                            "subject": payload.subject,
+                            "sender": payload.sender,
+                            "text": payload.text,
+                            "use_llm": payload.use_llm,
+                            "use_virustotal": payload.use_virustotal,
+                            "mail_context": mail_context.as_payload(),
+                        },
+                        headers={"Authorization": f"Bearer {inference_key}"},
+                    )
             resp.raise_for_status()
             result = resp.json()
 
@@ -561,6 +564,11 @@ async def scan_email(
             ) from exc
 
     decision_latency_ms = round((perf_counter() - request_started_at) * 1000, 2)
+    observe_scan(
+        verdict=verdict_label,
+        duration_seconds=decision_latency_ms / 1000.0,
+        sla_seconds=settings.sla_latency_ms / 1000.0,
+    )
 
     # ── Quarantine Handling ────────────────────────────────────────────────
     # If verdict is phishing, quarantine the email instead of bouncing
