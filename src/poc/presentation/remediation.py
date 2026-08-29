@@ -19,6 +19,7 @@ Translator = Callable[[str], str]
 Reclassify = Callable[[str, str, str], None]
 DeleteEvent = Callable[[str, str], None]
 Period = Literal["all", "today", "week"]
+THREAT_PAGE_SIZE = 10
 
 
 def _request_confirmation(action: str, event_id: str, surface: str) -> None:
@@ -112,6 +113,16 @@ def filter_threats(
     current_time = now or datetime.now(UTC)
     cutoff = current_time - timedelta(days=1 if period == "today" else 7)
     return [event for event in threats if event["created_at"] >= cutoff.isoformat()]
+
+
+def paginate_threats(
+    threats: list[dict[str, Any]], page: int, page_size: int = THREAT_PAGE_SIZE
+) -> tuple[list[dict[str, Any]], int, int]:
+    """Return one bounded threat page, its normalized index, and total pages."""
+    total_pages = max(1, (len(threats) + page_size - 1) // page_size)
+    normalized_page = min(max(page, 1), total_pages)
+    start = (normalized_page - 1) * page_size
+    return threats[start : start + page_size], normalized_page, total_pages
 
 
 def _render_delivered_card(
@@ -208,12 +219,21 @@ def render_threat_log(
             label_visibility="collapsed",
         )
     selected_period = next(key for key, label in options if label == selected_label)
+    if st.session_state.get("threat_log_period") != selected_period:
+        st.session_state["threat_log_period"] = selected_period
+        st.session_state["threat_log_page"] = 1
     threats = filter_threats(events, selected_period)
     if not threats:
         st.info(translate("no_events"))
         return
 
-    for event in threats[:80]:
+    requested_page = int(st.session_state.get("threat_log_page", 1))
+    visible_threats, current_page, total_pages = paginate_threats(
+        threats,
+        requested_page,
+    )
+    st.session_state["threat_log_page"] = current_page
+    for event in visible_threats:
         _render_threat_card(
             event,
             user_email,
@@ -221,6 +241,26 @@ def render_threat_log(
             reclassify,
             delete_event,
         )
+    if total_pages > 1:
+        previous, page_status, following = st.columns([1, 2, 1])
+        if previous.button(
+            translate("pagination_previous"),
+            disabled=current_page == 1,
+            use_container_width=True,
+        ):
+            st.session_state["threat_log_page"] = current_page - 1
+            st.rerun()
+        page_status.markdown(
+            f"<p class='pagination-status'>{translate('pagination_status').format(page=current_page, total=total_pages)}</p>",
+            unsafe_allow_html=True,
+        )
+        if following.button(
+            translate("pagination_next"),
+            disabled=current_page == total_pages,
+            use_container_width=True,
+        ):
+            st.session_state["threat_log_page"] = current_page + 1
+            st.rerun()
     _render_confirmation(user_email, translate, reclassify, delete_event)
 
 
@@ -236,7 +276,7 @@ def _render_threat_card(
     correction = ""
     if event.get("override_verdict") == "phishing":
         correction = (
-            f" &nbsp;<span class='badge badge-phishing'>"
+            f" &nbsp;<span class='badge badge-human-report'>"
             f"{translate('reported_phishing_label')}</span>"
         )
     elif event.get("override_verdict"):

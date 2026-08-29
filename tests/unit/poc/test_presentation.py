@@ -3,10 +3,17 @@
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import streamlit as st
 
+from poc.presentation.admin import (
+    _check_readiness,
+    _inference_readiness,
+    _ingestion_status,
+    _render_classification_chart,
+)
 from poc.presentation.datasets import (
     _aggregate_initialization_runs,
     _load_frozen_source_distribution,
@@ -37,10 +44,72 @@ from poc.presentation.remediation import (
     _request_confirmation,
     clear_stale_confirmation,
     filter_threats,
+    paginate_threats,
     partition_delivered_events,
 )
 from poc.presentation.result import confidence_bar, result_style
 from poc.presentation.theme import initialize_theme, load_theme_css, set_theme
+from poc.presentation.theme_overrides import get_theme_override_css
+from poc.runtime_preflight import RuntimeCheck
+
+
+def test_admin_readiness_statuses_are_text_backed_and_semantic() -> None:
+    """Readiness colors supplement explicit ready, attention, and blocking text."""
+    labels = {
+        "preflight_ready": "Prêt",
+        "preflight_attention": "À vérifier",
+        "preflight_blocking": "Bloquant",
+        "admin_ingestion_completed": "Terminée",
+        "admin_ingestion_running": "En cours",
+        "admin_ingestion_failed": "Échec",
+        "admin_unavailable": "indisponible",
+    }
+    translate = lambda key: labels.get(key, key)  # noqa: E731
+
+    assert _check_readiness(RuntimeCheck("ready", True, True), translate) == (
+        "ready",
+        "Prêt",
+    )
+    assert _check_readiness(RuntimeCheck("optional", False, False), translate) == (
+        "attention",
+        "À vérifier",
+    )
+    assert _check_readiness(RuntimeCheck("required", False, True), translate) == (
+        "blocking",
+        "Bloquant",
+    )
+    assert _inference_readiness("ready", translate) == ("ready", "Prêt")
+    assert _inference_readiness("contract_invalid", translate) == (
+        "attention",
+        "À vérifier",
+    )
+    assert _inference_readiness("unreachable", translate) == ("blocking", "Bloquant")
+    assert _ingestion_status("completed", translate) == ("ready", "Terminée")
+    assert _ingestion_status("running", translate) == ("attention", "En cours")
+    assert _ingestion_status("failed", translate) == ("blocking", "Échec")
+
+
+def test_admin_classification_chart_uses_distinct_integer_ticks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Small class totals must not render duplicate rounded half-step labels."""
+    rendered: dict[str, object] = {}
+
+    def capture_chart(rows: object, specification: object, **kwargs: object) -> None:
+        rendered.update(rows=rows, specification=specification, kwargs=kwargs)
+
+    monkeypatch.setattr(st, "vega_lite_chart", capture_chart)
+    snapshot = SimpleNamespace(
+        classifications=SimpleNamespace(legitimate=1, spam=2, phishing=3)
+    )
+
+    _render_classification_chart(snapshot, lambda key: key)
+
+    specification = rendered["specification"]
+    assert isinstance(specification, dict)
+    axis = specification["encoding"]["x"]["axis"]
+    assert axis["format"] == ",d"
+    assert axis["tickMinStep"] == 1
 
 
 def test_dataset_source_labels_preserve_real_sources_and_shorten_reconstruction() -> None:
@@ -380,13 +449,56 @@ def test_poc_stylesheet_themes_dialogs_remediation_and_terminal_surfaces() -> No
     assert '[role="dialog"]' in stylesheet
     assert '[data-baseweb="modal"] button[aria-label="Close"]' in stylesheet
     assert '[data-testid="stExpanderDetails"] [class*="st-key-fp_"] button' in stylesheet
-    assert "background-color: #047857 !important" in stylesheet
+    assert "background-color: var(--status-safe-bg) !important" in stylesheet
+    assert "background-color: var(--status-danger-bg) !important" in stylesheet
     assert '[data-testid="stToast"]' in stylesheet
+    assert "background-color: var(--status-safe-bg) !important" in stylesheet
+    assert '[class*="st-key-delete_"] button:hover' in stylesheet
+    assert "background-color: var(--neutral-hover-bg) !important" in stylesheet
+    assert '[data-theme="dark"] [class*="st-key-fn_"]' not in stylesheet
+    assert '[class*="st-key-fn_"] button:hover *' in stylesheet
     assert '[data-testid="stCode"]' in stylesheet
     assert ".poc-success-notice" in stylesheet
     assert "background-color: #050A12 !important" in stylesheet
     assert "border: 1px solid #60738F !important" in stylesheet
     assert "color: #DCE7F5 !important" in stylesheet
+
+
+def test_poc_stylesheet_separates_semantic_and_table_tokens_by_theme() -> None:
+    """Status pills and data grids must remain distinct in light and dark modes."""
+    stylesheet = Path("src/poc/assets/poc.css").read_text(encoding="utf-8")
+
+    assert '[data-theme="light"]' in stylesheet
+    assert "--status-safe-border: #D7E9DE" in stylesheet
+    assert "--status-safe-border: #276B57" in stylesheet
+    assert "--table-border: #CBD5E1" in stylesheet
+    assert "--table-border: #58718F" in stylesheet
+    assert ".evidence-table th + th" in stylesheet
+    assert "border-left: 1px solid var(--table-border)" in stylesheet
+    assert "border-color: var(--status-safe-border)" in stylesheet
+
+
+def test_poc_sidebar_navigation_uses_one_continuous_fill() -> None:
+    """Navigation states must not combine a fill with a contrasting side stripe."""
+    stylesheet = Path("src/poc/assets/poc.css").read_text(encoding="utf-8")
+
+    assert "border-left: 3px solid" not in stylesheet
+    assert "border-radius: 6px !important" in stylesheet
+
+
+def test_forced_theme_overrides_streamlit_theme_containers() -> None:
+    """A selected POC theme must win over Streamlit or OS theme attributes."""
+    light = get_theme_override_css("Light")
+    dark = get_theme_override_css("Dark")
+
+    for override in (light, dark):
+        assert '[data-theme="light"]' in override
+        assert '[data-theme="dark"]' in override
+        assert "--table-header-bg:" in override
+        assert "--status-safe-bg:" in override
+    assert "--table-header-bg: #EEF2F7 !important" in light
+    assert "--status-safe-bg: #F7FBF8 !important" in light
+    assert "--table-header-bg: #15243A !important" in dark
 
 
 def test_pending_remediation_is_owned_by_one_page_and_cleared_on_dismissal() -> None:
@@ -545,6 +657,19 @@ def test_threat_filter_uses_effective_verdict_and_period() -> None:
         "old",
         "corrected-miss",
     ]
+
+
+def test_threat_pagination_is_bounded_and_clamps_stale_pages() -> None:
+    """Threat history exposes stable pages instead of truncating or scrolling forever."""
+    events = [{"id": str(index)} for index in range(23)]
+
+    first, first_page, total_pages = paginate_threats(events, 1)
+    last, last_page, _ = paginate_threats(events, 99)
+
+    assert [event["id"] for event in first] == [str(index) for index in range(10)]
+    assert (first_page, total_pages) == (1, 3)
+    assert [event["id"] for event in last] == ["20", "21", "22"]
+    assert last_page == 3
 
 
 @pytest.mark.parametrize(

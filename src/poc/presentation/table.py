@@ -14,8 +14,12 @@ def render_evidence_table(
     columns: Sequence[str],
     *,
     caption: str,
+    wrapper_class: str = "",
 ) -> None:
     """Render a semantic table that follows the active Sicurre theme."""
+    wrapper_classes = "evidence-table-scroll"
+    if wrapper_class:
+        wrapper_classes = f"{wrapper_classes} {escape(wrapper_class)}"
     headers = "".join(f"<th scope='col'>{escape(column)}</th>" for column in columns)
     body = "".join(
         "<tr>"
@@ -24,7 +28,7 @@ def render_evidence_table(
         for row in rows
     )
     st.markdown(
-        "<div class='evidence-table-scroll'>"
+        f"<div class='{wrapper_classes}'>"
         "<table class='evidence-table'>"
         f"<caption>{escape(caption)}</caption>"
         f"<thead><tr>{headers}</tr></thead><tbody>{body}</tbody>"

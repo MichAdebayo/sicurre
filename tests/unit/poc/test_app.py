@@ -223,9 +223,23 @@ def test_invalid_and_valid_login_are_contextual(poc_app: AppTest) -> None:
     assert poc_app.session_state["authenticated"] is True
     assert poc_app.session_state["user"]["display_name"] == "Admin Test"
     assert poc_app.session_state["page"] == "nav_admin"
-    assert any(title.value == "Administration du POC" for title in poc_app.title)
+    assert any(title.value == "Tableau de bord du POC" for title in poc_app.title)
     assert any(button.label == "Jeux de données" for button in poc_app.button)
     assert not any(button.label == "Tester un email" for button in poc_app.button)
+    labels = [button.label for button in poc_app.button]
+    assert labels.index("Tableau de bord") < labels.index("Espace d'essai")
+    assert any("readiness-ready" in markdown.value for markdown in poc_app.markdown)
+    assert any("admin-data-summary" in markdown.value for markdown in poc_app.markdown)
+    for heading in (
+        "Répartition des classes",
+        "Utilisateurs du POC",
+        "État de la plateforme de données",
+        "État de préparation local",
+    ):
+        assert any(heading in markdown.value for markdown in poc_app.markdown)
+    assert sum("admin-section-heading" in item.value for item in poc_app.markdown) >= 4
+    assert any("admin-accounts-table" in markdown.value for markdown in poc_app.markdown)
+    assert any("<th scope='col'>N°</th>" in markdown.value for markdown in poc_app.markdown)
 
 
 def test_resilience_page_exposes_selectable_real_fault_evidence(poc_app: AppTest) -> None:
@@ -315,6 +329,7 @@ def test_false_negative_report_moves_delivered_message_to_threat_log(poc_app: Ap
 
     open_page(poc_app, "Journal des menaces", "nav_threat_log")
     assert any("Validation facture mars" in markdown.value for markdown in poc_app.markdown)
+    assert any("Signalement utilisateur" in markdown.value for markdown in poc_app.markdown)
 
 
 def test_smail_deletion_is_confirmed_and_permanent(poc_app: AppTest) -> None:
@@ -391,7 +406,7 @@ def test_pipeline_and_datasets_pages(poc_app: AppTest) -> None:
     assert any(btn.label == "Tester un email" for btn in poc_app.button)
 
     for admin_page in (
-        "Vue d'administration",
+        "Tableau de bord",
         "Espace d'essai",
         "Flux de données",
         "Jeux de données",

@@ -42,12 +42,13 @@ def render_resilience(
         translate("resilience_scenario"),
         SCENARIOS,
         index=selected_index,
-        format_func=lambda value: translate(f"resilience_scenario_{value.value}"),
+        format_func=lambda value: (
+            f"{translate(f'resilience_scenario_{value.value}')} "
+            f"({translate(f'resilience_scenario_{value.value}_help')})"
+        ),
         key="resilience_fault_scenario",
         disabled=current_fault is not None,
     )
-    st.caption(translate(f"resilience_scenario_{scenario.value}_help"))
-
     inject_column, restore_column = st.columns(2)
     inject_requested = inject_column.button(
         translate("resilience_inject"),
