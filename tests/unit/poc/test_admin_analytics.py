@@ -44,12 +44,16 @@ def _seed_data_database(path: Path) -> None:
             id TEXT PRIMARY KEY, version_tag TEXT, status TEXT, created_at TEXT
         );
         CREATE TABLE data_dataset_item (id TEXT PRIMARY KEY, dataset_id TEXT);
-        CREATE TABLE data_ingestion_run (id TEXT PRIMARY KEY, started_at TEXT, finished_at TEXT);
+        CREATE TABLE data_ingestion_run (
+            id TEXT PRIMARY KEY, started_at TEXT, finished_at TEXT, status TEXT
+        );
         INSERT INTO data_raw_record VALUES ('r1'), ('r2'), ('r3');
         INSERT INTO data_normalized_message VALUES ('n1'), ('n2');
         INSERT INTO data_dataset VALUES ('d1', 'base-v1', 'frozen', '2026-08-28T08:00:00Z');
         INSERT INTO data_dataset_item VALUES ('i1', 'd1'), ('i2', 'd1');
-        INSERT INTO data_ingestion_run VALUES ('run-1', '2026-08-28T07:00:00Z', NULL);
+        INSERT INTO data_ingestion_run VALUES (
+            'run-1', '2026-08-28T07:00:00Z', NULL, 'running'
+        );
         """
     )
     connection.commit()
@@ -83,3 +87,4 @@ def test_admin_snapshot_aggregates_accounts_classes_and_data_without_content(
     assert snapshot.data_platform.dataset_items == 2
     assert snapshot.data_platform.dataset_version == "base-v1"
     assert snapshot.data_platform.latest_ingestion_at == "2026-08-28T07:00:00Z"
+    assert snapshot.data_platform.latest_ingestion_status == "running"
