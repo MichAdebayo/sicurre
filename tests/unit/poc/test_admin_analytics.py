@@ -88,3 +88,13 @@ def test_admin_snapshot_aggregates_accounts_classes_and_data_without_content(
     assert snapshot.data_platform.dataset_version == "base-v1"
     assert snapshot.data_platform.latest_ingestion_at == "2026-08-28T07:00:00Z"
     assert snapshot.data_platform.latest_ingestion_status == "running"
+
+
+def test_admin_analytics_tolerates_missing_ingestion_table(tmp_path: Path) -> None:
+    """A fresh local data store has no ingestion evidence yet."""
+    analytics = PocAdminAnalytics(
+        PocAuthStore(tmp_path / "auth.db"),
+        PocDataEvidenceStore(tmp_path / "data.db"),
+    )
+
+    assert analytics._latest_ingestion() == {}
