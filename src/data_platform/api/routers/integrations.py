@@ -315,6 +315,20 @@ async def _async_query(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
     return await execute_runtime_query(sql, params)
 
 
+async def _timed_query(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
+    """Same as _async_query, but attributed to the "database" scan stage.
+
+    Production Postgres is Neon (serverless, eu-central-1) reached over TLS from
+    the application host, and it autosuspends when idle. At current volume the
+    compute is cold for most scans, so round-trip cost here is a prime suspect
+    for the gap between inference time and total decision time.
+    """
+    # Delegates through _async_query rather than calling the engine directly so
+    # the existing module-level test seam keeps working.
+    with observe_stage("database"):
+        return await _async_query(sql, params)
+
+
 def _ensure_tables() -> None:
     """Create application tables for local development only."""
     ensure_runtime_tables()
@@ -418,7 +432,7 @@ async def scan_email(
 
     # Verify the secret against stored hash
     secret_hash = hashlib.sha256(x_sicurre_secret.encode()).hexdigest()
-    rows = await _async_query(
+    rows = await _timed_query(
         "SELECT id, user_email, workspace_id, workspace_member_user_id, zone_name, status FROM cloudflare_integration WHERE shared_secret_hash = ? AND status IN ('pending_verification','active') LIMIT 1",
         (secret_hash,),
     )
@@ -436,7 +450,7 @@ async def scan_email(
         if payload.message_id and payload.message_id.strip()
         else str(uuid4())
     )
-    existing_quarantine = await _async_query(
+    existing_quarantine = await _timed_query(
         "SELECT id, safety_verdict, composite_score FROM app_quarantine_item "
         "WHERE workspace_id = ? AND message_id = ? LIMIT 1",
         (workspace_id, event_id),
@@ -451,7 +465,7 @@ async def scan_email(
             explanation="Existing idempotent quarantine decision.",
             quarantine_id=str(held["id"]),
         )
-    existing_event = await _async_query(
+    existing_event = await _timed_query(
         "SELECT safety_verdict, label_verdict, composite_score, explanation, latency_ms "
         "FROM app_inference_event WHERE id = ? AND workspace_id = ? LIMIT 1",
         (event_id, workspace_id),
@@ -468,7 +482,7 @@ async def scan_email(
         )
 
     # ── Check Whitelist / Blocklist Rules ──────────────────────────────────
-    rules = await _async_query(
+    rules = await _timed_query(
         "SELECT rule_type, pattern FROM app_security_rule WHERE workspace_id = ?", (workspace_id,)
     )
 
