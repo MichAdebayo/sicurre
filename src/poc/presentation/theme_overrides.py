@@ -8,7 +8,9 @@ poc.css stylesheet.
 from __future__ import annotations
 
 LIGHT_OVERRIDES = """
-:root {
+:root,
+[data-theme="light"],
+[data-theme="dark"] {
   --bg: #F8FAFC !important;
   --surface: #FFFFFF !important;
   --border: #E2E8F0 !important;
@@ -32,11 +34,26 @@ LIGHT_OVERRIDES = """
   --nav-hover: #EEF3FF !important;
   --danger-semantic: #EF4444 !important;
   --safe-semantic: #047857 !important;
+  --status-safe-text: #247A4B !important;
+  --status-safe-bg: #F7FBF8 !important;
+  --status-safe-border: #D7E9DE !important;
+  --status-warning-text: #92400E !important;
+  --status-warning-bg: #FFFBEB !important;
+  --status-warning-border: #FDE68A !important;
+  --status-danger-text: #B91C1C !important;
+  --status-danger-bg: #FEF2F2 !important;
+  --status-danger-border: #FECACA !important;
+  --table-border: #CBD5E1 !important;
+  --table-header-bg: #EEF2F7 !important;
+  --neutral-hover-bg: #E2E8F0 !important;
+  --neutral-hover-border: #94A3B8 !important;
 }
 """
 
 DARK_OVERRIDES = """
-:root {
+:root,
+[data-theme="light"],
+[data-theme="dark"] {
   --bg: #07111F !important;
   --surface: #0B1626 !important;
   --border: #26364F !important;
@@ -60,6 +77,19 @@ DARK_OVERRIDES = """
   --nav-hover: #1E3A5F !important;
   --danger-semantic: #EF4444 !important;
   --safe-semantic: #34D399 !important;
+  --status-safe-text: #6EE7B7 !important;
+  --status-safe-bg: #0D2B24 !important;
+  --status-safe-border: #276B57 !important;
+  --status-warning-text: #FCD34D !important;
+  --status-warning-bg: #33230A !important;
+  --status-warning-border: #76530F !important;
+  --status-danger-text: #FCA5A5 !important;
+  --status-danger-bg: #351414 !important;
+  --status-danger-border: #7F2F2F !important;
+  --table-border: #58718F !important;
+  --table-header-bg: #15243A !important;
+  --neutral-hover-bg: #1B2A40 !important;
+  --neutral-hover-border: #58718F !important;
 }
 /* Forced dark: badge overrides */
 .badge-phishing { background: #450A0A !important; border-color: #7F1D1D !important; color: #F87171 !important; }
