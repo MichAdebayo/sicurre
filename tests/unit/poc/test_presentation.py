@@ -46,6 +46,7 @@ from poc.presentation.remediation import (
     filter_threats,
     paginate_threats,
     partition_delivered_events,
+    render_threat_log,
 )
 from poc.presentation.result import confidence_bar, result_style
 from poc.presentation.theme import initialize_theme, load_theme_css, set_theme
@@ -87,6 +88,7 @@ def test_admin_readiness_statuses_are_text_backed_and_semantic() -> None:
     assert _ingestion_status("completed", translate) == ("ready", "Terminée")
     assert _ingestion_status("running", translate) == ("attention", "En cours")
     assert _ingestion_status("failed", translate) == ("blocking", "Échec")
+    assert _ingestion_status("unknown", translate) == ("attention", "indisponible")
 
 
 def test_admin_classification_chart_uses_distinct_integer_ticks(
@@ -670,6 +672,100 @@ def test_threat_pagination_is_bounded_and_clamps_stale_pages() -> None:
     assert (first_page, total_pages) == (1, 3)
     assert [event["id"] for event in last] == ["20", "21", "22"]
     assert last_page == 3
+
+
+@pytest.mark.parametrize(
+    ("starting_page", "clicked_direction", "expected_page"),
+    [(2, "previous", 1), (1, "next", 2)],
+)
+def test_threat_log_pagination_controls_change_page(
+    monkeypatch: pytest.MonkeyPatch,
+    starting_page: int,
+    clicked_direction: str,
+    expected_page: int,
+) -> None:
+    """Both threat-history controls update state and request a rerender."""
+    rerenders: list[bool] = []
+    statuses: list[str] = []
+
+    class Column:
+        def __init__(self, clicked: bool = False) -> None:
+            self.clicked = clicked
+
+        def __enter__(self) -> "Column":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def button(self, *_args: object, **_kwargs: object) -> bool:
+            return self.clicked
+
+        def markdown(self, value: str, **_kwargs: object) -> None:
+            statuses.append(value)
+
+    column_calls = 0
+
+    def columns(specification: list[int]) -> list[Column]:
+        nonlocal column_calls
+        column_calls += 1
+        if column_calls == 1:
+            return [Column(), Column()]
+        return [
+            Column(clicked_direction == "previous"),
+            Column(),
+            Column(clicked_direction == "next"),
+        ]
+
+    labels = {
+        "period_all": "Tout",
+        "period_today": "Jour",
+        "period_week": "Semaine",
+        "pagination_previous": "Précédent",
+        "pagination_next": "Suivant",
+        "pagination_status": "Page {page} sur {total}",
+    }
+    translate = lambda key: labels.get(key, key)  # noqa: E731
+    events = [
+        {
+            "id": str(index),
+            "safety_verdict": "phishing",
+            "created_at": "2026-08-29T08:00:00+00:00",
+        }
+        for index in range(11)
+    ]
+
+    st.session_state["threat_log_period"] = "all"
+    st.session_state["threat_log_page"] = starting_page
+    monkeypatch.setattr(st, "title", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(st, "caption", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(st, "columns", columns)
+    monkeypatch.setattr(st, "selectbox", lambda *_args, **_kwargs: "Tout")
+    monkeypatch.setattr(st, "rerun", lambda: rerenders.append(True))
+    monkeypatch.setattr(
+        "poc.presentation.remediation._render_completed_notice",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "poc.presentation.remediation._render_threat_card",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "poc.presentation.remediation._render_confirmation",
+        lambda *_args, **_kwargs: None,
+    )
+
+    render_threat_log(
+        events,
+        "admin@example.test",
+        translate,
+        lambda *_args: None,
+        lambda *_args: None,
+    )
+
+    assert st.session_state["threat_log_page"] == expected_page
+    assert rerenders == [True]
+    assert statuses == [f"<p class='pagination-status'>Page {starting_page} sur 2</p>"]
 
 
 @pytest.mark.parametrize(
