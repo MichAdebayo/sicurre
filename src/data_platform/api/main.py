@@ -17,6 +17,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 from core.config import get_settings
+from core.inference_client import close_inference_client
 from core.provider_credentials import encrypt_legacy_provider_credentials
 from core.rate_limit import limiter
 from data_platform.api.routers import router as data_platform_router
@@ -111,6 +112,7 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
+        await close_inference_client()
         if task:
             task.cancel()
             try:
