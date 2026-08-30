@@ -24,6 +24,8 @@ import {
   Activity,
   MousePointerClick,
   Mouse,
+  FileUp,
+  Loader2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -33,6 +35,7 @@ import {
   useRefreshDomainShieldStatus,
   useWorkspaceCloudflareToken,
   useDmarcReportSummary,
+  useImportDmarcReport,
   useCloudflareStatus,
   AuthSession,
 } from "../lib/api";
@@ -63,6 +66,8 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
     refetch: refetchDmarcReports,
   } = useDmarcReportSummary(selectedDomain, !!selectedDomain);
   const { refetch: refetchCloudflareStatus } = useCloudflareStatus();
+  const importDmarcMutation = useImportDmarcReport(selectedDomain);
+  const dmarcFileInputRef = useRef<HTMLInputElement>(null);
 
   const refreshShieldMutation = useRefreshDomainShieldStatus();
 
@@ -188,6 +193,30 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
   const [successNotification, setSuccessNotification] = useState<string | null>(null);
   const [errorNotification, setErrorNotification] = useState<string | null>(null);
   const isAutoFixRunning = autoFixProgress !== "idle" && autoFixProgress !== "success" && autoFixProgress !== "error";
+
+  const handleDmarcImport = async (file?: File) => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorNotification(t("domain_shield.report_too_large"));
+      return;
+    }
+    setErrorNotification(null);
+    try {
+      const result = await importDmarcMutation.mutateAsync(file);
+      setSuccessNotification(
+        result.status === "already_imported"
+          ? t("domain_shield.report_already_imported")
+          : t("domain_shield.report_imported", { count: result.record_count }),
+      );
+    } catch (error) {
+      setSuccessNotification(null);
+      setErrorNotification(
+        error instanceof Error ? error.message : t("domain_shield.report_import_failed"),
+      );
+    } finally {
+      if (dmarcFileInputRef.current) dmarcFileInputRef.current.value = "";
+    }
+  };
 
   const getAutoFixButtonText = () => {
     if (autoFixProgress === "verify") {
@@ -319,7 +348,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
 
           <div className="flex items-center gap-3">
             {domainsLoading ? (
-              <div className="h-10 w-48 bg-surface-low rounded-lg animate-pulse" />
+              <div className="h-10 w-48 bg-surface-low rounded-lg motion-safe:animate-pulse" />
             ) : !domainsList || domainsList.length === 0 ? (
               <span className="text-xs text-on-surface-variant/70 italic">
                 {t("domain_shield.no_domains")}
@@ -336,7 +365,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                 size="sm"
                 onClick={handleManualRefresh}
                 disabled={isShieldLoading}
-                className="p-2 min-h-[38px] flex items-center justify-center cursor-pointer bg-white"
+                className="p-2 min-h-[38px] flex items-center justify-center cursor-pointer bg-surface-lowest"
               >
                 <RefreshCw className={`w-4 h-4 ${isShieldLoading ? "animate-spin text-primary" : ""}`} />
               </Button>
@@ -346,7 +375,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
 
         {!selectedDomain ? (
           <div className="bg-surface-lowest rounded-2xl border border-border-subtle p-12 text-center text-on-surface-variant/50 max-w-lg mx-auto flex flex-col items-center justify-center shadow-sm">
-            <Globe className="w-12 h-12 text-on-surface-variant/30 mb-3 animate-pulse" />
+            <Globe className="w-12 h-12 text-on-surface-variant/30 mb-3 motion-safe:animate-pulse" />
             <p className="font-bold text-base text-on-surface">
               {t("domain_shield.no_active_shield")}
             </p>
@@ -356,10 +385,10 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
           </div>
         ) : (shieldLoading && !shieldStatus) ? (
           <div className="space-y-6">
-            <div className="h-44 bg-surface-low rounded-2xl animate-pulse" />
+            <div className="h-44 bg-surface-low rounded-2xl motion-safe:animate-pulse" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="h-32 bg-surface-low rounded-2xl animate-pulse" />
-              <div className="h-32 bg-surface-low rounded-2xl animate-pulse" />
+              <div className="h-32 bg-surface-low rounded-2xl motion-safe:animate-pulse" />
+              <div className="h-32 bg-surface-low rounded-2xl motion-safe:animate-pulse" />
             </div>
           </div>
         ) : shieldError || !shieldStatus ? (
@@ -376,29 +405,29 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
               <div>
                 <div className="flex items-center gap-1.5">
                   <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-safe" />
+                    <span className="absolute inline-flex h-full w-full rounded-full bg-safe opacity-75 motion-safe:animate-ping" />
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-safe" />
                   </span>
                   <span className="text-xs font-semibold text-safe">
                     {t("domain_shield.protection_active")}
                   </span>
                 </div>
-                <h2 className="mt-2 text-xl font-bold text-on-surface">
+                <h2 className="app-h2 mt-2">
                   {t("domain_shield.integrity_title")}
                 </h2>
-                <p className="mt-1 max-w-xl text-sm text-on-surface-variant">
+                <p className="app-body-sub mt-1 max-w-xl">
                   {t("domain_shield.integrity_desc")}
                 </p>
               </div>
-              <div className="relative flex w-full shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border-subtle bg-surface-lowest p-3 shadow-sm sm:w-40">
+              <div className="relative flex w-full shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border-subtle bg-surface-lowest p-3 shadow-sm sm:w-44">
                 <div className="absolute inset-x-5 top-0 h-[3px] rounded-b-md bg-primary" />
-                <div className="relative flex h-28 w-28 items-center justify-center">
+                <div className="relative flex h-32 w-32 items-center justify-center">
                   <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
                   <circle
                     cx="50"
                     cy="50"
                     r="40"
-                    stroke="#f1f5f9"
+                    stroke="var(--color-surface-high)"
                     strokeWidth="7"
                     fill="transparent"
                   />
@@ -431,14 +460,14 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
             <div className="bg-surface-lowest rounded-2xl border border-border-subtle p-6 shadow-sm space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border-subtle/80">
                 <div className="flex items-center gap-2.5">
-                  <div className="p-2 bg-primary/10 rounded-lg text-[#2e6bb5]">
+                  <div className="p-2 bg-primary/10 rounded-lg text-primary">
                     <Activity className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-display font-bold text-[18px] text-on-surface">
+                    <h3 className="app-h2">
                       {t("domain_shield.audit_title")}
                     </h3>
-                    <p className="text-xs text-on-surface-variant mt-0.5 font-medium">
+                    <p className="app-body-sub mt-0.5">
                       {t("domain_shield.audit_desc")}
                     </p>
                   </div>
@@ -453,9 +482,9 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     runStepDiagnostics();
                   }}
                   disabled={isTerminalRunning || isShieldLoading}
-                  className="gap-2 cursor-pointer bg-white text-xs font-bold border-border-subtle hover:bg-surface-low/30 text-on-surface transition-all h-[36px]"
+                  className="gap-2 cursor-pointer bg-surface-lowest text-xs font-bold border-border-subtle hover:bg-surface-low/30 text-on-surface transition-all h-[36px]"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isTerminalRunning ? "animate-spin text-[#2e6bb5]" : "text-on-surface-variant"}`} />
+                  <RefreshCw className={`w-3.5 h-3.5 ${isTerminalRunning ? "animate-spin text-primary" : "text-on-surface-variant"}`} />
                   {t("domain_shield.rerun_audit")}
                 </Button>
               </div>
@@ -588,14 +617,14 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
               <div className="lg:col-span-6 bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm flex flex-col justify-between">
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
-                    <Mouse className="w-5 h-5 text-[#2e6bb5] animate-pulse" />
-                    <h3 className="font-display font-bold text-[18px] text-on-surface">
+                    <Mouse className="w-5 h-5 text-primary motion-safe:animate-pulse" />
+                    <h3 className="app-h2">
                       {t("domain_shield.autofix_title")}
                     </h3>
                   </div>
 
                   <div>
-                    <p className="text-xs text-on-surface-variant leading-relaxed">
+                    <p className="app-body-sub">
                       {t("domain_shield.autofix_desc")}
                     </p>
                   </div>
@@ -618,8 +647,8 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
 
                           {/* Tooltip safety info */}
                           <div className="relative group">
-                            <Info className="w-3.5 h-3.5 text-[#2e6bb5] cursor-help hover:text-primary transition-colors" />
-                            <div className="absolute bottom-full right-0 mb-1.5 w-64 max-w-[calc(100vw-3rem)] rounded-lg border border-border-subtle bg-white p-2.5 text-center font-sans text-[10px] font-bold normal-case leading-normal text-on-surface opacity-0 shadow-xl transition-opacity duration-200 pointer-events-none group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50">
+                            <Info className="w-3.5 h-3.5 text-primary cursor-help hover:text-primary-hover transition-colors" />
+                            <div className="absolute bottom-full right-0 mb-1.5 w-64 max-w-[calc(100vw-3rem)] rounded-lg border border-border-subtle bg-surface-lowest p-2.5 text-center font-sans text-[10px] font-bold normal-case leading-normal text-on-surface opacity-0 shadow-xl transition-opacity duration-200 pointer-events-none group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50">
                               {t("domain_shield.dns_records_help")}
                             </div>
                           </div>
@@ -635,7 +664,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                                 type="checkbox"
                                 checked={fixSpf}
                                 onChange={(e) => setFixSpf(e.target.checked)}
-                                className="w-4 h-4 text-primary bg-white border-border-subtle rounded cursor-pointer focus:ring-0"
+                                className="w-4 h-4 text-primary bg-surface-lowest border-border-subtle rounded cursor-pointer focus:ring-0"
                               />
                               <span className="text-on-surface">SPF (TXT @)</span>
                             </div>
@@ -653,7 +682,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                                 type="checkbox"
                                 checked={fixDkim}
                                 onChange={(e) => setFixDkim(e.target.checked)}
-                                className="w-4 h-4 text-primary bg-white border-border-subtle rounded cursor-pointer focus:ring-0"
+                                className="w-4 h-4 text-primary bg-surface-lowest border-border-subtle rounded cursor-pointer focus:ring-0"
                               />
                               <span className="text-on-surface">DKIM (TXT cloudflare._domainkey)</span>
                             </div>
@@ -671,7 +700,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                                 type="checkbox"
                                 checked={fixDmarc}
                                 onChange={(e) => setFixDmarc(e.target.checked)}
-                                className="w-4 h-4 text-primary bg-white border-border-subtle rounded cursor-pointer focus:ring-0"
+                                className="w-4 h-4 text-primary bg-surface-lowest border-border-subtle rounded cursor-pointer focus:ring-0"
                               />
                               <span className="text-on-surface">DMARC (TXT _dmarc)</span>
                             </div>
@@ -680,11 +709,11 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                                 {t("domain_shield.status_missing_incorrect")}
                               </span>
                             ) : isDmarcValid && !hasSicurreDmarcReporting ? (
-                              <span className="text-[#b45309] text-[11px] font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200/50">
+                              <span className="rounded border border-warning/25 bg-warning-bg px-2 py-0.5 text-[11px] font-bold text-warning">
                                 {t("domain_shield.reporting_missing")}
                               </span>
                             ) : (
-                              <span className="text-[#b45309] text-[11px] font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200/50">
+                              <span className="rounded border border-warning/25 bg-warning-bg px-2 py-0.5 text-[11px] font-bold text-warning">
                                 {t("domain_shield.status_partial")}
                               </span>
                             )}
@@ -716,7 +745,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                       disabled={autoFixProgress !== "idle" || !wsTokenData?.configured}
                       className={`inline-flex h-10 w-full min-w-[13rem] items-center justify-center gap-2 rounded-lg border px-4 text-xs font-bold transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${isAutoFixRunning
                           ? "border-primary/25 bg-primary-container text-on-primary-container cursor-wait"
-                          : "border-transparent bg-[#2e6bb5] text-white hover:bg-[#255da0] cursor-pointer"
+                          : "border-transparent bg-primary text-on-primary hover:bg-primary-hover cursor-pointer"
                         }`}
                     >
                       {isAutoFixRunning ? (
@@ -734,8 +763,8 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
               <div className="lg:col-span-6 bg-surface-lowest border border-border-subtle rounded-2xl p-6 shadow-sm flex flex-col justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-6">
-                    <Activity className="w-5 h-5 text-[#2e6bb5] animate-pulse" />
-                    <h3 className="font-display font-bold text-[18px] text-on-surface">
+                    <Activity className="w-5 h-5 text-primary motion-safe:animate-pulse" />
+                    <h3 className="app-h2">
                       {t("domain_shield.monitoring_title")}
                     </h3>
                   </div>
@@ -744,16 +773,16 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     {/* Row 1: SSL Status */}
                     <div className="py-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 first:pt-0">
                       <div className="flex items-center gap-4">
-                        <div className="p-3 bg-primary/[0.06] rounded-xl text-[#2e6bb5] shrink-0">
+                        <div className="p-3 bg-primary/[0.06] rounded-xl text-primary shrink-0">
                           <Lock className="w-5.5 h-5.5 stroke-[1.5]" />
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <h5 className="font-semibold text-[14.5px] text-on-surface">
+                          <h4 className="font-semibold text-[14.5px] text-on-surface">
                             {t("domain_shield.ssl_expiry")}
-                          </h5>
+                          </h4>
                           <div className="relative group">
-                            <Info className="w-3.5 h-3.5 text-[#2e6bb5] cursor-help hover:text-primary transition-colors" />
-                            <div className="absolute bottom-full right-0 mb-1.5 w-60 max-w-[calc(100vw-3rem)] rounded-lg border border-border-subtle bg-white p-2.5 text-center font-sans text-[10px] font-bold normal-case leading-normal text-on-surface opacity-0 shadow-xl transition-opacity duration-200 pointer-events-none group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50">
+                            <Info className="w-3.5 h-3.5 text-primary cursor-help hover:text-primary-hover transition-colors" />
+                            <div className="absolute bottom-full right-0 mb-1.5 w-60 max-w-[calc(100vw-3rem)] rounded-lg border border-border-subtle bg-surface-lowest p-2.5 text-center font-sans text-[10px] font-bold normal-case leading-normal text-on-surface opacity-0 shadow-xl transition-opacity duration-200 pointer-events-none group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50">
                               {t("domain_shield.ssl_help")}
                             </div>
                           </div>
@@ -761,13 +790,13 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                       </div>
                       <div className="flex flex-col sm:items-end gap-1.5 min-w-[160px]">
                         {shieldStatus.ssl.valid ? (
-                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#047857] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 w-fit">
+                          <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-safe/25 bg-safe-bg px-2.5 py-1 text-xs font-bold text-safe">
                             <BadgeCheck className="w-4 h-4 stroke-[2]" />
                             {t("domain_shield.ssl_countdown", { days: shieldStatus.ssl.days_remaining })}
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 text-xs font-bold text-error bg-error-container/20 px-2.5 py-1 rounded-full border border-error-container w-fit">
-                            <AlertTriangle className="w-3.5 h-3.5 animate-pulse" />
+                            <AlertTriangle className="w-3.5 h-3.5 motion-safe:animate-pulse" />
                             {t("domain_shield.unresolved")}
                           </span>
                         )}
@@ -777,16 +806,16 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     {/* Row 2: Blacklist Status */}
                     <div className="py-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="flex items-center gap-4">
-                        <div className="p-3 bg-primary/[0.06] rounded-xl text-[#2e6bb5] shrink-0">
+                        <div className="p-3 bg-primary/[0.06] rounded-xl text-primary shrink-0">
                           <Skull className="w-5.5 h-5.5 stroke-[1.5]" />
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <h5 className="font-semibold text-[14.5px] text-on-surface">
+                          <h4 className="font-semibold text-[14.5px] text-on-surface">
                             {t("domain_shield.reputation_check")}
-                          </h5>
+                          </h4>
                           <div className="relative group">
-                            <Info className="w-3.5 h-3.5 text-[#2e6bb5] cursor-help hover:text-primary transition-colors" />
-                            <div className="absolute bottom-full right-0 mb-1.5 w-60 max-w-[calc(100vw-3rem)] rounded-lg border border-border-subtle bg-white p-2.5 text-center font-sans text-[10px] font-bold normal-case leading-normal text-on-surface opacity-0 shadow-xl transition-opacity duration-200 pointer-events-none group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50">
+                            <Info className="w-3.5 h-3.5 text-primary cursor-help hover:text-primary-hover transition-colors" />
+                            <div className="absolute bottom-full right-0 mb-1.5 w-60 max-w-[calc(100vw-3rem)] rounded-lg border border-border-subtle bg-surface-lowest p-2.5 text-center font-sans text-[10px] font-bold normal-case leading-normal text-on-surface opacity-0 shadow-xl transition-opacity duration-200 pointer-events-none group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50">
                               {t("domain_shield.reputation_help")}
                             </div>
                           </div>
@@ -795,11 +824,11 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                       <div className="flex flex-col sm:items-end gap-1.5 min-w-[160px]">
                         {shieldStatus?.blacklists?.listed ? (
                           <>
-                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-50 px-2.5 py-1 rounded-full border border-red-200 w-fit animate-pulse">
-                              <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                            <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-error/25 bg-error/10 px-2.5 py-1 text-xs font-bold text-error motion-safe:animate-pulse">
+                              <AlertTriangle className="w-3.5 h-3.5" />
                               {t("domain_shield.listed")}
                             </span>
-                            <span className="text-[10px] font-bold text-red-600 text-left sm:text-right">
+                            <span className="text-left text-[10px] font-bold text-error sm:text-right">
                               {t("domain_shield.matched_feeds", { feeds: shieldStatus.blacklists.matched.join(", ") })}
                             </span>
                           </>
@@ -814,7 +843,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                             </span>
                           </>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#047857] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 w-fit">
+                          <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-safe/25 bg-safe-bg px-2.5 py-1 text-xs font-bold text-safe">
                             <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                             {t("domain_shield.blacklist_clean")}
                           </span>
@@ -825,27 +854,34 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     {/* Row 3: DMARC Reports Activity */}
                     <div className="py-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 last:pb-0 border-b-0">
                       <div className="flex items-center gap-4">
-                        <div className="p-3 bg-primary/[0.06] rounded-xl text-[#2e6bb5] shrink-0">
+                        <div className="p-3 bg-primary/[0.06] rounded-xl text-primary shrink-0">
                           <Activity className="w-5.5 h-5.5 stroke-[1.5]" />
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <h5 className="font-semibold text-[14.5px] text-on-surface">
+                          <h4 className="font-semibold text-[14.5px] text-on-surface">
                             {t("domain_shield.dmarc_failures")}
-                          </h5>
+                          </h4>
                           <div className="relative group">
-                            <Info className="w-3.5 h-3.5 text-[#2e6bb5] cursor-help hover:text-primary transition-colors" />
-                            <div className="absolute bottom-full right-0 mb-1.5 w-60 max-w-[calc(100vw-3rem)] rounded-lg border border-border-subtle bg-white p-2.5 text-center font-sans text-[10px] font-bold normal-case leading-normal text-on-surface opacity-0 shadow-xl transition-opacity duration-200 pointer-events-none group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50">
+                            <Info className="w-3.5 h-3.5 text-primary cursor-help hover:text-primary-hover transition-colors" />
+                            <div className="absolute bottom-full right-0 mb-1.5 w-60 max-w-[calc(100vw-3rem)] rounded-lg border border-border-subtle bg-surface-lowest p-2.5 text-center font-sans text-[10px] font-bold normal-case leading-normal text-on-surface opacity-0 shadow-xl transition-opacity duration-200 pointer-events-none group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50">
                               {t("domain_shield.dmarc_failures_help")}
                             </div>
                           </div>
                         </div>
                       </div>
                       <div className="flex flex-col sm:items-end gap-1.5 min-w-[160px]">
-                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#2e6bb5] bg-[#d0e4ff]/30 px-2.5 py-1 rounded-full border border-primary-container/20 w-fit">
+                        <span className={`inline-flex w-fit items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold ${!dmarcReports?.report_count
+                          ? "border-border-subtle bg-surface-high text-on-surface-variant"
+                          : dmarcReports.failed_messages > 0
+                            ? "border-error/25 bg-error/10 text-error"
+                            : "border-safe/25 bg-safe-bg text-safe"
+                          }`}>
                           <Activity className="w-3.5 h-3.5" />
-                          {t("domain_shield.failed_count", { count: dmarcReports?.failed_messages ?? 0 })}
+                          {dmarcReports?.report_count
+                            ? t("domain_shield.failed_count", { count: dmarcReports.failed_messages })
+                            : t("domain_shield.no_report_data")}
                         </span>
-                        <span className="text-[10px] font-bold text-[#2e6bb5]">
+                        <span className="text-[11px] font-semibold text-on-surface-variant">
                           {dmarcReports?.report_count
                             ? t("domain_shield.report_count_received", { count: dmarcReports.report_count })
                             : t("domain_shield.no_reports_received")}
@@ -860,7 +896,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
 
             {/* DNS Record Verification Matrix */}
             <div className="space-y-6">
-              <h3 className="font-display font-bold text-xl text-on-surface">
+              <h3 className="app-h2">
                 {t("domain_shield.dns_validation_title")}
               </h3>
 
@@ -914,7 +950,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                         variant="outline"
                         size="sm"
                         onClick={() => handleCopy("spf", "v=spf1 include:spf.cloudflare.com include:sicurre.com ~all")}
-                        className="px-3 h-10 cursor-pointer text-xs gap-1 font-bold rounded-xl bg-white"
+                        className="px-3 h-10 cursor-pointer text-xs gap-1 font-bold rounded-xl bg-surface-lowest"
                       >
                         {copiedKey === "spf" ? (
                           <Check className="w-4 h-4 text-safe" />
@@ -977,7 +1013,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                         variant="outline"
                         size="sm"
                         onClick={() => handleCopy("dkim", "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1+z7s...")}
-                        className="px-3 h-10 cursor-pointer text-xs gap-1 font-bold rounded-xl bg-white"
+                        className="px-3 h-10 cursor-pointer text-xs gap-1 font-bold rounded-xl bg-surface-lowest"
                       >
                         {copiedKey === "dkim" ? (
                           <Check className="w-4 h-4 text-safe" />
@@ -1047,7 +1083,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                         variant="outline"
                         size="sm"
                         onClick={() => handleCopy("dmarc", getRecommendedDmarcRecord())}
-                        className="px-3 h-10 cursor-pointer text-xs gap-1 font-bold rounded-xl bg-white"
+                        className="px-3 h-10 cursor-pointer text-xs gap-1 font-bold rounded-xl bg-surface-lowest"
                       >
                         {copiedKey === "dmarc" ? (
                           <Check className="w-4 h-4 text-safe" />
@@ -1068,20 +1104,45 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                       <BarChart3 className="h-4 w-4 text-primary" />
                       <p className="text-xs font-bold text-on-surface">{t("domain_shield.report_title")}</p>
                     </div>
-                    <p className="max-w-2xl text-[11px] leading-relaxed text-on-surface-variant">
+                    <p className="app-body-sub mt-1 max-w-2xl">
                       {hasSicurreDmarcReporting ? t("domain_shield.report_enabled_desc") : t("domain_shield.report_missing_desc")}
                     </p>
                   </div>
-                  <span className={`w-fit rounded-md border px-2.5 py-1 text-[11px] font-semibold ${dmarcReports?.report_count ? "border-safe/20 bg-safe/10 text-safe" : "border-warning/25 bg-warning/10 text-warning"}`}>
-                    {dmarcReports?.report_count
-                      ? t("domain_shield.reports_received")
-                      : hasSicurreDmarcReporting
-                        ? t("domain_shield.awaiting_report")
-                        : t("domain_shield.status_partial")}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`w-fit rounded-md border px-2.5 py-1 text-[11px] font-semibold ${dmarcReports?.report_count ? "border-safe/20 bg-safe/10 text-safe" : "border-warning/25 bg-warning/10 text-warning"}`}>
+                      {dmarcReports?.report_count
+                        ? t("domain_shield.reports_received")
+                        : hasSicurreDmarcReporting
+                          ? t("domain_shield.awaiting_report")
+                          : t("domain_shield.status_partial")}
+                    </span>
+                    <input
+                      ref={dmarcFileInputRef}
+                      type="file"
+                      accept=".xml,.gz,.zip,application/xml,text/xml,application/gzip,application/zip"
+                      className="sr-only"
+                      aria-hidden="true"
+                      tabIndex={-1}
+                      onChange={(event) => void handleDmarcImport(event.target.files?.[0])}
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => dmarcFileInputRef.current?.click()}
+                      disabled={importDmarcMutation.isPending}
+                      className="h-9 gap-1.5 bg-surface-lowest text-xs font-bold"
+                    >
+                      {importDmarcMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" />
+                      ) : (
+                        <FileUp className="h-4 w-4" aria-hidden="true" />
+                      )}
+                      {t("domain_shield.import_report")}
+                    </Button>
+                  </div>
                 </div>
                 {dmarcReportsLoading ? (
-                  <div className="mt-4 h-20 animate-pulse rounded-lg bg-surface-low" />
+                  <div className="mt-4 h-20 motion-safe:animate-pulse rounded-lg bg-surface-low" />
                 ) : dmarcReportsFailed ? (
                   <div role="alert" className="mt-4 rounded-lg border border-error/25 bg-error-container/35 p-4 text-sm text-on-surface">
                     <p className="font-semibold">{t("common.load_error")}</p>
