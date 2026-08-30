@@ -1120,7 +1120,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                       ref={dmarcFileInputRef}
                       type="file"
                       accept=".xml,.gz,.zip,application/xml,text/xml,application/gzip,application/zip"
-                      className="sr-only"
+                      className="hidden"
                       aria-hidden="true"
                       tabIndex={-1}
                       onChange={(event) => void handleDmarcImport(event.target.files?.[0])}
