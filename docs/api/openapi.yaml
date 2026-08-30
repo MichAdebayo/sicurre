@@ -311,12 +311,26 @@ components:
       additionalProperties: false
       description: One customer-visible notification.
       properties:
+        action_page:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Action Page
         created_at:
           title: Created At
+          type: string
+        domain:
+          title: Domain
+          type: string
+        event_type:
+          title: Event Type
           type: string
         id:
           title: Id
           type: string
+        is_read:
+          title: Is Read
+          type: boolean
         message:
           title: Message
           type: string
@@ -325,20 +339,29 @@ components:
           type: string
       required:
       - id
+      - domain
+      - event_type
       - title
       - message
       - created_at
+      - is_read
       title: AlertHistoryResponse
       type: object
     AlertPreferenceResponse:
       additionalProperties: false
-      description: Workspace notification preferences.
+      description: Notification preferences for one connected domain.
       properties:
+        domain:
+          title: Domain
+          type: string
+        email_enabled:
+          title: Email Enabled
+          type: boolean
+        notify_domain_shield:
+          title: Notify Domain Shield
+          type: boolean
         notify_phishing:
           title: Notify Phishing
-          type: boolean
-        notify_spam:
-          title: Notify Spam
           type: boolean
         quiet_hours_enabled:
           title: Quiet Hours Enabled
@@ -353,8 +376,10 @@ components:
           title: Timezone
           type: string
       required:
+      - domain
+      - email_enabled
       - notify_phishing
-      - notify_spam
+      - notify_domain_shield
       - quiet_hours_enabled
       - quiet_hours_start
       - quiet_hours_end
@@ -363,11 +388,14 @@ components:
       type: object
     AlertPreferenceUpdate:
       properties:
+        email_enabled:
+          title: Email Enabled
+          type: boolean
+        notify_domain_shield:
+          title: Notify Domain Shield
+          type: boolean
         notify_phishing:
           title: Notify Phishing
-          type: boolean
-        notify_spam:
-          title: Notify Spam
           type: boolean
         quiet_hours_enabled:
           title: Quiet Hours Enabled
@@ -389,8 +417,9 @@ components:
           title: Timezone
           type: string
       required:
+      - email_enabled
       - notify_phishing
-      - notify_spam
+      - notify_domain_shield
       - quiet_hours_enabled
       title: AlertPreferenceUpdate
       type: object
@@ -1667,6 +1696,9 @@ components:
           minimum: 0.0
           title: Dataset Items Count
           type: integer
+        domain:
+          title: Domain
+          type: string
         normalized_messages_count:
           minimum: 0.0
           title: Normalized Messages Count
@@ -1694,6 +1726,7 @@ components:
       - threats_phishing_count
       - threats_spam_count
       - threats_legitimate_count
+      - domain
       title: KpiResponse
       type: object
     LineageRecordResponse:
@@ -2231,6 +2264,9 @@ components:
         created_at:
           title: Created At
           type: string
+        domain:
+          title: Domain
+          type: string
         expires_at:
           title: Expires At
           type: string
@@ -2254,6 +2290,7 @@ components:
           type: string
       required:
       - id
+      - domain
       - message_id
       - sender
       - subject
@@ -2491,6 +2528,9 @@ components:
           - type: string
           - type: 'null'
           title: Created At
+        domain:
+          title: Domain
+          type: string
         id:
           title: Id
           type: string
@@ -2505,6 +2545,7 @@ components:
           type: string
       required:
       - id
+      - domain
       - rule_type
       - pattern
       title: SecurityRuleResponse
@@ -3175,6 +3216,13 @@ paths:
   /v1/alerts/history:
     get:
       operationId: list_alert_history_v1_alerts_history_get
+      parameters:
+      - in: query
+        name: domain
+        required: true
+        schema:
+          title: Domain
+          type: string
       responses:
         '200':
           content:
@@ -3185,9 +3233,43 @@ paths:
                 title: Response List Alert History V1 Alerts History Get
                 type: array
           description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
       security:
       - HTTPBearer: []
       summary: List Alert History
+      tags:
+      - app-ui-flows
+  /v1/alerts/history/read:
+    post:
+      operationId: mark_domain_alerts_read_v1_alerts_history_read_post
+      parameters:
+      - in: query
+        name: domain
+        required: true
+        schema:
+          title: Domain
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Mark Domain Alerts Read
       tags:
       - app-ui-flows
   /v1/alerts/history/{id}/dismiss:
@@ -3199,6 +3281,12 @@ paths:
         required: true
         schema:
           title: Id
+          type: string
+      - in: query
+        name: domain
+        required: true
+        schema:
+          title: Domain
           type: string
       responses:
         '200':
@@ -3218,9 +3306,51 @@ paths:
       summary: Dismiss Alert
       tags:
       - app-ui-flows
+  /v1/alerts/history/{id}/read:
+    post:
+      description: Mark one owned, domain-scoped notification as read for this member.
+      operationId: mark_alert_read_v1_alerts_history__id__read_post
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          title: Id
+          type: string
+      - in: query
+        name: domain
+        required: true
+        schema:
+          title: Domain
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Mark Alert Read
+      tags:
+      - app-ui-flows
   /v1/alerts/preferences:
     get:
       operationId: get_alert_preferences_v1_alerts_preferences_get
+      parameters:
+      - in: query
+        name: domain
+        required: true
+        schema:
+          title: Domain
+          type: string
       responses:
         '200':
           content:
@@ -3228,6 +3358,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/AlertPreferenceResponse'
           description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
       security:
       - HTTPBearer: []
       summary: Get Alert Preferences
@@ -3235,6 +3371,13 @@ paths:
       - app-ui-flows
     put:
       operationId: update_alert_preferences_v1_alerts_preferences_put
+      parameters:
+      - in: query
+        name: domain
+        required: true
+        schema:
+          title: Domain
+          type: string
       requestBody:
         content:
           application/json:
@@ -3262,6 +3405,13 @@ paths:
   /v1/alerts/rules:
     get:
       operationId: list_security_rules_v1_alerts_rules_get
+      parameters:
+      - in: query
+        name: domain
+        required: true
+        schema:
+          title: Domain
+          type: string
       responses:
         '200':
           content:
@@ -3272,6 +3422,12 @@ paths:
                 title: Response List Security Rules V1 Alerts Rules Get
                 type: array
           description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
       security:
       - HTTPBearer: []
       summary: List Security Rules
@@ -3279,6 +3435,13 @@ paths:
       - app-ui-flows
     post:
       operationId: create_security_rule_v1_alerts_rules_post
+      parameters:
+      - in: query
+        name: domain
+        required: true
+        schema:
+          title: Domain
+          type: string
       requestBody:
         content:
           application/json:
@@ -3312,6 +3475,12 @@ paths:
         required: true
         schema:
           title: Id
+          type: string
+      - in: query
+        name: domain
+        required: true
+        schema:
+          title: Domain
           type: string
       responses:
         '200':
@@ -4206,6 +4375,13 @@ paths:
   /v1/feedback:
     post:
       operationId: create_feedback_v1_feedback_post
+      parameters:
+      - in: query
+        name: domain
+        required: true
+        schema:
+          title: Domain
+          type: string
       requestBody:
         content:
           application/json:
@@ -4446,6 +4622,13 @@ paths:
   /v1/quarantine:
     get:
       operationId: list_quarantine_v1_quarantine_get
+      parameters:
+      - in: query
+        name: domain
+        required: true
+        schema:
+          title: Domain
+          type: string
       responses:
         '200':
           content:
@@ -4456,6 +4639,12 @@ paths:
                 title: Response List Quarantine V1 Quarantine Get
                 type: array
           description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
       security:
       - HTTPBearer: []
       summary: List Quarantine
@@ -4470,6 +4659,12 @@ paths:
         required: true
         schema:
           title: Id
+          type: string
+      - in: query
+        name: domain
+        required: true
+        schema:
+          title: Domain
           type: string
       responses:
         '200':
@@ -4499,6 +4694,12 @@ paths:
         schema:
           title: Id
           type: string
+      - in: query
+        name: domain
+        required: true
+        schema:
+          title: Domain
+          type: string
       responses:
         '200':
           content:
@@ -4527,6 +4728,12 @@ paths:
         schema:
           title: Id
           type: string
+      - in: query
+        name: domain
+        required: true
+        schema:
+          title: Domain
+          type: string
       responses:
         '200':
           content:
@@ -4548,6 +4755,13 @@ paths:
   /v1/stats/kpi:
     get:
       operationId: get_kpis_v1_stats_kpi_get
+      parameters:
+      - in: query
+        name: domain
+        required: true
+        schema:
+          title: Domain
+          type: string
       responses:
         '200':
           content:
@@ -4555,6 +4769,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/KpiResponse'
           description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
       security:
       - HTTPBearer: []
       summary: Get Kpis
@@ -4593,6 +4813,12 @@ paths:
       description: Return one filtered page of workspace events.
       operationId: get_threats_v1_threats_get
       parameters:
+      - in: query
+        name: domain
+        required: true
+        schema:
+          title: Domain
+          type: string
       - in: query
         name: page
         required: false
@@ -4657,6 +4883,13 @@ paths:
     post:
       description: Hide or restore selected events without deleting their audit evidence.
       operationId: update_threat_visibility_v1_threats_visibility_post
+      parameters:
+      - in: query
+        name: domain
+        required: true
+        schema:
+          title: Domain
+          type: string
       requestBody:
         content:
           application/json:
@@ -4690,6 +4923,12 @@ paths:
         required: true
         schema:
           title: Id
+          type: string
+      - in: query
+        name: domain
+        required: true
+        schema:
+          title: Domain
           type: string
       requestBody:
         content:

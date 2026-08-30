@@ -28,7 +28,6 @@ import {
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import {
-  useCloudflareList,
   useDomainShieldStatus,
   useSetupCloudflare,
   useRefreshDomainShieldStatus,
@@ -38,6 +37,7 @@ import {
   AuthSession,
 } from "../lib/api";
 import { AppToast } from "../components/common/app-toast";
+import { useActiveDomain } from "../contexts/active-domain";
 
 const MotionDiv = motion.div as any;
 
@@ -48,19 +48,7 @@ interface DomainShieldRouteProps {
 export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
   const { t } = useTranslation();
 
-  // Load configured cloudflare domains
-  const { data: domainsList, isLoading: domainsLoading } = useCloudflareList();
-  const [selectedDomain, setSelectedDomain] = useState("");
-
-  // Select first active domain by default once list loads
-  useEffect(() => {
-    if (domainsList && domainsList.length > 0) {
-      const activeZone = domainsList.find((d) => d.status === "active") || domainsList[0];
-      if (activeZone?.zone_name) {
-        setSelectedDomain(activeZone.zone_name);
-      }
-    }
-  }, [domainsList]);
+  const { domains: domainsList, activeDomain: selectedDomain, isLoading: domainsLoading } = useActiveDomain();
 
   // Query DNS Shield metrics
   const {
@@ -329,7 +317,6 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
             </p>
           </div>
 
-          {/* Domain Selection dropdown */}
           <div className="flex items-center gap-3">
             {domainsLoading ? (
               <div className="h-10 w-48 bg-surface-low rounded-lg animate-pulse" />
@@ -338,17 +325,9 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                 {t("domain_shield.no_domains")}
               </span>
             ) : (
-              <select
-                value={selectedDomain}
-                onChange={(e) => setSelectedDomain(e.target.value)}
-                className="px-3.5 py-2 bg-surface-lowest border border-border-subtle rounded-lg text-sm text-on-surface-variant font-bold focus:outline-none focus:border-primary transition-all cursor-pointer shadow-sm h-[38px]"
-              >
-                {domainsList.map((d) => (
-                  <option key={d.id} value={d.zone_name}>
-                    {d.zone_name}
-                  </option>
-                ))}
-              </select>
+              <span className="rounded-lg border border-border-subtle bg-surface-lowest px-3.5 py-2 text-sm font-bold text-on-surface">
+                {selectedDomain}
+              </span>
             )}
 
             {selectedDomain && (
