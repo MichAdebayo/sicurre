@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { AppShell } from "./components/common/app-shell";
 import { SidebarPage } from "./components/common/sidebar";
 import {
@@ -156,17 +156,19 @@ function AppContent() {
     () => getSidebarPageFromPath(window.location.pathname) ?? "dashboard",
   );
   const [settingsTab, setSettingsTab] = useState<string | undefined>();
+  const requestedAfterLogin = useRef(getSidebarPageFromPath(window.location.pathname));
   const sessionQuery = useCurrentSession(sessionLookupEnabled);
   const logoutMutation = useLogout();
   const session = sessionQuery.data;
+  const administration = activePage === "logs" && Boolean(session?.is_platform_admin);
 
   useEffect(() => {
-    if (!session && !getSidebarPageFromPath(window.location.pathname)) return;
+    if (!sessionQuery.isLoading || !getSidebarPageFromPath(window.location.pathname)) return;
     // Fetch code alongside session validation, without rendering protected content.
     void pageLoaders[activePage]().catch(() => {
       // A failed speculative fetch must not interrupt authentication.
     });
-  }, [activePage, session]);
+  }, [activePage, sessionQuery.isLoading]);
 
   const titleView: DocumentTitleView = session && hasStoredSession
     ? activePage
@@ -205,19 +207,23 @@ function AppContent() {
   useEffect(() => {
     if (session) {
       setHasStoredSession(true);
-      const requested = getSidebarPageFromPath(window.location.pathname);
+      const requested = getSidebarPageFromPath(window.location.pathname) ?? requestedAfterLogin.current;
       setAuthenticatedPage(resolveAuthorizedPage(requested, {
         isPlatformAdmin: session.is_platform_admin,
         onboardingRequired: session.onboarding_required,
       }), true);
+      requestedAfterLogin.current = null;
     }
   }, [session]);
 
   useEffect(() => {
-    if (session?.onboarding_required && activePage !== "settings") {
-      setAuthenticatedPage("settings", true);
-    }
-  }, [session?.onboarding_required, activePage]);
+    if (!session) return;
+    const authorized = resolveAuthorizedPage(activePage, {
+      isPlatformAdmin: session.is_platform_admin,
+      onboardingRequired: session.onboarding_required,
+    });
+    if (authorized !== activePage) setAuthenticatedPage(authorized, true);
+  }, [session?.onboarding_required, session?.is_platform_admin, activePage]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -229,10 +235,10 @@ function AppContent() {
       }
       const page = getSidebarPageFromPath(window.location.pathname);
       if (page && session) {
-        setActivePage(resolveAuthorizedPage(page, {
+        setAuthenticatedPage(resolveAuthorizedPage(page, {
           isPlatformAdmin: session.is_platform_admin,
           onboardingRequired: session.onboarding_required,
-        }));
+        }), true);
       }
     };
 
@@ -240,21 +246,17 @@ function AppContent() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, [session]);
 
-  useEffect(() => {
-    if (session && !session.is_platform_admin && activePage === "logs") {
-      setAuthenticatedPage("dashboard", true);
-    }
-  }, [session, activePage]);
-
   const handleLoginSuccess = () => {
-    window.history.replaceState({}, document.title, sidebarPagePaths.dashboard);
+    const requested = requestedAfterLogin.current ?? "dashboard";
+    window.history.replaceState({}, document.title, sidebarPagePaths[requested]);
     sessionStorage.removeItem("sicurre_view_state");
     setSessionLookupEnabled(true);
     setHasStoredSession(true);
-    setActivePage("dashboard");
+    setActivePage(requested);
   };
 
   const handleLogout = async () => {
+    requestedAfterLogin.current = null;
     setSessionLookupEnabled(false);
     setHasStoredSession(false);
     clearStoredSession();
@@ -324,15 +326,16 @@ function AppContent() {
       currentPage={activePage}
       onPageChange={(page) => {
         if (page !== "settings") setSettingsTab(undefined);
-        if (session.is_platform_admin && page !== "logs" && page !== "settings" && page !== "support") {
-          return;
-        }
-        setAuthenticatedPage(page);
+        setAuthenticatedPage(resolveAuthorizedPage(page, {
+          isPlatformAdmin: session.is_platform_admin,
+          onboardingRequired: session.onboarding_required,
+        }));
       }}
       onLogout={handleLogout}
       userName={session.display_name}
       userEmail={session.email}
-      userRole={session.is_platform_admin ? "admin" : session.role}
+      userRole={session.role}
+      administration={administration}
       onboardingRequired={session.onboarding_required}
       workspaceName={session.workspace_name}
       workspaceId={session.workspace_id}
@@ -340,7 +343,7 @@ function AppContent() {
       hasIntegration={session.has_cloudflare_integration}
     >
       <Suspense fallback={<PageLoading />}>
-        {!session.is_platform_admin && !["settings", "support"].includes(activePage) ? (
+        {!["logs", "settings", "support"].includes(activePage) ? (
           <DomainPageBoundary>
             {activePage === "dashboard" && <DashboardRoute session={session} onGoToSettings={handleGoToSettings} />}
             {activePage === "threats" && <ThreatsRoute />}

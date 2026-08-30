@@ -43,6 +43,7 @@ interface SidebarProps {
   onLogout: () => void;
   onLockdown?: () => void;
   userRole?: string;
+  administration?: boolean;
   onboardingRequired?: boolean;
   workspaceName?: string;
   workspaceId?: string;
@@ -114,7 +115,7 @@ export function Sidebar({
   onPageChange,
   onLogout,
   onLockdown,
-  userRole = "owner",
+  administration = false,
   onboardingRequired = false,
   workspaceName,
   workspaceId = "",
@@ -127,7 +128,7 @@ export function Sidebar({
   const [theme, setTheme] = useTheme();
   const { domains, activeDomain, activeIntegration, setActiveDomain, isLoading, isError } = useActiveDomain();
   const domainUnavailable = isLoading || isError;
-  const { data: domainKpis } = useKPIStats(workspaceId, activeDomain);
+  const { data: domainKpis } = useKPIStats(workspaceId, administration ? "" : activeDomain);
 
   const [collapsed, setCollapsed] = useState(
     () => collapsible && localStorage.getItem(COLLAPSED_KEY) === "1",
@@ -137,10 +138,8 @@ export function Sidebar({
     if (collapsible) localStorage.setItem(COLLAPSED_KEY, collapsed ? "1" : "0");
   }, [collapsed, collapsible]);
 
-  const isOnboardingLocked = onboardingRequired && userRole !== "admin";
-  // Platform admins have no mailbox of their own, so the workspace card would
-  // be describing something they do not have.
-  const isCustomerWorkspace = userRole !== "admin";
+  const isOnboardingLocked = onboardingRequired && !administration;
+  const isCustomerWorkspace = !administration;
   const isProtected = activeIntegration?.status === "active" && !onboardingRequired;
   const statusLabel = isLoading ? t("common.loading") : isError ? t("common.domains_load_error") : isProtected
     ? t("sidebar.status_protected")
@@ -157,11 +156,11 @@ export function Sidebar({
 
   const adminNav = [
     { id: "logs", label: t("sidebar.nav_admin_console"), icon: History },
+    { ...baseNav[0], label: t("sidebar.back_to_workspace") },
     baseNav[5],
   ] as const;
 
-  // Platform admins operate the service and do not own a customer mailbox.
-  const mainNav = userRole === "admin" ? adminNav : baseNav;
+  const mainNav = administration ? adminNav : baseNav;
 
   const bottomNav = [
     { id: "support", label: t("sidebar.nav_support"), icon: HelpCircle },
