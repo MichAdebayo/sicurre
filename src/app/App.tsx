@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 import { parseVerificationCallback } from "./lib/email-verification";
 import { applyTheme, getStoredTheme } from "./lib/theme";
 import { ActiveDomainProvider } from "./contexts/active-domain";
+import { buildDocumentTitle, type DocumentTitleView } from "./lib/document-title";
 
 const LandingRoute = lazy(() => import("./routes/landing"));
 const LoginRoute = lazy(() => import("./routes/login"));
@@ -134,6 +135,7 @@ export default function App() {
 }
 
 function AppContent() {
+  const { t, i18n } = useTranslation();
   const [hasStoredSession, setHasStoredSession] = useState(getInitialLoginState);
   const [sessionLookupEnabled, setSessionLookupEnabled] = useState(true);
   const [viewState, setViewStateState] = useState<ViewState>(getInitialViewState);
@@ -153,6 +155,14 @@ function AppContent() {
   const sessionQuery = useCurrentSession(sessionLookupEnabled);
   const logoutMutation = useLogout();
   const session = sessionQuery.data;
+
+  const titleView: DocumentTitleView = session && hasStoredSession
+    ? activePage
+    : viewState;
+
+  useEffect(() => {
+    document.title = buildDocumentTitle(titleView, t);
+  }, [titleView, i18n.language, t]);
 
   const setAuthenticatedPage = (page: SidebarPage, replace = false) => {
     const nextPath = sidebarPagePaths[page];
