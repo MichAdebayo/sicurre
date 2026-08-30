@@ -72,6 +72,7 @@
     "back_to_login": "Retour à la connexion"
   },
   "sidebar": {
+    "back_to_workspace": "Mon espace",
     "collapse_rail": "Réduire le menu",
     "expand_rail": "Déployer le menu",
     "locked_hint": "Connectez Cloudflare pour déverrouiller cette page",

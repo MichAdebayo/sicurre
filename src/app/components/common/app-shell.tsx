@@ -16,6 +16,7 @@ interface AppShellProps {
   userName?: string;
   userEmail?: string;
   userRole?: string;
+  administration?: boolean;
   onboardingRequired?: boolean;
   workspaceName?: string;
   workspaceId?: string;
@@ -34,6 +35,7 @@ export function AppShell({
   userName,
   userEmail,
   userRole,
+  administration = false,
   onboardingRequired = false,
   workspaceName,
   workspaceId,
@@ -56,6 +58,7 @@ export function AppShell({
         onLogout={onLogout}
         onLockdown={onLockdown}
         userRole={userRole}
+        administration={administration}
         onboardingRequired={onboardingRequired}
         workspaceName={workspaceName}
         workspaceId={workspaceId}
@@ -79,6 +82,7 @@ export function AppShell({
             onLogout={onLogout}
             onLockdown={onLockdown}
             userRole={userRole}
+            administration={administration}
             onboardingRequired={onboardingRequired}
             workspaceName={workspaceName}
             workspaceId={workspaceId}
@@ -114,6 +118,7 @@ export function AppShell({
             <TopBar
               userName={userName}
               userRole={userRole}
+              administration={administration}
               onboardingRequired={onboardingRequired}
               onPageChange={changePage}
             />

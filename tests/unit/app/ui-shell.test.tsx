@@ -85,6 +85,7 @@ describe("application navigation", () => {
         onPageChange={vi.fn()}
         onLogout={vi.fn()}
         userRole="admin"
+        administration
       />,
     );
 
@@ -249,13 +250,14 @@ describe("workspace context in the rail", () => {
     expect(screen.queryByText("sidebar.status_protected")).not.toBeInTheDocument();
   });
 
-  it("omits the workspace card for platform admins, who hold no mailbox", () => {
+  it("omits customer context only while viewing the administration console", () => {
     render(
       <Sidebar
         currentPage="logs"
         onPageChange={vi.fn()}
         onLogout={vi.fn()}
         userRole="admin"
+        administration
         workspaceName="sicurre.com"
         threatCount={12}
         hasIntegration
@@ -264,6 +266,21 @@ describe("workspace context in the rail", () => {
 
     expect(screen.queryByText("sicurre.com")).not.toBeInTheDocument();
     expect(screen.queryByText("sidebar.status_protected")).not.toBeInTheDocument();
+  });
+
+  it("shows a workspace administrator the customer shell outside /admin", () => {
+    render(<AppShell currentPage="dashboard" onPageChange={vi.fn()} onLogout={vi.fn()} userRole="admin" workspaceName="My workspace"><p>Customer dashboard</p></AppShell>);
+    expect(screen.getByText("My workspace")).toBeVisible();
+    expect(screen.getByRole("button", { name: /sidebar.nav_quarantine/i })).toBeVisible();
+    expect(screen.queryByText("topbar.system_operational")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /sidebar.nav_admin_console/i })).not.toBeInTheDocument();
+  });
+
+  it("offers a return to the workspace from administration", () => {
+    const navigate = vi.fn();
+    render(<Sidebar currentPage="logs" onPageChange={navigate} onLogout={vi.fn()} administration onboardingRequired />);
+    fireEvent.click(screen.getByRole("button", { name: /sidebar.back_to_workspace/i }));
+    expect(navigate).toHaveBeenCalledWith("dashboard");
   });
 });
 
