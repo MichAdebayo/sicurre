@@ -5,6 +5,7 @@ import sqlite3
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import lru_cache
 from typing import Any
 
 from fastapi import Depends, HTTPException, Request, status
@@ -380,8 +381,18 @@ async def async_query(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
 
 
 def ensure_runtime_tables() -> None:
-    """Create app runtime tables only for local SQLite development."""
+    """Create and upgrade app runtime tables for local SQLite development."""
     ensure_local_runtime_tables()
+    settings = get_settings()
+    if settings.environment.strip().lower() not in {"production", "prod"}:
+        _upgrade_legacy_sqlite_schema(settings.database_url)
+
+
+@lru_cache(maxsize=8)
+def _upgrade_legacy_sqlite_schema(database_url: str) -> None:
+    """Apply additive local compatibility upgrades once per database URL."""
+    if database_url.startswith(("sqlite://", "sqlite+aiosqlite://")):
+        _ensure_legacy_sqlite_tables()
 
 
 def _slugify_workspace_name(display_name: str, email: str, auth_user_id: str) -> str:
@@ -428,6 +439,7 @@ async def _backfill_workspace_owned_rows(
 async def _ensure_workspace_membership(
     principal: AuthenticatedPrincipal,
 ) -> AuthUser:
+    ensure_runtime_tables()
     user_row = await _get_better_auth_user(principal)
     auth_user_id = str(user_row["id"])
     email = str(user_row.get("email") or principal.email or "").strip().lower()
