@@ -29,7 +29,6 @@ from datetime import datetime, timedelta, timezone
 from time import perf_counter
 from typing import Any, Literal
 from uuid import NAMESPACE_URL, uuid4, uuid5
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 from fastapi import (
@@ -66,6 +65,7 @@ from data_platform.services.cloudflare_provisioner import (
     CloudflareProvisioner,
 )
 from data_platform.services.email_context import derive_email_context
+from data_platform.services.notification_policy import notification_is_allowed
 from data_platform.services.quarantine_storage import build_quarantine_store
 from db.runtime import execute_runtime_query
 
@@ -101,31 +101,6 @@ def _merge_spf(current_spf: str) -> str:
             mechanisms.append(inc)
 
     return f"v=spf1 {' '.join(mechanisms)} {all_mechanism}"
-
-
-def _minute_of_day(value: str) -> int:
-    hours, minutes = value.split(":", maxsplit=1)
-    return int(hours) * 60 + int(minutes)
-
-
-def _notification_is_allowed(preference: dict[str, Any] | None, now: datetime) -> bool:
-    """Apply phishing notification and user-local quiet-hour preferences."""
-    if preference and not bool(preference.get("notify_phishing", 1)):
-        return False
-    if not preference or not bool(preference.get("quiet_hours_enabled", 0)):
-        return True
-    try:
-        user_timezone = ZoneInfo(str(preference.get("timezone") or "Europe/Paris"))
-    except ZoneInfoNotFoundError:
-        user_timezone = ZoneInfo("UTC")
-    local_now = now.astimezone(user_timezone)
-    current = local_now.hour * 60 + local_now.minute
-    start = _minute_of_day(str(preference.get("quiet_hours_start") or "22:00"))
-    end = _minute_of_day(str(preference.get("quiet_hours_end") or "07:00"))
-    inside_quiet_hours = (
-        start <= current < end if start <= end else current >= start or current < end
-    )
-    return not inside_quiet_hours
 
 
 def _merge_dmarc(current_dmarc: str) -> str:
@@ -445,20 +420,30 @@ async def scan_email(
     settings = get_settings()
     workspace_id = integration.get("workspace_id")
     now = datetime.now(timezone.utc).isoformat()
+    message_id = payload.message_id.strip() if payload.message_id else ""
     event_id = (
-        str(uuid5(NAMESPACE_URL, f"{workspace_id}:{payload.message_id.strip()}"))
-        if payload.message_id and payload.message_id.strip()
+        str(
+            uuid5(
+                NAMESPACE_URL,
+                f"{workspace_id}:{integration.get('zone_name', '').lower()}:{message_id}",
+            )
+        )
+        if message_id
         else str(uuid4())
     )
+    legacy_event_id = (
+        str(uuid5(NAMESPACE_URL, f"{workspace_id}:{message_id}")) if message_id else event_id
+    )
     existing_quarantine = await _timed_query(
-        "SELECT id, safety_verdict, composite_score FROM app_quarantine_item "
-        "WHERE workspace_id = ? AND message_id = ? LIMIT 1",
-        (workspace_id, event_id),
+        "SELECT id, message_id, safety_verdict, composite_score FROM app_quarantine_item "
+        "WHERE workspace_id = ? AND lower(domain) = lower(?) "
+        "AND message_id IN (?, ?) LIMIT 1",
+        (workspace_id, integration.get("zone_name") or "", event_id, legacy_event_id),
     )
     if existing_quarantine:
         held = existing_quarantine[0]
         return EmailScanResponse(
-            event_id=event_id,
+            event_id=str(held["message_id"]),
             verdict="quarantine",
             label=str(held["safety_verdict"]),
             score=float(held["composite_score"]),
@@ -466,14 +451,15 @@ async def scan_email(
             quarantine_id=str(held["id"]),
         )
     existing_event = await _timed_query(
-        "SELECT safety_verdict, label_verdict, composite_score, explanation, latency_ms "
-        "FROM app_inference_event WHERE id = ? AND workspace_id = ? LIMIT 1",
-        (event_id, workspace_id),
+        "SELECT id, safety_verdict, label_verdict, composite_score, explanation, latency_ms "
+        "FROM app_inference_event WHERE id IN (?, ?) AND workspace_id = ? "
+        "AND lower(domain) = lower(?) LIMIT 1",
+        (event_id, legacy_event_id, workspace_id, integration.get("zone_name") or ""),
     )
     if existing_event:
         event = existing_event[0]
         return EmailScanResponse(
-            event_id=event_id,
+            event_id=str(event["id"]),
             verdict=str(event["safety_verdict"]),
             label=str(event["label_verdict"]),
             score=float(event["composite_score"]),
@@ -483,7 +469,9 @@ async def scan_email(
 
     # ── Check Whitelist / Blocklist Rules ──────────────────────────────────
     rules = await _timed_query(
-        "SELECT rule_type, pattern FROM app_security_rule WHERE workspace_id = ?", (workspace_id,)
+        "SELECT rule_type, pattern FROM app_security_rule WHERE workspace_id = ? "
+        "AND lower(domain) = lower(?)",
+        (workspace_id, integration.get("zone_name") or ""),
     )
 
     matched_rule_type = None
@@ -591,20 +579,20 @@ async def scan_email(
     if verdict_safety == "phishing":
         quarantine_id = str(uuid4())
         expires_at = (
-            datetime.now(timezone.utc)
-            + timedelta(days=settings.quarantine_retention_days)
+            datetime.now(timezone.utc) + timedelta(days=settings.quarantine_retention_days)
         ).isoformat()
         try:
             await _async_query(
                 """
                 INSERT INTO app_quarantine_item (
-                    id, workspace_id, message_id, sender, subject, body_text,
+                    id, workspace_id, domain, message_id, sender, subject, body_text,
                     safety_verdict, composite_score, status, created_at, expires_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'held', ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'held', ?, ?)
                 """,
                 (
                     quarantine_id,
                     workspace_id,
+                    str(integration.get("zone_name") or "").lower(),
                     event_id,
                     payload.sender,
                     payload.subject,
@@ -619,12 +607,14 @@ async def scan_email(
             await _async_query(
                 """
                 INSERT INTO app_alert_history (
-                    id, workspace_id, title, message, is_dismissed, created_at
-                ) VALUES (?, ?, ?, ?, 0, ?)
+                    id, workspace_id, domain, event_type, action_page,
+                    title, message, is_dismissed, created_at
+                ) VALUES (?, ?, ?, 'phishing_quarantine', 'quarantine', ?, ?, 0, ?)
                 """,
                 (
                     str(uuid4()),
                     workspace_id,
+                    str(integration.get("zone_name") or "").lower(),
                     "Email mis en quarantaine",
                     "Un email suspect a été intercepté. Consultez la quarantaine pour décider de son sort.",
                     now,
@@ -634,13 +624,15 @@ async def scan_email(
             verdict_safety = "quarantine"
 
             preference_rows = await _async_query(
-                "SELECT * FROM app_alert_preference WHERE workspace_id = ? LIMIT 1",
-                (workspace_id,),
+                "SELECT * FROM app_alert_preference "
+                "WHERE workspace_id = ? AND lower(domain) = lower(?) LIMIT 1",
+                (workspace_id, integration.get("zone_name") or ""),
             )
             notification_time = datetime.now(timezone.utc)
-            if _notification_is_allowed(
+            if notification_is_allowed(
                 preference_rows[0] if preference_rows else None,
                 notification_time,
+                "phishing",
             ):
                 user_rows = await _async_query(
                     'SELECT name FROM "user" WHERE email = ? LIMIT 1',
@@ -682,13 +674,13 @@ async def scan_email(
         await _async_query(
             """
             INSERT INTO app_inference_event (
-                id, created_at, user_email, workspace_id, workspace_member_user_id, context,
+                id, created_at, user_email, workspace_id, workspace_member_user_id, domain, context,
                 subject, sender, snippet,
                 safety_verdict, label_verdict, composite_score, is_phishing,
                 delivered_in_smail, llm_provider, explanation, latency_ms,
                 used_llm, used_virustotal, inference_source,
                 stage_scores_json, stage_labels_json, stage_breakdown_json, expected_label
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 event_id,
@@ -696,6 +688,7 @@ async def scan_email(
                 integration["user_email"],
                 integration.get("workspace_id"),
                 integration.get("workspace_member_user_id"),
+                str(integration.get("zone_name") or "").lower(),
                 "cloudflare_intercept",
                 db_subject,
                 db_sender,
@@ -752,17 +745,19 @@ async def upload_quarantine_content(
         raise HTTPException(status_code=401, detail="Missing X-Sicurre-Secret header")
     secret_hash = hashlib.sha256(x_sicurre_secret.encode()).hexdigest()
     integrations = await _async_query(
-        "SELECT workspace_id FROM cloudflare_integration "
+        "SELECT workspace_id, zone_name FROM cloudflare_integration "
         "WHERE shared_secret_hash = ? AND status IN ('pending_verification','active') LIMIT 1",
         (secret_hash,),
     )
     if not integrations:
         raise HTTPException(status_code=401, detail="Invalid shared secret")
     workspace_id = integrations[0]["workspace_id"]
+    domain = str(integrations[0]["zone_name"]).lower()
     items = await _async_query(
         "SELECT raw_storage_uri, raw_content_hash FROM app_quarantine_item "
-        "WHERE id = ? AND workspace_id = ? AND status = 'held' LIMIT 1",
-        (item_id, workspace_id),
+        "WHERE id = ? AND workspace_id = ? AND lower(domain) = lower(?) "
+        "AND status = 'held' LIMIT 1",
+        (item_id, workspace_id, domain),
     )
     if not items:
         raise HTTPException(status_code=404, detail="Quarantined item not found")
@@ -787,13 +782,15 @@ async def upload_quarantine_content(
     )
     await _async_query(
         "UPDATE app_quarantine_item SET raw_storage_uri = ?, raw_content_hash = ?, "
-        "raw_size_bytes = ? WHERE id = ? AND workspace_id = ? AND raw_storage_uri IS NULL",
+        "raw_size_bytes = ? WHERE id = ? AND workspace_id = ? "
+        "AND lower(domain) = lower(?) AND raw_storage_uri IS NULL",
         (
             stored.storage_uri,
             stored.content_hash,
             stored.size_bytes,
             item_id,
             workspace_id,
+            domain,
         ),
     )
     return {"status": "stored", "idempotent": False}
@@ -965,12 +962,14 @@ async def setup_cloudflare(
         await _async_query(
             """
             INSERT INTO app_alert_history (
-                id, workspace_id, title, message, is_dismissed, created_at
-            ) VALUES (?, ?, ?, ?, 0, ?)
+                id, workspace_id, domain, event_type, action_page,
+                title, message, is_dismissed, created_at
+            ) VALUES (?, ?, ?, 'cloudflare_sync', NULL, ?, ?, 0, ?)
             """,
             (
                 str(uuid4()),
                 current_user.workspace_id,
+                payload.zone_name.lower(),
                 "Configuration DNS appliquée",
                 f"{payload.zone_name} est synchronisé avec Cloudflare.",
                 now,
@@ -1209,12 +1208,14 @@ async def setup_cloudflare(
             await _async_query(
                 """
                 INSERT INTO app_alert_history (
-                    id, workspace_id, title, message, is_dismissed, created_at
-                ) VALUES (?, ?, ?, ?, 0, ?)
+                    id, workspace_id, domain, event_type, action_page,
+                    title, message, is_dismissed, created_at
+                ) VALUES (?, ?, ?, 'cloudflare_sync', NULL, ?, ?, 0, ?)
                 """,
                 (
                     str(uuid4()),
                     current_user.workspace_id,
+                    payload.zone_name.lower(),
                     "Configuration Cloudflare appliquée",
                     f"{payload.zone_name} est synchronisé avec Cloudflare.",
                     ts,

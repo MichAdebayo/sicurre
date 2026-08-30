@@ -12,13 +12,26 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: "fr" } }),
 }));
 
+vi.mock("../../../src/app/contexts/active-domain", () => ({
+  useActiveDomain: () => ({
+    domains: [{ id: "domain-1", zone_name: "vinse.app", status: "active" }],
+    activeDomain: "vinse.app",
+    activeIntegration: { id: "domain-1", zone_name: "vinse.app", status: "active" },
+    setActiveDomain: vi.fn(),
+    isLoading: false,
+  }),
+}));
+
 vi.mock("../../../src/app/lib/api", () => ({
   useAdminRuntimeHealth: () => ({ data: undefined }),
   useAlertHistory: () => ({ data: [] }),
+  useMarkDomainAlertsRead: () => ({ mutate: vi.fn(), isPending: false }),
+  useMarkAlertRead: () => ({ mutate: vi.fn(), isPending: false }),
   useCloudflareList: () => ({ data: [] }),
   useDomainShieldStatus: () => ({ data: undefined }),
   useQuarantineItems: () => ({ data: [] }),
   useThreatLogs: () => ({ data: [] }),
+  useKPIStats: () => ({ data: { raw_records_count: 33 } }),
 }));
 
 afterEach(() => {
@@ -191,9 +204,9 @@ describe("workspace context in the rail", () => {
       />,
     );
 
-    expect(screen.getByText("vinse.app")).toBeInTheDocument();
+    expect(screen.getAllByText("vinse.app")).toHaveLength(2);
     expect(screen.getByText("sidebar.status_protected")).toBeInTheDocument();
-    expect(screen.getByText("sidebar.emails_analysed")).toBeInTheDocument();
+    expect(screen.getByText(/sidebar\.emails_analysed/)).toBeInTheDocument();
   });
 
   it("reports setup as outstanding while onboarding is incomplete", () => {

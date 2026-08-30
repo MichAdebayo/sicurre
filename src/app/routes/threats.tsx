@@ -13,11 +13,13 @@ import { useReportAddress, useSetThreatVisibility, useThreatLogs, useThreatPage 
 import { VerdictBadge } from "../components/threats/verdict-badge";
 import { Button } from "../components/ui/button";
 import { AppToast } from "../components/common/app-toast";
+import { useActiveDomain } from "../contexts/active-domain";
 
 const MotionDiv = motion.div as any;
 
 export default function ThreatsRoute() {
   const { t, i18n } = useTranslation();
+  const { activeDomain } = useActiveDomain();
   const { data: reportAddressData } = useReportAddress();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -36,7 +38,7 @@ export default function ThreatsRoute() {
   const itemsPerPage = 10;
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  const { data: threatPage, isLoading, error } = useThreatPage({
+  const { data: threatPage, isLoading, error } = useThreatPage(activeDomain, {
     page: currentPage,
     pageSize: itemsPerPage,
     verdict: filterVerdict as "all" | "phishing" | "spam" | "legitimate",
@@ -44,8 +46,8 @@ export default function ThreatsRoute() {
     search: deferredSearch,
     hidden: showHidden,
   });
-  const { data: chartThreats } = useThreatLogs();
-  const visibilityMutation = useSetThreatVisibility();
+  const { data: chartThreats } = useThreatLogs(activeDomain);
+  const visibilityMutation = useSetThreatVisibility(activeDomain);
   const threats = threatPage?.items ?? [];
 
   const [actionSuccess, setActionSuccess] = useState("");
@@ -60,7 +62,7 @@ export default function ThreatsRoute() {
   useEffect(() => {
     setCurrentPage(1);
     setSelectedIds(new Set());
-  }, [deferredSearch, filterVerdict, dateFilter, showHidden]);
+  }, [activeDomain, deferredSearch, filterVerdict, dateFilter, showHidden]);
 
   const updateSelection = (id: string, checked: boolean) => {
     setSelectedIds((current) => {

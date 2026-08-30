@@ -397,6 +397,15 @@ def test_translator_initializes_and_updates_language(tmp_path: Path) -> None:
     assert query["lang"] == "fr"
 
 
+def test_poc_french_copy_uses_spam_terminology() -> None:
+    """The POC names its classifier class the same way as the product UI."""
+    locale = json.loads(Path("src/poc/i18n.json").read_text(encoding="utf-8"))["fr"]
+    french_copy = "\n".join(str(value) for value in locale.values()).lower()
+
+    assert "indésirable" not in french_copy
+    assert "indesirable" not in french_copy
+
+
 def test_translator_uses_fallback_when_file_is_absent(tmp_path: Path) -> None:
     """A missing translation file leaves the POC bootable."""
     translator = PocTranslator(tmp_path / "missing.json")
