@@ -88,7 +88,7 @@ export default function ConfidentialiteRoute({ onBack }: ConfidentialiteProps) {
           <section className="space-y-3">
             <h2 className="font-display font-medium text-lg text-slate-200">3. Stockage minimal et quarantaine temporaire</h2>
             <p className="text-sm text-slate-400 leading-relaxed">
-              Les messages légitimes ou indésirables ne sont pas conservés en contenu brut. Pour permettre une restauration,
+              Les messages légitimes ou classés comme spam ne sont pas conservés en contenu brut. Pour permettre une restauration,
               <strong className="text-white"> le MIME original d'un message classé comme phishing est placé dans une quarantaine privée pendant 14 jours au maximum</strong>,
               puis supprimé lors de sa libération, de sa suppression ou de son expiration. La base applicative conserve uniquement les métadonnées
               nécessaires et un aperçu dont les données personnelles détectables sont masquées :
@@ -97,7 +97,7 @@ export default function ConfidentialiteRoute({ onBack }: ConfidentialiteProps) {
               <li>Adresse de l'expéditeur et du destinataire</li>
               <li>Objet (sujet) du message</li>
               <li>Date et heure de réception</li>
-              <li>Verdict de classification (Légitime, Indésirable, Phishing) et score de confiance associé</li>
+              <li>Verdict de classification (Légitime, Spam, Phishing) et score de confiance associé</li>
             </ul>
           </section>
 

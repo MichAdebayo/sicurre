@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import {
   Bell,
   Cpu,
-  ShieldAlert,
   Globe,
   Inbox,
   ArrowRight,
@@ -11,12 +10,12 @@ import {
 } from "lucide-react";
 import { SidebarPage } from "./sidebar";
 import {
-  useCloudflareList,
-  useDomainShieldStatus,
-  useQuarantineItems,
   useAlertHistory,
   useAdminRuntimeHealth,
+  useMarkAlertRead,
+  useMarkDomainAlertsRead,
 } from "../../lib/api";
+import { useActiveDomain } from "../../contexts/active-domain";
 
 interface TopBarProps {
   userName?: string;
@@ -34,24 +33,10 @@ export function TopBar({
   const { t, i18n } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const runtimeHealth = useAdminRuntimeHealth(userRole === "admin");
-
-  // Persistent notification read IDs using localStorage
-  const [readIds, setReadIds] = useState<string[]>(() => {
-    try {
-      const stored = localStorage.getItem("sicurre_read_notif_ids");
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("sicurre_read_notif_ids", JSON.stringify(readIds));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [readIds]);
+  const { activeDomain } = useActiveDomain();
+  const { data: alertHistory } = useAlertHistory(activeDomain);
+  const markAlertReadMutation = useMarkAlertRead(activeDomain);
+  const markReadMutation = useMarkDomainAlertsRead(activeDomain);
 
   const timeSince = (dateStr: string) => {
     if (!dateStr) return t("topbar.now");
@@ -66,17 +51,6 @@ export function TopBar({
     if (hours < 24) return t("topbar.hours_ago", { count: hours });
     return new Date(dateStr).toLocaleDateString(i18n.language === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short" });
   };
-
-  // Load real-time workspace data to build dynamic actionable notifications
-  const { data: domains } = useCloudflareList();
-  const { data: quarantineItems } = useQuarantineItems();
-  const { data: alertHistory } = useAlertHistory();
-
-  const activeDomain = domains && domains.length > 0
-    ? (domains.find((d) => d.status === "active")?.zone_name || domains[0].zone_name)
-    : "";
-
-  const { data: shieldStatus } = useDomainShieldStatus(activeDomain || "", !!activeDomain);
 
   // Auto-close popover on click-away
   useEffect(() => {
@@ -93,7 +67,7 @@ export function TopBar({
     desc: string;
     time: string;
     category: "Critical" | "Domain" | "System";
-    page: SidebarPage;
+    page?: SidebarPage;
     unread: boolean;
   }[] = [];
 
@@ -110,84 +84,32 @@ export function TopBar({
   }
 
   const recentAlertHistory = !onboardingRequired
-    ? (alertHistory || []).slice(0, 3).map((alert) => ({
+    ? (alertHistory || []).slice(0, 4).map((alert) => ({
         id: `alert_history_${alert.id}`,
         title: alert.title,
         desc: alert.message,
         time: timeSince(alert.created_at),
-        category: "System" as const,
-        page: "alerts" as const,
-        unread: true,
+        category: alert.event_type === "domain_shield" ? "Domain" as const : "System" as const,
+        page: alert.action_page as SidebarPage | undefined,
+        unread: !alert.is_read,
       }))
     : [];
   notificationsList.push(...recentAlertHistory);
 
-  // 2. SSL Expiry Alert
-  if (!onboardingRequired && shieldStatus && shieldStatus.ssl.valid && shieldStatus.ssl.days_remaining < 30) {
-    notificationsList.push({
-      id: "ssl_expiring",
-      title: t("topbar.ssl_expiring"),
-      desc: t("topbar.ssl_expiring_desc", {
-        domain: activeDomain,
-        count: shieldStatus.ssl.days_remaining,
-      }),
-      time: shieldStatus.updated_at ? timeSince(shieldStatus.updated_at) : "",
-      category: "Domain" as const,
-      page: "domain-shield" as const,
-      unread: true,
-    });
-  }
-
-  // 3. DMARC policy warning
-  if (!onboardingRequired && shieldStatus && (!shieldStatus.dmarc.valid || shieldStatus.dmarc.policy === "none")) {
-    notificationsList.push({
-      id: "dmarc_none",
-      title: t("topbar.dmarc_none"),
-      desc: t("topbar.dmarc_none_desc", { domain: activeDomain }),
-      time: shieldStatus.updated_at ? timeSince(shieldStatus.updated_at) : "",
-      category: "Domain" as const,
-      page: "domain-shield" as const,
-      unread: true,
-    });
-  }
-
-  // 4. Quarantine waiting emails
-  if (
-    !onboardingRequired
-    && recentAlertHistory.length === 0
-    && quarantineItems
-    && quarantineItems.length > 0
-  ) {
-    notificationsList.push({
-      id: "quarantine_held",
-      title: t("topbar.quarantine_waiting", { count: quarantineItems.length }),
-      desc: t("topbar.quarantine_waiting_desc"),
-      time: quarantineItems.length > 0
-        ? timeSince(quarantineItems[0].created_at)
-        : t("topbar.hours_ago", { count: 14 }),
-      category: "System" as const,
-      page: "quarantine" as const,
-      unread: true,
-    });
-  }
-
   // Capped list of notifications (display most recent 4)
   const cappedNotifs = notificationsList.slice(0, 4);
 
-  const unreadCount = notificationsList.filter(n => n.unread && !readIds.includes(n.id)).length;
+  const unreadCount = notificationsList.filter((item) => item.unread).length;
 
   const markAllRead = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setReadIds(notificationsList.map(n => n.id));
+    markReadMutation.mutate();
   };
 
   const getCategoryIconContainer = (category: "Critical" | "Domain" | "System") => {
-    const critical = category === "Critical";
     const domain = category === "Domain";
-    const bg = critical ? "bg-error/10" : domain ? "bg-warning-bg" : "bg-primary/10";
-    const icon = critical
-      ? <ShieldAlert className="w-4 h-4 text-error" />
-      : domain
+    const bg = domain ? "bg-warning-bg" : "bg-primary/10";
+    const icon = domain
         ? <Globe className="w-4 h-4 text-warning" />
         : <Inbox className="w-4 h-4 text-primary" />;
     return (
@@ -202,7 +124,7 @@ export function TopBar({
       {/* Title Placeholder / Brand Space to balance the header layout */}
       <div className="truncate font-display font-semibold text-sm text-on-surface-variant opacity-80">
         {activeDomain
-          ? t("topbar.workspace_name", { domain: activeDomain })
+          ? activeDomain
           : t("topbar.console_name")}
       </div>
 
@@ -291,18 +213,20 @@ export function TopBar({
                 </div>
               ) : (
                 cappedNotifs.map((notif) => {
-                  const isUnread = notif.unread && !readIds.includes(notif.id);
+                  const isUnread = notif.unread;
                   return (
                     <div
                       key={notif.id}
                       onClick={() => {
-                        setReadIds((prev) => [...prev, notif.id]);
-                        if (onPageChange) {
+                        if (notif.id.startsWith("alert_history_")) {
+                          markAlertReadMutation.mutate(notif.id.replace("alert_history_", ""));
+                        }
+                        if (notif.page && onPageChange) {
                           onPageChange(notif.page);
                         }
                         setIsOpen(false);
                       }}
-                      className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-surface-low transition-colors cursor-pointer border border-transparent hover:border-border-subtle"
+                      className={`flex items-start gap-3 p-2.5 rounded-lg border border-transparent transition-colors ${notif.page ? "cursor-pointer hover:border-border-subtle hover:bg-surface-low" : "cursor-default"}`}
                     >
                       {/* Icon */}
                       {getCategoryIconContainer(notif.category)}
