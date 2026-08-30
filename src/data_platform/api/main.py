@@ -17,6 +17,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 from core.config import get_settings
+from core.db_keepalive import keepalive_enabled, run_db_keepalive
 from core.inference_client import close_inference_client
 from core.provider_credentials import encrypt_legacy_provider_credentials
 from core.rate_limit import limiter
@@ -109,16 +110,20 @@ async def lifespan(app: FastAPI):
     task = None
     if settings.scheduler_enabled:
         task = asyncio.create_task(run_scheduler_loop())
+    # Keeps one pooled connection open so a scan does not pay connection setup
+    # to a suspended serverless database inside its latency budget.
+    keepalive = asyncio.create_task(run_db_keepalive()) if keepalive_enabled() else None
     try:
         yield
     finally:
         await close_inference_client()
-        if task:
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
+        for background in (task, keepalive):
+            if background:
+                background.cancel()
+                try:
+                    await background
+                except asyncio.CancelledError:
+                    pass
 
 
 def create_app() -> FastAPI:
