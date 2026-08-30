@@ -43,3 +43,34 @@ def test_stage_timing_records_even_when_the_stage_raises() -> None:
 def test_buckets_straddle_the_two_second_objective() -> None:
     bounds = scan_stage_duration._upper_bounds  # noqa: SLF001 - contract check
     assert 2.0 in bounds, "2s SLA must be a bucket boundary to read compliance directly"
+
+
+def test_inference_client_is_reused_across_calls() -> None:
+    """One TLS handshake per process, not per email.
+
+    Opening a client per request cost ~275 ms of the scan on connection setup
+    alone, so reuse is the behaviour worth pinning.
+    """
+    from core import inference_client
+    from core.inference_client import get_inference_client
+
+    inference_client._client = None  # other suites patch httpx globally
+    first = get_inference_client()
+    second = get_inference_client()
+    assert first is second
+
+
+def test_closed_inference_client_is_replaced() -> None:
+    """A client closed at shutdown must not be handed out again."""
+    import asyncio
+
+    from core import inference_client
+    from core.inference_client import close_inference_client, get_inference_client
+
+    inference_client._client = None  # other suites patch httpx globally
+    first = get_inference_client()
+    asyncio.run(close_inference_client())
+    second = get_inference_client()
+    assert second is not first
+    assert not second.is_closed
+    asyncio.run(close_inference_client())

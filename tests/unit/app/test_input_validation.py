@@ -145,7 +145,7 @@ async def test_scan_email_returns_503_when_inference_unavailable(
         async def post(self, *_: Any, **__: Any) -> None:
             raise httpx.ConnectError("Connection refused")
 
-    monkeypatch.setattr("httpx.AsyncClient", FailingClient)
+    monkeypatch.setattr(integrations, "get_inference_client", lambda: FailingClient())
 
     with pytest.raises(HTTPException) as exc_info:
         await integrations.scan_email(
@@ -212,7 +212,7 @@ async def test_scan_email_records_whitelist_stage_evidence(
 
     monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
     monkeypatch.setattr(integrations, "_async_query", query)
-    monkeypatch.setattr("httpx.AsyncClient", SuccessClient)
+    monkeypatch.setattr(integrations, "get_inference_client", lambda: SuccessClient())
 
     response = await integrations.scan_email(
         request=_limiter_request(),
@@ -292,7 +292,7 @@ async def test_scan_email_persists_ml_stage_contract(
 
     monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
     monkeypatch.setattr(integrations, "_async_query", query)
-    monkeypatch.setattr("httpx.AsyncClient", SuccessClient)
+    monkeypatch.setattr(integrations, "get_inference_client", lambda: SuccessClient())
 
     response = await integrations.scan_email(
         request=_limiter_request(),
@@ -571,7 +571,7 @@ async def test_scan_email_runs_independent_lookups_concurrently(
         async def post(self, *args: Any, **kwargs: Any) -> Any:
             raise httpx.ConnectError("Connection refused")
 
-    monkeypatch.setattr("httpx.AsyncClient", FailingClient)
+    monkeypatch.setattr(integrations, "get_inference_client", lambda: FailingClient())
 
     payload = integrations.EmailScanRequest(
         subject="Objet", sender="expediteur@example.com", text="corps", message_id="m-1"
