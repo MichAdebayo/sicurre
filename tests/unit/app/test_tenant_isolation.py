@@ -34,6 +34,7 @@ from data_platform.api.routers.app_routes import (
     list_quarantine,
     list_security_rules,
     mark_alert_read,
+    mark_domain_alerts_read,
     release_and_whitelist_item,
     release_quarantine_item,
     update_alert_preferences,
@@ -613,6 +614,40 @@ async def test_alert_read_receipt_rejects_foreign_alert(
     assert exc_info.value.status_code == 404
     assert all(USER_A.workspace_id in params for _, params in captured)
     assert all(DOMAIN_A in params for _, params in captured)
+
+
+@pytest.mark.asyncio
+async def test_alert_read_receipts_are_member_and_domain_scoped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Individual and bulk acknowledgements persist only for the active member/domain."""
+    captured: list[tuple[str, tuple[Any, ...]]] = []
+
+    async def query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        captured.append((sql, params))
+        if sql.startswith("SELECT 1 FROM app_alert_history"):
+            return [{"found": 1}]
+        return []
+
+    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+
+    assert await mark_alert_read("alert-a", DOMAIN_A, USER_A) == {"status": "read"}
+    assert await mark_domain_alerts_read(DOMAIN_A, USER_A) == {"status": "read"}
+
+    inserts = [
+        (sql, params) for sql, params in captured if sql.startswith("INSERT INTO app_alert_read")
+    ]
+    assert len(inserts) == 2
+    assert all(USER_A.id in params and DOMAIN_A in params for _, params in inserts)
+
+
+@pytest.mark.asyncio
+async def test_empty_active_domain_is_rejected() -> None:
+    """Operational routes cannot silently fall back to workspace-wide data."""
+    with pytest.raises(HTTPException) as exc_info:
+        await app_routes._owned_domain("   ", USER_A)
+
+    assert exc_info.value.status_code == 400
 
 
 # ── Cloudflare Integrations ─────────────────────────────────────────────────
