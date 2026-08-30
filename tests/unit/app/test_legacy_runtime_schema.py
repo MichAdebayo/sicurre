@@ -39,8 +39,7 @@ def test_legacy_quarantine_table_receives_current_storage_columns(
         columns = auth._table_columns(connection, "app_quarantine_item")
         reported_columns = auth._table_columns(connection, "app_reported_email")
         reported_indexes = {
-            row[1]
-            for row in connection.execute("PRAGMA index_list(app_reported_email)").fetchall()
+            row[1] for row in connection.execute("PRAGMA index_list(app_reported_email)").fetchall()
         }
 
     assert {
@@ -62,3 +61,56 @@ def test_legacy_quarantine_table_receives_current_storage_columns(
         "received_at",
     } == reported_columns
     assert "ix_app_reported_email_workspace_id" in reported_indexes
+
+
+def test_legacy_workspace_tables_receive_domain_context(tmp_path: Path, monkeypatch) -> None:
+    """Upgrade pre-domain local tables without retaining the workspace-wide policy shape."""
+    database_path = tmp_path / "legacy-domain-context.db"
+    with sqlite3.connect(database_path) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE poc_inference_event (id TEXT PRIMARY KEY);
+            CREATE TABLE cloudflare_integration (
+                id TEXT PRIMARY KEY,
+                zone_name TEXT NOT NULL
+            );
+            CREATE TABLE app_security_rule (
+                id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                rule_type TEXT NOT NULL,
+                pattern TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE app_alert_preference (
+                workspace_id TEXT PRIMARY KEY,
+                notify_phishing INTEGER NOT NULL DEFAULT 1,
+                quiet_hours_enabled INTEGER NOT NULL DEFAULT 0,
+                quiet_hours_start TEXT NOT NULL DEFAULT '22:00',
+                quiet_hours_end TEXT NOT NULL DEFAULT '07:00'
+            );
+            CREATE TABLE app_alert_history (
+                id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                message TEXT NOT NULL,
+                is_dismissed INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL
+            );
+            """
+        )
+
+    monkeypatch.setattr(auth, "_db_path", lambda: str(database_path))
+    auth._ensure_legacy_sqlite_tables()
+
+    with sqlite3.connect(database_path) as connection:
+        event_columns = auth._table_columns(connection, "app_inference_event")
+        integration_columns = auth._table_columns(connection, "cloudflare_integration")
+        rule_columns = auth._table_columns(connection, "app_security_rule")
+        preference_columns = auth._table_columns(connection, "app_alert_preference")
+        history_columns = auth._table_columns(connection, "app_alert_history")
+
+    assert {"workspace_id", "workspace_member_user_id", "domain", "is_deleted"} <= event_columns
+    assert {"workspace_id", "workspace_member_user_id", "api_token"} <= integration_columns
+    assert "domain" in rule_columns
+    assert {"workspace_id", "domain", "email_enabled", "notify_domain_shield"} <= preference_columns
+    assert {"domain", "event_type", "action_page"} <= history_columns
