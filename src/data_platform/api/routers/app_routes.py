@@ -2563,6 +2563,7 @@ async def get_dmarc_report_summary(
     "/v1/domain-shield/{domain}/dmarc-reports/import",
     response_model=DmarcImportResponse,
 )
+@limiter.limit("10/minute")
 async def import_dmarc_report(
     domain: str,
     request: Request,
@@ -2570,10 +2571,15 @@ async def import_dmarc_report(
 ):
     await _require_workspace_domain(domain, current_user.workspace_id)
     _ensure_app_runtime_tables()
+    payload = await request.body()
+    if not payload:
+        raise HTTPException(status_code=400, detail="Empty DMARC report")
+    if len(payload) > get_settings().reported_email_max_message_bytes:
+        raise HTTPException(status_code=413, detail="DMARC report is too large")
     return await persist_dmarc_report(
         current_user.workspace_id,
         domain,
-        await request.body(),
+        payload,
     )
 
 

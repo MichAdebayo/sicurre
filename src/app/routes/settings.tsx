@@ -526,11 +526,10 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                   <div className="flex items-center gap-2.5">
                     <Globe className="w-5 h-5 text-primary" />
                     <div>
-                      <h3 className="font-display font-semibold text-[17px] text-on-surface">
+                      <h2 className="app-h2">
                         {t("settings.domains_title")}
-                      </h3>
-                      {/* Improved subtext colors and size readability */}
-                      <p className="text-sm font-semibold text-on-surface-variant">
+                      </h2>
+                      <p className="app-body-sub mt-1">
                         {t("settings.domains_desc")}
                       </p>
                     </div>
@@ -570,7 +569,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                 ) : (
                   <div className="space-y-4">
                     {domainsLoading ? (
-                      <div className="h-16 bg-surface-low rounded-xl animate-pulse" />
+                      <div className="h-16 bg-surface-low rounded-xl motion-safe:animate-pulse" />
                     ) : !domains || domains.length === 0 ? (
                       <div className="py-12 text-center text-sm text-on-surface-variant/50 flex flex-col items-center justify-center">
                         <Globe className="w-10 h-10 text-on-surface-variant/30 mb-2" />
@@ -613,19 +612,18 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                                       <button
                                         onClick={() => void handleRetryDomain(dom)}
                                         disabled={retrySetupMutation.isPending}
-                                        className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-50 transition-colors cursor-pointer"
+                                        className="inline-grid h-10 w-10 place-items-center rounded-md text-primary transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-50 cursor-pointer"
                                         title={t("settings.retry_configuration")}
                                         aria-label={t("settings.retry_domain", { domain: dom.zone_name })}
                                       >
                                         {retrySetupMutation.isPending && retryingDomainId === dom.id
                                           ? <Loader2 className="w-4 h-4 animate-spin" />
                                           : <RefreshCw className="w-4 h-4" />}
-                                        <span>{t("common.retry")}</span>
                                       </button>
                                     )}
                                     <button
                                       onClick={() => dom.id && handleRemoveDomain(dom.id)}
-                                      className="p-2 rounded-md hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error text-on-surface-variant transition-colors cursor-pointer"
+                                      className="inline-grid h-10 w-10 place-items-center rounded-md text-on-surface-variant transition-colors hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error cursor-pointer"
                                       title={t("settings.disconnect")}
                                       aria-label={t("settings.disconnect_domain_named", { domain: dom.zone_name })}
                                     >
@@ -654,10 +652,10 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                   <div className="flex items-center gap-3">
                     <Puzzle className="w-5 h-5 text-primary shrink-0" />
                     <div>
-                      <h3 className="font-display font-semibold text-[17px] text-on-surface">
+                      <h2 className="app-h2">
                         {t("settings.integrations_title")}
-                      </h3>
-                      <p className="text-xs font-semibold text-on-surface-variant">
+                      </h2>
+                      <p className="app-body-sub mt-1">
                         {t("settings.integrations_desc")}
                       </p>
                     </div>
@@ -688,7 +686,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                 {isEditingToken ? (
                   <form onSubmit={handleSaveToken} className="space-y-4 max-w-xl">
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase text-on-surface-variant tracking-wider">
+                      <label className="text-xs font-semibold text-on-surface-variant">
                         {t("settings.cloudflare_token")}
                       </label>
                       <div className="relative">
@@ -748,22 +746,12 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                           <img src={cloudflareLogo} alt="Cloudflare" className="w-8 h-8" />
                         </div>
                         <div className="space-y-1 grow">
-                          <h4 className="font-bold text-sm text-on-surface flex items-center gap-2">
-                            <span>Cloudflare Integration</span>
-                            <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-emerald-50 text-[#047857] border border-emerald-200">
+                          <h4 className="flex items-center gap-2 text-sm font-bold text-on-surface">
+                            <span>Cloudflare</span>
+                            <span className="rounded-full border border-safe/25 bg-safe-bg px-2.5 py-1 text-xs font-semibold text-safe">
                               {t("settings.connected")}
                             </span>
                           </h4>
-
-                          {/* Provider credentials are write-only in the browser. */}
-                          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border-subtle/50 text-xs w-full">
-                            <span className="font-bold text-on-surface-variant shrink-0">
-                              {t("settings.credential")}
-                            </span>
-                            <span className="bg-surface-low px-3 py-1 rounded text-xs font-semibold grow max-w-xs md:max-w-md block overflow-hidden text-ellipsis whitespace-nowrap">
-                              {t("settings.stored_securely")}
-                            </span>
-                          </div>
                         </div>
                       </div>
 
@@ -805,7 +793,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
       {/* UI Confirmation Modal for Token Deletion */}
       {deleteTokenConfirmVisible && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm select-none animate-in fade-in duration-200">
-          <div className="bg-white border border-border-subtle rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl space-y-4">
+          <div className="bg-surface-lowest border border-border-subtle rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl space-y-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-error/10 text-error rounded-xl">
                 <AlertTriangle className="w-5 h-5" />
@@ -842,7 +830,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
       {/* UI Confirmation Modal for Domain Deletion */}
       {removeDomainConfirmId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm select-none animate-in fade-in duration-200">
-          <div className="bg-white border border-border-subtle rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl space-y-4">
+          <div className="bg-surface-lowest border border-border-subtle rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl space-y-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-error/10 text-error rounded-xl">
                 <AlertTriangle className="w-5 h-5" />
