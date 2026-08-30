@@ -108,6 +108,14 @@ Primary resources:
 - `app_inference_event`
 - `app_quarantine_item`
 - `app_feedback`
+- `app_alert_preference`, `app_alert_history`, and per-member `app_alert_read`
+
+Customer operational endpoints require a connected `domain` in addition to
+the authenticated workspace. This is deliberate defense in depth: switching
+the UI context changes the requested domain, but every backend query still
+checks workspace ownership. Notification and rule configuration are therefore
+domain-scoped; language, theme, membership, and Cloudflare credential custody
+remain workspace- or user-scoped.
 
 ## Naming convention
 

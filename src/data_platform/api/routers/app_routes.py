@@ -55,6 +55,7 @@ from data_platform.api.schemas.app_responses import (
     ThreatPageResponse,
     ThreatVisibilityResponse,
 )
+from data_platform.services.notification_policy import notification_is_allowed
 from data_platform.services.quarantine_delivery import (
     QuarantineDeliveryError,
     prepare_restoration_mime,
@@ -212,10 +213,23 @@ async def _require_workspace_domain(domain: str, workspace_id: str) -> None:
         raise HTTPException(status_code=404, detail="Connected domain not found")
 
 
-async def _workspace_threat_count(workspace_id: str) -> int:
+async def _owned_domain(domain: str, current_user: AuthUser) -> str:
+    normalized = domain.strip().lower()
+    if not normalized:
+        raise HTTPException(status_code=400, detail="Domain is required")
+    await _require_workspace_domain(normalized, current_user.workspace_id)
+    return normalized
+
+
+async def _workspace_threat_count(workspace_id: str, domain: str | None = None) -> int:
+    where = "workspace_id = ?"
+    params: tuple[object, ...] = (workspace_id,)
+    if domain:
+        where += " AND lower(domain) = lower(?)"
+        params += (domain,)
     rows = await auth_query(
-        "SELECT COUNT(*) AS count FROM app_inference_event WHERE workspace_id = ?",
-        (workspace_id,),
+        f"SELECT COUNT(*) AS count FROM app_inference_event WHERE {where}",
+        params,
     )
     return int(rows[0]["count"]) if rows else 0
 
@@ -301,10 +315,12 @@ async def patch_profile(
 
 @router.get("/v1/stats/kpi", response_model=KpiResponse)
 async def get_kpis(
+    domain: str,
     session: AsyncSession = Depends(get_async_session),
     current_user: AuthUser = Depends(get_current_user),
 ):
-    raw_count = await _workspace_threat_count(current_user.workspace_id)
+    active_domain = await _owned_domain(domain, current_user)
+    raw_count = await _workspace_threat_count(current_user.workspace_id, active_domain)
     norm_count = raw_count
     dataset_item_count = 0
     if current_user.is_platform_admin:
@@ -320,8 +336,8 @@ async def get_kpis(
     rows = await async_query_auth_db(
         "SELECT COALESCE(label_verdict, CASE WHEN safety_verdict = 'safe' "
         "THEN 'legitimate' ELSE safety_verdict END) AS label_verdict, COUNT(*) as cnt "
-        "FROM app_inference_event WHERE workspace_id = ? GROUP BY 1",
-        (current_user.workspace_id,),
+        "FROM app_inference_event WHERE workspace_id = ? AND lower(domain) = lower(?) GROUP BY 1",
+        (current_user.workspace_id, active_domain),
     )
     for row in rows:
         verdict = row["label_verdict"]
@@ -340,6 +356,7 @@ async def get_kpis(
         "threats_phishing_count": phishing_count,
         "threats_spam_count": spam_count,
         "threats_legitimate_count": legitimate_count,
+        "domain": active_domain,
     }
 
 
@@ -370,6 +387,7 @@ def _serialize_threat(row: dict[str, object]) -> dict[str, object]:
 
 @router.get("/v1/threats", response_model=ThreatPageResponse)
 async def get_threats(
+    domain: str,
     current_user: AuthUser = Depends(get_current_user),
     page: int = 1,
     page_size: int = 10,
@@ -386,12 +404,13 @@ async def get_threats(
     if date_range not in {"all", "today", "7d", "month", "last_month"}:
         raise HTTPException(status_code=400, detail="Invalid date filter")
 
+    active_domain = await _owned_domain(domain, current_user)
     verdict_expr = (
         "COALESCE(label_verdict, CASE WHEN safety_verdict = 'safe' "
         "THEN 'legitimate' ELSE safety_verdict END)"
     )
-    where = ["workspace_id = ?", "COALESCE(is_deleted, 0) = ?"]
-    params: list[object] = [current_user.workspace_id, 1 if hidden else 0]
+    where = ["workspace_id = ?", "lower(domain) = lower(?)", "COALESCE(is_deleted, 0) = ?"]
+    params: list[object] = [current_user.workspace_id, active_domain, 1 if hidden else 0]
     if verdict == "phishing":
         where.append(f"{verdict_expr} IN ('phishing', 'quarantine')")
     elif verdict != "all":
@@ -462,20 +481,22 @@ async def get_threats(
 @router.post("/v1/threats/visibility", response_model=ThreatVisibilityResponse)
 async def update_threat_visibility(
     payload: ThreatVisibilityUpdate,
+    domain: str,
     current_user: AuthUser = Depends(get_current_user),
 ):
     """Hide or restore selected events without deleting their audit evidence."""
+    active_domain = await _owned_domain(domain, current_user)
     placeholders = ", ".join("?" for _ in payload.ids)
     existing = await async_query_auth_db(
-        f"SELECT id FROM app_inference_event WHERE workspace_id = ? AND id IN ({placeholders})",
-        (current_user.workspace_id, *payload.ids),
+        f"SELECT id FROM app_inference_event WHERE workspace_id = ? AND lower(domain) = lower(?) AND id IN ({placeholders})",
+        (current_user.workspace_id, active_domain, *payload.ids),
     )
     existing_ids = {str(row["id"]) for row in existing}
     if len(existing_ids) != len(set(payload.ids)):
         raise HTTPException(status_code=404, detail="Threat not found")
     await async_query_auth_db(
-        f"UPDATE app_inference_event SET is_deleted = ? WHERE workspace_id = ? AND id IN ({placeholders})",
-        (1 if payload.hidden else 0, current_user.workspace_id, *payload.ids),
+        f"UPDATE app_inference_event SET is_deleted = ? WHERE workspace_id = ? AND lower(domain) = lower(?) AND id IN ({placeholders})",
+        (1 if payload.hidden else 0, current_user.workspace_id, active_domain, *payload.ids),
     )
     return {"updated": len(existing_ids), "hidden": payload.hidden}
 
@@ -488,20 +509,23 @@ async def update_threat_visibility(
 async def update_threat_status(
     id: str,
     payload: StatusUpdate,
+    domain: str,
     current_user: AuthUser = Depends(get_current_user),
 ):
     if payload.status not in ("active", "trashed", "restored"):
         raise HTTPException(status_code=400, detail="Invalid status value")
+    active_domain = await _owned_domain(domain, current_user)
     try:
         is_del = 1 if payload.status == "trashed" else 0
         await async_query_auth_db(
-            "UPDATE app_inference_event SET is_deleted = ?, override_verdict = ?, overridden_at = ? WHERE id = ? AND workspace_id = ?",
+            "UPDATE app_inference_event SET is_deleted = ?, override_verdict = ?, overridden_at = ? WHERE id = ? AND workspace_id = ? AND lower(domain) = lower(?)",
             (
                 is_del,
                 payload.status,
                 datetime.now(timezone.utc).isoformat(),
                 id,
                 current_user.workspace_id,
+                active_domain,
             ),
         )
         rows = await async_query_auth_db(
@@ -509,8 +533,8 @@ async def update_threat_status(
             "COALESCE(label_verdict, CASE WHEN safety_verdict = 'safe' THEN 'legitimate' "
             "ELSE safety_verdict END) AS verdict, composite_score AS confidence, "
             "created_at AS received_at, override_verdict AS status "
-            "FROM app_inference_event WHERE id = ? AND workspace_id = ?",
-            (id, current_user.workspace_id),
+            "FROM app_inference_event WHERE id = ? AND workspace_id = ? AND lower(domain) = lower(?)",
+            (id, current_user.workspace_id, active_domain),
         )
         if not rows:
             raise HTTPException(status_code=404, detail="Threat not found")
@@ -542,18 +566,20 @@ async def update_threat_status(
 @router.post("/v1/feedback", status_code=201, response_model=FeedbackResponse)
 async def create_feedback(
     payload: FeedbackCreate,
+    domain: str,
     current_user: AuthUser = Depends(get_current_user),
 ):
+    active_domain = await _owned_domain(domain, current_user)
     event_row = None
     if payload.event_id:
         rows = await async_query_auth_db(
             """
             SELECT id, safety_verdict
             FROM app_inference_event
-            WHERE id = ? AND workspace_id = ?
+            WHERE id = ? AND workspace_id = ? AND lower(domain) = lower(?)
             LIMIT 1
             """,
-            (payload.event_id, current_user.workspace_id),
+            (payload.event_id, current_user.workspace_id, active_domain),
         )
         if not rows:
             raise HTTPException(status_code=404, detail="Linked event not found")
@@ -600,13 +626,14 @@ async def create_feedback(
             """
             UPDATE app_inference_event
             SET override_verdict = ?, overridden_at = ?
-            WHERE id = ? AND workspace_id = ?
+            WHERE id = ? AND workspace_id = ? AND lower(domain) = lower(?)
             """,
             (
                 override_status,
                 now,
                 payload.event_id,
                 current_user.workspace_id,
+                active_domain,
             ),
         )
 
@@ -1185,10 +1212,14 @@ async def get_admin_domains(
     where = ""
     params: tuple[object, ...] = ()
     if normalized_search:
-        where = "WHERE LOWER(COALESCE(zone_name, '')) LIKE ? OR LOWER(COALESCE(user_email, '')) LIKE ?"
+        where = (
+            "WHERE LOWER(COALESCE(zone_name, '')) LIKE ? OR LOWER(COALESCE(user_email, '')) LIKE ?"
+        )
         token = f"%{normalized_search.lower()}%"
         params = (token, token)
-    total = await _admin_count(f"SELECT COUNT(*) AS count FROM cloudflare_integration {where}", params)
+    total = await _admin_count(
+        f"SELECT COUNT(*) AS count FROM cloudflare_integration {where}", params
+    )
     items = await _admin_rows(
         f"SELECT zone_name, status, user_email, updated_at FROM cloudflare_integration {where} "
         "ORDER BY updated_at DESC LIMIT ? OFFSET ?",
@@ -1259,7 +1290,9 @@ async def start_operational_exercise(
     if not settings.operational_tests_enabled:
         raise HTTPException(status_code=409, detail="Operational exercises are disabled")
     if payload.duration_seconds > settings.operational_test_max_duration_seconds:
-        raise HTTPException(status_code=422, detail="Exercise duration exceeds the configured limit")
+        raise HTTPException(
+            status_code=422, detail="Exercise duration exceeds the configured limit"
+        )
 
     exercise_id = str(uuid.uuid4())
     try:
@@ -1384,8 +1417,9 @@ async def run_pipeline(
 
 
 class AlertPreferenceUpdate(BaseModel):
+    email_enabled: bool
     notify_phishing: bool
-    notify_spam: bool
+    notify_domain_shield: bool
     quiet_hours_enabled: bool
     quiet_hours_start: str = Field(default="22:00", pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")
     quiet_hours_end: str = Field(default="07:00", pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")
@@ -1427,15 +1461,18 @@ async def _purge_expired_quarantine(workspace_id: str):
 
 
 @router.get("/v1/quarantine", response_model=list[QuarantineItemResponse])
-async def list_quarantine(current_user: AuthUser = Depends(get_current_user)):
+async def list_quarantine(domain: str, current_user: AuthUser = Depends(get_current_user)):
+    active_domain = await _owned_domain(domain, current_user)
     await _purge_expired_quarantine(current_user.workspace_id)
     rows = await async_query_auth_db(
-        "SELECT * FROM app_quarantine_item WHERE workspace_id = ? AND status = 'held' ORDER BY created_at DESC",
-        (current_user.workspace_id,),
+        "SELECT * FROM app_quarantine_item WHERE workspace_id = ? "
+        "AND lower(domain) = lower(?) AND status = 'held' ORDER BY created_at DESC",
+        (current_user.workspace_id, active_domain),
     )
     return [
         {
             "id": r["id"],
+            "domain": active_domain,
             "message_id": r["message_id"],
             "sender": r["sender"],
             "subject": r["subject"],
@@ -1455,15 +1492,21 @@ async def list_quarantine(current_user: AuthUser = Depends(get_current_user)):
     response_model=QuarantineReleaseResponse,
     response_model_exclude_unset=True,
 )
-async def release_quarantine_item(id: str, current_user: AuthUser = Depends(get_current_user)):
-    return await _release_quarantine_item(id=id, current_user=current_user)
+async def release_quarantine_item(
+    id: str,
+    domain: str,
+    current_user: AuthUser = Depends(get_current_user),
+):
+    return await _release_quarantine_item(id=id, domain=domain, current_user=current_user)
 
 
-async def _release_quarantine_item(*, id: str, current_user: AuthUser) -> dict:
+async def _release_quarantine_item(*, id: str, domain: str, current_user: AuthUser) -> dict:
     """Release one held item with durable, idempotent delivery state."""
+    active_domain = await _owned_domain(domain, current_user)
     rows = await async_query_auth_db(
-        "SELECT * FROM app_quarantine_item WHERE id = ? AND workspace_id = ? LIMIT 1",
-        (id, current_user.workspace_id),
+        "SELECT * FROM app_quarantine_item WHERE id = ? AND workspace_id = ? "
+        "AND lower(domain) = lower(?) LIMIT 1",
+        (id, current_user.workspace_id, active_domain),
     )
     if not rows:
         raise HTTPException(status_code=404, detail="Quarantined item not found")
@@ -1471,8 +1514,8 @@ async def _release_quarantine_item(*, id: str, current_user: AuthUser) -> dict:
     if item["status"] == "released":
         integrations = await async_query_auth_db(
             "SELECT destination_email FROM cloudflare_integration "
-            "WHERE workspace_id = ? ORDER BY updated_at DESC LIMIT 1",
-            (current_user.workspace_id,),
+            "WHERE workspace_id = ? AND lower(zone_name) = lower(?) LIMIT 1",
+            (current_user.workspace_id, item.get("domain") or ""),
         )
         return {
             "status": "released",
@@ -1493,8 +1536,8 @@ async def _release_quarantine_item(*, id: str, current_user: AuthUser) -> dict:
     integrations = await async_query_auth_db(
         "SELECT account_id, zone_id, zone_name, destination_email, api_token "
         "FROM cloudflare_integration WHERE workspace_id = ? AND status = 'active' "
-        "ORDER BY updated_at DESC LIMIT 1",
-        (current_user.workspace_id,),
+        "AND lower(zone_name) = lower(?) LIMIT 1",
+        (current_user.workspace_id, item.get("domain") or ""),
     )
     if not integrations:
         raise HTTPException(status_code=409, detail="Active Cloudflare integration required")
@@ -1504,8 +1547,9 @@ async def _release_quarantine_item(*, id: str, current_user: AuthUser) -> dict:
 
     claimed = await async_query_auth_db(
         "UPDATE app_quarantine_item SET status = 'releasing', last_delivery_error = NULL "
-        "WHERE id = ? AND workspace_id = ? AND status = 'held' RETURNING id",
-        (id, current_user.workspace_id),
+        "WHERE id = ? AND workspace_id = ? AND lower(domain) = lower(?) "
+        "AND status = 'held' RETURNING id",
+        (id, current_user.workspace_id, active_domain),
     )
     if not claimed:
         raise HTTPException(status_code=409, detail="Message release is already in progress")
@@ -1540,8 +1584,8 @@ async def _release_quarantine_item(*, id: str, current_user: AuthUser) -> dict:
     except QuarantineDeliveryError as exc:
         await async_query_auth_db(
             "UPDATE app_quarantine_item SET status = 'held', last_delivery_error = ? "
-            "WHERE id = ? AND workspace_id = ?",
-            (str(exc)[:240], id, current_user.workspace_id),
+            "WHERE id = ? AND workspace_id = ? AND lower(domain) = lower(?)",
+            (str(exc)[:240], id, current_user.workspace_id, active_domain),
         )
         status_code = 403 if exc.code.endswith("permission_required") else 424
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
@@ -1549,8 +1593,8 @@ async def _release_quarantine_item(*, id: str, current_user: AuthUser) -> dict:
         logger.exception("Quarantine release failed")
         await async_query_auth_db(
             "UPDATE app_quarantine_item SET status = 'held', last_delivery_error = ? "
-            "WHERE id = ? AND workspace_id = ?",
-            ("Quarantine storage is unavailable", id, current_user.workspace_id),
+            "WHERE id = ? AND workspace_id = ? AND lower(domain) = lower(?)",
+            ("Quarantine storage is unavailable", id, current_user.workspace_id, active_domain),
         )
         raise HTTPException(
             status_code=503,
@@ -1560,15 +1604,17 @@ async def _release_quarantine_item(*, id: str, current_user: AuthUser) -> dict:
     delivered_at = datetime.now(timezone.utc).isoformat()
     await async_query_auth_db(
         "UPDATE app_quarantine_item SET status = 'released', delivery_message_id = ?, "
-        "delivered_at = ?, last_delivery_error = NULL WHERE id = ? AND workspace_id = ?",
-        (result.message_id, delivered_at, id, current_user.workspace_id),
+        "delivered_at = ?, last_delivery_error = NULL WHERE id = ? AND workspace_id = ? "
+        "AND lower(domain) = lower(?)",
+        (result.message_id, delivered_at, id, current_user.workspace_id, active_domain),
     )
     await _record_release_feedback(item=item, current_user=current_user)
     with suppress(Exception):
         await store.delete(str(item["raw_storage_uri"]))
         await async_query_auth_db(
-            "UPDATE app_quarantine_item SET raw_storage_uri = NULL WHERE id = ? AND workspace_id = ?",
-            (id, current_user.workspace_id),
+            "UPDATE app_quarantine_item SET raw_storage_uri = NULL WHERE id = ? AND workspace_id = ? "
+            "AND lower(domain) = lower(?)",
+            (id, current_user.workspace_id, active_domain),
         )
     return {
         "status": "released",
@@ -1599,10 +1645,16 @@ async def _record_release_feedback(*, item: dict, current_user: AuthUser) -> Non
 
 
 @router.delete("/v1/quarantine/{id}", response_model=StatusResponse)
-async def delete_quarantine_item(id: str, current_user: AuthUser = Depends(get_current_user)):
+async def delete_quarantine_item(
+    id: str,
+    domain: str,
+    current_user: AuthUser = Depends(get_current_user),
+):
+    active_domain = await _owned_domain(domain, current_user)
     rows = await async_query_auth_db(
-        "SELECT raw_storage_uri FROM app_quarantine_item WHERE id = ? AND workspace_id = ? LIMIT 1",
-        (id, current_user.workspace_id),
+        "SELECT raw_storage_uri FROM app_quarantine_item WHERE id = ? AND workspace_id = ? "
+        "AND lower(domain) = lower(?) LIMIT 1",
+        (id, current_user.workspace_id, active_domain),
     )
     if not rows:
         raise HTTPException(status_code=404, detail="Quarantined item not found")
@@ -1620,8 +1672,8 @@ async def delete_quarantine_item(id: str, current_user: AuthUser = Depends(get_c
         "UPDATE app_quarantine_item SET status = 'deleted', sender = '[deleted]', "
         "subject = '[deleted]', body_text = '', raw_storage_uri = NULL, "
         "raw_content_hash = NULL, raw_size_bytes = NULL, last_delivery_error = NULL "
-        "WHERE id = ? AND workspace_id = ?",
-        (id, current_user.workspace_id),
+        "WHERE id = ? AND workspace_id = ? AND lower(domain) = lower(?)",
+        (id, current_user.workspace_id, active_domain),
     )
     return {"status": "deleted"}
 
@@ -1631,29 +1683,41 @@ async def delete_quarantine_item(id: str, current_user: AuthUser = Depends(get_c
     response_model=QuarantineWhitelistResponse,
     response_model_exclude_unset=True,
 )
-async def release_and_whitelist_item(id: str, current_user: AuthUser = Depends(get_current_user)):
+async def release_and_whitelist_item(
+    id: str,
+    domain: str,
+    current_user: AuthUser = Depends(get_current_user),
+):
+    active_domain = await _owned_domain(domain, current_user)
     rows = await async_query_auth_db(
         "SELECT * FROM app_quarantine_item WHERE id = ? AND workspace_id = ? "
-        "AND status IN ('held', 'released') LIMIT 1",
-        (id, current_user.workspace_id),
+        "AND lower(domain) = lower(?) AND status IN ('held', 'released') LIMIT 1",
+        (id, current_user.workspace_id, active_domain),
     )
     if not rows:
         raise HTTPException(status_code=404, detail="Quarantined item not found")
     item = rows[0]
-    result = await _release_quarantine_item(id=id, current_user=current_user)
+    result = await _release_quarantine_item(
+        id=id,
+        domain=active_domain,
+        current_user=current_user,
+    )
     sender = str(item["sender"]).strip().lower()
     existing = await async_query_auth_db(
-        "SELECT id FROM app_security_rule WHERE workspace_id = ? AND rule_type = 'whitelist' "
+        "SELECT id FROM app_security_rule WHERE workspace_id = ? "
+        "AND lower(domain) = lower(?) AND rule_type = 'whitelist' "
         "AND lower(pattern) = ? LIMIT 1",
-        (current_user.workspace_id, sender),
+        (current_user.workspace_id, active_domain, sender),
     )
     if not existing:
         await async_query_auth_db(
-            "INSERT INTO app_security_rule (id, workspace_id, rule_type, pattern, created_at) "
-            "VALUES (?, ?, 'whitelist', ?, ?)",
+            "INSERT INTO app_security_rule "
+            "(id, workspace_id, domain, rule_type, pattern, created_at) "
+            "VALUES (?, ?, ?, 'whitelist', ?, ?)",
             (
                 str(uuid.uuid4()),
                 current_user.workspace_id,
+                active_domain,
                 sender,
                 datetime.now(timezone.utc).isoformat(),
             ),
@@ -1662,24 +1726,35 @@ async def release_and_whitelist_item(id: str, current_user: AuthUser = Depends(g
 
 
 @router.get("/v1/alerts/preferences", response_model=AlertPreferenceResponse)
-async def get_alert_preferences(current_user: AuthUser = Depends(get_current_user)):
+async def get_alert_preferences(
+    domain: str,
+    current_user: AuthUser = Depends(get_current_user),
+):
+    active_domain = await _owned_domain(domain, current_user)
     rows = await async_query_auth_db(
-        "SELECT * FROM app_alert_preference WHERE workspace_id = ? LIMIT 1",
-        (current_user.workspace_id,),
+        "SELECT * FROM app_alert_preference WHERE workspace_id = ? "
+        "AND lower(domain) = lower(?) LIMIT 1",
+        (current_user.workspace_id, active_domain),
     )
     if not rows:
         await async_query_auth_db(
-            "INSERT INTO app_alert_preference (workspace_id, notify_phishing, notify_spam, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, timezone) VALUES (?, 1, 0, 0, '22:00', '07:00', 'Europe/Paris')",
-            (current_user.workspace_id,),
+            "INSERT INTO app_alert_preference "
+            "(workspace_id, domain, email_enabled, notify_phishing, notify_domain_shield, "
+            "quiet_hours_enabled, quiet_hours_start, quiet_hours_end, timezone) "
+            "VALUES (?, ?, 1, 1, 1, 0, '22:00', '07:00', 'Europe/Paris')",
+            (current_user.workspace_id, active_domain),
         )
         rows = await async_query_auth_db(
-            "SELECT * FROM app_alert_preference WHERE workspace_id = ? LIMIT 1",
-            (current_user.workspace_id,),
+            "SELECT * FROM app_alert_preference WHERE workspace_id = ? "
+            "AND lower(domain) = lower(?) LIMIT 1",
+            (current_user.workspace_id, active_domain),
         )
     r = rows[0]
     return {
+        "domain": active_domain,
+        "email_enabled": bool(r["email_enabled"]),
         "notify_phishing": bool(r["notify_phishing"]),
-        "notify_spam": bool(r["notify_spam"]),
+        "notify_domain_shield": bool(r["notify_domain_shield"]),
         "quiet_hours_enabled": bool(r["quiet_hours_enabled"]),
         "quiet_hours_start": r["quiet_hours_start"],
         "quiet_hours_end": r["quiet_hours_end"],
@@ -1689,16 +1764,21 @@ async def get_alert_preferences(current_user: AuthUser = Depends(get_current_use
 
 @router.put("/v1/alerts/preferences", response_model=StatusResponse)
 async def update_alert_preferences(
-    payload: AlertPreferenceUpdate, current_user: AuthUser = Depends(get_current_user)
+    payload: AlertPreferenceUpdate,
+    domain: str,
+    current_user: AuthUser = Depends(get_current_user),
 ):
+    active_domain = await _owned_domain(domain, current_user)
     await async_query_auth_db(
         """
         INSERT INTO app_alert_preference
-        (workspace_id, notify_phishing, notify_spam, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, timezone)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(workspace_id) DO UPDATE SET
+        (workspace_id, domain, email_enabled, notify_phishing, notify_domain_shield,
+         quiet_hours_enabled, quiet_hours_start, quiet_hours_end, timezone)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(workspace_id, domain) DO UPDATE SET
+            email_enabled=excluded.email_enabled,
             notify_phishing=excluded.notify_phishing,
-            notify_spam=excluded.notify_spam,
+            notify_domain_shield=excluded.notify_domain_shield,
             quiet_hours_enabled=excluded.quiet_hours_enabled,
             quiet_hours_start=excluded.quiet_hours_start,
             quiet_hours_end=excluded.quiet_hours_end,
@@ -1706,8 +1786,10 @@ async def update_alert_preferences(
         """,
         (
             current_user.workspace_id,
+            active_domain,
+            1 if payload.email_enabled else 0,
             1 if payload.notify_phishing else 0,
-            1 if payload.notify_spam else 0,
+            1 if payload.notify_domain_shield else 0,
             1 if payload.quiet_hours_enabled else 0,
             payload.quiet_hours_start,
             payload.quiet_hours_end,
@@ -1718,14 +1800,17 @@ async def update_alert_preferences(
 
 
 @router.get("/v1/alerts/rules", response_model=list[SecurityRuleResponse])
-async def list_security_rules(current_user: AuthUser = Depends(get_current_user)):
+async def list_security_rules(domain: str, current_user: AuthUser = Depends(get_current_user)):
+    active_domain = await _owned_domain(domain, current_user)
     rows = await async_query_auth_db(
-        "SELECT * FROM app_security_rule WHERE workspace_id = ? ORDER BY created_at DESC",
-        (current_user.workspace_id,),
+        "SELECT * FROM app_security_rule WHERE workspace_id = ? "
+        "AND lower(domain) = lower(?) ORDER BY created_at DESC",
+        (current_user.workspace_id, active_domain),
     )
     return [
         {
             "id": r["id"],
+            "domain": active_domain,
             "rule_type": r["rule_type"],
             "pattern": r["pattern"],
             "created_at": r["created_at"],
@@ -1740,62 +1825,155 @@ async def list_security_rules(current_user: AuthUser = Depends(get_current_user)
     response_model_exclude_unset=True,
 )
 async def create_security_rule(
-    payload: SecurityRuleCreate, current_user: AuthUser = Depends(get_current_user)
+    payload: SecurityRuleCreate,
+    domain: str,
+    current_user: AuthUser = Depends(get_current_user),
 ):
+    active_domain = await _owned_domain(domain, current_user)
     rule_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat() + "Z"
     await async_query_auth_db(
-        "INSERT INTO app_security_rule (id, workspace_id, rule_type, pattern, created_at) VALUES (?, ?, ?, ?, ?)",
-        (rule_id, current_user.workspace_id, payload.rule_type, payload.pattern, now),
+        "INSERT INTO app_security_rule (id, workspace_id, domain, rule_type, pattern, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            rule_id,
+            current_user.workspace_id,
+            active_domain,
+            payload.rule_type,
+            payload.pattern,
+            now,
+        ),
     )
-    return {"id": rule_id, "rule_type": payload.rule_type, "pattern": payload.pattern}
+    return {
+        "id": rule_id,
+        "domain": active_domain,
+        "rule_type": payload.rule_type,
+        "pattern": payload.pattern,
+    }
 
 
 @router.delete("/v1/alerts/rules/{id}", response_model=StatusResponse)
-async def delete_security_rule(id: str, current_user: AuthUser = Depends(get_current_user)):
+async def delete_security_rule(
+    id: str,
+    domain: str,
+    current_user: AuthUser = Depends(get_current_user),
+):
+    active_domain = await _owned_domain(domain, current_user)
     rows = await async_query_auth_db(
-        "SELECT 1 FROM app_security_rule WHERE id = ? AND workspace_id = ? LIMIT 1",
-        (id, current_user.workspace_id),
+        "SELECT 1 FROM app_security_rule WHERE id = ? AND workspace_id = ? "
+        "AND lower(domain) = lower(?) LIMIT 1",
+        (id, current_user.workspace_id, active_domain),
     )
     if not rows:
         raise HTTPException(status_code=404, detail="Rule not found")
     await async_query_auth_db(
-        "DELETE FROM app_security_rule WHERE id = ? AND workspace_id = ?",
-        (id, current_user.workspace_id),
+        "DELETE FROM app_security_rule WHERE id = ? AND workspace_id = ? "
+        "AND lower(domain) = lower(?)",
+        (id, current_user.workspace_id, active_domain),
     )
     return {"status": "deleted"}
 
 
 @router.get("/v1/alerts/history", response_model=list[AlertHistoryResponse])
-async def list_alert_history(current_user: AuthUser = Depends(get_current_user)):
+async def list_alert_history(domain: str, current_user: AuthUser = Depends(get_current_user)):
+    active_domain = await _owned_domain(domain, current_user)
     rows = await async_query_auth_db(
-        "SELECT * FROM app_alert_history WHERE workspace_id = ? AND is_dismissed = 0 ORDER BY created_at DESC LIMIT 50",
-        (current_user.workspace_id,),
+        "SELECT h.*, CASE WHEN r.alert_id IS NULL THEN 0 ELSE 1 END AS is_read "
+        "FROM app_alert_history h LEFT JOIN app_alert_read r "
+        "ON r.alert_id = h.id AND r.auth_user_id = ? "
+        "WHERE h.workspace_id = ? AND lower(h.domain) = lower(?) "
+        "AND h.is_dismissed = 0 ORDER BY h.created_at DESC",
+        (current_user.id, current_user.workspace_id, active_domain),
     )
     return [
         {
             "id": r["id"],
+            "domain": active_domain,
+            "event_type": r.get("event_type") or "system",
+            "action_page": r.get("action_page"),
             "title": r["title"],
             "message": r["message"],
             "created_at": r["created_at"],
+            "is_read": bool(r["is_read"]),
         }
         for r in rows
     ]
 
 
 @router.post("/v1/alerts/history/{id}/dismiss", response_model=StatusResponse)
-async def dismiss_alert(id: str, current_user: AuthUser = Depends(get_current_user)):
+async def dismiss_alert(
+    id: str,
+    domain: str,
+    current_user: AuthUser = Depends(get_current_user),
+):
+    active_domain = await _owned_domain(domain, current_user)
     rows = await async_query_auth_db(
-        "SELECT 1 FROM app_alert_history WHERE id = ? AND workspace_id = ? LIMIT 1",
-        (id, current_user.workspace_id),
+        "SELECT 1 FROM app_alert_history WHERE id = ? AND workspace_id = ? "
+        "AND lower(domain) = lower(?) LIMIT 1",
+        (id, current_user.workspace_id, active_domain),
     )
     if not rows:
         raise HTTPException(status_code=404, detail="Alert not found")
     await async_query_auth_db(
-        "UPDATE app_alert_history SET is_dismissed = 1 WHERE id = ? AND workspace_id = ?",
-        (id, current_user.workspace_id),
+        "UPDATE app_alert_history SET is_dismissed = 1 WHERE id = ? AND workspace_id = ? "
+        "AND lower(domain) = lower(?)",
+        (id, current_user.workspace_id, active_domain),
     )
     return {"status": "dismissed"}
+
+
+@router.post("/v1/alerts/history/{id}/read", response_model=StatusResponse)
+async def mark_alert_read(
+    id: str,
+    domain: str,
+    current_user: AuthUser = Depends(get_current_user),
+):
+    """Mark one owned, domain-scoped notification as read for this member."""
+    active_domain = await _owned_domain(domain, current_user)
+    rows = await async_query_auth_db(
+        "SELECT 1 FROM app_alert_history WHERE id = ? AND workspace_id = ? "
+        "AND lower(domain) = lower(?) AND is_dismissed = 0 LIMIT 1",
+        (id, current_user.workspace_id, active_domain),
+    )
+    if not rows:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    await async_query_auth_db(
+        "INSERT INTO app_alert_read "
+        "(workspace_id, domain, auth_user_id, alert_id, read_at) VALUES (?, ?, ?, ?, ?) "
+        "ON CONFLICT(auth_user_id, alert_id) DO NOTHING",
+        (
+            current_user.workspace_id,
+            active_domain,
+            current_user.id,
+            id,
+            datetime.now(timezone.utc).isoformat(),
+        ),
+    )
+    return {"status": "read"}
+
+
+@router.post("/v1/alerts/history/read", response_model=StatusResponse)
+async def mark_domain_alerts_read(
+    domain: str,
+    current_user: AuthUser = Depends(get_current_user),
+):
+    active_domain = await _owned_domain(domain, current_user)
+    now = datetime.now(timezone.utc).isoformat()
+    await async_query_auth_db(
+        "INSERT INTO app_alert_read (workspace_id, domain, auth_user_id, alert_id, read_at) "
+        "SELECT ?, ?, ?, id, ? FROM app_alert_history "
+        "WHERE workspace_id = ? AND lower(domain) = lower(?) AND is_dismissed = 0 "
+        "ON CONFLICT(auth_user_id, alert_id) DO NOTHING",
+        (
+            current_user.workspace_id,
+            active_domain,
+            current_user.id,
+            now,
+            current_user.workspace_id,
+            active_domain,
+        ),
+    )
+    return {"status": "read"}
 
 
 @router.get(
@@ -1928,7 +2106,8 @@ async def check_domain_shield_status(
     # Run dynamic blacklist check
     settings = get_settings()
     blacklists_listed, blacklist_errors = await _check_domain_blacklists(
-        domain, dqs_key=settings.spamhaus_dqs_key,
+        domain,
+        dqs_key=settings.spamhaus_dqs_key,
     )
     blacklist_error = "; ".join(blacklist_errors) or None
 
@@ -2177,8 +2356,9 @@ async def check_domain_shield_status(
 
     # Check current active record in history
     hist_rows = await async_query_auth_db(
-        "SELECT * FROM app_domain_shield_history WHERE domain = ? AND is_current = 1 LIMIT 1",
-        (domain,),
+        "SELECT * FROM app_domain_shield_history WHERE workspace_id = ? "
+        "AND lower(domain) = lower(?) AND is_current = 1 LIMIT 1",
+        (current_user.workspace_id, domain),
     )
 
     has_changed = True
@@ -2215,24 +2395,50 @@ async def check_domain_shield_status(
                 else "Utilisateur"
             )
 
-            from core.loops import send_loops_transactional
-
-            await send_loops_transactional(
-                email=current_user.email,
-                transactional_id=settings.loops_dns_shield_alert_transaction_id,
-                data_variables={
-                    "firstName": first_name,
-                    "domainName": domain,
-                    "dnsAnomalyDetails": anomaly_details,
-                    "domainShieldUrl": f"{settings.public_api_url or 'http://localhost:5173'}/",
-                },
+            await async_query_auth_db(
+                "INSERT INTO app_alert_history "
+                "(id, workspace_id, domain, event_type, action_page, title, message, "
+                "is_dismissed, created_at) "
+                "VALUES (?, ?, ?, 'domain_shield', 'domain-shield', ?, ?, 0, ?)",
+                (
+                    str(uuid.uuid4()),
+                    current_user.workspace_id,
+                    domain.lower(),
+                    "Protection du domaine dégradée",
+                    f"Le score de {domain} est passé de {h['reputation_score']} à "
+                    f"{status['reputation_score']}.",
+                    now_str,
+                ),
             )
+            preference_rows = await async_query_auth_db(
+                "SELECT * FROM app_alert_preference WHERE workspace_id = ? "
+                "AND lower(domain) = lower(?) LIMIT 1",
+                (current_user.workspace_id, domain),
+            )
+            if notification_is_allowed(
+                preference_rows[0] if preference_rows else None,
+                datetime.now(timezone.utc),
+                "domain_shield",
+            ):
+                from core.loops import send_loops_transactional
+
+                await send_loops_transactional(
+                    email=current_user.email,
+                    transactional_id=settings.loops_dns_shield_alert_transaction_id,
+                    data_variables={
+                        "firstName": first_name,
+                        "domainName": domain,
+                        "dnsAnomalyDetails": anomaly_details,
+                        "domainShieldUrl": f"{settings.public_api_url or 'http://localhost:5173'}/",
+                    },
+                )
 
     if has_changed:
         # Close previous active record
         await async_query_auth_db(
-            "UPDATE app_domain_shield_history SET is_current = 0, end_date = ? WHERE domain = ? AND is_current = 1",
-            (now_str, domain),
+            "UPDATE app_domain_shield_history SET is_current = 0, end_date = ? "
+            "WHERE workspace_id = ? AND lower(domain) = lower(?) AND is_current = 1",
+            (now_str, current_user.workspace_id, domain),
         )
         # Create new history entry
         new_hist_id = str(uuid.uuid4())

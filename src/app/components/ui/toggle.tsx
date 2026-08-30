@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useId } from "react";
 import { clsx } from "clsx";
 
 interface ToggleProps {
@@ -18,6 +18,8 @@ export function Toggle({
   description,
   className,
 }: ToggleProps) {
+  const labelId = useId();
+  const descriptionId = useId();
   const handleToggle = () => {
     if (!disabled) {
       onChange(!checked);
@@ -29,12 +31,12 @@ export function Toggle({
       {(label || description) && (
         <div className="flex flex-col gap-0.5">
           {label && (
-            <span className="text-body-md font-semibold text-on-surface select-none">
+            <span id={labelId} className="text-body-md font-semibold text-on-surface select-none">
               {label}
             </span>
           )}
           {description && (
-            <span className="text-body-sm text-on-surface-variant/70 select-none">
+            <span id={descriptionId} className="text-body-sm text-on-surface-variant/70 select-none">
               {description}
             </span>
           )}
@@ -44,6 +46,8 @@ export function Toggle({
         type="button"
         role="switch"
         aria-checked={checked}
+        aria-labelledby={label ? labelId : undefined}
+        aria-describedby={description ? descriptionId : undefined}
         disabled={disabled}
         onClick={handleToggle}
         className={clsx(

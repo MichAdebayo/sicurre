@@ -243,7 +243,7 @@ async def test_kpis_aggregate_each_class_for_current_workspace(
     """KPI totals preserve all three model classes and quarantine aliases."""
     captured_sql = ""
 
-    async def threat_count(_: str) -> int:
+    async def threat_count(_: str, _domain: str | None = None) -> int:
         return 10
 
     async def query(sql: str, *_: object, **__: object) -> list[dict]:
@@ -261,7 +261,11 @@ async def test_kpis_aggregate_each_class_for_current_workspace(
     monkeypatch.setattr(app_routes, "_workspace_threat_count", threat_count)
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
 
-    result = await app_routes.get_kpis(object(), USER)  # type: ignore[arg-type]
+    async def allow_domain(_domain: str, _workspace_id: str) -> None:
+        return None
+
+    monkeypatch.setattr(app_routes, "_require_workspace_domain", allow_domain)
+    result = await app_routes.get_kpis("example.test", object(), USER)  # type: ignore[arg-type]
 
     assert result["raw_records_count"] == 10
     assert result["threats_phishing_count"] == 3
@@ -313,7 +317,12 @@ async def test_threat_list_masks_non_threat_content(
 
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
 
-    result = await app_routes.get_threats(USER)
+    async def allow_domain(_domain: str, _workspace_id: str) -> None:
+        return None
+
+    monkeypatch.setattr(app_routes, "_require_workspace_domain", allow_domain)
+
+    result = await app_routes.get_threats("example.test", USER)
 
     assert result["items"][0]["subject"] == "[Masqué par Sicurre]"
     assert result["items"][0]["status"] == "active"
