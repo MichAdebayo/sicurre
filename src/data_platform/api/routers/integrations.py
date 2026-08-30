@@ -20,6 +20,7 @@ Integrations router — two responsibilities:
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -434,12 +435,36 @@ async def scan_email(
     legacy_event_id = (
         str(uuid5(NAMESPACE_URL, f"{workspace_id}:{message_id}")) if message_id else event_id
     )
-    existing_quarantine = await _timed_query(
-        "SELECT id, message_id, safety_verdict, composite_score FROM app_quarantine_item "
-        "WHERE workspace_id = ? AND lower(domain) = lower(?) "
-        "AND message_id IN (?, ?) LIMIT 1",
-        (workspace_id, integration.get("zone_name") or "", event_id, legacy_event_id),
-    )
+    # These three reads depend only on the integration row resolved above, not on
+    # each other, and all are side-effect-free SELECTs. Run them concurrently:
+    # serially they were four round-trips to Neon at ~115 ms each, which measured
+    # 458 ms — 23% of a 2.0 s scan against a 2.0 s objective.
+    #
+    # The dedup guards below still short-circuit in their original order. The only
+    # difference is that a replayed message now also fetches rules it will not use,
+    # which costs nothing in wall-clock because the fetch already overlapped.
+    zone_name = integration.get("zone_name") or ""
+    with observe_stage("database"):
+        existing_quarantine, existing_event, rules = await asyncio.gather(
+            _async_query(
+                "SELECT id, message_id, safety_verdict, composite_score FROM app_quarantine_item "
+                "WHERE workspace_id = ? AND lower(domain) = lower(?) "
+                "AND message_id IN (?, ?) LIMIT 1",
+                (workspace_id, zone_name, event_id, legacy_event_id),
+            ),
+            _async_query(
+                "SELECT id, safety_verdict, label_verdict, composite_score, explanation, latency_ms "
+                "FROM app_inference_event WHERE id IN (?, ?) AND workspace_id = ? "
+                "AND lower(domain) = lower(?) LIMIT 1",
+                (event_id, legacy_event_id, workspace_id, zone_name),
+            ),
+            _async_query(
+                "SELECT rule_type, pattern FROM app_security_rule WHERE workspace_id = ? "
+                "AND lower(domain) = lower(?)",
+                (workspace_id, zone_name),
+            ),
+        )
+
     if existing_quarantine:
         held = existing_quarantine[0]
         return EmailScanResponse(
@@ -450,12 +475,6 @@ async def scan_email(
             explanation="Existing idempotent quarantine decision.",
             quarantine_id=str(held["id"]),
         )
-    existing_event = await _timed_query(
-        "SELECT id, safety_verdict, label_verdict, composite_score, explanation, latency_ms "
-        "FROM app_inference_event WHERE id IN (?, ?) AND workspace_id = ? "
-        "AND lower(domain) = lower(?) LIMIT 1",
-        (event_id, legacy_event_id, workspace_id, integration.get("zone_name") or ""),
-    )
     if existing_event:
         event = existing_event[0]
         return EmailScanResponse(
@@ -468,12 +487,6 @@ async def scan_email(
         )
 
     # ── Check Whitelist / Blocklist Rules ──────────────────────────────────
-    rules = await _timed_query(
-        "SELECT rule_type, pattern FROM app_security_rule WHERE workspace_id = ? "
-        "AND lower(domain) = lower(?)",
-        (workspace_id, integration.get("zone_name") or ""),
-    )
-
     matched_rule_type = None
     sender_lower = payload.sender.lower()
 
