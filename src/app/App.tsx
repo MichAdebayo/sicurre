@@ -17,18 +17,31 @@ import { parseVerificationCallback } from "./lib/email-verification";
 import { applyTheme, getStoredTheme } from "./lib/theme";
 import { ActiveDomainProvider } from "./contexts/active-domain";
 import { buildDocumentTitle, type DocumentTitleView } from "./lib/document-title";
+import { PageLoading } from "./components/common/page-loading";
+import { DomainPageBoundary } from "./components/common/domain-page-boundary";
+
+const pageLoaders = {
+  dashboard: () => import("./routes/dashboard"),
+  threats: () => import("./routes/threats"),
+  logs: () => import("./routes/logs"),
+  settings: () => import("./routes/settings"),
+  support: () => import("./routes/support"),
+  quarantine: () => import("./routes/quarantine"),
+  alerts: () => import("./routes/alerts"),
+  "domain-shield": () => import("./routes/domain-shield"),
+};
 
 const LandingRoute = lazy(() => import("./routes/landing"));
 const LoginRoute = lazy(() => import("./routes/login"));
 const VerifyEmailRoute = lazy(() => import("./routes/verify-email"));
-const DashboardRoute = lazy(() => import("./routes/dashboard"));
-const ThreatsRoute = lazy(() => import("./routes/threats"));
-const LogsRoute = lazy(() => import("./routes/logs"));
-const SettingsRoute = lazy(() => import("./routes/settings"));
-const SupportRoute = lazy(() => import("./routes/support"));
-const QuarantineRoute = lazy(() => import("./routes/quarantine"));
-const AlertsRoute = lazy(() => import("./routes/alerts"));
-const DomainShieldRoute = lazy(() => import("./routes/domain-shield"));
+const DashboardRoute = lazy(pageLoaders.dashboard);
+const ThreatsRoute = lazy(pageLoaders.threats);
+const LogsRoute = lazy(pageLoaders.logs);
+const SettingsRoute = lazy(pageLoaders.settings);
+const SupportRoute = lazy(pageLoaders.support);
+const QuarantineRoute = lazy(pageLoaders.quarantine);
+const AlertsRoute = lazy(pageLoaders.alerts);
+const DomainShieldRoute = lazy(pageLoaders["domain-shield"]);
 const MentionsLegalesRoute = lazy(() => import("./routes/mentions-legales"));
 const ConfidentialiteRoute = lazy(() => import("./routes/confidentialite"));
 const ContactRoute = lazy(() => import("./routes/contact"));
@@ -111,17 +124,8 @@ const getInitialViewState = (): ViewState => {
 function RouteFallback() {
   const { t } = useTranslation();
   return (
-    <div className="min-h-screen w-screen flex items-center justify-center bg-surface-low text-on-surface">
+    <div role="status" className="min-h-screen w-full flex items-center justify-center bg-surface-low text-on-surface">
       <div className="text-sm font-semibold">{t("common.loading")}</div>
-    </div>
-  );
-}
-
-function PageRouteFallback() {
-  const { t } = useTranslation();
-  return (
-    <div className="flex min-h-48 items-center justify-center text-sm font-semibold text-on-surface-variant">
-      {t("common.loading")}
     </div>
   );
 }
@@ -155,6 +159,14 @@ function AppContent() {
   const sessionQuery = useCurrentSession(sessionLookupEnabled);
   const logoutMutation = useLogout();
   const session = sessionQuery.data;
+
+  useEffect(() => {
+    if (!session && !getSidebarPageFromPath(window.location.pathname)) return;
+    // Fetch code alongside session validation, without rendering protected content.
+    void pageLoaders[activePage]().catch(() => {
+      // A failed speculative fetch must not interrupt authentication.
+    });
+  }, [activePage, session]);
 
   const titleView: DocumentTitleView = session && hasStoredSession
     ? activePage
@@ -255,12 +267,8 @@ function AppContent() {
     }
   };
 
-  if (sessionQuery.isLoading) {
-    return (
-      <div className="min-h-screen w-screen flex items-center justify-center bg-surface-low text-on-surface">
-        <div className="text-sm font-semibold">Chargement de votre session…</div>
-      </div>
-    );
+  if (sessionQuery.isLoading || (sessionLookupEnabled && session && !hasStoredSession)) {
+    return <RouteFallback />;
   }
 
   if (!hasStoredSession || !session) {
@@ -311,7 +319,7 @@ function AppContent() {
   };
 
   return (
-    <ActiveDomainProvider workspaceId={session.workspace_id}>
+    <ActiveDomainProvider key={session.workspace_id} workspaceId={session.workspace_id}>
     <AppShell
       currentPage={activePage}
       onPageChange={(page) => {
@@ -331,17 +339,22 @@ function AppContent() {
       threatCount={session.threat_count}
       hasIntegration={session.has_cloudflare_integration}
     >
-      <Suspense fallback={<PageRouteFallback />}>
-          {activePage === "dashboard" && !session.is_platform_admin && <DashboardRoute session={session} onGoToSettings={handleGoToSettings} />}
-          {activePage === "threats" && !session.is_platform_admin && (
-            <ThreatsRoute />
-          )}
-          {activePage === "quarantine" && !session.is_platform_admin && <QuarantineRoute />}
-          {activePage === "alerts" && !session.is_platform_admin && <AlertsRoute />}
-          {activePage === "domain-shield" && !session.is_platform_admin && <DomainShieldRoute session={session} />}
-          {activePage === "logs" && session.is_platform_admin && <LogsRoute />}
-          {activePage === "settings" && <SettingsRoute session={session} initialTab={settingsTab} />}
-          {activePage === "support" && <SupportRoute session={session} />}
+      <Suspense fallback={<PageLoading />}>
+        {!session.is_platform_admin && !["settings", "support"].includes(activePage) ? (
+          <DomainPageBoundary>
+            {activePage === "dashboard" && <DashboardRoute session={session} onGoToSettings={handleGoToSettings} />}
+            {activePage === "threats" && <ThreatsRoute />}
+            {activePage === "quarantine" && <QuarantineRoute />}
+            {activePage === "alerts" && <AlertsRoute />}
+            {activePage === "domain-shield" && <DomainShieldRoute session={session} />}
+          </DomainPageBoundary>
+        ) : (
+          <>
+            {activePage === "logs" && session.is_platform_admin && <LogsRoute />}
+            {activePage === "settings" && <SettingsRoute session={session} initialTab={settingsTab} />}
+            {activePage === "support" && <SupportRoute session={session} />}
+          </>
+        )}
       </Suspense>
     </AppShell>
     </ActiveDomainProvider>

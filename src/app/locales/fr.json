@@ -14,6 +14,7 @@
     "alerts": "Alertes & Règles",
     "domain_shield": "Domain Shield",
     "load_error": "Impossible de charger ces données.",
+    "domains_load_error": "Impossible de charger vos domaines.",
     "retry": "Réessayer",
     "previous": "Précédent",
     "next": "Suivant",

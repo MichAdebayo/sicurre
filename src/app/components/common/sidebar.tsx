@@ -125,7 +125,8 @@ export function Sidebar({
 }: SidebarProps) {
   const { t } = useTranslation();
   const [theme, setTheme] = useTheme();
-  const { domains, activeDomain, activeIntegration, setActiveDomain } = useActiveDomain();
+  const { domains, activeDomain, activeIntegration, setActiveDomain, isLoading, isError } = useActiveDomain();
+  const domainUnavailable = isLoading || isError;
   const { data: domainKpis } = useKPIStats(workspaceId, activeDomain);
 
   const [collapsed, setCollapsed] = useState(
@@ -141,7 +142,7 @@ export function Sidebar({
   // be describing something they do not have.
   const isCustomerWorkspace = userRole !== "admin";
   const isProtected = activeIntegration?.status === "active" && !onboardingRequired;
-  const statusLabel = isProtected
+  const statusLabel = isLoading ? t("common.loading") : isError ? t("common.domains_load_error") : isProtected
     ? t("sidebar.status_protected")
     : t("sidebar.status_setup_required");
 
@@ -228,7 +229,7 @@ export function Sidebar({
                 aria-hidden="true"
                 className={clsx(
                   "h-2.5 w-2.5 rounded-full motion-safe:animate-pulse",
-                  isProtected ? "bg-safe" : "bg-warning",
+                  domainUnavailable ? "bg-on-surface-variant" : isProtected ? "bg-safe" : "bg-warning",
                 )}
               />
             </div>
@@ -242,7 +243,11 @@ export function Sidebar({
                   {userName || workspaceName}
                 </span>
               </div>
-              {domains.length > 1 ? (
+              {domainUnavailable ? (
+                <p className="mt-2 text-xs text-on-surface-variant" role={isLoading ? "status" : undefined}>
+                  {statusLabel}
+                </p>
+              ) : domains.length > 1 ? (
                 <select
                   value={activeDomain}
                   onChange={(event) => setActiveDomain(event.target.value)}
@@ -260,7 +265,7 @@ export function Sidebar({
                   {activeDomain || t("sidebar.no_domain")}
                 </p>
               )}
-              <p className="mt-1.5 flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant tabular-nums">
+              {!domainUnavailable && <p className="mt-1.5 flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant tabular-nums">
                 <span className="relative flex h-2 w-2 shrink-0" aria-hidden="true">
                   <span
                     className={clsx(
@@ -277,7 +282,7 @@ export function Sidebar({
                 </span>
                 <span className={isProtected ? "text-safe" : "text-warning"}>{statusLabel}</span>
                 {domainKpis && ` · ${t("sidebar.emails_analysed", { count: domainKpis.raw_records_count })}`}
-              </p>
+              </p>}
             </div>
           )}
         </div>
