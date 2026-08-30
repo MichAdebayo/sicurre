@@ -99,6 +99,20 @@ describe("application navigation", () => {
     expect(screen.queryByRole("button", { name: "common.close_navigation" })).not.toBeInTheDocument();
   });
 
+  it("keeps page scrolling inside the shell without a horizontal axis", () => {
+    const { container } = render(
+      <AppShell currentPage="dashboard" onPageChange={vi.fn()} onLogout={vi.fn()}>
+        <p>Dashboard content</p>
+      </AppShell>,
+    );
+
+    expect(container.firstElementChild).toHaveClass("w-full", "overflow-hidden");
+    expect(container.querySelector("main.app-readable")).toHaveClass(
+      "overflow-x-hidden",
+      "overflow-y-auto",
+    );
+  });
+
   it("exposes one clear mobile navigation close control", () => {
     render(
       <AppShell currentPage="dashboard" onPageChange={vi.fn()} onLogout={vi.fn()}>
