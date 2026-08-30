@@ -49,7 +49,7 @@ export function AppShell({
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background text-on-surface">
+    <div className="flex h-screen w-full overflow-hidden bg-background text-on-surface">
       <Sidebar
         currentPage={currentPage}
         onPageChange={changePage}
@@ -120,7 +120,7 @@ export function AppShell({
           </div>
 
           {/* Page Content */}
-          <main className="app-readable flex-1 overflow-y-auto px-4 pb-6 pt-5 md:pl-8 md:pr-12 md:pt-8">
+          <main className="app-readable flex-1 overflow-x-hidden overflow-y-auto px-4 pb-6 pt-5 md:pl-8 md:pr-12 md:pt-8">
             {children}
           </main>
         </div>
