@@ -121,3 +121,105 @@ def test_keepalive_survives_a_failing_ping() -> None:
         assert calls["n"] >= 2, "loop stopped after a failing ping"
     finally:
         db_keepalive._ping_once = original  # type: ignore[assignment]
+
+
+def test_ping_issues_one_trivial_statement() -> None:
+    """The warm-up must stay a single cheap statement, not a health check."""
+    import asyncio
+
+    from core import db_keepalive
+
+    executed: list[str] = []
+
+    class _Conn:
+        async def __aenter__(self) -> "_Conn":
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+        async def execute(self, statement: object) -> None:
+            executed.append(str(statement))
+
+    class _Engine:
+        def connect(self) -> "_Conn":
+            return _Conn()
+
+    original = db_keepalive.get_app_engine
+    db_keepalive.get_app_engine = lambda: _Engine()  # type: ignore[assignment]
+    try:
+        asyncio.run(db_keepalive._ping_once())
+    finally:
+        db_keepalive.get_app_engine = original  # type: ignore[assignment]
+
+    assert executed == ["SELECT 1"]
+
+
+def test_keepalive_pings_repeatedly_while_healthy() -> None:
+    """The loop must keep warming, not ping once and fall through."""
+    import asyncio
+
+    from core import db_keepalive
+
+    calls = {"n": 0}
+
+    async def ok() -> None:
+        calls["n"] += 1
+
+    original = db_keepalive._ping_once
+    db_keepalive._ping_once = ok  # type: ignore[assignment]
+    try:
+        async def drive() -> None:
+            task = asyncio.create_task(db_keepalive.run_db_keepalive(interval_seconds=0.01))
+            await asyncio.sleep(0.05)
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+        asyncio.run(drive())
+    finally:
+        db_keepalive._ping_once = original  # type: ignore[assignment]
+
+    assert calls["n"] >= 2
+
+
+def test_lifespan_starts_and_stops_the_keepalive() -> None:
+    """A background task that outlives the app would leak a connection."""
+    import asyncio
+
+    from data_platform.api import main as api_main
+
+    started: list[str] = []
+
+    async def fake_keepalive() -> None:
+        started.append("running")
+        try:
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            started.append("cancelled")
+            raise
+
+    class _S:
+        environment = "test"
+        scheduler_enabled = False
+
+    orig_settings = api_main.get_settings
+    orig_enabled = api_main.keepalive_enabled
+    orig_run = api_main.run_db_keepalive
+    api_main.get_settings = lambda: _S()  # type: ignore[assignment]
+    api_main.keepalive_enabled = lambda: True  # type: ignore[assignment]
+    api_main.run_db_keepalive = fake_keepalive  # type: ignore[assignment]
+    try:
+        async def drive() -> None:
+            async with api_main.lifespan(None):  # type: ignore[arg-type]
+                await asyncio.sleep(0.02)
+
+        asyncio.run(drive())
+    finally:
+        api_main.get_settings = orig_settings  # type: ignore[assignment]
+        api_main.keepalive_enabled = orig_enabled  # type: ignore[assignment]
+        api_main.run_db_keepalive = orig_run  # type: ignore[assignment]
+
+    assert started == ["running", "cancelled"]
