@@ -74,3 +74,50 @@ def test_closed_inference_client_is_replaced() -> None:
     assert second is not first
     assert not second.is_closed
     asyncio.run(close_inference_client())
+
+
+def test_keepalive_only_runs_for_a_remote_database() -> None:
+    """Local SQLite has no connection to keep warm, and no compute to wake."""
+    from core import db_keepalive
+
+    class _S:
+        database_url = "sqlite+aiosqlite:///./local.db"
+
+    original = db_keepalive.get_settings
+    db_keepalive.get_settings = lambda: _S()  # type: ignore[assignment]
+    try:
+        assert db_keepalive.keepalive_enabled() is False
+        _S.database_url = "postgresql+psycopg://user@host/db"
+        assert db_keepalive.keepalive_enabled() is True
+    finally:
+        db_keepalive.get_settings = original  # type: ignore[assignment]
+
+
+def test_keepalive_survives_a_failing_ping() -> None:
+    """Warmth is an optimisation; a failed ping must not end the loop."""
+    import asyncio
+
+    from core import db_keepalive
+
+    calls = {"n": 0}
+
+    async def flaky() -> None:
+        calls["n"] += 1
+        raise RuntimeError("connection reset")
+
+    original = db_keepalive._ping_once
+    db_keepalive._ping_once = flaky  # type: ignore[assignment]
+    try:
+        async def drive() -> None:
+            task = asyncio.create_task(db_keepalive.run_db_keepalive(interval_seconds=0.01))
+            await asyncio.sleep(0.05)
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+        asyncio.run(drive())
+        assert calls["n"] >= 2, "loop stopped after a failing ping"
+    finally:
+        db_keepalive._ping_once = original  # type: ignore[assignment]
