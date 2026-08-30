@@ -8,6 +8,8 @@ import { AppShell } from "../../../src/app/components/common/app-shell";
 import { AppToast } from "../../../src/app/components/common/app-toast";
 import { Sidebar } from "../../../src/app/components/common/sidebar";
 
+const domainState = vi.hoisted(() => ({ isLoading: false, isError: false }));
+
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: "fr" } }),
 }));
@@ -18,7 +20,7 @@ vi.mock("../../../src/app/contexts/active-domain", () => ({
     activeDomain: "vinse.app",
     activeIntegration: { id: "domain-1", zone_name: "vinse.app", status: "active" },
     setActiveDomain: vi.fn(),
-    isLoading: false,
+    ...domainState,
   }),
 }));
 
@@ -35,12 +37,23 @@ vi.mock("../../../src/app/lib/api", () => ({
 }));
 
 afterEach(() => {
+  domainState.isLoading = false;
+  domainState.isError = false;
   cleanup();
   localStorage.clear();
   vi.restoreAllMocks();
 });
 
 describe("application navigation", () => {
+  it.each(["isLoading", "isError"] as const)("does not claim missing protection during %s", (state) => {
+    domainState[state] = true;
+    render(<Sidebar currentPage="domain-shield" onPageChange={vi.fn()} onLogout={vi.fn()} workspaceName="Workspace" userRole="owner" />);
+    expect(screen.queryByText("sidebar.no_domain")).not.toBeInTheDocument();
+    expect(screen.queryByText("sidebar.status_setup_required")).not.toBeInTheDocument();
+    expect(screen.queryByText("sidebar.status_protected")).not.toBeInTheDocument();
+    expect(screen.getByText(state === "isLoading" ? "common.loading" : "common.domains_load_error")).toBeVisible();
+  });
+
   it("locks customer destinations until Cloudflare onboarding is complete", () => {
     const onPageChange = vi.fn();
     render(

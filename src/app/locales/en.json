@@ -15,6 +15,7 @@
     "domain_shield": "Domain Shield",
     "load_error": "These data could not be loaded.",
     "retry": "Try again",
+    "domains_load_error": "Unable to load your domains.",
     "previous": "Previous",
     "next": "Next",
     "open_navigation": "Open navigation",
