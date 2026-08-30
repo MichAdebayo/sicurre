@@ -46,6 +46,7 @@ from pydantic import BaseModel, Field
 from core.config import get_settings
 from core.loops import send_loops_transactional
 from core.rate_limit import limiter
+from core.inference_client import get_inference_client
 from core.scan_metrics import observe_scan, observe_stage
 from core.secret_cipher import decrypt_secret, encrypt_secret
 from data_platform.api.auth import AuthUser, ensure_runtime_tables, get_current_user
@@ -537,19 +538,21 @@ async def scan_email(
 
         try:
             with observe_stage("inference"):
-                async with httpx.AsyncClient(timeout=15.0) as client:
-                    resp = await client.post(
-                        inference_url,
-                        json={
-                            "subject": payload.subject,
-                            "sender": payload.sender,
-                            "text": payload.text,
-                            "use_llm": payload.use_llm,
-                            "use_virustotal": payload.use_virustotal,
-                            "mail_context": mail_context.as_payload(),
-                        },
-                        headers={"Authorization": f"Bearer {inference_key}"},
-                    )
+                # Shared, long-lived client: opening one per request paid a TLS
+                # handshake to the inference host on every email.
+                client = get_inference_client()
+                resp = await client.post(
+                    inference_url,
+                    json={
+                        "subject": payload.subject,
+                        "sender": payload.sender,
+                        "text": payload.text,
+                        "use_llm": payload.use_llm,
+                        "use_virustotal": payload.use_virustotal,
+                        "mail_context": mail_context.as_payload(),
+                    },
+                    headers={"Authorization": f"Bearer {inference_key}"},
+                )
             resp.raise_for_status()
             result = resp.json()
 
