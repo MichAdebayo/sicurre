@@ -99,7 +99,7 @@ describe("application navigation", () => {
     expect(screen.queryByRole("button", { name: "common.close_navigation" })).not.toBeInTheDocument();
   });
 
-  it("closes mobile navigation from both the backdrop and close control", () => {
+  it("exposes one clear mobile navigation close control", () => {
     render(
       <AppShell currentPage="dashboard" onPageChange={vi.fn()} onLogout={vi.fn()}>
         <p>Dashboard content</p>
@@ -107,12 +107,8 @@ describe("application navigation", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "common.open_navigation" }));
-    const closeButtons = screen.getAllByRole("button", { name: "common.close_navigation" });
-    fireEvent.click(closeButtons[0]);
-    expect(screen.queryByRole("button", { name: "common.close_navigation" })).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "common.open_navigation" }));
-    fireEvent.click(screen.getAllByRole("button", { name: "common.close_navigation" })[1]);
+    expect(screen.getAllByRole("button", { name: "common.close_navigation" })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "common.close_navigation" }));
     expect(screen.queryByRole("button", { name: "common.close_navigation" })).not.toBeInTheDocument();
   });
 
