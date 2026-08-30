@@ -33,6 +33,7 @@ from data_platform.api.routers.app_routes import (
     list_cloudflare_integrations,
     list_quarantine,
     list_security_rules,
+    mark_alert_read,
     release_and_whitelist_item,
     release_quarantine_item,
     update_alert_preferences,
@@ -74,6 +75,22 @@ PLATFORM_ADMIN = AuthUser(
     workspace_name="Sicurre",
     is_platform_admin=True,
 )
+DOMAIN_A = "workspace-one.test"
+
+
+@pytest.fixture(autouse=True)
+def _owned_domain(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) -> None:
+    """Keep endpoint tests focused on resource predicates after domain authorization."""
+    if request.node.name in {
+        "test_domain_shield_rejects_unconnected_domain",
+        "test_dmarc_reports_reject_foreign_domain",
+    }:
+        return
+
+    async def allow_domain(_domain: str, _workspace_id: str) -> None:
+        return None
+
+    monkeypatch.setattr(app_routes, "_require_workspace_domain", allow_domain)
 
 
 def _tracking_query(
@@ -141,7 +158,7 @@ async def test_threats_are_workspace_scoped(monkeypatch: pytest.MonkeyPatch) -> 
     )
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
 
-    result = await get_threats(USER_A)
+    result = await get_threats(DOMAIN_A, USER_A)
 
     assert result["items"] == [], "User A must not see threats belonging to workspace-2"
     assert result["total"] == 0
@@ -175,7 +192,7 @@ async def test_threat_filters_build_bounded_workspace_queries(
 
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
 
-    result = await get_threats(USER_A, page=0, page_size=500, **kwargs)
+    result = await get_threats(DOMAIN_A, USER_A, page=0, page_size=500, **kwargs)
 
     assert result["page"] == 1
     assert result["page_size"] == 100
@@ -193,11 +210,9 @@ async def test_threat_filters_build_bounded_workspace_queries(
         ({"date_range": "year"}, "Invalid date filter"),
     ],
 )
-async def test_threat_filters_reject_unknown_values(
-    kwargs: dict[str, str], detail: str
-) -> None:
+async def test_threat_filters_reject_unknown_values(kwargs: dict[str, str], detail: str) -> None:
     with pytest.raises(HTTPException) as exc_info:
-        await get_threats(USER_A, **kwargs)
+        await get_threats(DOMAIN_A, USER_A, **kwargs)
 
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == detail
@@ -216,7 +231,7 @@ async def test_threat_visibility_is_workspace_scoped(monkeypatch: pytest.MonkeyP
 
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
     result = await app_routes.update_threat_visibility(
-        app_routes.ThreatVisibilityUpdate(ids=["event-1"], hidden=True), USER_A
+        app_routes.ThreatVisibilityUpdate(ids=["event-1"], hidden=True), DOMAIN_A, USER_A
     )
 
     assert result == {"updated": 1, "hidden": True}
@@ -234,7 +249,7 @@ async def test_threat_visibility_rejects_foreign_rows(monkeypatch: pytest.Monkey
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
     with pytest.raises(app_routes.HTTPException) as exc_info:
         await app_routes.update_threat_visibility(
-            app_routes.ThreatVisibilityUpdate(ids=["foreign-event"], hidden=True), USER_A
+            app_routes.ThreatVisibilityUpdate(ids=["foreign-event"], hidden=True), DOMAIN_A, USER_A
         )
     assert exc_info.value.status_code == 404
 
@@ -260,7 +275,9 @@ async def test_threat_status_update_cannot_cross_workspaces(
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
 
     with pytest.raises(HTTPException) as exc_info:
-        await update_threat_status("threat-owned-by-b", StatusUpdate(status="trashed"), USER_A)
+        await update_threat_status(
+            "threat-owned-by-b", StatusUpdate(status="trashed"), DOMAIN_A, USER_A
+        )
 
     assert exc_info.value.status_code == 404
     # Verify workspace_id was in the WHERE clause
@@ -285,6 +302,7 @@ async def test_feedback_with_foreign_event_returns_404(
                 feedback_type="false_positive",
                 corrected_verdict="legitimate",
             ),
+            DOMAIN_A,
             USER_A,
         )
 
@@ -312,6 +330,7 @@ async def test_feedback_without_event_scopes_to_calling_workspace(
             feedback_type="false_negative",
             corrected_verdict="phishing",
         ),
+        DOMAIN_A,
         USER_A,
     )
 
@@ -349,7 +368,7 @@ async def test_quarantine_list_is_workspace_scoped(
     )
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
 
-    result = await list_quarantine(USER_A)
+    result = await list_quarantine(DOMAIN_A, USER_A)
 
     assert result == [], "User A must not see quarantine items from workspace-2"
 
@@ -363,7 +382,7 @@ async def test_quarantine_release_rejects_foreign_item(
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
 
     with pytest.raises(HTTPException) as exc_info:
-        await release_quarantine_item("q-owned-by-b", USER_A)
+        await release_quarantine_item("q-owned-by-b", DOMAIN_A, USER_A)
 
     assert exc_info.value.status_code == 404
     assert all("workspace_id" in sql.lower() for sql, _ in captured)
@@ -381,7 +400,7 @@ async def test_quarantine_delete_rejects_foreign_item(
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
 
     with pytest.raises(HTTPException) as exc_info:
-        await delete_quarantine_item("q-owned-by-b", USER_A)
+        await delete_quarantine_item("q-owned-by-b", DOMAIN_A, USER_A)
 
     assert exc_info.value.status_code == 404
     assert all("workspace_id" in sql.lower() for sql, _ in captured)
@@ -397,7 +416,7 @@ async def test_quarantine_whitelist_rejects_foreign_item(
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
 
     with pytest.raises(HTTPException) as exc_info:
-        await release_and_whitelist_item("q-owned-by-b", USER_A)
+        await release_and_whitelist_item("q-owned-by-b", DOMAIN_A, USER_A)
 
     assert exc_info.value.status_code == 404
     assert all("workspace_id" in sql.lower() for sql, _ in captured)
@@ -423,8 +442,10 @@ async def test_alert_preferences_read_is_workspace_scoped(
             return []  # no existing prefs → will insert default
         return [
             {
+                "domain": DOMAIN_A,
+                "email_enabled": 1,
                 "notify_phishing": 1,
-                "notify_spam": 0,
+                "notify_domain_shield": 1,
                 "quiet_hours_enabled": 0,
                 "quiet_hours_start": "22:00",
                 "quiet_hours_end": "07:00",
@@ -434,7 +455,7 @@ async def test_alert_preferences_read_is_workspace_scoped(
 
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
 
-    result = await get_alert_preferences(USER_A)
+    result = await get_alert_preferences(DOMAIN_A, USER_A)
 
     assert result["timezone"] == "Europe/Paris"
     # All queries must reference workspace-1, never workspace-2
@@ -458,13 +479,15 @@ async def test_alert_preferences_write_is_workspace_scoped(
 
     result = await update_alert_preferences(
         AlertPreferenceUpdate(
+            email_enabled=True,
             notify_phishing=True,
-            notify_spam=False,
+            notify_domain_shield=True,
             quiet_hours_enabled=False,
             quiet_hours_start="22:00",
             quiet_hours_end="07:00",
             timezone="Europe/Paris",
         ),
+        DOMAIN_A,
         USER_A,
     )
 
@@ -495,7 +518,7 @@ async def test_security_rules_list_is_workspace_scoped(
     )
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
 
-    result = await list_security_rules(USER_A)
+    result = await list_security_rules(DOMAIN_A, USER_A)
 
     assert result == [], "User A must not see rules from workspace-2"
 
@@ -515,6 +538,7 @@ async def test_security_rule_create_is_workspace_scoped(
 
     result = await create_security_rule(
         SecurityRuleCreate(rule_type="blocklist", pattern="phish@evil.test"),
+        DOMAIN_A,
         USER_A,
     )
 
@@ -532,7 +556,7 @@ async def test_security_rule_delete_rejects_foreign_rule(
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
 
     with pytest.raises(HTTPException) as exc_info:
-        await delete_security_rule("rule-owned-by-b", USER_A)
+        await delete_security_rule("rule-owned-by-b", DOMAIN_A, USER_A)
 
     assert exc_info.value.status_code == 404
     assert all("workspace_id" in sql.lower() for sql, _ in captured)
@@ -556,7 +580,7 @@ async def test_alert_history_is_workspace_scoped(
     )
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
 
-    result = await list_alert_history(USER_A)
+    result = await list_alert_history(DOMAIN_A, USER_A)
 
     assert result == [], "User A must not see alerts from workspace-2"
 
@@ -570,9 +594,25 @@ async def test_alert_dismiss_rejects_foreign_alert(
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
 
     with pytest.raises(HTTPException) as exc_info:
-        await dismiss_alert("alert-owned-by-b", USER_A)
+        await dismiss_alert("alert-owned-by-b", DOMAIN_A, USER_A)
 
     assert exc_info.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_alert_read_receipt_rejects_foreign_alert(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A member cannot acknowledge another workspace or domain's notification."""
+    captured, query = _tracking_query({})
+    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await mark_alert_read("alert-owned-by-b", DOMAIN_A, USER_A)
+
+    assert exc_info.value.status_code == 404
+    assert all(USER_A.workspace_id in params for _, params in captured)
+    assert all(DOMAIN_A in params for _, params in captured)
 
 
 # ── Cloudflare Integrations ─────────────────────────────────────────────────
@@ -722,13 +762,13 @@ async def test_kpis_are_workspace_scoped(monkeypatch: pytest.MonkeyPatch) -> Non
     )
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
 
-    async def mock_count(ws: str) -> int:
+    async def mock_count(ws: str, _domain: str | None = None) -> int:
         return 5 if ws == "workspace-2" else 0
 
     monkeypatch.setattr(app_routes, "_workspace_threat_count", mock_count)
 
     session = MagicMock()
-    result = await get_kpis(session=session, current_user=USER_A)
+    result = await get_kpis(domain=DOMAIN_A, session=session, current_user=USER_A)
 
     assert result["threats_phishing_count"] == 0, "Alice must not see Bob's threats in KPI stats"
     assert any("workspace-1" in params for _, params in captured)

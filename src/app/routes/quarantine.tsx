@@ -20,17 +20,19 @@ import {
   useReleaseAndWhitelist,
   QuarantineItem,
 } from "../lib/api";
+import { useActiveDomain } from "../contexts/active-domain";
 
 const MotionDiv = motion.div as any;
 
 export default function QuarantineRoute() {
   const { t } = useTranslation();
+  const { activeDomain } = useActiveDomain();
 
   // Queries & Mutations
-  const { data: items, isLoading, error, refetch } = useQuarantineItems();
-  const releaseMutation = useReleaseQuarantine();
-  const deleteMutation = useDeleteQuarantine();
-  const whitelistMutation = useReleaseAndWhitelist();
+  const { data: items, isLoading, error, refetch } = useQuarantineItems(activeDomain);
+  const releaseMutation = useReleaseQuarantine(activeDomain);
+  const deleteMutation = useDeleteQuarantine(activeDomain);
+  const whitelistMutation = useReleaseAndWhitelist(activeDomain);
 
   // Selected item for the Zoom Modal
   const [selectedItem, setSelectedItem] = useState<QuarantineItem | null>(null);

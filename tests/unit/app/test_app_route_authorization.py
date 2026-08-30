@@ -50,6 +50,10 @@ def _user(*, platform_admin: bool) -> AuthUser:
     )
 
 
+async def _allow_domain(_domain: str, _workspace_id: str) -> None:
+    return None
+
+
 @pytest.mark.asyncio
 async def test_customer_cannot_read_global_datasets() -> None:
     """Global training lineage remains restricted to platform operators."""
@@ -137,19 +141,21 @@ async def test_domain_shield_cache_ages_ssl_days(monkeypatch) -> None:
     updated_at = (datetime.now(UTC) - timedelta(days=3)).isoformat()
 
     async def query(_sql: str, _params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
-        return [{
-            "reputation_score": 100,
-            "ssl_days_remaining": 10,
-            "updated_at": updated_at,
-            "spf_valid": 1,
-            "spf_record": "v=spf1 ~all",
-            "dkim_valid": 1,
-            "dkim_record": "v=DKIM1",
-            "dmarc_valid": 1,
-            "dmarc_record": "v=DMARC1; p=reject; rua=mailto:dmarc@sicurre.com",
-            "dmarc_policy": "reject",
-            "ssl_valid": 1,
-        }]
+        return [
+            {
+                "reputation_score": 100,
+                "ssl_days_remaining": 10,
+                "updated_at": updated_at,
+                "spf_valid": 1,
+                "spf_record": "v=spf1 ~all",
+                "dkim_valid": 1,
+                "dkim_record": "v=DKIM1",
+                "dmarc_valid": 1,
+                "dmarc_record": "v=DMARC1; p=reject; rua=mailto:dmarc@sicurre.com",
+                "dmarc_policy": "reject",
+                "ssl_valid": 1,
+            }
+        ]
 
     monkeypatch.setattr(app_routes, "_require_workspace_domain", allow_domain)
     monkeypatch.setattr(app_routes, "_check_domain_blacklists", blocklists)
@@ -221,9 +227,10 @@ async def test_quarantine_release_rejects_missing_original_content(monkeypatch) 
         return [{"id": "held-1", "status": "held", "raw_storage_uri": None}]
 
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+    monkeypatch.setattr(app_routes, "_require_workspace_domain", _allow_domain)
 
     with pytest.raises(HTTPException) as exc_info:
-        await release_quarantine_item("held-1", _user(platform_admin=False))
+        await release_quarantine_item("held-1", "example.test", _user(platform_admin=False))
 
     assert exc_info.value.status_code == 409
     assert len(queries) == 1
@@ -241,6 +248,7 @@ async def test_quarantine_release_delivers_original_mime_once(monkeypatch) -> No
         "status": "held",
         "raw_storage_uri": "file:///quarantine/held-1.eml",
         "message_id": "event-1",
+        "domain": "example.test",
         "safety_verdict": "phishing",
     }
 
@@ -282,11 +290,12 @@ async def test_quarantine_release_delivers_original_mime_once(monkeypatch) -> No
         return "quarantine@example.test"
 
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+    monkeypatch.setattr(app_routes, "_require_workspace_domain", _allow_domain)
     monkeypatch.setattr(app_routes, "build_quarantine_store", lambda _settings: Store())
     monkeypatch.setattr(app_routes, "send_raw_email", deliver)
     monkeypatch.setattr(app_routes, "resolve_sending_address", sending_address)
 
-    response = await release_quarantine_item("held-1", _user(platform_admin=False))
+    response = await release_quarantine_item("held-1", "example.test", _user(platform_admin=False))
 
     assert response["status"] == "released"
     assert response["delivery_message_id"] == "delivery-1"
@@ -304,15 +313,16 @@ async def test_quarantine_delete_write_remains_workspace_scoped(monkeypatch) -> 
         return [{"exists": 1}]
 
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+    monkeypatch.setattr(app_routes, "_require_workspace_domain", _allow_domain)
 
-    assert await delete_quarantine_item("held-1", _user(platform_admin=False)) == {
+    assert await delete_quarantine_item("held-1", "example.test", _user(platform_admin=False)) == {
         "status": "deleted"
     }
     update_sql, update_params = queries[-1]
     assert "WHERE id = ? AND workspace_id = ?" in update_sql
     assert "sender = '[deleted]'" in update_sql
     assert "body_text = ''" in update_sql
-    assert update_params == ("held-1", "workspace-1")
+    assert update_params == ("held-1", "workspace-1", "example.test")
 
 
 @pytest.mark.asyncio
@@ -329,10 +339,11 @@ async def test_quarantine_delete_keeps_item_when_storage_fails(monkeypatch) -> N
             raise RuntimeError("R2 unavailable")
 
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+    monkeypatch.setattr(app_routes, "_require_workspace_domain", _allow_domain)
     monkeypatch.setattr(app_routes, "build_quarantine_store", lambda _settings: Store())
 
     with pytest.raises(HTTPException) as exc_info:
-        await delete_quarantine_item("held-1", _user(platform_admin=False))
+        await delete_quarantine_item("held-1", "example.test", _user(platform_admin=False))
 
     assert exc_info.value.status_code == 503
     assert len(queries) == 1
@@ -348,11 +359,14 @@ async def test_alert_dismiss_write_remains_workspace_scoped(monkeypatch) -> None
         return [{"exists": 1}]
 
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+    monkeypatch.setattr(app_routes, "_require_workspace_domain", _allow_domain)
 
-    assert await dismiss_alert("alert-1", _user(platform_admin=False)) == {"status": "dismissed"}
+    assert await dismiss_alert("alert-1", "example.test", _user(platform_admin=False)) == {
+        "status": "dismissed"
+    }
     update_sql, update_params = queries[-1]
     assert "WHERE id = ? AND workspace_id = ?" in update_sql
-    assert update_params == ("alert-1", "workspace-1")
+    assert update_params == ("alert-1", "workspace-1", "example.test")
 
 
 @pytest.mark.asyncio

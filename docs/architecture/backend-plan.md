@@ -207,10 +207,30 @@ promotion decision, approval, deployment, and rollback lineage.
 - `app_quarantine_item`
 - `app_alert_preference`
 - `app_alert_history`
+- `app_alert_read`
 - `app_security_rule`
 - `app_domain_shield_status`
 - `app_domain_shield_history`
 - `app_feedback`
+
+### Workspace and active-domain boundary
+
+A customer has one workspace and may connect several domains. The workspace
+owns membership, the encrypted Cloudflare credential, and the integration
+inventory. The selected domain is presentation context, persisted per
+workspace in the browser; it is not a second tenant.
+
+Customer operations are authorized by both the authenticated `workspace_id`
+and a connected `domain`. This applies to dashboard counts, inference history,
+quarantine, sender rules, notification preferences, notification history,
+DMARC evidence, and Domain Shield. Domain attribution is derived from the
+authenticated Cloudflare integration, never accepted from the Worker payload.
+
+Notification email policy is stored per connected domain. It has one master
+switch, explicit phishing and Domain Shield switches, and quiet hours. In-app
+history only displays the active domain, while the scheduled Domain Shield
+monitor refreshes every active integration and can send an enabled Loops alert
+even when that domain is not selected in the browser.
 
 ## Recommended implementation order
 
