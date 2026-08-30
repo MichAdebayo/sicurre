@@ -516,3 +516,74 @@ async def test_duplicate_feedback_returns_409(monkeypatch: pytest.MonkeyPatch) -
 
     assert exc_info.value.status_code == 409
     assert "already submitted" in str(exc_info.value.detail).lower()
+
+
+@pytest.mark.anyio
+async def test_scan_email_runs_independent_lookups_concurrently(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The dedup and rules reads must overlap, not run one after another.
+
+    Serially these were four round-trips to a remote Postgres and measured
+    458 ms, 23% of a scan against a 2.0 s objective. Concurrency is the whole
+    point of the change, so assert the overlap rather than the wall clock,
+    which would make the test timing-dependent.
+    """
+    import asyncio as _asyncio
+
+    import httpx
+
+    from data_platform.api.routers import integrations
+
+    monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
+
+    in_flight = 0
+    max_in_flight = 0
+
+    async def query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        nonlocal in_flight, max_in_flight
+        if "FROM cloudflare_integration" in sql:
+            return [
+                {
+                    "id": "int-1",
+                    "user_email": "owner@example.com",
+                    "workspace_id": "ws-1",
+                    "workspace_member_user_id": "user-1",
+                    "zone_name": "example.com",
+                    "status": "active",
+                }
+            ]
+        in_flight += 1
+        max_in_flight = max(max_in_flight, in_flight)
+        try:
+            await _asyncio.sleep(0.01)
+            return []
+        finally:
+            in_flight -= 1
+
+    monkeypatch.setattr(integrations, "_async_query", query)
+
+    class FailingClient:
+        def __init__(self, *args: Any, **kwargs: Any) -> None: ...
+        async def __aenter__(self) -> "FailingClient":
+            return self
+        async def __aexit__(self, *args: Any) -> None: ...
+        async def post(self, *args: Any, **kwargs: Any) -> Any:
+            raise httpx.ConnectError("Connection refused")
+
+    monkeypatch.setattr("httpx.AsyncClient", FailingClient)
+
+    payload = integrations.EmailScanRequest(
+        subject="Objet", sender="expediteur@example.com", text="corps", message_id="m-1"
+    )
+    with pytest.raises(HTTPException):
+        await integrations.scan_email(
+            request=_limiter_request(),
+            payload=payload,
+            x_sicurre_secret="secret",
+        )
+
+    assert max_in_flight >= 3, (
+        f"expected the three independent lookups to overlap, saw at most "
+        f"{max_in_flight} concurrent"
+    )
