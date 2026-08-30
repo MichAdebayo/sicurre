@@ -18,6 +18,7 @@ interface AppShellProps {
   userRole?: string;
   onboardingRequired?: boolean;
   workspaceName?: string;
+  workspaceId?: string;
   threatCount?: number;
   hasIntegration?: boolean;
 }
@@ -35,6 +36,7 @@ export function AppShell({
   userRole,
   onboardingRequired = false,
   workspaceName,
+  workspaceId,
   threatCount,
   hasIntegration = false,
 }: AppShellProps) {
@@ -56,6 +58,8 @@ export function AppShell({
         userRole={userRole}
         onboardingRequired={onboardingRequired}
         workspaceName={workspaceName}
+        workspaceId={workspaceId}
+        userName={userName}
         threatCount={threatCount}
         hasIntegration={hasIntegration}
         collapsible
@@ -78,6 +82,8 @@ export function AppShell({
             userRole={userRole}
             onboardingRequired={onboardingRequired}
             workspaceName={workspaceName}
+            workspaceId={workspaceId}
+            userName={userName}
             threatCount={threatCount}
             hasIntegration={hasIntegration}
             className="relative z-10 flex shadow-2xl"

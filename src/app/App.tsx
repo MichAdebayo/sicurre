@@ -15,6 +15,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { parseVerificationCallback } from "./lib/email-verification";
 import { applyTheme, getStoredTheme } from "./lib/theme";
+import { ActiveDomainProvider } from "./contexts/active-domain";
 
 const LandingRoute = lazy(() => import("./routes/landing"));
 const LoginRoute = lazy(() => import("./routes/login"));
@@ -300,6 +301,7 @@ function AppContent() {
   };
 
   return (
+    <ActiveDomainProvider workspaceId={session.workspace_id}>
     <AppShell
       currentPage={activePage}
       onPageChange={(page) => {
@@ -315,6 +317,7 @@ function AppContent() {
       userRole={session.is_platform_admin ? "admin" : session.role}
       onboardingRequired={session.onboarding_required}
       workspaceName={session.workspace_name}
+      workspaceId={session.workspace_id}
       threatCount={session.threat_count}
       hasIntegration={session.has_cloudflare_integration}
     >
@@ -331,5 +334,6 @@ function AppContent() {
           {activePage === "support" && <SupportRoute session={session} />}
       </Suspense>
     </AppShell>
+    </ActiveDomainProvider>
   );
 }

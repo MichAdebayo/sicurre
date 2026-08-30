@@ -38,6 +38,7 @@ class KpiResponse(ApiResponse):
     threats_phishing_count: int = Field(ge=0)
     threats_spam_count: int = Field(ge=0)
     threats_legitimate_count: int = Field(ge=0)
+    domain: str
 
 
 class ThreatLogResponse(ApiResponse):
@@ -252,6 +253,7 @@ class QuarantineItemResponse(ApiResponse):
     """Held message metadata and bounded content preview."""
 
     id: str
+    domain: str
     message_id: str
     sender: str
     subject: str
@@ -286,10 +288,12 @@ class StatusResponse(ApiResponse):
 
 
 class AlertPreferenceResponse(ApiResponse):
-    """Workspace notification preferences."""
+    """Notification preferences for one connected domain."""
 
+    domain: str
+    email_enabled: bool
     notify_phishing: bool
-    notify_spam: bool
+    notify_domain_shield: bool
     quiet_hours_enabled: bool
     quiet_hours_start: str
     quiet_hours_end: str
@@ -300,6 +304,7 @@ class SecurityRuleResponse(ApiResponse):
     """Workspace sender or domain rule."""
 
     id: str
+    domain: str
     rule_type: Literal["whitelist", "blocklist"]
     pattern: str
     created_at: str | None = None
@@ -309,9 +314,13 @@ class AlertHistoryResponse(ApiResponse):
     """One customer-visible notification."""
 
     id: str
+    domain: str
+    event_type: str
+    action_page: str | None = None
     title: str
     message: str
     created_at: str
+    is_read: bool
 
 
 class CloudflareIntegrationResponse(ApiResponse):

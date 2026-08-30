@@ -22,11 +22,17 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
 }));
 
+vi.mock("../../../src/app/contexts/active-domain", () => ({
+  useActiveDomain: () => ({ activeDomain: "vinse.app" }),
+}));
+
 vi.mock("../../../src/app/lib/api", () => ({
   useAlertPreferences: () => ({
     data: mocks.queryState.preferencesFailed ? undefined : {
+      domain: "vinse.app",
+      email_enabled: true,
       notify_phishing: true,
-      notify_spam: true,
+      notify_domain_shield: true,
       quiet_hours_enabled: false,
       quiet_hours_start: "22:00",
       quiet_hours_end: "07:00",
@@ -52,6 +58,7 @@ vi.mock("../../../src/app/lib/api", () => ({
     refetch: mocks.retryHistory,
   }),
   useDismissAlert: () => ({ mutateAsync: vi.fn() }),
+  useMarkDomainAlertsRead: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 afterEach(() => {
@@ -63,17 +70,18 @@ afterEach(() => {
 });
 
 describe("alerts route", () => {
-  it("preserves the loaded spam preference when another preference is saved", async () => {
+  it("preserves the loaded per-domain preferences when saving", async () => {
     mocks.updatePreferences.mockResolvedValue({ status: "saved" });
     render(<AlertsRoute mode="settings" />);
 
-    expect(screen.queryByRole("checkbox", { name: /alerts.notify_spam/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: /alerts.email_enabled/i })).toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: "alerts.save_preferences" }));
 
     await waitFor(() => expect(mocks.updatePreferences).toHaveBeenCalledOnce());
     expect(mocks.updatePreferences).toHaveBeenCalledWith(expect.objectContaining({
       notify_phishing: true,
-      notify_spam: true,
+      notify_domain_shield: true,
+      email_enabled: true,
     }));
   });
 

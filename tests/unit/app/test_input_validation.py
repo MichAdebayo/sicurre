@@ -318,13 +318,11 @@ async def test_scan_email_persists_ml_stage_contract(
         "subscription_claimed": True,
         "transactional_evidence": False,
     }
-    inserted = next(
-        params for sql, params in writes if "INSERT INTO app_inference_event" in sql
-    )
-    assert inserted[14] == "mistral"
-    assert inserted[20] == '{"llm":0.02,"onnx":0.1}'
-    assert inserted[21] == '{"llm":"legitimate","onnx":"spam"}'
-    assert inserted[22] == '{"llm":{"active":true,"provider":"mistral"}}'
+    inserted = next(params for sql, params in writes if "INSERT INTO app_inference_event" in sql)
+    assert inserted[15] == "mistral"
+    assert inserted[21] == '{"llm":0.02,"onnx":0.1}'
+    assert inserted[22] == '{"llm":"legitimate","onnx":"spam"}'
+    assert inserted[23] == '{"llm":{"active":true,"provider":"mistral"}}'
 
 
 # ── Pydantic Schema Validation ───────────────────────────────────────────────
@@ -332,7 +330,6 @@ async def test_scan_email_persists_ml_stage_contract(
 
 class TestEmailScanRequestValidation:
     """Verify field constraints on the email scan request schema."""
-
 
     def test_rejects_oversized_subject(self) -> None:
         with pytest.raises(ValidationError, match="String should have at most 500"):
@@ -470,7 +467,9 @@ class TestStatusUpdateValidation:
         from data_platform.api.routers.app_routes import update_threat_status
 
         with pytest.raises(HTTPException) as exc_info:
-            await update_threat_status("threat-1", StatusUpdate(status="hacked"), _USER)
+            await update_threat_status(
+                "threat-1", StatusUpdate(status="hacked"), "example.test", _USER
+            )
 
         assert exc_info.value.status_code == 400
 
@@ -503,9 +502,15 @@ async def test_duplicate_feedback_returns_409(monkeypatch: pytest.MonkeyPatch) -
 
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
 
+    async def allow_domain(_domain: str, _workspace_id: str) -> None:
+        return None
+
+    monkeypatch.setattr(app_routes, "_require_workspace_domain", allow_domain)
+
     with pytest.raises(HTTPException) as exc_info:
         await create_feedback(
             FeedbackCreate(feedback_type="false_positive", corrected_verdict="legitimate"),
+            "example.test",
             _USER,
         )
 

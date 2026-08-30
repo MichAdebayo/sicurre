@@ -64,6 +64,7 @@ export interface SessionSeed {
 }
 
 export interface KPIStats {
+  domain: string;
   raw_records_count: number;
   normalized_messages_count: number;
   dataset_items_count: number;
@@ -439,27 +440,28 @@ export function useChangePassword() {
   });
 }
 
-function readCachedKpis(workspaceId: string): KPIStats | undefined {
+function readCachedKpis(workspaceId: string, domain: string): KPIStats | undefined {
   if (!workspaceId || typeof window === "undefined") return undefined;
   try {
-    const raw = window.sessionStorage.getItem(`sicurre:kpis:${workspaceId}`);
+    const raw = window.sessionStorage.getItem(`sicurre:kpis:${workspaceId}:${domain}`);
     return raw ? (JSON.parse(raw) as KPIStats) : undefined;
   } catch {
     return undefined;
   }
 }
 
-export function useKPIStats(workspaceId = "current") {
+export function useKPIStats(workspaceId: string, domain: string) {
   return useQuery<KPIStats>({
-    queryKey: ["kpis", workspaceId],
+    queryKey: ["kpis", workspaceId, domain],
     queryFn: async () => {
-      const data = await fetchJson<KPIStats>("/stats/kpi");
+      const data = await fetchJson<KPIStats>(`/stats/kpi?domain=${encodeURIComponent(domain)}`);
       if (typeof window !== "undefined") {
-        window.sessionStorage.setItem(`sicurre:kpis:${workspaceId}`, JSON.stringify(data));
+        window.sessionStorage.setItem(`sicurre:kpis:${workspaceId}:${domain}`, JSON.stringify(data));
       }
       return data;
     },
-    initialData: () => readCachedKpis(workspaceId),
+    initialData: () => readCachedKpis(workspaceId, domain),
+    enabled: !!domain,
     refetchInterval: 60000,
     refetchIntervalInBackground: false,
   });
@@ -530,7 +532,7 @@ export function useRecoverOperationalExercise() {
   });
 }
 
-export function useThreatPage(query: ThreatQuery = {}) {
+export function useThreatPage(domain: string, query: ThreatQuery = {}) {
   const params = new URLSearchParams({
     page: String(query.page ?? 1),
     page_size: String(query.pageSize ?? 10),
@@ -538,31 +540,34 @@ export function useThreatPage(query: ThreatQuery = {}) {
     date_range: query.dateRange ?? "all",
     search: query.search ?? "",
     hidden: String(query.hidden ?? false),
+    domain,
   });
   return useQuery<ThreatPage>({
-    queryKey: ["threats", query],
+    queryKey: ["threats", domain, query],
     queryFn: () => fetchJson<ThreatPage>(`/threats?${params.toString()}`),
+    enabled: !!domain,
     placeholderData: (previous) => previous,
     refetchInterval: 30000,
     refetchIntervalInBackground: false,
   });
 }
 
-export function useThreatLogs() {
+export function useThreatLogs(domain: string) {
   return useQuery<ThreatLog[]>({
-    queryKey: ["threats", "recent"],
-    queryFn: async () => (await fetchJson<ThreatPage>("/threats?page=1&page_size=100&date_range=all")).items,
+    queryKey: ["threats", domain, "recent"],
+    queryFn: async () => (await fetchJson<ThreatPage>(`/threats?page=1&page_size=100&date_range=all&domain=${encodeURIComponent(domain)}`)).items,
+    enabled: !!domain,
     placeholderData: (previous) => previous,
     refetchInterval: 30000,
     refetchIntervalInBackground: false,
   });
 }
 
-export function useSetThreatVisibility() {
+export function useSetThreatVisibility(domain: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: { ids: string[]; hidden: boolean }) =>
-      fetchJson<{ updated: number; hidden: boolean }>("/threats/visibility", {
+      fetchJson<{ updated: number; hidden: boolean }>(`/threats/visibility?domain=${encodeURIComponent(domain)}`, {
         method: "POST",
         body: JSON.stringify(payload),
       }),
@@ -578,11 +583,11 @@ export function useReportAddress() {
   });
 }
 
-export function useUpdateThreatStatus() {
+export function useUpdateThreatStatus(domain: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: "trashed" | "restored" | "active" }) =>
-      fetchJson<ThreatLog>(`/threats/${id}/status`, {
+      fetchJson<ThreatLog>(`/threats/${id}/status?domain=${encodeURIComponent(domain)}`, {
         method: "POST",
         body: JSON.stringify({ status }),
       }),
@@ -593,11 +598,11 @@ export function useUpdateThreatStatus() {
   });
 }
 
-export function useCreateFeedback() {
+export function useCreateFeedback(domain: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: FeedbackPayload) =>
-      fetchJson<{ id: string; event_id?: string; feedback_type: string; created_at: string }>("/feedback", {
+      fetchJson<{ id: string; event_id?: string; feedback_type: string; created_at: string }>(`/feedback?domain=${encodeURIComponent(domain)}`, {
         method: "POST",
         body: JSON.stringify(payload),
       }),
@@ -741,6 +746,7 @@ export function useRunPipeline() {
 
 export interface QuarantineItem {
   id: string;
+  domain: string;
   message_id: string;
   sender: string;
   subject: string;
@@ -752,18 +758,19 @@ export interface QuarantineItem {
   expires_at: string;
 }
 
-export function useQuarantineItems() {
+export function useQuarantineItems(domain: string) {
   return useQuery<QuarantineItem[]>({
-    queryKey: ["quarantine"],
-    queryFn: () => fetchJson<QuarantineItem[]>("/quarantine"),
+    queryKey: ["quarantine", domain],
+    queryFn: () => fetchJson<QuarantineItem[]>(`/quarantine?domain=${encodeURIComponent(domain)}`),
+    enabled: !!domain,
   });
 }
 
-export function useReleaseQuarantine() {
+export function useReleaseQuarantine(domain: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      fetchJson<{ status: string; forwarded_to: string }>(`/quarantine/${id}/release`, {
+      fetchJson<{ status: string; forwarded_to: string }>(`/quarantine/${id}/release?domain=${encodeURIComponent(domain)}`, {
         method: "POST",
       }),
     onSuccess: () => {
@@ -773,11 +780,11 @@ export function useReleaseQuarantine() {
   });
 }
 
-export function useDeleteQuarantine() {
+export function useDeleteQuarantine(domain: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      fetchJson<{ status: string }>(`/quarantine/${id}`, {
+      fetchJson<{ status: string }>(`/quarantine/${id}?domain=${encodeURIComponent(domain)}`, {
         method: "DELETE",
       }),
     onSuccess: () => {
@@ -786,11 +793,11 @@ export function useDeleteQuarantine() {
   });
 }
 
-export function useReleaseAndWhitelist() {
+export function useReleaseAndWhitelist(domain: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      fetchJson<{ status: string; whitelisted_pattern: string }>(`/quarantine/${id}/whitelist`, {
+      fetchJson<{ status: string; whitelisted_pattern: string }>(`/quarantine/${id}/whitelist?domain=${encodeURIComponent(domain)}`, {
         method: "POST",
       }),
     onSuccess: () => {
@@ -804,26 +811,29 @@ export function useReleaseAndWhitelist() {
 // ── Alerts & Preference API Types & Hooks ─────────────────────────────────────
 
 export interface AlertPreferences {
+  domain: string;
+  email_enabled: boolean;
   notify_phishing: boolean;
-  notify_spam: boolean;
+  notify_domain_shield: boolean;
   quiet_hours_enabled: boolean;
   quiet_hours_start: string;
   quiet_hours_end: string;
   timezone: string;
 }
 
-export function useAlertPreferences() {
+export function useAlertPreferences(domain: string) {
   return useQuery<AlertPreferences>({
-    queryKey: ["alert-preferences"],
-    queryFn: () => fetchJson<AlertPreferences>("/alerts/preferences"),
+    queryKey: ["alert-preferences", domain],
+    queryFn: () => fetchJson<AlertPreferences>(`/alerts/preferences?domain=${encodeURIComponent(domain)}`),
+    enabled: !!domain,
   });
 }
 
-export function useUpdateAlertPreferences() {
+export function useUpdateAlertPreferences(domain: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: AlertPreferences) =>
-      fetchJson<{ status: string }>("/alerts/preferences", {
+    mutationFn: (payload: Omit<AlertPreferences, "domain">) =>
+      fetchJson<{ status: string }>(`/alerts/preferences?domain=${encodeURIComponent(domain)}`, {
         method: "PUT",
         body: JSON.stringify(payload),
       }),
@@ -835,23 +845,25 @@ export function useUpdateAlertPreferences() {
 
 export interface SecurityRule {
   id: string;
+  domain: string;
   rule_type: "whitelist" | "blocklist";
   pattern: string;
   created_at: string;
 }
 
-export function useSecurityRules() {
+export function useSecurityRules(domain: string) {
   return useQuery<SecurityRule[]>({
-    queryKey: ["security-rules"],
-    queryFn: () => fetchJson<SecurityRule[]>("/alerts/rules"),
+    queryKey: ["security-rules", domain],
+    queryFn: () => fetchJson<SecurityRule[]>(`/alerts/rules?domain=${encodeURIComponent(domain)}`),
+    enabled: !!domain,
   });
 }
 
-export function useCreateSecurityRule() {
+export function useCreateSecurityRule(domain: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: { rule_type: string; pattern: string }) =>
-      fetchJson<SecurityRule>("/alerts/rules", {
+      fetchJson<SecurityRule>(`/alerts/rules?domain=${encodeURIComponent(domain)}`, {
         method: "POST",
         body: JSON.stringify(payload),
       }),
@@ -861,11 +873,11 @@ export function useCreateSecurityRule() {
   });
 }
 
-export function useDeleteSecurityRule() {
+export function useDeleteSecurityRule(domain: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      fetchJson<{ status: string }>(`/alerts/rules/${id}`, {
+      fetchJson<{ status: string }>(`/alerts/rules/${id}?domain=${encodeURIComponent(domain)}`, {
         method: "DELETE",
       }),
     onSuccess: () => {
@@ -876,30 +888,56 @@ export function useDeleteSecurityRule() {
 
 export interface AlertHistoryItem {
   id: string;
+  domain: string;
+  event_type: string;
+  action_page: string | null;
   title: string;
   message: string;
   created_at: string;
+  is_read: boolean;
 }
 
-export function useAlertHistory() {
+export function useAlertHistory(domain: string) {
   return useQuery<AlertHistoryItem[]>({
-    queryKey: ["alert-history"],
-    queryFn: () => fetchJson<AlertHistoryItem[]>("/alerts/history"),
+    queryKey: ["alert-history", domain],
+    queryFn: () => fetchJson<AlertHistoryItem[]>(`/alerts/history?domain=${encodeURIComponent(domain)}`),
+    enabled: !!domain,
     refetchInterval: 60000,
     refetchIntervalInBackground: false,
   });
 }
 
-export function useDismissAlert() {
+export function useDismissAlert(domain: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      fetchJson<{ status: string }>(`/alerts/history/${id}/dismiss`, {
+      fetchJson<{ status: string }>(`/alerts/history/${id}/dismiss?domain=${encodeURIComponent(domain)}`, {
         method: "POST",
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["alert-history"] });
     },
+  });
+}
+
+export function useMarkDomainAlertsRead(domain: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => fetchJson<{ status: string }>(`/alerts/history/read?domain=${encodeURIComponent(domain)}`, {
+      method: "POST",
+    }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["alert-history", domain] }),
+  });
+}
+
+export function useMarkAlertRead(domain: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => fetchJson<{ status: string }>(
+      `/alerts/history/${id}/read?domain=${encodeURIComponent(domain)}`,
+      { method: "POST" },
+    ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["alert-history", domain] }),
   });
 }
 
