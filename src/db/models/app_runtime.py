@@ -15,6 +15,7 @@ APP_TABLE_NAMES = (
     "app_security_rule",
     "app_alert_preference",
     "app_alert_history",
+    "app_alert_read",
     "app_quarantine_item",
     "app_domain_shield_status",
     "app_domain_shield_history",
@@ -97,6 +98,7 @@ app_inference_event = sa.Table(
     _text_column("user_email", nullable=False),
     _text_column("workspace_id", nullable=True),
     _text_column("workspace_member_user_id", nullable=True),
+    _text_column("domain", nullable=True),
     _text_column("context", nullable=False),
     _text_column("subject", nullable=False),
     _text_column("sender", nullable=False),
@@ -122,6 +124,7 @@ app_inference_event = sa.Table(
     sa.Column("is_deleted", sa.Integer(), nullable=False, server_default=sa.text("0")),
     sa.PrimaryKeyConstraint("id"),
     sa.Index("ix_app_inference_event_workspace_id", "workspace_id"),
+    sa.Index("ix_app_inference_event_workspace_domain", "workspace_id", "domain"),
 )
 
 
@@ -144,31 +147,38 @@ app_security_rule = _workspace_table(
     "app_security_rule",
     _text_column("id", nullable=False),
     _text_column("workspace_id", nullable=False),
+    _text_column("domain", nullable=False),
     _text_column("rule_type", nullable=False),
     _text_column("pattern", nullable=False),
     _text_column("created_at", nullable=False),
     constraints=(
         sa.PrimaryKeyConstraint("id"),
         sa.Index("ix_app_security_rule_workspace_id", "workspace_id"),
+        sa.Index("ix_app_security_rule_workspace_domain", "workspace_id", "domain"),
     ),
 )
 
 app_alert_preference = _workspace_table(
     "app_alert_preference",
     _text_column("workspace_id", nullable=False),
+    _text_column("domain", nullable=False),
+    sa.Column("email_enabled", sa.Integer(), nullable=False, server_default=sa.text("1")),
     sa.Column("notify_phishing", sa.Integer(), nullable=False, server_default=sa.text("1")),
-    sa.Column("notify_spam", sa.Integer(), nullable=False, server_default=sa.text("1")),
+    sa.Column("notify_domain_shield", sa.Integer(), nullable=False, server_default=sa.text("1")),
     sa.Column("quiet_hours_enabled", sa.Integer(), nullable=False, server_default=sa.text("0")),
     _text_column("quiet_hours_start", nullable=False, default="22:00"),
     _text_column("quiet_hours_end", nullable=False, default="07:00"),
     _text_column("timezone", nullable=False, default="Europe/Paris"),
-    constraints=(sa.PrimaryKeyConstraint("workspace_id"),),
+    constraints=(sa.PrimaryKeyConstraint("workspace_id", "domain"),),
 )
 
 app_alert_history = _workspace_table(
     "app_alert_history",
     _text_column("id", nullable=False),
     _text_column("workspace_id", nullable=False),
+    _text_column("domain", nullable=True),
+    _text_column("event_type", nullable=False, default="system"),
+    _text_column("action_page", nullable=True),
     _text_column("title", nullable=False),
     _text_column("message", nullable=False),
     sa.Column("is_dismissed", sa.Integer(), nullable=False, server_default=sa.text("0")),
@@ -176,6 +186,20 @@ app_alert_history = _workspace_table(
     constraints=(
         sa.PrimaryKeyConstraint("id"),
         sa.Index("ix_app_alert_history_workspace_id", "workspace_id"),
+        sa.Index("ix_app_alert_history_workspace_domain", "workspace_id", "domain"),
+    ),
+)
+
+app_alert_read = _workspace_table(
+    "app_alert_read",
+    _text_column("workspace_id", nullable=False),
+    _text_column("domain", nullable=False),
+    _text_column("auth_user_id", nullable=False),
+    _text_column("alert_id", nullable=False),
+    _text_column("read_at", nullable=False),
+    constraints=(
+        sa.PrimaryKeyConstraint("auth_user_id", "alert_id"),
+        sa.Index("ix_app_alert_read_workspace_domain", "workspace_id", "domain"),
     ),
 )
 
@@ -198,6 +222,7 @@ app_quarantine_item = _workspace_table(
     "app_quarantine_item",
     _text_column("id", nullable=False),
     _text_column("workspace_id", nullable=False),
+    _text_column("domain", nullable=True),
     _text_column("message_id", nullable=False),
     _text_column("sender", nullable=False),
     _text_column("subject", nullable=False),
@@ -216,9 +241,13 @@ app_quarantine_item = _workspace_table(
     constraints=(
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
-            "workspace_id", "message_id", name="uq_app_quarantine_workspace_message"
+            "workspace_id",
+            "domain",
+            "message_id",
+            name="uq_app_quarantine_workspace_domain_message",
         ),
         sa.Index("ix_app_quarantine_item_workspace_id", "workspace_id"),
+        sa.Index("ix_app_quarantine_item_workspace_domain", "workspace_id", "domain"),
     ),
 )
 

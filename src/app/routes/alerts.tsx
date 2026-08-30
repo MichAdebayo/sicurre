@@ -22,7 +22,10 @@ import {
   useDeleteSecurityRule,
   useAlertHistory,
   useDismissAlert,
+  useMarkDomainAlertsRead,
 } from "../lib/api";
+import { useActiveDomain } from "../contexts/active-domain";
+import { Toggle } from "../components/ui/toggle";
 
 const MotionDiv = motion.div as any;
 
@@ -65,6 +68,7 @@ interface AlertsRouteProps {
 
 export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
   const { t } = useTranslation();
+  const { activeDomain } = useActiveDomain();
 
   // Queries & Mutations
   const {
@@ -72,29 +76,31 @@ export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
     isLoading: prefsLoading,
     isError: prefsFailed,
     refetch: refetchPreferences,
-  } = useAlertPreferences();
-  const updatePrefsMutation = useUpdateAlertPreferences();
+  } = useAlertPreferences(activeDomain);
+  const updatePrefsMutation = useUpdateAlertPreferences(activeDomain);
 
   const {
     data: rules,
     isLoading: rulesLoading,
     isError: rulesFailed,
     refetch: refetchRules,
-  } = useSecurityRules();
-  const createRuleMutation = useCreateSecurityRule();
-  const deleteRuleMutation = useDeleteSecurityRule();
+  } = useSecurityRules(activeDomain);
+  const createRuleMutation = useCreateSecurityRule(activeDomain);
+  const deleteRuleMutation = useDeleteSecurityRule(activeDomain);
 
   const {
     data: history,
     isLoading: historyLoading,
     isError: historyFailed,
     refetch: refetchHistory,
-  } = useAlertHistory();
-  const dismissAlertMutation = useDismissAlert();
+  } = useAlertHistory(activeDomain);
+  const dismissAlertMutation = useDismissAlert(activeDomain);
+  const markReadMutation = useMarkDomainAlertsRead(activeDomain);
 
   // Form states
+  const [emailEnabled, setEmailEnabled] = useState(true);
   const [notifyPhishing, setNotifyPhishing] = useState(true);
-  const [notifySpam, setNotifySpam] = useState(false);
+  const [notifyDomainShield, setNotifyDomainShield] = useState(true);
   const [quietEnabled, setQuietEnabled] = useState(false);
   const [quietStart, setQuietStart] = useState("22:00");
   const [quietEnd, setQuietEnd] = useState("07:00");
@@ -109,13 +115,20 @@ export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
   // Sync component state when preferences query finishes loading
   useEffect(() => {
     if (preferences) {
+      setEmailEnabled(preferences.email_enabled);
       setNotifyPhishing(preferences.notify_phishing);
-      setNotifySpam(preferences.notify_spam);
+      setNotifyDomainShield(preferences.notify_domain_shield);
       setQuietEnabled(preferences.quiet_hours_enabled);
       setQuietStart(preferences.quiet_hours_start);
       setQuietEnd(preferences.quiet_hours_end);
     }
   }, [preferences]);
+
+  useEffect(() => {
+    if (mode === "history" && history?.some((item) => !item.is_read) && !markReadMutation.isPending) {
+      markReadMutation.mutate();
+    }
+  }, [history, markReadMutation, mode]);
 
   const handleSavePrefs = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,8 +136,9 @@ export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
     setPrefsError("");
     try {
       await updatePrefsMutation.mutateAsync({
+        email_enabled: emailEnabled,
         notify_phishing: notifyPhishing,
-        notify_spam: notifySpam,
+        notify_domain_shield: notifyDomainShield,
         quiet_hours_enabled: quietEnabled,
         quiet_hours_start: quietStart,
         quiet_hours_end: quietEnd,
@@ -208,10 +222,10 @@ export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
         {/* Left Hand: Preference Controls */}
         {mode === "settings" && <div className="space-y-6">
           {/* Email Notification Toggles */}
-          <form onSubmit={handleSavePrefs} className="bg-white rounded-xl border border-border-subtle p-6 space-y-6 shadow-sm">
+          <form onSubmit={handleSavePrefs} className="rounded-xl border border-border-subtle bg-surface-lowest p-6 space-y-6 shadow-sm dark:bg-surface-low">
             <div className="pb-4 border-b border-border-subtle">
               <h3 className="font-display font-semibold text-[17px] text-on-surface">
-                {t("alerts.section_preferences")}
+                {t("alerts.preferences_for_domain", { domain: activeDomain })}
               </h3>
             </div>
 
@@ -220,23 +234,29 @@ export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
             ) : prefsFailed ? (
               <QueryFailure onRetry={() => void refetchPreferences()} />
             ) : (
-              <div className="space-y-4">
-                <label className="flex items-start gap-3 cursor-pointer group">
-                  <input
-                    type="checkbox"
+              <div className="space-y-5">
+                <Toggle
+                  checked={emailEnabled}
+                  onChange={setEmailEnabled}
+                  label={t("alerts.email_enabled")}
+                  description={t("alerts.email_enabled_desc")}
+                />
+                <div className="space-y-4 border-l-2 border-border-subtle pl-4">
+                  <Toggle
                     checked={notifyPhishing}
-                    onChange={(e) => setNotifyPhishing(e.target.checked)}
-                    className="w-4 h-4 mt-1 rounded text-primary border-border-subtle focus:ring-primary/20 accent-primary"
+                    onChange={setNotifyPhishing}
+                    disabled={!emailEnabled}
+                    label={t("alerts.notify_phishing")}
+                    description={t("alerts.notify_phishing_desc")}
                   />
-                  <div>
-                    <span className="text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">
-                      {t("alerts.notify_phishing")}
-                    </span>
-                    <p className="mt-1 text-sm text-on-surface-variant">
-                      {t("alerts.notify_phishing_desc")}
-                    </p>
-                  </div>
-                </label>
+                  <Toggle
+                    checked={notifyDomainShield}
+                    onChange={setNotifyDomainShield}
+                    disabled={!emailEnabled}
+                    label={t("alerts.notify_domain_shield")}
+                    description={t("alerts.notify_domain_shield_desc")}
+                  />
+                </div>
               </div>
             )}
 
@@ -249,17 +269,12 @@ export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
               </div>
 
               <div className="space-y-3 bg-surface-low/30 rounded-xl p-4 border border-border-subtle/40">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={quietEnabled}
-                    onChange={(e) => setQuietEnabled(e.target.checked)}
-                    className="w-4 h-4 rounded text-primary focus:ring-primary/20 accent-primary"
-                  />
-                  <span className="text-sm font-semibold text-on-surface">
-                    {t("alerts.quiet_hours_enabled")}
-                  </span>
-                </label>
+                <Toggle
+                  checked={quietEnabled}
+                  onChange={setQuietEnabled}
+                  disabled={!emailEnabled}
+                  label={t("alerts.quiet_hours_enabled")}
+                />
 
                 {quietEnabled && (
                   <div className="grid grid-cols-2 gap-4 pt-2">
@@ -271,7 +286,8 @@ export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
                         type="time"
                         value={quietStart}
                         onChange={(e) => setQuietStart(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-border-subtle rounded-lg text-sm outline-none focus:border-primary"
+                        disabled={!emailEnabled}
+                        className="w-full px-3 py-2 bg-surface-lowest border border-border-subtle rounded-lg text-sm outline-none focus:border-primary"
                       />
                     </div>
                     <div>
@@ -282,7 +298,8 @@ export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
                         type="time"
                         value={quietEnd}
                         onChange={(e) => setQuietEnd(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-border-subtle rounded-lg text-sm outline-none focus:border-primary"
+                        disabled={!emailEnabled}
+                        className="w-full px-3 py-2 bg-surface-lowest border border-border-subtle rounded-lg text-sm outline-none focus:border-primary"
                       />
                     </div>
                   </div>
@@ -301,7 +318,7 @@ export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
           </form>
 
           {/* Filtering Rules list */}
-          <div className="bg-white rounded-xl border border-border-subtle p-6 space-y-6 shadow-sm">
+          <div className="rounded-xl border border-border-subtle bg-surface-lowest p-6 space-y-6 shadow-sm dark:bg-surface-low">
             <div className="pb-4 border-b border-border-subtle">
               <h3 className="font-display font-semibold text-[17px] text-on-surface">
                 {t("alerts.section_rules")}
@@ -316,7 +333,7 @@ export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
                 <select
                   value={ruleType}
                   onChange={(e) => setRuleType(e.target.value as any)}
-                  className="w-full px-3 py-2 bg-white border border-border-subtle rounded-lg text-sm focus:outline-none focus:border-primary cursor-pointer"
+                  className="w-full rounded-lg border border-border-subtle bg-surface-lowest px-3 py-2 text-sm text-on-surface focus:border-primary focus:outline-none cursor-pointer dark:bg-surface-low"
                 >
                   <option value="whitelist">{t("alerts.whitelist")}</option>
                   <option value="blocklist">{t("alerts.blocklist")}</option>
@@ -339,7 +356,7 @@ export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
                   placeholder={t("alerts.pattern_placeholder")}
                   value={rulePattern}
                   onChange={(e) => setRulePattern(e.target.value)}
-                  className="bg-white"
+                  className="bg-surface-lowest dark:bg-surface-low"
                 />
               </div>
               <div className="sm:col-span-2">

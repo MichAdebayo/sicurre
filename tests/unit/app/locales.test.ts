@@ -64,4 +64,13 @@ describe("application locale dictionaries", () => {
       localeBranches.filter((value) => value !== "fr-FR"),
     ).toEqual([]);
   });
+
+  it("uses Spam consistently for the French classification", () => {
+    const frenchCopy = [
+      ...Object.values(readLocale("fr")),
+      readApplicationSources(),
+    ].join("\n");
+
+    expect(frenchCopy.toLocaleLowerCase("fr")).not.toMatch(/ind[ée]sirable/);
+  });
 });

@@ -30,9 +30,7 @@ class AuthUser:
 
 def _db_path() -> str:
     settings = get_settings()
-    return settings.database_url.replace("sqlite+aiosqlite:///", "").replace(
-        "sqlite:///", ""
-    )
+    return settings.database_url.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
 
 
 def _table_columns(conn: sqlite3.Connection, table_name: str) -> set[str]:
@@ -76,31 +74,25 @@ def _ensure_legacy_sqlite_tables() -> None:
 
         tables = {
             row[0]
-            for row in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         }
         if "poc_inference_event" in tables and "app_inference_event" not in tables:
-            conn.execute(
-                "ALTER TABLE poc_inference_event RENAME TO app_inference_event"
-            )
+            conn.execute("ALTER TABLE poc_inference_event RENAME TO app_inference_event")
 
         refreshed_tables = {
             row[0]
-            for row in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         }
         if "app_inference_event" in refreshed_tables:
             event_columns = _table_columns(conn, "app_inference_event")
             if "workspace_id" not in event_columns:
-                conn.execute(
-                    "ALTER TABLE app_inference_event ADD COLUMN workspace_id TEXT NULL"
-                )
+                conn.execute("ALTER TABLE app_inference_event ADD COLUMN workspace_id TEXT NULL")
             if "workspace_member_user_id" not in event_columns:
                 conn.execute(
                     "ALTER TABLE app_inference_event ADD COLUMN workspace_member_user_id TEXT NULL"
                 )
+            if "domain" not in event_columns:
+                conn.execute("ALTER TABLE app_inference_event ADD COLUMN domain TEXT NULL")
             if "is_deleted" not in event_columns:
                 conn.execute(
                     "ALTER TABLE app_inference_event ADD COLUMN is_deleted INTEGER DEFAULT 0"
@@ -109,17 +101,13 @@ def _ensure_legacy_sqlite_tables() -> None:
         if "cloudflare_integration" in refreshed_tables:
             cf_columns = _table_columns(conn, "cloudflare_integration")
             if "workspace_id" not in cf_columns:
-                conn.execute(
-                    "ALTER TABLE cloudflare_integration ADD COLUMN workspace_id TEXT NULL"
-                )
+                conn.execute("ALTER TABLE cloudflare_integration ADD COLUMN workspace_id TEXT NULL")
             if "workspace_member_user_id" not in cf_columns:
                 conn.execute(
                     "ALTER TABLE cloudflare_integration ADD COLUMN workspace_member_user_id TEXT NULL"
                 )
             if "api_token" not in cf_columns:
-                conn.execute(
-                    "ALTER TABLE cloudflare_integration ADD COLUMN api_token TEXT NULL"
-                )
+                conn.execute("ALTER TABLE cloudflare_integration ADD COLUMN api_token TEXT NULL")
 
         # ── 1. Security Rules ────────────────────────────────────────────────
         conn.execute("""
@@ -130,49 +118,112 @@ def _ensure_legacy_sqlite_tables() -> None:
                 updated_at TEXT NOT NULL
             )
         """)
-        conn.execute("CREATE INDEX IF NOT EXISTS ix_app_cloudflare_config_workspace_id ON app_cloudflare_config(workspace_id)")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS ix_app_cloudflare_config_workspace_id ON app_cloudflare_config(workspace_id)"
+        )
 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS app_security_rule (
                 id TEXT PRIMARY KEY,
                 workspace_id TEXT NOT NULL,
+                domain TEXT NOT NULL,
                 rule_type TEXT NOT NULL,
                 pattern TEXT NOT NULL,
                 created_at TEXT NOT NULL
             )
         """)
-        conn.execute("CREATE INDEX IF NOT EXISTS ix_app_security_rule_workspace_id ON app_security_rule(workspace_id)")
+        security_rule_columns = _table_columns(conn, "app_security_rule")
+        if "domain" not in security_rule_columns:
+            conn.execute("ALTER TABLE app_security_rule ADD COLUMN domain TEXT NULL")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS ix_app_security_rule_workspace_id ON app_security_rule(workspace_id)"
+        )
 
         # ── 2. Alert Preferences ─────────────────────────────────────────────
         conn.execute("""
             CREATE TABLE IF NOT EXISTS app_alert_preference (
-                workspace_id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                domain TEXT NOT NULL,
+                email_enabled INTEGER NOT NULL DEFAULT 1,
                 notify_phishing INTEGER NOT NULL DEFAULT 1,
-                notify_spam INTEGER NOT NULL DEFAULT 1,
+                notify_domain_shield INTEGER NOT NULL DEFAULT 1,
                 quiet_hours_enabled INTEGER NOT NULL DEFAULT 0,
                 quiet_hours_start TEXT NOT NULL DEFAULT '22:00',
-                quiet_hours_end TEXT NOT NULL DEFAULT '07:00'
+                quiet_hours_end TEXT NOT NULL DEFAULT '07:00',
+                timezone TEXT NOT NULL DEFAULT 'Europe/Paris',
+                PRIMARY KEY(workspace_id, domain)
             )
         """)
+        preference_columns = _table_columns(conn, "app_alert_preference")
+        if "domain" not in preference_columns:
+            timezone_expr = "timezone" if "timezone" in preference_columns else "'Europe/Paris'"
+            conn.execute("ALTER TABLE app_alert_preference RENAME TO app_alert_preference_legacy")
+            conn.execute("""
+                CREATE TABLE app_alert_preference (
+                    workspace_id TEXT NOT NULL,
+                    domain TEXT NOT NULL,
+                    email_enabled INTEGER NOT NULL DEFAULT 1,
+                    notify_phishing INTEGER NOT NULL DEFAULT 1,
+                    notify_domain_shield INTEGER NOT NULL DEFAULT 1,
+                    quiet_hours_enabled INTEGER NOT NULL DEFAULT 0,
+                    quiet_hours_start TEXT NOT NULL DEFAULT '22:00',
+                    quiet_hours_end TEXT NOT NULL DEFAULT '07:00',
+                    timezone TEXT NOT NULL DEFAULT 'Europe/Paris',
+                    PRIMARY KEY(workspace_id, domain)
+                )
+            """)
+            conn.execute(f"""
+                INSERT INTO app_alert_preference
+                SELECT DISTINCT p.workspace_id, lower(i.zone_name), 1,
+                    p.notify_phishing, 1, p.quiet_hours_enabled,
+                    p.quiet_hours_start, p.quiet_hours_end, {timezone_expr}
+                FROM app_alert_preference_legacy p
+                JOIN cloudflare_integration i ON i.workspace_id = p.workspace_id
+            """)
+            conn.execute("DROP TABLE app_alert_preference_legacy")
 
         # ── 3. Alert History ────────────────────────────────────────────────
         conn.execute("""
             CREATE TABLE IF NOT EXISTS app_alert_history (
                 id TEXT PRIMARY KEY,
                 workspace_id TEXT NOT NULL,
+                domain TEXT,
+                event_type TEXT NOT NULL DEFAULT 'system',
+                action_page TEXT,
                 title TEXT NOT NULL,
                 message TEXT NOT NULL,
                 is_dismissed INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL
             )
         """)
-        conn.execute("CREATE INDEX IF NOT EXISTS ix_app_alert_history_workspace_id ON app_alert_history(workspace_id)")
+        history_columns = _table_columns(conn, "app_alert_history")
+        for name, definition in {
+            "domain": "TEXT NULL",
+            "event_type": "TEXT NOT NULL DEFAULT 'system'",
+            "action_page": "TEXT NULL",
+        }.items():
+            if name not in history_columns:
+                conn.execute(f"ALTER TABLE app_alert_history ADD COLUMN {name} {definition}")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS ix_app_alert_history_workspace_id ON app_alert_history(workspace_id)"
+        )
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS app_alert_read (
+                workspace_id TEXT NOT NULL,
+                domain TEXT NOT NULL,
+                auth_user_id TEXT NOT NULL,
+                alert_id TEXT NOT NULL,
+                read_at TEXT NOT NULL,
+                PRIMARY KEY(auth_user_id, alert_id)
+            )
+        """)
 
         # ── 4. Quarantine Items ──────────────────────────────────────────────
         conn.execute("""
             CREATE TABLE IF NOT EXISTS app_quarantine_item (
                 id TEXT PRIMARY KEY,
                 workspace_id TEXT NOT NULL,
+                domain TEXT,
                 message_id TEXT NOT NULL,
                 sender TEXT NOT NULL,
                 subject TEXT NOT NULL,
@@ -188,7 +239,7 @@ def _ensure_legacy_sqlite_tables() -> None:
                 delivery_message_id TEXT,
                 delivered_at TEXT,
                 last_delivery_error TEXT,
-                UNIQUE(workspace_id, message_id)
+                UNIQUE(workspace_id, domain, message_id)
             )
         """)
         quarantine_columns = _table_columns(conn, "app_quarantine_item")
@@ -199,14 +250,15 @@ def _ensure_legacy_sqlite_tables() -> None:
             "delivery_message_id": "TEXT",
             "delivered_at": "TEXT",
             "last_delivery_error": "TEXT",
+            "domain": "TEXT",
         }.items():
             if column_name not in quarantine_columns:
                 conn.execute(
                     f"ALTER TABLE app_quarantine_item ADD COLUMN {column_name} {column_type} NULL"
                 )
         conn.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS uq_app_quarantine_workspace_message "
-            "ON app_quarantine_item(workspace_id, message_id)"
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_app_quarantine_workspace_domain_message "
+            "ON app_quarantine_item(workspace_id, domain, message_id)"
         )
         conn.execute("""
             CREATE TABLE IF NOT EXISTS app_domain_shield_status (
@@ -242,7 +294,9 @@ def _ensure_legacy_sqlite_tables() -> None:
                 is_current INTEGER NOT NULL DEFAULT 1
             )
         """)
-        conn.execute("CREATE INDEX IF NOT EXISTS ix_app_domain_shield_history_domain ON app_domain_shield_history(domain)")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS ix_app_domain_shield_history_domain ON app_domain_shield_history(domain)"
+        )
 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS app_dmarc_report_summary (
@@ -262,7 +316,9 @@ def _ensure_legacy_sqlite_tables() -> None:
                 created_at TEXT NOT NULL
             )
         """)
-        conn.execute("CREATE INDEX IF NOT EXISTS ix_app_dmarc_report_summary_workspace_domain ON app_dmarc_report_summary(workspace_id, domain)")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS ix_app_dmarc_report_summary_workspace_domain ON app_dmarc_report_summary(workspace_id, domain)"
+        )
 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS app_feedback (
@@ -278,8 +334,12 @@ def _ensure_legacy_sqlite_tables() -> None:
                 UNIQUE(workspace_id, event_id, feedback_type)
             )
         """)
-        conn.execute("CREATE INDEX IF NOT EXISTS ix_app_feedback_workspace_id ON app_feedback(workspace_id)")
-        conn.execute("CREATE INDEX IF NOT EXISTS ix_app_feedback_event_id ON app_feedback(event_id)")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS ix_app_feedback_workspace_id ON app_feedback(workspace_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS ix_app_feedback_event_id ON app_feedback(event_id)"
+        )
 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS app_reported_email (
@@ -294,7 +354,9 @@ def _ensure_legacy_sqlite_tables() -> None:
                 UNIQUE(workspace_id, content_hash)
             )
         """)
-        conn.execute("CREATE INDEX IF NOT EXISTS ix_app_reported_email_workspace_id ON app_reported_email(workspace_id)")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS ix_app_reported_email_workspace_id ON app_reported_email(workspace_id)"
+        )
 
         conn.commit()
     finally:
