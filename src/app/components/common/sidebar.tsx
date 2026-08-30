@@ -15,8 +15,9 @@ import {
   LockKeyhole,
   Moon,
   Sun,
-  ChevronsLeft,
-  ChevronsRight,
+  PanelLeftClose,
+  PanelLeftOpen,
+  X,
 } from "lucide-react";
 import sicurreLogo from "../../assets/sicurre.svg";
 import { useTheme } from "../../lib/theme";
@@ -50,6 +51,7 @@ interface SidebarProps {
   hasIntegration?: boolean;
   /** Desktop rail only. The mobile drawer is already a transient overlay. */
   collapsible?: boolean;
+  onClose?: () => void;
   className?: string;
 }
 
@@ -118,6 +120,7 @@ export function Sidebar({
   workspaceId = "",
   userName,
   collapsible = false,
+  onClose,
   className,
 }: SidebarProps) {
   const { t } = useTranslation();
@@ -172,14 +175,41 @@ export function Sidebar({
       )}
     >
       {/* Brand */}
-      <div className={clsx("pt-5 pb-4", collapsed ? "px-0" : "px-4")}>
-        <div className={clsx("flex items-center", collapsed ? "justify-center" : "gap-2.5")}>
-          <img src={sicurreLogo} alt="Sicurre" className="h-9 w-9 shrink-0" />
-          {!collapsed && (
-            <span className="font-display text-xl font-bold leading-none text-on-surface">
-              Sicurre
-            </span>
-          )}
+      <div className={clsx("pt-5 pb-6", collapsed ? "px-2" : "px-4")}>
+        <div className={clsx("flex", collapsed ? "flex-col items-center gap-2" : "items-center justify-between gap-2.5")}>
+          <div className={clsx("flex items-center", collapsed ? "justify-center" : "gap-2.5")}>
+            <img src={sicurreLogo} alt="Sicurre" className="h-9 w-9 shrink-0" />
+            {!collapsed && (
+              <span className="font-display text-xl font-bold leading-none text-on-surface">
+                Sicurre
+              </span>
+            )}
+          </div>
+          {onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-low hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              aria-label={t("common.close_navigation")}
+              title={t("common.close_navigation")}
+            >
+              <X className="h-5 w-5" aria-hidden="true" />
+            </button>
+          ) : collapsible ? (
+            <button
+              type="button"
+              onClick={() => setCollapsed((value) => !value)}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-low hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              aria-label={collapsed ? t("sidebar.expand_rail") : t("sidebar.collapse_rail")}
+              title={collapsed ? t("sidebar.expand_rail") : t("sidebar.collapse_rail")}
+            >
+              {collapsed ? (
+                <PanelLeftOpen className="h-[18px] w-[18px]" aria-hidden="true" />
+              ) : (
+                <PanelLeftClose className="h-[18px] w-[18px]" aria-hidden="true" />
+              )}
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -187,7 +217,7 @@ export function Sidebar({
           Visible on every page, so the answer never depends on the top bar.
           Collapsed, it reduces to the status dot with the detail in a tooltip. */}
       {isCustomerWorkspace && workspaceName && (
-        <div className={clsx("pb-4", collapsed ? "px-0" : "px-4")}>
+        <div className={clsx("pb-5", collapsed ? "px-0" : "px-4")}>
           {collapsed ? (
             <div
               className="mx-auto grid h-9 w-9 place-items-center rounded-lg bg-surface-low/60"
@@ -197,7 +227,7 @@ export function Sidebar({
               <span
                 aria-hidden="true"
                 className={clsx(
-                  "h-2.5 w-2.5 rounded-full",
+                  "h-2.5 w-2.5 rounded-full motion-safe:animate-pulse",
                   isProtected ? "bg-safe" : "bg-warning",
                 )}
               />
@@ -205,13 +235,6 @@ export function Sidebar({
           ) : (
             <div className="rounded-xl border border-border-subtle bg-surface-low/60 px-3.5 py-3">
               <div className="flex items-center gap-2">
-                <span
-                  aria-hidden="true"
-                  className={clsx(
-                    "h-2 w-2 shrink-0 rounded-full",
-                    isProtected ? "bg-safe" : "bg-warning",
-                  )}
-                />
                 <span
                   className="truncate text-[13px] font-bold text-on-surface"
                   title={userName || workspaceName}
@@ -237,7 +260,21 @@ export function Sidebar({
                   {activeDomain || t("sidebar.no_domain")}
                 </p>
               )}
-              <p className="mt-1.5 text-[11px] font-medium text-on-surface-variant tabular-nums">
+              <p className="mt-1.5 flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant tabular-nums">
+                <span className="relative flex h-2 w-2 shrink-0" aria-hidden="true">
+                  <span
+                    className={clsx(
+                      "absolute inline-flex h-full w-full rounded-full opacity-70 motion-safe:animate-ping",
+                      isProtected ? "bg-safe" : "bg-warning",
+                    )}
+                  />
+                  <span
+                    className={clsx(
+                      "relative inline-flex h-2 w-2 rounded-full",
+                      isProtected ? "bg-safe" : "bg-warning",
+                    )}
+                  />
+                </span>
                 <span className={isProtected ? "text-safe" : "text-warning"}>{statusLabel}</span>
                 {domainKpis && ` · ${t("sidebar.emails_analysed", { count: domainKpis.raw_records_count })}`}
               </p>
@@ -276,7 +313,7 @@ export function Sidebar({
       </nav>
 
       {/* Bottom Section */}
-      <div className="space-y-3 px-3 pb-4 pt-3">
+      <div className="space-y-1 border-t border-border-subtle px-3 pb-4 pt-3">
         {bottomNav.map((item) => (
           <RailButton
             key={item.id}
@@ -344,24 +381,13 @@ export function Sidebar({
           )}
         </button>
 
-        <div className="space-y-1 border-t border-border-subtle pt-3">
-          <RailButton
-            icon={LogOut}
-            label={t("common.logout")}
-            collapsed={collapsed}
-            tone="danger"
-            onClick={onLogout}
-          />
-
-          {collapsible && (
-            <RailButton
-              icon={collapsed ? ChevronsRight : ChevronsLeft}
-              label={collapsed ? t("sidebar.expand_rail") : t("sidebar.collapse_rail")}
-              collapsed={collapsed}
-              onClick={() => setCollapsed((value) => !value)}
-            />
-          )}
-        </div>
+        <RailButton
+          icon={LogOut}
+          label={t("common.logout")}
+          collapsed={collapsed}
+          tone="danger"
+          onClick={onLogout}
+        />
       </div>
     </aside>
   );
