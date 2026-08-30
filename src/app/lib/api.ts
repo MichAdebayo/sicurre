@@ -269,7 +269,7 @@ export function clearStoredSession(): void {
 
 async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
   const headers = new Headers(options?.headers);
-  headers.set("Content-Type", "application/json");
+  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
@@ -998,6 +998,11 @@ export interface DmarcReportSummary {
   }[];
 }
 
+export interface DmarcImportResult {
+  status: "imported" | "already_imported";
+  record_count: number;
+}
+
 export function useDomainShieldStatus(domain: string, enabled = true) {
   return useQuery<DomainShieldStatus>({
     queryKey: ["domain-shield", domain],
@@ -1020,6 +1025,21 @@ export function useDmarcReportSummary(domain: string, enabled = true) {
     queryKey: ["dmarc-reports", domain],
     queryFn: () => fetchJson<DmarcReportSummary>(`/domain-shield/${domain}/dmarc-reports`),
     enabled: enabled && !!domain,
+  });
+}
+
+export function useImportDmarcReport(domain: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => fetchJson<DmarcImportResult>(
+      `/domain-shield/${domain}/dmarc-reports/import`,
+      {
+        method: "POST",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      },
+    ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dmarc-reports", domain] }),
   });
 }
 

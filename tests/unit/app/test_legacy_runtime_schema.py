@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
+from types import SimpleNamespace
 
 from data_platform.api import auth
 
@@ -114,3 +115,40 @@ def test_legacy_workspace_tables_receive_domain_context(tmp_path: Path, monkeypa
     assert "domain" in rule_columns
     assert {"workspace_id", "domain", "email_enabled", "notify_domain_shield"} <= preference_columns
     assert {"domain", "event_type", "action_page"} <= history_columns
+
+
+def test_runtime_initialization_upgrades_existing_local_schema(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Normal local startup upgrades old tables before authenticated queries run."""
+    database_path = tmp_path / "startup-upgrade.db"
+    with sqlite3.connect(database_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE app_alert_history (
+                id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                message TEXT NOT NULL,
+                is_dismissed INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+
+    database_url = f"sqlite+aiosqlite:///{database_path}"
+    monkeypatch.setattr(auth, "_db_path", lambda: str(database_path))
+    monkeypatch.setattr(auth, "ensure_local_runtime_tables", lambda: None)
+    monkeypatch.setattr(
+        auth,
+        "get_settings",
+        lambda: SimpleNamespace(environment="development", database_url=database_url),
+    )
+    auth._upgrade_legacy_sqlite_schema.cache_clear()
+
+    auth.ensure_runtime_tables()
+
+    with sqlite3.connect(database_path) as connection:
+        columns = auth._table_columns(connection, "app_alert_history")
+
+    assert {"domain", "event_type", "action_page"} <= columns

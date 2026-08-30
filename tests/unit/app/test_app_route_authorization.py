@@ -50,6 +50,28 @@ def _user(*, platform_admin: bool) -> AuthUser:
     )
 
 
+def _request_with_body(body: bytes) -> Request:
+    sent = False
+
+    async def receive() -> dict[str, Any]:
+        nonlocal sent
+        if sent:
+            return {"type": "http.request", "body": b"", "more_body": False}
+        sent = True
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    return Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/",
+            "headers": [],
+            "client": ("127.0.0.1", 12345),
+        },
+        receive,
+    )
+
+
 async def _allow_domain(_domain: str, _workspace_id: str) -> None:
     return None
 
@@ -106,26 +128,43 @@ async def test_dmarc_import_is_idempotent(monkeypatch) -> None:
             return [{"id": "row-1"}]
         return []
 
-    def request() -> Request:
-        sent = False
-
-        async def receive() -> dict[str, Any]:
-            nonlocal sent
-            if sent:
-                return {"type": "http.request", "body": b"", "more_body": False}
-            sent = True
-            return {"type": "http.request", "body": DMARC_XML, "more_body": False}
-
-        return Request({"type": "http", "method": "POST", "path": "/"}, receive)
-
     monkeypatch.setattr(app_routes, "_ensure_app_runtime_tables", lambda: None)
     monkeypatch.setattr(app_routes, "async_query_auth_db", query)
 
-    first = await import_dmarc_report("example.test", request(), _user(platform_admin=False))
-    replay = await import_dmarc_report("example.test", request(), _user(platform_admin=False))
+    first = await import_dmarc_report(
+        "example.test", _request_with_body(DMARC_XML), _user(platform_admin=False)
+    )
+    replay = await import_dmarc_report(
+        "example.test", _request_with_body(DMARC_XML), _user(platform_admin=False)
+    )
 
     assert first == {"status": "imported", "record_count": 1}
     assert replay == {"status": "already_imported", "record_count": 0}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("payload", "expected_status"),
+    [(b"", 400), (b"oversized", 413)],
+)
+async def test_dmarc_import_rejects_invalid_size(
+    monkeypatch, payload: bytes, expected_status: int
+) -> None:
+    """Manual imports reject empty and oversized payloads before parsing."""
+    monkeypatch.setattr(app_routes, "_require_workspace_domain", _allow_domain)
+    monkeypatch.setattr(app_routes, "_ensure_app_runtime_tables", lambda: None)
+    monkeypatch.setattr(
+        app_routes,
+        "get_settings",
+        lambda: SimpleNamespace(reported_email_max_message_bytes=4),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await import_dmarc_report(
+            "example.test", _request_with_body(payload), _user(platform_admin=False)
+        )
+
+    assert exc_info.value.status_code == expected_status
 
 
 @pytest.mark.asyncio

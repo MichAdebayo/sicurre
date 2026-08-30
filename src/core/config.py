@@ -258,13 +258,6 @@ class Settings(BaseSettings):
     loops_dns_shield_alert_transaction_id: str | None = Field(
         default=None, validation_alias="LOOPS_DNS_SHIELD_ALERT_TRANSACTION_ID"
     )
-    loops_emergency_lockdown_transaction_id: str | None = Field(
-        default=None, validation_alias="LOOPS_EMERGECNY_LOCKDOWN_TRANSACTION_ID"
-    )
-    loops_quota_warning_transaction_id: str | None = Field(
-        default=None, validation_alias="LOOPS_QUOTA_WARNING_TRANSACTION_ID"
-    )
-
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),
         env_file_encoding="utf-8",
