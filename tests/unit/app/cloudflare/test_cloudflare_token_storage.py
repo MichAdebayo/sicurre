@@ -14,11 +14,10 @@ from starlette.requests import Request
 from data_platform.api.auth import AuthUser
 from data_platform.api.routers import integrations
 from data_platform.api.routers.integrations import (
-    CloudflareTokenSaveRequest,
     CloudflareSetupRequest,
+    CloudflareTokenSaveRequest,
     EmailScanRequest,
     TeardownRequest,
-    _notification_is_allowed,
     cloudflare_status,
     get_workspace_cloudflare_token,
     save_workspace_cloudflare_token,
@@ -27,6 +26,7 @@ from data_platform.api.routers.integrations import (
     teardown_cloudflare,
     upload_quarantine_content,
 )
+from data_platform.services.notification_policy import notification_is_allowed
 
 
 def _user() -> AuthUser:
@@ -57,9 +57,29 @@ def _request() -> Request:
 
 def test_phishing_email_notification_respects_opt_out() -> None:
     """A disabled phishing preference suppresses the outbound notification."""
-    assert not _notification_is_allowed(
+    assert not notification_is_allowed(
         {"notify_phishing": 0, "quiet_hours_enabled": 0},
         datetime(2026, 7, 15, 12, tzinfo=timezone.utc),
+    )
+
+
+def test_notification_master_switch_and_event_switches_are_independent() -> None:
+    """Each domain has one master switch and explicit event-type switches."""
+    now = datetime(2026, 7, 15, 12, tzinfo=timezone.utc)
+    assert not notification_is_allowed(
+        {"email_enabled": 0, "notify_phishing": 1, "notify_domain_shield": 1},
+        now,
+        "phishing",
+    )
+    assert not notification_is_allowed(
+        {"email_enabled": 1, "notify_phishing": 1, "notify_domain_shield": 0},
+        now,
+        "domain_shield",
+    )
+    assert notification_is_allowed(
+        {"email_enabled": 1, "notify_phishing": 1, "notify_domain_shield": 0},
+        now,
+        "phishing",
     )
 
 
@@ -72,10 +92,10 @@ def test_quiet_hours_use_recipient_timezone_across_midnight() -> None:
         "quiet_hours_end": "07:00",
         "timezone": "Europe/Paris",
     }
-    assert not _notification_is_allowed(
+    assert not notification_is_allowed(
         preference, datetime(2026, 7, 15, 21, 30, tzinfo=timezone.utc)
     )
-    assert _notification_is_allowed(preference, datetime(2026, 7, 15, 8, 0, tzinfo=timezone.utc))
+    assert notification_is_allowed(preference, datetime(2026, 7, 15, 8, 0, tzinfo=timezone.utc))
 
 
 @pytest.mark.asyncio
@@ -164,7 +184,7 @@ async def test_quarantine_mime_upload_is_workspace_scoped_and_idempotent(monkeyp
     async def query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
         writes.append((sql, params))
         if "FROM cloudflare_integration" in sql:
-            return [{"workspace_id": "workspace-1"}]
+            return [{"workspace_id": "workspace-1", "zone_name": "example.test"}]
         if "FROM app_quarantine_item" in sql:
             return [{"raw_storage_uri": None, "raw_content_hash": None}]
         return []
@@ -210,6 +230,7 @@ async def test_quarantine_mime_upload_is_workspace_scoped_and_idempotent(monkeyp
 
     assert response == {"status": "stored", "idempotent": False}
     assert any("workspace_id = ?" in sql for sql, _ in writes)
+    assert any("example.test" in params for _, params in writes)
 
 
 @pytest.mark.asyncio
@@ -270,11 +291,11 @@ async def test_phishing_scan_persists_only_a_redacted_quarantine_preview(monkeyp
     quarantine_insert = next(
         params for sql, params in writes if "INSERT INTO app_quarantine_item" in sql
     )
-    assert quarantine_insert[5] == "Write to [EMAIL] using IBAN [IBAN]."
+    assert quarantine_insert[6] == "Write to [EMAIL] using IBAN [IBAN]."
     inference_insert = next(
         params for sql, params in writes if "INSERT INTO app_inference_event" in sql
     )
-    assert inference_insert[16] == 125.0
+    assert inference_insert[17] == 125.0
 
 
 @pytest.mark.asyncio

@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import sicurreLogo from "../../assets/sicurre.svg";
 import { useTheme } from "../../lib/theme";
+import { useActiveDomain } from "../../contexts/active-domain";
+import { useKPIStats } from "../../lib/api";
 
 // Supported pages in the sidebar navigation
 export type SidebarPage =
@@ -42,6 +44,8 @@ interface SidebarProps {
   userRole?: string;
   onboardingRequired?: boolean;
   workspaceName?: string;
+  workspaceId?: string;
+  userName?: string;
   threatCount?: number;
   hasIntegration?: boolean;
   /** Desktop rail only. The mobile drawer is already a transient overlay. */
@@ -111,13 +115,15 @@ export function Sidebar({
   userRole = "owner",
   onboardingRequired = false,
   workspaceName,
-  threatCount,
-  hasIntegration = false,
+  workspaceId = "",
+  userName,
   collapsible = false,
   className,
 }: SidebarProps) {
   const { t } = useTranslation();
   const [theme, setTheme] = useTheme();
+  const { domains, activeDomain, activeIntegration, setActiveDomain } = useActiveDomain();
+  const { data: domainKpis } = useKPIStats(workspaceId, activeDomain);
 
   const [collapsed, setCollapsed] = useState(
     () => collapsible && localStorage.getItem(COLLAPSED_KEY) === "1",
@@ -131,7 +137,7 @@ export function Sidebar({
   // Platform admins have no mailbox of their own, so the workspace card would
   // be describing something they do not have.
   const isCustomerWorkspace = userRole !== "admin";
-  const isProtected = hasIntegration && !onboardingRequired;
+  const isProtected = activeIntegration?.status === "active" && !onboardingRequired;
   const statusLabel = isProtected
     ? t("sidebar.status_protected")
     : t("sidebar.status_setup_required");
@@ -185,9 +191,9 @@ export function Sidebar({
           {collapsed ? (
             <div
               className="mx-auto grid h-9 w-9 place-items-center rounded-lg bg-surface-low/60"
-              title={`${workspaceName} — ${statusLabel}`}
+              title={`${userName || workspaceName}: ${activeDomain || statusLabel}`}
             >
-              <span className="sr-only">{`${workspaceName} — ${statusLabel}`}</span>
+              <span className="sr-only">{`${userName || workspaceName}: ${activeDomain || statusLabel}`}</span>
               <span
                 aria-hidden="true"
                 className={clsx(
@@ -208,24 +214,33 @@ export function Sidebar({
                 />
                 <span
                   className="truncate text-[13px] font-bold text-on-surface"
-                  title={workspaceName}
+                  title={userName || workspaceName}
                 >
-                  {workspaceName}
+                  {userName || workspaceName}
                 </span>
               </div>
-              <p
-                className={clsx(
-                  "mt-1.5 text-[11px] font-semibold",
-                  isProtected ? "text-safe" : "text-warning",
-                )}
-              >
-                {statusLabel}
-              </p>
-              {typeof threatCount === "number" && (
-                <p className="mt-1 text-[11px] font-medium text-on-surface-variant tabular-nums">
-                  {t("sidebar.emails_analysed", { count: threatCount })}
+              {domains.length > 1 ? (
+                <select
+                  value={activeDomain}
+                  onChange={(event) => setActiveDomain(event.target.value)}
+                  className="mt-2 w-full rounded-md border border-border-subtle bg-surface-lowest px-2 py-1.5 text-xs font-semibold text-on-surface focus:border-primary focus:outline-none"
+                  aria-label={t("sidebar.active_domain")}
+                >
+                  {domains.map((domain) => (
+                    <option key={domain.id || domain.zone_name} value={domain.zone_name}>
+                      {domain.zone_name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p className="mt-2 truncate text-xs font-semibold text-on-surface">
+                  {activeDomain || t("sidebar.no_domain")}
                 </p>
               )}
+              <p className="mt-1.5 text-[11px] font-medium text-on-surface-variant tabular-nums">
+                <span className={isProtected ? "text-safe" : "text-warning"}>{statusLabel}</span>
+                {domainKpis && ` · ${t("sidebar.emails_analysed", { count: domainKpis.raw_records_count })}`}
+              </p>
             </div>
           )}
         </div>

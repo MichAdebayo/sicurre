@@ -62,7 +62,7 @@ export default function CGURoute({ onBack }: CGURouteProps) {
             <p className="text-sm text-slate-400 leading-relaxed">
               Les présentes Conditions Générales d'Utilisation (CGU) encadrent l'accès et l'utilisation de la plateforme 
               <strong className="text-white"> Sicurre</strong> (éditée par Sicurre). La plateforme fournit un service automatisé 
-              d'analyse et de remédiation en temps réel des menaces par e-mail (phishing, indésirables, ingénierie sociale).
+              d'analyse et de remédiation en temps réel des menaces par e-mail (phishing, spam, ingénierie sociale).
             </p>
           </section>
 

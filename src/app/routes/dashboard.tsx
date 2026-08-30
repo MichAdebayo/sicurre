@@ -21,19 +21,12 @@ import {
   useThreatLogs,
   useDatasets,
   useRunPipeline,
-  useCloudflareList,
   useDomainShieldStatus,
 } from "../lib/api";
 import { countTrendVerdicts } from "../lib/dashboard-trends";
+import { useActiveDomain } from "../contexts/active-domain";
 
 const MotionDiv = motion.div as any;
-const LAST_ACTIVE_DOMAIN_KEY = "sicurre_last_active_domain";
-
-const readLastActiveDomain = () => {
-  if (typeof window === "undefined") return "";
-  return window.localStorage.getItem(LAST_ACTIVE_DOMAIN_KEY) || "";
-};
-
 interface DashboardRouteProps {
   session: AuthSession;
   onGoToSettings: (tab?: string) => void;
@@ -78,8 +71,9 @@ function KPIBlock({
 
 export default function DashboardRoute({ session, onGoToSettings }: DashboardRouteProps) {
   const { t, i18n } = useTranslation();
-  const { data: kpis, isLoading: kpisLoading } = useKPIStats(session.workspace_id);
-  const { data: threats, isLoading: threatsLoading } = useThreatLogs();
+  const { activeDomain, domains: domainsList } = useActiveDomain();
+  const { data: kpis, isLoading: kpisLoading } = useKPIStats(session.workspace_id, activeDomain);
+  const { data: threats, isLoading: threatsLoading } = useThreatLogs(activeDomain);
   const datasetsQuery = useDatasets(session.is_platform_admin);
   const runPipelineMutation = useRunPipeline();
   const [pipelineMessage, setPipelineMessage] = useState("");
@@ -90,20 +84,8 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
   const [hoveredBarIndex, setHoveredBarIndex] = useState<number | null>(null);
 
   // Domains & Shield status check for security score
-  const { data: domainsList } = useCloudflareList();
-  const [cachedActiveDomain] = useState(readLastActiveDomain);
-
-  const cloudflareActiveDomain = domainsList && domainsList.length > 0
-    ? (domainsList.find((d) => d.status === "active")?.zone_name || domainsList[0].zone_name)
-    : "";
-  const activeDomain = cloudflareActiveDomain || cachedActiveDomain;
   const hasActiveDomain = !!activeDomain;
   const showOnboarding = session.onboarding_required || (domainsList ? domainsList.length === 0 : !activeDomain);
-
-  useEffect(() => {
-    if (!cloudflareActiveDomain || typeof window === "undefined") return;
-    window.localStorage.setItem(LAST_ACTIVE_DOMAIN_KEY, cloudflareActiveDomain);
-  }, [cloudflareActiveDomain]);
 
   const { data: shieldStatus } = useDomainShieldStatus(
     activeDomain || "",
