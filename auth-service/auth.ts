@@ -13,7 +13,7 @@ import {
   directMigrationUrl,
   normalizePostgresUrl,
 } from "./database.js";
-import { buildEmailVerificationEntryUrl } from "./email-verification.js";
+import { buildEmailVerificationEntryUrl, resolveFrontendOrigin } from "./email-verification.js";
 import { sendLoopsTransactional } from "./loops.js";
 import "./env.js";
 
@@ -185,7 +185,11 @@ const trustedOrigins = [
   "http://127.0.0.1:5173",
   "http://localhost:5173",
 ].filter(Boolean) as string[];
-const frontendOrigin = process.env.SICURRE_FRONTEND_ORIGIN?.trim() || new URL(authBaseUrl).origin;
+const frontendOrigin = resolveFrontendOrigin({
+  configuredOrigin: process.env.SICURRE_FRONTEND_ORIGIN,
+  authBaseUrl,
+  isProduction,
+});
 
 export const auth = betterAuth({
   secret: authSecret,

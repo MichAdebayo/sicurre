@@ -256,9 +256,7 @@ async def _session_payload(user: AuthUser) -> dict:
         "is_platform_admin": user.is_platform_admin,
         "has_cloudflare_integration": has_integration,
         "threat_count": threat_count,
-        "onboarding_required": not user.is_platform_admin
-        and not has_integration
-        and threat_count == 0,
+        "onboarding_required": not has_integration and threat_count == 0,
         "sla_latency_ms": settings.sla_latency_ms,
     }
 
@@ -323,11 +321,6 @@ async def get_kpis(
     raw_count = await _workspace_threat_count(current_user.workspace_id, active_domain)
     norm_count = raw_count
     dataset_item_count = 0
-    if current_user.is_platform_admin:
-        with suppress(Exception):
-            dataset_item_count = (
-                await session.execute(text("SELECT COUNT(*) FROM data_dataset_item"))
-            ).scalar() or 0
 
     phishing_count = 0
     spam_count = 0
