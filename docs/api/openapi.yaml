@@ -2462,6 +2462,51 @@ components:
       - idempotent
       title: ReportedEmailIngestResponse
       type: object
+    ReportedEmailListResponse:
+      additionalProperties: false
+      description: Forwarded reports belonging to the authenticated workspace.
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/ReportedEmailSummary'
+          title: Items
+          type: array
+      required:
+      - items
+      title: ReportedEmailListResponse
+      type: object
+    ReportedEmailSummary:
+      additionalProperties: false
+      description: 'One forwarded report, described without reproducing its content.
+
+
+        Deliberately metadata only. The ingest pipeline anonymises the message and
+
+        stores it in private R2 precisely so the forwarded content stops circulating;
+
+        returning a body here would undo that. Date, size and status are enough for
+
+        the person who forwarded it to see that it arrived.'
+      properties:
+        id:
+          title: Id
+          type: string
+        received_at:
+          title: Received At
+          type: string
+        size_bytes:
+          title: Size Bytes
+          type: integer
+        status:
+          title: Status
+          type: string
+      required:
+      - id
+      - received_at
+      - size_bytes
+      - status
+      title: ReportedEmailSummary
+      type: object
     RuntimeComponentResponse:
       additionalProperties: false
       description: Health result for one deployed component.
@@ -4420,6 +4465,36 @@ paths:
       security:
       - HTTPBearer: []
       summary: Get Report Address
+      tags:
+      - reported-email
+  /v1/feedback/reports:
+    get:
+      description: 'List forwarded reports for the authenticated workspace.
+
+
+        The ingest path wrote these rows and nothing read them back, so a user who
+
+        forwarded a missed phishing email saw no confirmation anywhere in the
+
+        product and had no reason to believe it had worked.
+
+
+        Metadata only. The ingest pipeline anonymises the message into private R2
+
+        precisely so the forwarded content stops circulating; returning a body here
+
+        would undo that. Scoped on workspace_id like every other tenant route.'
+      operationId: list_reported_emails_v1_feedback_reports_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportedEmailListResponse'
+          description: Successful Response
+      security:
+      - HTTPBearer: []
+      summary: List Reported Emails
       tags:
       - reported-email
   /v1/integrations/cloudflare:
