@@ -16,7 +16,7 @@ export function parseVerificationCallback(search: string): VerificationCallback 
   return params.get("verified") === "1" ? { status: "verified" } : { status: "none" };
 }
 
-/** Build the Better Auth request performed only after explicit user confirmation. */
+/** Build the verification request with a sign-in callback for success or errors. */
 export function buildVerificationRequestUrl(
   token: string,
   origin: string,
@@ -26,4 +26,9 @@ export function buildVerificationRequestUrl(
   url.searchParams.set("token", token);
   url.searchParams.set("callbackURL", `${origin}/login?verified=1`);
   return url.toString();
+}
+
+/** Exchange the emailed token through Better Auth without a second confirmation. */
+export function verifyEmailFromLink(token: string, origin: string, authBaseUrl: string): void {
+  window.location.replace(buildVerificationRequestUrl(token, origin, authBaseUrl));
 }

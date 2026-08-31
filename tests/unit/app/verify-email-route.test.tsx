@@ -1,10 +1,17 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import VerifyEmailRoute from "../../../src/app/routes/verify-email";
+import { verifyEmailFromLink } from "../../../src/app/lib/email-verification";
+
+vi.mock("../../../src/app/lib/email-verification", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../../../src/app/lib/email-verification")>(),
+  verifyEmailFromLink: vi.fn(),
+}));
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -12,26 +19,32 @@ vi.mock("react-i18next", () => ({
 
 afterEach(() => {
   cleanup();
+  vi.clearAllMocks();
   window.history.replaceState({}, "", "/");
 });
 
-describe("verification confirmation page", () => {
-  it("keeps the token client-side and exposes one explicit confirmation", () => {
+describe("automatic email verification", () => {
+  it("starts verification once without another click, including StrictMode rerenders", () => {
     window.history.replaceState({}, "", "/verify-email#token=secret-token");
-    render(<VerifyEmailRoute onNavigateToLogin={vi.fn()} />);
+    const { rerender } = render(<StrictMode><VerifyEmailRoute onNavigateToLogin={vi.fn()} /></StrictMode>);
 
     expect(window.location.hash).toBe("#token=secret-token");
-    const confirm = screen.getByRole("link", { name: "verify_email.confirm" });
-    const url = new URL(confirm.getAttribute("href")!, window.location.origin);
-    expect(url.pathname).toBe("/api/auth/verify-email");
-    expect(url.searchParams.get("token")).toBe("secret-token");
+    expect(verifyEmailFromLink).toHaveBeenCalledExactlyOnceWith("secret-token", window.location.origin, `${window.location.origin}/api/auth`);
+    expect(screen.getByRole("status")).toHaveTextContent("verify_email.verifying");
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    rerender(<StrictMode><VerifyEmailRoute onNavigateToLogin={vi.fn()} /></StrictMode>);
+    expect(verifyEmailFromLink).toHaveBeenCalledTimes(1);
   });
 
   it("rejects a link without a token", () => {
     window.history.replaceState({}, "", "/verify-email");
-    render(<VerifyEmailRoute onNavigateToLogin={vi.fn()} />);
+    const onNavigateToLogin = vi.fn();
+    render(<VerifyEmailRoute onNavigateToLogin={onNavigateToLogin} />);
 
     expect(screen.getByText("verify_email.invalid_link")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "verify_email.confirm" })).not.toBeInTheDocument();
+    expect(verifyEmailFromLink).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "verify_email.back_to_login" }));
+    expect(onNavigateToLogin).toHaveBeenCalledOnce();
   });
 });
