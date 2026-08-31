@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Home, X } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, ArrowRight, Home, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import sicurreLogo from "../assets/sicurre.svg";
 import { loginSchema, signUpSchema } from "../lib/schemas";
@@ -64,11 +64,14 @@ export default function LoginRoute({
 
   useEffect(() => {
     setIsSignUp(initialMode === "signup");
-    setAuthError(emailVerificationError ? t(`login.verification_${emailVerificationError}`) : "");
-    setAuthNotice(emailJustVerified ? t("login.email_verified_sign_in") : "");
     setVerificationEmailSent(false);
     setTurnstileToken("");
-  }, [emailJustVerified, emailVerificationError, initialMode, t]);
+  }, [initialMode]);
+
+  useEffect(() => {
+    setAuthError(emailVerificationError ? t(`login.verification_${emailVerificationError}`) : "");
+    setAuthNotice(emailJustVerified ? t("login.email_verified_sign_in") : "");
+  }, [emailJustVerified, emailVerificationError, t]);
 
   useEffect(() => {
     if (!isSignUp || turnstileConfig.status !== "idle") return;
@@ -304,11 +307,12 @@ export default function LoginRoute({
             </div>
             {authError && <p className="text-sm text-red-300" role="alert">{authError}</p>}
             {authNotice && <p className="text-sm text-emerald-200">{authNotice}</p>}
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-6">
               <Button
                 type="button"
                 fullWidth
                 variant="outline"
+                className="hover:bg-primary! hover:text-on-primary hover:border-primary focus-visible:bg-primary focus-visible:text-on-primary focus-visible:border-primary"
                 disabled={isResendingVerification}
                 onClick={() => void handleResendVerification()}
               >
@@ -322,8 +326,9 @@ export default function LoginRoute({
                   setAuthError("");
                   setAuthNotice("");
                 }}
-                className="text-sm font-medium text-slate-300 hover:text-white transition-colors cursor-pointer"
+                className="inline-flex min-h-11 items-center justify-center gap-2 self-center rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-colors cursor-pointer"
               >
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                 Revenir à la connexion
               </button>
             </div>

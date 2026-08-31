@@ -14,6 +14,7 @@
     "alerts": "Alertes & Règles",
     "domain_shield": "Domain Shield",
     "load_error": "Impossible de charger ces données.",
+    "domains_load_error": "Impossible de charger vos domaines.",
     "retry": "Réessayer",
     "previous": "Précédent",
     "next": "Suivant",
@@ -64,13 +65,13 @@
     }
   },
   "verify_email": {
-    "title": "Confirmez votre adresse e-mail",
-    "description": "Confirmez que vous êtes à l’origine de cette demande pour activer votre compte Sicurre.",
-    "confirm": "Confirmer mon adresse",
+    "verifying": "Vérification de votre adresse e-mail…",
+    "invalid_title": "Lien de vérification invalide",
     "invalid_link": "Ce lien ne contient pas de jeton de vérification valide. Demandez un nouveau lien depuis la page de connexion.",
     "back_to_login": "Retour à la connexion"
   },
   "sidebar": {
+    "back_to_workspace": "Mon espace",
     "collapse_rail": "Réduire le menu",
     "expand_rail": "Déployer le menu",
     "locked_hint": "Connectez Cloudflare pour déverrouiller cette page",
