@@ -260,11 +260,43 @@ export function persistSession(session: AuthSession, authProvider: AuthProvider 
   localStorage.setItem(AUTH_PROVIDER_KEY, authProvider);
 }
 
+/**
+ * Preferences that describe the device, not the tenant. These survive logout
+ * because clearing them would reset the person's theme and language every time
+ * they sign out, and none of them says anything about who was signed in.
+ */
+const DEVICE_PREFERENCE_KEYS = new Set([
+  "sicurre_theme",
+  "sicurre_lang",
+  "sicurre_rail_collapsed",
+]);
+
+/**
+ * Remove everything the signed-in session put in browser storage.
+ *
+ * This sweeps by prefix rather than naming keys. Several are named after the
+ * data they hold — `sicurre:active-domain:<workspaceId>`,
+ * `sicurre:kpis:<workspaceId>:<domain>`, `sicurre_domain_shield_status:<domain>`
+ * — so they cannot be listed ahead of time, and the previous version removed
+ * four fixed keys and left the rest behind. After logout a shared browser still
+ * held the domain the previous user managed, that domain's SPF/DKIM/DMARC
+ * posture, their threat counts and their workspace id.
+ *
+ * Sweeping also means a tenant-scoped key added later is cleared without anyone
+ * remembering to update this function, which is the failure the fixed list had.
+ */
 export function clearStoredSession(): void {
-  localStorage.removeItem(USER_NAME_KEY);
-  localStorage.removeItem(USER_EMAIL_KEY);
-  localStorage.removeItem(USER_ROLE_KEY);
-  localStorage.removeItem(AUTH_PROVIDER_KEY);
+  for (const store of [localStorage, sessionStorage]) {
+    try {
+      const doomed = Object.keys(store).filter(
+        (key) => key.startsWith("sicurre") && !DEVICE_PREFERENCE_KEYS.has(key),
+      );
+      for (const key of doomed) store.removeItem(key);
+    } catch {
+      // Storage can be unavailable (private mode, blocked site data). Losing
+      // the sweep must not stop the sign-out that is already in progress.
+    }
+  }
 }
 
 async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
