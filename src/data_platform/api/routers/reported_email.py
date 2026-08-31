@@ -22,6 +22,7 @@ from data_platform.api.routers.app_routes import (
 )
 from data_platform.api.schemas.app_responses import DmarcImportResponse
 from data_platform.api.schemas.integration_responses import (
+    ReportedEmailListResponse,
     ReportAddressResponse,
     ReportedEmailIngestResponse,
 )
@@ -81,6 +82,38 @@ async def get_report_address(
     settings = get_settings()
     token = _codec(settings).encode(current_user.workspace_id)
     return {"address": report_address(settings.reported_email_address, token)}
+
+
+@router.get("/v1/feedback/reports", response_model=ReportedEmailListResponse)
+async def list_reported_emails(
+    current_user: AuthUser = Depends(get_current_user),  # noqa: B008
+) -> dict[str, list[dict[str, object]]]:
+    """List forwarded reports for the authenticated workspace.
+
+    The ingest path wrote these rows and nothing read them back, so a user who
+    forwarded a missed phishing email saw no confirmation anywhere in the
+    product and had no reason to believe it had worked.
+
+    Metadata only. The ingest pipeline anonymises the message into private R2
+    precisely so the forwarded content stops circulating; returning a body here
+    would undo that. Scoped on workspace_id like every other tenant route.
+    """
+    rows = await auth_query(
+        "SELECT id, received_at, size_bytes, status FROM app_reported_email "
+        "WHERE workspace_id = ? ORDER BY received_at DESC LIMIT 50",
+        (current_user.workspace_id,),
+    )
+    return {
+        "items": [
+            {
+                "id": str(row["id"]),
+                "received_at": str(row["received_at"]),
+                "size_bytes": int(row["size_bytes"] or 0),
+                "status": str(row["status"] or "received"),
+            }
+            for row in rows
+        ]
+    }
 
 
 @router.post(
