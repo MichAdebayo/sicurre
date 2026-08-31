@@ -15,6 +15,7 @@ import {
 } from "./database.js";
 import { buildEmailVerificationEntryUrl, resolveFrontendOrigin } from "./email-verification.js";
 import { sendLoopsTransactional } from "./loops.js";
+import { buildTrustedOrigins } from "./trusted-origins.js";
 import "./env.js";
 
 const authBaseUrl =
@@ -180,11 +181,10 @@ async function verifyTurnstileToken(token: string, remoteIp: string | null): Pro
   return result.success === true;
 }
 
-const trustedOrigins = [
-  process.env.SICURRE_FRONTEND_ORIGIN,
-  "http://127.0.0.1:5173",
-  "http://localhost:5173",
-].filter(Boolean) as string[];
+const trustedOrigins = buildTrustedOrigins({
+  configuredOrigin: process.env.SICURRE_FRONTEND_ORIGIN,
+  isProduction,
+});
 const frontendOrigin = resolveFrontendOrigin({
   configuredOrigin: process.env.SICURRE_FRONTEND_ORIGIN,
   authBaseUrl,
