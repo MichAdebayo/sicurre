@@ -78,6 +78,14 @@ describe("signup verification", () => {
 
     await waitFor(() => expect(screen.getByText("Vérifiez votre adresse e-mail")).toBeInTheDocument());
     expect(screen.getByText("new@example.test")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Renvoyer le lien" })).toHaveClass(
+      "hover:bg-primary!", "hover:text-on-primary", "hover:border-primary",
+      "focus-visible:bg-primary", "focus-visible:text-on-primary",
+    );
+    const returnButton = screen.getByRole("button", { name: "Revenir à la connexion" });
+    expect(returnButton.parentElement).toHaveClass("gap-6");
+    expect(returnButton).toHaveClass("min-h-11", "focus-visible:outline-primary");
+    expect(returnButton.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
     expect(onLoginSuccess).not.toHaveBeenCalled();
   });
 });

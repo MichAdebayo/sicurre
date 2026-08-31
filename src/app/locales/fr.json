@@ -65,9 +65,8 @@
     }
   },
   "verify_email": {
-    "title": "Confirmez votre adresse e-mail",
-    "description": "Confirmez que vous êtes à l’origine de cette demande pour activer votre compte Sicurre.",
-    "confirm": "Confirmer mon adresse",
+    "verifying": "Vérification de votre adresse e-mail…",
+    "invalid_title": "Lien de vérification invalide",
     "invalid_link": "Ce lien ne contient pas de jeton de vérification valide. Demandez un nouveau lien depuis la page de connexion.",
     "back_to_login": "Retour à la connexion"
   },
