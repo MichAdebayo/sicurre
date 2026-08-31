@@ -141,7 +141,7 @@ export default function App() {
 function AppContent() {
   const { t, i18n } = useTranslation();
   const [hasStoredSession, setHasStoredSession] = useState(getInitialLoginState);
-  const [sessionLookupEnabled, setSessionLookupEnabled] = useState(true);
+  const [sessionLookupEnabled, setSessionLookupEnabled] = useState(verificationCallback.status === "none");
   const [viewState, setViewStateState] = useState<ViewState>(getInitialViewState);
 
   const setViewState = (view: ViewState) => {
@@ -157,9 +157,10 @@ function AppContent() {
   );
   const [settingsTab, setSettingsTab] = useState<string | undefined>();
   const requestedAfterLogin = useRef(getSidebarPageFromPath(window.location.pathname));
-  const sessionQuery = useCurrentSession(sessionLookupEnabled);
+  const isVerificationEntry = viewState === "verify-email";
+  const sessionQuery = useCurrentSession(sessionLookupEnabled && !isVerificationEntry);
   const logoutMutation = useLogout();
-  const session = sessionQuery.data;
+  const session = isVerificationEntry || !sessionLookupEnabled ? undefined : sessionQuery.data;
   const administration = activePage === "logs" && Boolean(session?.is_platform_admin);
 
   useEffect(() => {
@@ -269,14 +270,16 @@ function AppContent() {
     }
   };
 
-  if (sessionQuery.isLoading || (sessionLookupEnabled && session && !hasStoredSession)) {
+  if (isVerificationEntry) {
+    return <VerifyEmailRoute onNavigateToLogin={() => setViewState("login")} />;
+  }
+
+  // Background checks must not unmount a public form or its verification notice.
+  if ((sessionQuery.isLoading && !sessionQuery.isFetched) || (sessionLookupEnabled && session && !hasStoredSession)) {
     return <RouteFallback />;
   }
 
   if (!hasStoredSession || !session) {
-    if (viewState === "verify-email") {
-      return <VerifyEmailRoute onNavigateToLogin={() => setViewState("login")} />;
-    }
     if (viewState === "landing") {
       return (
         <LandingRoute

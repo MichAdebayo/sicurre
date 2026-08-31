@@ -65,9 +65,8 @@
     }
   },
   "verify_email": {
-    "title": "Confirm your email address",
-    "description": "Confirm that you requested this action to activate your Sicurre account.",
-    "confirm": "Confirm my address",
+    "verifying": "Verifying your email address…",
+    "invalid_title": "Invalid verification link",
     "invalid_link": "This link does not contain a valid verification token. Request a new link from the sign-in page.",
     "back_to_login": "Back to sign in"
   },
