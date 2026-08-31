@@ -24,11 +24,8 @@ export function resolveAuthorizedPage(
   requested: SidebarPage | null,
   options: { isPlatformAdmin: boolean; onboardingRequired: boolean },
 ): SidebarPage {
-  if (options.isPlatformAdmin) {
-    return requested && ["logs", "settings", "support"].includes(requested)
-      ? requested
-      : "logs";
-  }
+  if (requested === "logs" && options.isPlatformAdmin) return "logs";
+  if (requested === "support") return "support";
   if (options.onboardingRequired) return "settings";
   return requested && requested !== "logs" ? requested : "dashboard";
 }

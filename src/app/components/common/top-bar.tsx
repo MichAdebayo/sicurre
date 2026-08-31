@@ -20,21 +20,22 @@ import { useActiveDomain } from "../../contexts/active-domain";
 interface TopBarProps {
   userName?: string;
   userRole?: string;
+  administration?: boolean;
   onboardingRequired?: boolean;
   onPageChange?: (page: SidebarPage) => void;
 }
 
 export function TopBar({
   userName = "SA",
-  userRole = "owner",
+  administration = false,
   onboardingRequired = false,
   onPageChange,
 }: TopBarProps) {
   const { t, i18n } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
-  const runtimeHealth = useAdminRuntimeHealth(userRole === "admin");
+  const runtimeHealth = useAdminRuntimeHealth(administration);
   const { activeDomain } = useActiveDomain();
-  const { data: alertHistory } = useAlertHistory(activeDomain);
+  const { data: alertHistory } = useAlertHistory(administration ? "" : activeDomain);
   const markAlertReadMutation = useMarkAlertRead(activeDomain);
   const markReadMutation = useMarkDomainAlertsRead(activeDomain);
 
@@ -71,7 +72,7 @@ export function TopBar({
     unread: boolean;
   }[] = [];
 
-  if (onboardingRequired && userRole !== "admin") {
+  if (onboardingRequired && !administration) {
     notificationsList.push({
       id: "onboarding_cloudflare_required",
       title: t("topbar.connect_cloudflare"),
@@ -123,7 +124,7 @@ export function TopBar({
     <header className="h-14 min-w-0 flex-1 bg-transparent px-0 flex items-center justify-between shrink-0 relative z-40">
       {/* Title Placeholder / Brand Space to balance the header layout */}
       <div className="truncate font-display font-semibold text-sm text-on-surface-variant opacity-80">
-        {activeDomain
+        {!administration && activeDomain
           ? activeDomain
           : t("topbar.console_name")}
       </div>
@@ -131,7 +132,7 @@ export function TopBar({
       {/* Right Actions */}
       <div className="flex items-center gap-4 relative">
         {/* System Status (Visible ONLY to platform administrators) */}
-        {userRole === "admin" && (
+        {administration && (
           <div className="flex items-center gap-2 pr-2 border-r border-border-subtle/50">
             <span className="relative flex h-2 w-2">
               {runtimeHealth.data?.status === "ok" && (
@@ -161,7 +162,7 @@ export function TopBar({
         )}
 
         {/* Notifications Icon Button */}
-        <button
+        {!administration && <button
           onClick={(e) => {
             e.stopPropagation();
             setIsOpen(!isOpen);
@@ -173,10 +174,10 @@ export function TopBar({
           {unreadCount > 0 && (
             <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-error rounded-full ring-2 ring-surface-lowest dark:ring-surface-low" />
           )}
-        </button>
+        </button>}
 
         {/* Notifications Floating Dropdown Overlay */}
-        {isOpen && (
+        {!administration && isOpen && (
           <div
             onClick={(e) => e.stopPropagation()}
             className="absolute right-0 top-11 z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg border border-border-subtle bg-surface-lowest p-4 text-on-surface shadow-xl shadow-primary/10 animate-in fade-in slide-in-from-top-1 duration-150 font-sans dark:bg-surface-low"

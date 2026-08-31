@@ -43,6 +43,7 @@ interface SidebarProps {
   onLogout: () => void;
   onLockdown?: () => void;
   userRole?: string;
+  administration?: boolean;
   onboardingRequired?: boolean;
   workspaceName?: string;
   workspaceId?: string;
@@ -114,7 +115,7 @@ export function Sidebar({
   onPageChange,
   onLogout,
   onLockdown,
-  userRole = "owner",
+  administration = false,
   onboardingRequired = false,
   workspaceName,
   workspaceId = "",
@@ -125,8 +126,9 @@ export function Sidebar({
 }: SidebarProps) {
   const { t } = useTranslation();
   const [theme, setTheme] = useTheme();
-  const { domains, activeDomain, activeIntegration, setActiveDomain } = useActiveDomain();
-  const { data: domainKpis } = useKPIStats(workspaceId, activeDomain);
+  const { domains, activeDomain, activeIntegration, setActiveDomain, isLoading, isError } = useActiveDomain();
+  const domainUnavailable = isLoading || isError;
+  const { data: domainKpis } = useKPIStats(workspaceId, administration ? "" : activeDomain);
 
   const [collapsed, setCollapsed] = useState(
     () => collapsible && localStorage.getItem(COLLAPSED_KEY) === "1",
@@ -136,12 +138,10 @@ export function Sidebar({
     if (collapsible) localStorage.setItem(COLLAPSED_KEY, collapsed ? "1" : "0");
   }, [collapsed, collapsible]);
 
-  const isOnboardingLocked = onboardingRequired && userRole !== "admin";
-  // Platform admins have no mailbox of their own, so the workspace card would
-  // be describing something they do not have.
-  const isCustomerWorkspace = userRole !== "admin";
+  const isOnboardingLocked = onboardingRequired && !administration;
+  const isCustomerWorkspace = !administration;
   const isProtected = activeIntegration?.status === "active" && !onboardingRequired;
-  const statusLabel = isProtected
+  const statusLabel = isLoading ? t("common.loading") : isError ? t("common.domains_load_error") : isProtected
     ? t("sidebar.status_protected")
     : t("sidebar.status_setup_required");
 
@@ -156,11 +156,11 @@ export function Sidebar({
 
   const adminNav = [
     { id: "logs", label: t("sidebar.nav_admin_console"), icon: History },
+    { ...baseNav[0], label: t("sidebar.back_to_workspace") },
     baseNav[5],
   ] as const;
 
-  // Platform admins operate the service and do not own a customer mailbox.
-  const mainNav = userRole === "admin" ? adminNav : baseNav;
+  const mainNav = administration ? adminNav : baseNav;
 
   const bottomNav = [
     { id: "support", label: t("sidebar.nav_support"), icon: HelpCircle },
@@ -228,7 +228,7 @@ export function Sidebar({
                 aria-hidden="true"
                 className={clsx(
                   "h-2.5 w-2.5 rounded-full motion-safe:animate-pulse",
-                  isProtected ? "bg-safe" : "bg-warning",
+                  domainUnavailable ? "bg-on-surface-variant" : isProtected ? "bg-safe" : "bg-warning",
                 )}
               />
             </div>
@@ -242,7 +242,11 @@ export function Sidebar({
                   {userName || workspaceName}
                 </span>
               </div>
-              {domains.length > 1 ? (
+              {domainUnavailable ? (
+                <p className="mt-2 text-xs text-on-surface-variant" role={isLoading ? "status" : undefined}>
+                  {statusLabel}
+                </p>
+              ) : domains.length > 1 ? (
                 <select
                   value={activeDomain}
                   onChange={(event) => setActiveDomain(event.target.value)}
@@ -260,7 +264,7 @@ export function Sidebar({
                   {activeDomain || t("sidebar.no_domain")}
                 </p>
               )}
-              <p className="mt-1.5 flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant tabular-nums">
+              {!domainUnavailable && <p className="mt-1.5 flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant tabular-nums">
                 <span className="relative flex h-2 w-2 shrink-0" aria-hidden="true">
                   <span
                     className={clsx(
@@ -277,7 +281,7 @@ export function Sidebar({
                 </span>
                 <span className={isProtected ? "text-safe" : "text-warning"}>{statusLabel}</span>
                 {domainKpis && ` · ${t("sidebar.emails_analysed", { count: domainKpis.raw_records_count })}`}
-              </p>
+              </p>}
             </div>
           )}
         </div>

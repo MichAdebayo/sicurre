@@ -5,7 +5,6 @@ import {
   ShieldCheck,
   Mail,
   Settings,
-  Play,
   Award,
   TrendingUp,
   Cpu,
@@ -14,13 +13,10 @@ import {
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { VerdictBadge } from "../components/threats/verdict-badge";
-import { AppToast } from "../components/common/app-toast";
 import {
   AuthSession,
   useKPIStats,
   useThreatLogs,
-  useDatasets,
-  useRunPipeline,
   useDomainShieldStatus,
 } from "../lib/api";
 import { countTrendVerdicts } from "../lib/dashboard-trends";
@@ -74,10 +70,6 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
   const { activeDomain, domains: domainsList } = useActiveDomain();
   const { data: kpis, isLoading: kpisLoading } = useKPIStats(session.workspace_id, activeDomain);
   const { data: threats, isLoading: threatsLoading } = useThreatLogs(activeDomain);
-  const datasetsQuery = useDatasets(session.is_platform_admin);
-  const runPipelineMutation = useRunPipeline();
-  const [pipelineMessage, setPipelineMessage] = useState("");
-  const [pipelineError, setPipelineError] = useState("");
 
   // States for dynamic interactive Last 7 days chart
   const [dateRange, setDateRange] = useState<"7d" | "30d" | "12m">("7d");
@@ -91,17 +83,6 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
     activeDomain || "",
     !!activeDomain
   );
-
-  const handleRunPipeline = async () => {
-    setPipelineMessage("");
-    setPipelineError("");
-    try {
-      await runPipelineMutation.mutateAsync();
-      setPipelineMessage("Pipeline lancé.");
-    } catch (err) {
-      setPipelineError(err instanceof Error ? err.message : "Impossible de lancer le pipeline.");
-    }
-  };
 
   const totalScans = kpis?.raw_records_count ?? 0;
   const phishingCount = kpis?.threats_phishing_count ?? 0;
@@ -219,148 +200,6 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
 
   const grade = securityScoreGrade();
 
-  // Platform admin rendering
-  if (session.is_platform_admin) {
-    return (
-      <MotionDiv
-        initial={false}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -12 }}
-        transition={{ duration: 0.3 }}
-        className="space-y-8"
-      >
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border-subtle">
-          <div>
-            <h1 className="font-display font-bold text-[28px] text-on-surface tracking-tight leading-tight">
-              Console d'Administration
-            </h1>
-            <p className="text-sm text-on-surface-variant mt-1">
-              Pilotez l'entraînement du modèle et supervisez les métriques globales
-            </p>
-          </div>
-          <div className="rounded-lg border border-border-subtle bg-white px-4 py-3 text-right shadow-sm">
-            <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant">
-              Rôle Utilisateur
-            </div>
-            <div className="text-lg font-bold text-primary">
-              Admin Plateforme
-            </div>
-          </div>
-        </div>
-
-        {/* Global KPIs */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          <KPIBlock label="Total Scannés (Global)" value={kpisLoading ? "—" : totalScans.toLocaleString("fr-FR")} variant="primary" />
-          <KPIBlock label="Phishing Bloqué" value={kpisLoading ? "—" : phishingCount.toLocaleString("fr-FR")} variant="phishing" />
-          <KPIBlock label="Total Dataset Items" value={kpisLoading ? "—" : (kpis?.dataset_items_count ?? 0).toLocaleString("fr-FR")} variant="default" />
-          <KPIBlock label="Statut Système" value="Actif" variant="legitimate" />
-        </div>
-
-        {/* Pipeline Controls & Verdicts */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-7 bg-white rounded-xl border border-border-subtle p-6 flex flex-col justify-between shadow-sm">
-            <div>
-              <h3 className="font-display font-semibold text-[17px] text-on-surface mb-2">
-                Pipeline de Données & Entraînement ML
-              </h3>
-              <p className="text-sm text-on-surface-variant mb-6 leading-relaxed">
-                Déclenchez manuellement le cycle de normalisation, d'annotation et d'export du dataset vers Cloudflare R2 et Kaggle pour ré-entraîner le modèle CamemBERTav2.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              {runPipelineMutation.isPending ? (
-                <Button disabled className="w-full flex items-center justify-center gap-2">
-                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  Lancement du pipeline...
-                </Button>
-              ) : (
-                <Button onClick={handleRunPipeline} className="w-full flex items-center justify-center gap-2">
-                  <Play className="w-4 h-4" />
-                  Lancer le Pipeline de Données (`make run-pipeline`)
-                </Button>
-              )}
-            </div>
-          </div>
-
-          <div className="lg:col-span-5 bg-white rounded-xl border border-border-subtle p-6 shadow-sm">
-            <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.12em] mb-5">
-              Répartition des verdicts globaux
-            </p>
-            <div className="space-y-4">
-              <DistributionRow label="Légitime" count={legitimateCount} total={Math.max(totalScans, 1)} colorClass="bg-safe" />
-              <DistributionRow label="Spam" count={spamCount} total={Math.max(totalScans, 1)} colorClass="bg-warning" />
-              <DistributionRow label="Phishing" count={phishingCount} total={Math.max(totalScans, 1)} colorClass="bg-error" />
-            </div>
-          </div>
-        </div>
-
-        {/* Datasets Table */}
-        <div className="bg-white rounded-xl border border-border-subtle p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-display font-semibold text-[17px] text-on-surface">
-              Historique des Datasets d'Entraînement
-            </h3>
-            <span className="text-[11px] font-bold px-2 py-1 rounded-md bg-primary/10 text-primary uppercase">
-              Provenances
-            </span>
-          </div>
-
-          {datasetsQuery.isLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-10 bg-surface-low rounded-lg animate-pulse" />
-              ))}
-            </div>
-          ) : !datasetsQuery.data || datasetsQuery.data.length === 0 ? (
-            <div className="py-8 text-center text-on-surface-variant/70 text-sm">
-              Aucun dataset enregistré pour le moment.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left font-sans">
-                <thead>
-                  <tr className="border-b border-border-subtle text-xs font-bold text-on-surface-variant/90 tracking-wide">
-                    <th className="pb-3 pl-2">Version Tag</th>
-                    <th className="pb-3">Nombre d'Éléments</th>
-                    <th className="pb-3">Statut</th>
-                    <th className="pb-3 pr-2 text-right">Date de Publication</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-subtle/50 text-xs">
-                  {datasetsQuery.data.map((ds) => (
-                    <tr key={ds.id} className="hover:bg-surface-low/30 transition-colors">
-                      <td className="py-3.5 pl-2 font-semibold text-on-surface text-xs">{ds.version_tag}</td>
-                      <td className="py-3.5 text-xs font-semibold text-on-surface">{ds.item_count.toLocaleString("fr-FR")}</td>
-                      <td className="py-3.5">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${ds.status === "frozen" ? "bg-safe/10 text-safe" : "bg-warning/10 text-warning"
-                          }`}>
-                          {ds.status}
-                        </span>
-                      </td>
-                      <td className="py-3.5 pr-2 text-right text-xs text-on-surface-variant/80 font-semibold">
-                        {ds.published_at ? new Date(ds.published_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }) : "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-        <AppToast
-          tone={pipelineError ? "error" : "success"}
-          message={pipelineError || pipelineMessage}
-          visible={Boolean(pipelineError || pipelineMessage)}
-          onClose={() => {
-            setPipelineError("");
-            setPipelineMessage("");
-          }}
-        />
-      </MotionDiv>
-    );
-  }
 
   // General tenant dashboard
   return (

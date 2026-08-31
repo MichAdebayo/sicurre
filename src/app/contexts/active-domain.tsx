@@ -7,6 +7,8 @@ interface ActiveDomainContextValue {
   activeIntegration?: CloudflareStatus;
   setActiveDomain: (domain: string) => void;
   isLoading: boolean;
+  isError: boolean;
+  retry: () => void;
 }
 
 const ActiveDomainContext = createContext<ActiveDomainContextValue | null>(null);
@@ -56,6 +58,8 @@ export function ActiveDomainProvider({
         ),
         setActiveDomain,
         isLoading: query.isLoading,
+        isError: query.isError && query.data === undefined,
+        retry: () => { void query.refetch(); },
       }}
     >
       {children}
