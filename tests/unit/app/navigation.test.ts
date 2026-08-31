@@ -15,15 +15,27 @@ describe("authenticated navigation", () => {
     expect(getSidebarPageFromPath("/login")).toBeNull();
   });
 
-  it("keeps platform administrators outside customer mailbox routes", () => {
+  it("opens administrators' own workspace unless admin access is explicitly requested", () => {
     expect(resolveAuthorizedPage("dashboard", {
       isPlatformAdmin: true,
       onboardingRequired: false,
-    })).toBe("logs");
+    })).toBe("dashboard");
     expect(resolveAuthorizedPage("settings", {
       isPlatformAdmin: true,
       onboardingRequired: false,
     })).toBe("settings");
+    expect(resolveAuthorizedPage(null, {
+      isPlatformAdmin: true, onboardingRequired: false,
+    })).toBe("dashboard");
+    expect(resolveAuthorizedPage("logs", {
+      isPlatformAdmin: true, onboardingRequired: true,
+    })).toBe("logs");
+    expect(resolveAuthorizedPage("dashboard", {
+      isPlatformAdmin: true, onboardingRequired: true,
+    })).toBe("settings");
+    expect(resolveAuthorizedPage("support", {
+      isPlatformAdmin: true, onboardingRequired: true,
+    })).toBe("support");
   });
 
   it("locks onboarding customers to settings and rejects the admin route", () => {

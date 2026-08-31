@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { AppShell } from "./components/common/app-shell";
 import { SidebarPage } from "./components/common/sidebar";
 import {
@@ -17,18 +17,31 @@ import { parseVerificationCallback } from "./lib/email-verification";
 import { applyTheme, getStoredTheme } from "./lib/theme";
 import { ActiveDomainProvider } from "./contexts/active-domain";
 import { buildDocumentTitle, type DocumentTitleView } from "./lib/document-title";
+import { PageLoading } from "./components/common/page-loading";
+import { DomainPageBoundary } from "./components/common/domain-page-boundary";
+
+const pageLoaders = {
+  dashboard: () => import("./routes/dashboard"),
+  threats: () => import("./routes/threats"),
+  logs: () => import("./routes/logs"),
+  settings: () => import("./routes/settings"),
+  support: () => import("./routes/support"),
+  quarantine: () => import("./routes/quarantine"),
+  alerts: () => import("./routes/alerts"),
+  "domain-shield": () => import("./routes/domain-shield"),
+};
 
 const LandingRoute = lazy(() => import("./routes/landing"));
 const LoginRoute = lazy(() => import("./routes/login"));
 const VerifyEmailRoute = lazy(() => import("./routes/verify-email"));
-const DashboardRoute = lazy(() => import("./routes/dashboard"));
-const ThreatsRoute = lazy(() => import("./routes/threats"));
-const LogsRoute = lazy(() => import("./routes/logs"));
-const SettingsRoute = lazy(() => import("./routes/settings"));
-const SupportRoute = lazy(() => import("./routes/support"));
-const QuarantineRoute = lazy(() => import("./routes/quarantine"));
-const AlertsRoute = lazy(() => import("./routes/alerts"));
-const DomainShieldRoute = lazy(() => import("./routes/domain-shield"));
+const DashboardRoute = lazy(pageLoaders.dashboard);
+const ThreatsRoute = lazy(pageLoaders.threats);
+const LogsRoute = lazy(pageLoaders.logs);
+const SettingsRoute = lazy(pageLoaders.settings);
+const SupportRoute = lazy(pageLoaders.support);
+const QuarantineRoute = lazy(pageLoaders.quarantine);
+const AlertsRoute = lazy(pageLoaders.alerts);
+const DomainShieldRoute = lazy(pageLoaders["domain-shield"]);
 const MentionsLegalesRoute = lazy(() => import("./routes/mentions-legales"));
 const ConfidentialiteRoute = lazy(() => import("./routes/confidentialite"));
 const ContactRoute = lazy(() => import("./routes/contact"));
@@ -111,17 +124,8 @@ const getInitialViewState = (): ViewState => {
 function RouteFallback() {
   const { t } = useTranslation();
   return (
-    <div className="min-h-screen w-screen flex items-center justify-center bg-surface-low text-on-surface">
+    <div role="status" className="min-h-screen w-full flex items-center justify-center bg-surface-low text-on-surface">
       <div className="text-sm font-semibold">{t("common.loading")}</div>
-    </div>
-  );
-}
-
-function PageRouteFallback() {
-  const { t } = useTranslation();
-  return (
-    <div className="flex min-h-48 items-center justify-center text-sm font-semibold text-on-surface-variant">
-      {t("common.loading")}
     </div>
   );
 }
@@ -137,7 +141,7 @@ export default function App() {
 function AppContent() {
   const { t, i18n } = useTranslation();
   const [hasStoredSession, setHasStoredSession] = useState(getInitialLoginState);
-  const [sessionLookupEnabled, setSessionLookupEnabled] = useState(true);
+  const [sessionLookupEnabled, setSessionLookupEnabled] = useState(verificationCallback.status === "none");
   const [viewState, setViewStateState] = useState<ViewState>(getInitialViewState);
 
   const setViewState = (view: ViewState) => {
@@ -152,9 +156,20 @@ function AppContent() {
     () => getSidebarPageFromPath(window.location.pathname) ?? "dashboard",
   );
   const [settingsTab, setSettingsTab] = useState<string | undefined>();
-  const sessionQuery = useCurrentSession(sessionLookupEnabled);
+  const requestedAfterLogin = useRef(getSidebarPageFromPath(window.location.pathname));
+  const isVerificationEntry = viewState === "verify-email";
+  const sessionQuery = useCurrentSession(sessionLookupEnabled && !isVerificationEntry);
   const logoutMutation = useLogout();
-  const session = sessionQuery.data;
+  const session = isVerificationEntry || !sessionLookupEnabled ? undefined : sessionQuery.data;
+  const administration = activePage === "logs" && Boolean(session?.is_platform_admin);
+
+  useEffect(() => {
+    if (!sessionQuery.isLoading || !getSidebarPageFromPath(window.location.pathname)) return;
+    // Fetch code alongside session validation, without rendering protected content.
+    void pageLoaders[activePage]().catch(() => {
+      // A failed speculative fetch must not interrupt authentication.
+    });
+  }, [activePage, sessionQuery.isLoading]);
 
   const titleView: DocumentTitleView = session && hasStoredSession
     ? activePage
@@ -193,19 +208,23 @@ function AppContent() {
   useEffect(() => {
     if (session) {
       setHasStoredSession(true);
-      const requested = getSidebarPageFromPath(window.location.pathname);
+      const requested = getSidebarPageFromPath(window.location.pathname) ?? requestedAfterLogin.current;
       setAuthenticatedPage(resolveAuthorizedPage(requested, {
         isPlatformAdmin: session.is_platform_admin,
         onboardingRequired: session.onboarding_required,
       }), true);
+      requestedAfterLogin.current = null;
     }
   }, [session]);
 
   useEffect(() => {
-    if (session?.onboarding_required && activePage !== "settings") {
-      setAuthenticatedPage("settings", true);
-    }
-  }, [session?.onboarding_required, activePage]);
+    if (!session) return;
+    const authorized = resolveAuthorizedPage(activePage, {
+      isPlatformAdmin: session.is_platform_admin,
+      onboardingRequired: session.onboarding_required,
+    });
+    if (authorized !== activePage) setAuthenticatedPage(authorized, true);
+  }, [session?.onboarding_required, session?.is_platform_admin, activePage]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -217,10 +236,10 @@ function AppContent() {
       }
       const page = getSidebarPageFromPath(window.location.pathname);
       if (page && session) {
-        setActivePage(resolveAuthorizedPage(page, {
+        setAuthenticatedPage(resolveAuthorizedPage(page, {
           isPlatformAdmin: session.is_platform_admin,
           onboardingRequired: session.onboarding_required,
-        }));
+        }), true);
       }
     };
 
@@ -228,21 +247,17 @@ function AppContent() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, [session]);
 
-  useEffect(() => {
-    if (session && !session.is_platform_admin && activePage === "logs") {
-      setAuthenticatedPage("dashboard", true);
-    }
-  }, [session, activePage]);
-
   const handleLoginSuccess = () => {
-    window.history.replaceState({}, document.title, sidebarPagePaths.dashboard);
+    const requested = requestedAfterLogin.current ?? "dashboard";
+    window.history.replaceState({}, document.title, sidebarPagePaths[requested]);
     sessionStorage.removeItem("sicurre_view_state");
     setSessionLookupEnabled(true);
     setHasStoredSession(true);
-    setActivePage("dashboard");
+    setActivePage(requested);
   };
 
   const handleLogout = async () => {
+    requestedAfterLogin.current = null;
     setSessionLookupEnabled(false);
     setHasStoredSession(false);
     clearStoredSession();
@@ -255,18 +270,16 @@ function AppContent() {
     }
   };
 
-  if (sessionQuery.isLoading) {
-    return (
-      <div className="min-h-screen w-screen flex items-center justify-center bg-surface-low text-on-surface">
-        <div className="text-sm font-semibold">Chargement de votre session…</div>
-      </div>
-    );
+  if (isVerificationEntry) {
+    return <VerifyEmailRoute onNavigateToLogin={() => setViewState("login")} />;
+  }
+
+  // Background checks must not unmount a public form or its verification notice.
+  if ((sessionQuery.isLoading && !sessionQuery.isFetched) || (sessionLookupEnabled && session && !hasStoredSession)) {
+    return <RouteFallback />;
   }
 
   if (!hasStoredSession || !session) {
-    if (viewState === "verify-email") {
-      return <VerifyEmailRoute onNavigateToLogin={() => setViewState("login")} />;
-    }
     if (viewState === "landing") {
       return (
         <LandingRoute
@@ -311,37 +324,43 @@ function AppContent() {
   };
 
   return (
-    <ActiveDomainProvider workspaceId={session.workspace_id}>
+    <ActiveDomainProvider key={session.workspace_id} workspaceId={session.workspace_id}>
     <AppShell
       currentPage={activePage}
       onPageChange={(page) => {
         if (page !== "settings") setSettingsTab(undefined);
-        if (session.is_platform_admin && page !== "logs" && page !== "settings" && page !== "support") {
-          return;
-        }
-        setAuthenticatedPage(page);
+        setAuthenticatedPage(resolveAuthorizedPage(page, {
+          isPlatformAdmin: session.is_platform_admin,
+          onboardingRequired: session.onboarding_required,
+        }));
       }}
       onLogout={handleLogout}
       userName={session.display_name}
       userEmail={session.email}
-      userRole={session.is_platform_admin ? "admin" : session.role}
+      userRole={session.role}
+      administration={administration}
       onboardingRequired={session.onboarding_required}
       workspaceName={session.workspace_name}
       workspaceId={session.workspace_id}
       threatCount={session.threat_count}
       hasIntegration={session.has_cloudflare_integration}
     >
-      <Suspense fallback={<PageRouteFallback />}>
-          {activePage === "dashboard" && !session.is_platform_admin && <DashboardRoute session={session} onGoToSettings={handleGoToSettings} />}
-          {activePage === "threats" && !session.is_platform_admin && (
-            <ThreatsRoute />
-          )}
-          {activePage === "quarantine" && !session.is_platform_admin && <QuarantineRoute />}
-          {activePage === "alerts" && !session.is_platform_admin && <AlertsRoute />}
-          {activePage === "domain-shield" && !session.is_platform_admin && <DomainShieldRoute session={session} />}
-          {activePage === "logs" && session.is_platform_admin && <LogsRoute />}
-          {activePage === "settings" && <SettingsRoute session={session} initialTab={settingsTab} />}
-          {activePage === "support" && <SupportRoute session={session} />}
+      <Suspense fallback={<PageLoading />}>
+        {!["logs", "settings", "support"].includes(activePage) ? (
+          <DomainPageBoundary>
+            {activePage === "dashboard" && <DashboardRoute session={session} onGoToSettings={handleGoToSettings} />}
+            {activePage === "threats" && <ThreatsRoute />}
+            {activePage === "quarantine" && <QuarantineRoute />}
+            {activePage === "alerts" && <AlertsRoute />}
+            {activePage === "domain-shield" && <DomainShieldRoute session={session} />}
+          </DomainPageBoundary>
+        ) : (
+          <>
+            {activePage === "logs" && session.is_platform_admin && <LogsRoute />}
+            {activePage === "settings" && <SettingsRoute session={session} initialTab={settingsTab} />}
+            {activePage === "support" && <SupportRoute session={session} />}
+          </>
+        )}
       </Suspense>
     </AppShell>
     </ActiveDomainProvider>

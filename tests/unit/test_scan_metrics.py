@@ -223,3 +223,32 @@ def test_lifespan_starts_and_stops_the_keepalive() -> None:
         api_main.run_db_keepalive = orig_run  # type: ignore[assignment]
 
     assert started == ["running", "cancelled"]
+
+
+def test_api_responses_forbid_caching() -> None:
+    """Threat payloads carry third-party personal data and must not be stored.
+
+    An absent Cache-Control licenses heuristic freshness rather than forbidding
+    caching, so the header has to be explicit.
+    """
+    from fastapi.testclient import TestClient
+
+    from data_platform.api.main import create_app
+
+    with TestClient(create_app()) as client:
+        # 401 is fine — the header must be set regardless of the outcome, since
+        # an unauthorised body can still be cached.
+        response = client.get("/v1/threats")
+        assert response.headers.get("Cache-Control") == "no-store"
+        assert "Cookie" in (response.headers.get("Vary") or "")
+
+
+def test_non_api_paths_keep_their_own_caching() -> None:
+    """The rule is scoped to /v1/, not blanket-applied to every route."""
+    from fastapi.testclient import TestClient
+
+    from data_platform.api.main import create_app
+
+    with TestClient(create_app()) as client:
+        response = client.get("/health")
+        assert response.headers.get("Cache-Control") != "no-store"

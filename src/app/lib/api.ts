@@ -361,15 +361,13 @@ export function useLogin() {
 }
 
 export function useSignup() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (payload: { name: string; email: string; password: string; turnstileToken?: string }) => {
       const result = await authClient.signUp.email({
         name: payload.name,
         email: payload.email,
         password: payload.password,
-        // Marked so the app can confirm verification even when the session
-        // cookie set on the verify-email response never reaches the browser.
+        // Verification returns to sign-in; signup does not create a session.
         callbackURL: `${window.location.origin}/?verified=1`,
         fetchOptions: payload.turnstileToken
           ? { headers: { "x-turnstile-token": payload.turnstileToken } }
@@ -379,10 +377,6 @@ export function useSignup() {
         throw createAuthError(normalizeAuthProviderError(result.error, "signup_failed"));
       }
       return result;
-    },
-    onSuccess: () => {
-      localStorage.setItem(AUTH_PROVIDER_KEY, "password");
-      queryClient.invalidateQueries({ queryKey: ["auth-session"] });
     },
   });
 }
