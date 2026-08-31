@@ -1,12 +1,24 @@
 import { describe, expect, it } from "vitest";
 
-import { buildEmailVerificationEntryUrl } from "../../../auth-service/email-verification";
+import { buildEmailVerificationEntryUrl, resolveFrontendOrigin } from "../../../auth-service/email-verification";
 import {
   buildVerificationRequestUrl,
   parseVerificationCallback,
 } from "../../../src/app/lib/email-verification";
 
 describe("email verification contract", () => {
+  it.each([undefined, "", "  "])("uses the local frontend when its origin is unset (%s)", (configuredOrigin) => {
+    const origin = resolveFrontendOrigin({ configuredOrigin, authBaseUrl: "http://127.0.0.1:3005", isProduction: false });
+    expect(buildEmailVerificationEntryUrl(origin, "test-token")).toBe("http://127.0.0.1:5173/verify-email#token=test-token");
+  });
+
+  it("uses the production public origin without falling back to localhost", () => {
+    expect(resolveFrontendOrigin({ authBaseUrl: "https://sicurre.com/api/auth", isProduction: true })).toBe("https://sicurre.com");
+  });
+
+  it.each([false, true])("honors the configured frontend origin (production=%s)", (isProduction) => {
+    expect(resolveFrontendOrigin({ configuredOrigin: " https://preview.sicurre.com/ ", authBaseUrl: "http://127.0.0.1:3005", isProduction })).toBe("https://preview.sicurre.com");
+  });
   it("keeps the emailed token out of the initial HTTP request", () => {
     const url = new URL(buildEmailVerificationEntryUrl("https://sicurre.com", "one time/token"));
 
@@ -27,7 +39,7 @@ describe("email verification contract", () => {
     expect(parseVerificationCallback("?verified=1")).toEqual({ status: "verified" });
   });
 
-  it("targets Better Auth only after confirmation and returns to sign-in", () => {
+  it("targets Better Auth for automatic verification and returns to sign-in", () => {
     const url = new URL(buildVerificationRequestUrl(
       "token-value",
       "https://sicurre.com",

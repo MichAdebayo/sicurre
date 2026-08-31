@@ -1,5 +1,5 @@
 import request from "supertest";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAuthApp } from "../../../auth-service/server.js";
 
@@ -12,6 +12,27 @@ function dependencies(overrides: Record<string, unknown> = {}) {
 }
 
 describe("Better Auth HTTP boundary", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("redirects older local verification links without verifying the account", async () => {
+    vi.stubEnv("SICURRE_FRONTEND_ORIGIN", "");
+    const deps = dependencies();
+    const response = await request(createAuthApp(deps)).get("/verify-email");
+    expect(response.status).toBe(302);
+    expect(response.headers.location).toBe("http://127.0.0.1:5173/verify-email");
+    expect(deps.authHandler).not.toHaveBeenCalled();
+  });
+
+  it("uses the configured frontend for local legacy redirects", async () => {
+    vi.stubEnv("SICURRE_FRONTEND_ORIGIN", "http://localhost:5174");
+    const response = await request(createAuthApp(dependencies())).get("/verify-email");
+    expect(response.headers.location).toBe("http://localhost:5174/verify-email");
+  });
+
+  it("does not add the local compatibility redirect to production auth", async () => {
+    const response = await request(createAuthApp(dependencies({ databaseDialect: "postgresql" }))).get("/verify-email");
+    expect(response.status).toBe(404);
+  });
   it("reports health and disabled Turnstile configuration", async () => {
     delete process.env.TURNSTILE_SITE_KEY;
     delete process.env.TURNSTILE_SECRET_KEY;
