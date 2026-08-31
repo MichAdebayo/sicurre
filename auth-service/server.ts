@@ -1,12 +1,9 @@
 import cors from "cors";
 import express, { type Request, type Response } from "express";
 import { resolveFrontendOrigin } from "./email-verification.js";
+import { buildTrustedOrigins } from "./trusted-origins.js";
 
-const trustedOrigins = [
-  process.env.SICURRE_FRONTEND_ORIGIN,
-  "http://127.0.0.1:5173",
-  "http://localhost:5173",
-].filter(Boolean) as string[];
+const trustedOrigins = buildTrustedOrigins();
 
 export type AuthServerDependencies = {
   databaseDialect: string;
@@ -17,6 +14,9 @@ export function createAuthApp(
   dependencies: AuthServerDependencies,
 ): express.Express {
   const app = express();
+  // Express sets "X-Powered-By: Express" on every response. It tells an
+  // attacker which stack to target and serves no other purpose.
+  app.disable("x-powered-by");
   app.use(cors({ origin: trustedOrigins, credentials: true }));
 
   if (dependencies.databaseDialect === "sqlite") {
