@@ -14,6 +14,26 @@ function dependencies(overrides: Record<string, unknown> = {}) {
 describe("Better Auth HTTP boundary", () => {
   afterEach(() => vi.unstubAllEnvs());
 
+  it("does not advertise the server stack", async () => {
+    // Express sets X-Powered-By by default. It tells an attacker what to
+    // target and serves no purpose to any legitimate client.
+    const response = await request(createAuthApp(dependencies())).get("/api/auth/health");
+
+    expect(response.headers["x-powered-by"]).toBeUndefined();
+  });
+
+  it("does not trust a developer origin when running in production", async () => {
+    vi.stubEnv("SICURRE_ENVIRONMENT", "production");
+    vi.stubEnv("SICURRE_FRONTEND_ORIGIN", "https://sicurre.com");
+
+    // The CORS list is built at module scope, so assert the builder directly:
+    // this is the value the production process would hand to cors().
+    const { buildTrustedOrigins } = await import("../../../auth-service/trusted-origins.js");
+    const origins = buildTrustedOrigins();
+
+    expect(origins).toEqual(["https://sicurre.com"]);
+  });
+
   it("redirects older local verification links without verifying the account", async () => {
     vi.stubEnv("SICURRE_FRONTEND_ORIGIN", "");
     const deps = dependencies();
