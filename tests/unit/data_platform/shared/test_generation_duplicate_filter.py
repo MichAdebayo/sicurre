@@ -122,3 +122,69 @@ async def test_a_sample_with_no_text_is_left_for_the_downstream_guard() -> None:
 
     assert kept == [empty]
     assert skipped == 0
+
+
+# ── The second write path ────────────────────────────────────────────────────
+# Common Crawl acceptance builds normalized-message rows directly rather than
+# going through gated promotion. It reaches the same unique index, so filtering
+# only the promotion path still lets the release die mid-INSERT.
+
+
+def _cc_pair(candidate_id: str, text: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    return (
+        {"candidate_id": candidate_id},
+        {"raw_record_id": candidate_id, "text_sha256": _sha(text), "normalized_text": text},
+    )
+
+
+@pytest.mark.asyncio
+async def test_cc_already_curated_candidates_are_dropped() -> None:
+    old, new = "Objet : deja curated\n\ncorps", "Objet : nouveau\n\ncorps"
+    (c1, m1), (c2, m2) = _cc_pair("a", old), _cc_pair("b", new)
+
+    kept_c, kept_m, skipped = (
+        await ReviewPersistenceService._drop_duplicate_cc_candidates(
+            _Session({_sha(old)}), [c1, c2], [m1, m2]
+        )
+    )
+
+    assert skipped == 1
+    assert [c["candidate_id"] for c in kept_c] == ["b"]
+    assert [m["raw_record_id"] for m in kept_m] == ["b"]
+
+
+@pytest.mark.asyncio
+async def test_cc_filter_keeps_the_two_lists_aligned() -> None:
+    """They are consumed by `zip(..., strict=True)`.
+
+    Dropping from one list and not the other pairs each candidate with the
+    wrong message - which would mislabel rows rather than fail loudly.
+    """
+    pairs = [_cc_pair(str(i), f"Objet : {i}\n\ncorps") for i in range(5)]
+    curated = {_sha("Objet : 1\n\ncorps"), _sha("Objet : 3\n\ncorps")}
+
+    kept_c, kept_m, skipped = (
+        await ReviewPersistenceService._drop_duplicate_cc_candidates(
+            _Session(curated), [c for c, _ in pairs], [m for _, m in pairs]
+        )
+    )
+
+    assert skipped == 2
+    assert len(kept_c) == len(kept_m) == 3
+    for candidate, message in zip(kept_c, kept_m, strict=True):
+        assert candidate["candidate_id"] == message["raw_record_id"], "pairing shifted"
+
+
+@pytest.mark.asyncio
+async def test_cc_repeated_text_inside_one_batch_is_kept_once() -> None:
+    text = "Objet : repete\n\ncorps"
+    (c1, m1), (c2, m2) = _cc_pair("a", text), _cc_pair("b", text)
+
+    kept_c, kept_m, skipped = (
+        await ReviewPersistenceService._drop_duplicate_cc_candidates(
+            _Session(set()), [c1, c2], [m1, m2]
+        )
+    )
+
+    assert skipped == 1
+    assert len(kept_c) == len(kept_m) == 1

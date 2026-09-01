@@ -987,6 +987,60 @@ class ReviewPersistenceService:
         }
 
     @staticmethod
+    async def _drop_duplicate_cc_candidates(
+        session: AsyncSession,
+        accepted_candidates: list[dict[str, Any]],
+        proposed_messages: list[dict[str, Any]],
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int]:
+        """Drop candidates whose text is already curated or repeated in this batch.
+
+        This is the second of the two write paths into
+        data_normalized_message. The gated-promotion path has its own filter;
+        this one is reached by the Common Crawl acceptance lane, which builds
+        rows directly. Both hit the same unique index on text_sha256, so a
+        filter on only one path still lets the release die mid-INSERT - after
+        earlier lanes have committed.
+
+        The two lists are consumed by a strict zip, so they must be filtered in
+        lockstep or the pairing silently shifts.
+        """
+        hashes = [str(m.get("text_sha256") or "") for m in proposed_messages]
+        present = [h for h in hashes if h]
+        if not present:
+            return accepted_candidates, proposed_messages, 0
+
+        existing = {
+            row[0]
+            for row in (
+                await session.execute(
+                    select(DataNormalizedMessage.text_sha256).where(
+                        DataNormalizedMessage.text_sha256.in_(present)
+                    )
+                )
+            ).all()
+        }
+
+        kept_candidates: list[dict[str, Any]] = []
+        kept_messages: list[dict[str, Any]] = []
+        seen_in_batch: set[str] = set()
+        for candidate, message in zip(
+            accepted_candidates, proposed_messages, strict=True
+        ):
+            text_hash = str(message.get("text_sha256") or "")
+            if text_hash and (text_hash in existing or text_hash in seen_in_batch):
+                continue
+            if text_hash:
+                seen_in_batch.add(text_hash)
+            kept_candidates.append(candidate)
+            kept_messages.append(message)
+
+        return (
+            kept_candidates,
+            kept_messages,
+            len(proposed_messages) - len(kept_messages),
+        )
+
+    @staticmethod
     async def persist_common_crawl_acceptance_review(
         session: AsyncSession,
         payload: dict[str, Any],
@@ -998,6 +1052,17 @@ class ReviewPersistenceService:
         proposed_messages = list(payload.get("proposed_normalized_messages") or [])
         proposed_annotations = list(payload.get("proposed_annotations") or [])
         started_at = datetime.now(timezone.utc)
+
+        accepted_candidates, proposed_messages, already_present = (
+            await ReviewPersistenceService._drop_duplicate_cc_candidates(
+                session, accepted_candidates, proposed_messages
+            )
+        )
+        if already_present:
+            logger.info(
+                "Skipping %d Common Crawl candidate(s) whose text is already curated",
+                already_present,
+            )
 
         await _validate_existing_raw_record_ids(
             session,
