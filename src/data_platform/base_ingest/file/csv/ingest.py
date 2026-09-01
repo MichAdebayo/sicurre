@@ -43,7 +43,7 @@ SRC_ROOT = ROOT_DIR / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from core.config import get_settings  # noqa: E402
+from core.config import get_settings, redact_database_url  # noqa: E402
 from core.database import Base  # noqa: E402
 from core.trace_logger import SemanticTraceLogger  # noqa: E402
 from db.models import DataRawObject, DataRawRecord  # noqa: E402
@@ -391,7 +391,7 @@ async def run_base_ingestion() -> None:
 
     # 3. DB setup
     settings = get_settings()
-    logger.info("Using database: %s", settings.data_platform_database_url)
+    logger.info("Using database: %s", redact_database_url(settings.data_platform_database_url))
     engine = create_async_engine(settings.data_platform_database_url, echo=False)
 
     async with engine.begin() as conn:

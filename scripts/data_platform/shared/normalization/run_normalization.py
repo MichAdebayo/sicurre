@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 load_dotenv(ROOT_DIR / ".env")
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from core.config import get_settings
+from core.config import get_settings, redact_database_url
 from data_platform.services.shared.normalization_pipeline import NormalizationPipeline
 from data_platform.services.shared.structured_review_artifact import (
     StructuredReviewArtifactService,
@@ -269,7 +269,7 @@ async def main():
         engine, expire_on_commit=False, class_=AsyncSession
     )
 
-    logger.info(f"Connecting to database: {settings.database_url}")
+    logger.info("Connecting to database: %s", redact_database_url(settings.database_url))
 
     async with session_maker() as session:
         pipeline = NormalizationPipeline(session)
