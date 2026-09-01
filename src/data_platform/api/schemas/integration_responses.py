@@ -74,6 +74,27 @@ class ReportAddressResponse(ApiResponse):
     address: str
 
 
+class ReportedEmailSummary(ApiResponse):
+    """One forwarded report, described without reproducing its content.
+
+    Deliberately metadata only. The ingest pipeline anonymises the message and
+    stores it in private R2 precisely so the forwarded content stops circulating;
+    returning a body here would undo that. Date, size and status are enough for
+    the person who forwarded it to see that it arrived.
+    """
+
+    id: str
+    received_at: str
+    size_bytes: int
+    status: str
+
+
+class ReportedEmailListResponse(ApiResponse):
+    """Forwarded reports belonging to the authenticated workspace."""
+
+    items: list[ReportedEmailSummary]
+
+
 class ReportedEmailIngestResponse(ApiResponse):
     """Idempotent forwarded-message ingestion result."""
 

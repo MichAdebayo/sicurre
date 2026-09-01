@@ -19,13 +19,22 @@ import {
   useDeleteQuarantine,
   useReleaseAndWhitelist,
   QuarantineItem,
+  useReportedEmails,
 } from "../lib/api";
 import { useActiveDomain } from "../contexts/active-domain";
 
 const MotionDiv = motion.div as any;
 
+/** Sizes come from the stored evidence, so keep the unit honest and compact. */
+function formatReportSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} o`;
+  return `${(bytes / 1024).toFixed(1)} Ko`;
+}
+
 export default function QuarantineRoute() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { data: reportsData, isLoading: reportsLoading } = useReportedEmails();
+  const reportedEmails = reportsData?.items ?? [];
   const { activeDomain } = useActiveDomain();
 
   // Queries & Mutations
@@ -256,6 +265,48 @@ export default function QuarantineRoute() {
           )}
         </div>
       )}
+
+      {/* Forwarded reports — the mirror image of the cards above. Quarantine is
+          what the filter held; these are what it should have held and a user
+          told us about. Metadata only: the ingest pipeline anonymises the
+          message into private R2, and rendering it back here would undo that. */}
+      <section className="rounded-xl border border-border-subtle bg-surface-lowest p-6 shadow-sm">
+        <header className="mb-4">
+          <h2 className="app-h2">{t("quarantine.reports_title")}</h2>
+          <p className="app-body-sub mt-1">{t("quarantine.reports_subtitle")}</p>
+        </header>
+
+        {reportsLoading ? (
+          <p className="text-sm text-on-surface-variant">{t("common.loading")}</p>
+        ) : reportedEmails.length === 0 ? (
+          <p className="text-sm text-on-surface-variant">{t("quarantine.reports_empty")}</p>
+        ) : (
+          <ul className="flex flex-col">
+            {reportedEmails.map((report) => (
+              <li
+                key={report.id}
+                className="flex flex-wrap items-baseline justify-between gap-3 border-b border-border-subtle/60 py-2.5 last:border-b-0"
+              >
+                <span className="text-sm font-semibold text-on-surface tabular-nums">
+                  {new Date(report.received_at).toLocaleString(i18n.language, {
+                    day: "numeric",
+                    month: "long",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+                <span className="text-xs font-medium text-on-surface-variant tabular-nums">
+                  {formatReportSize(report.size_bytes)}
+                  {" · "}
+                  {t(`quarantine.report_status_${report.status}`, {
+                    defaultValue: report.status,
+                  })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {/* Floating zoom modal backdrop overlay with background blur */}
       <AnimatePresence>
