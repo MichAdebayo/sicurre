@@ -18,7 +18,7 @@ if str(SRC_ROOT) not in sys.path:
 
 load_dotenv(ROOT_DIR / ".env")
 
-from core.config import get_settings  # noqa: E402
+from core.config import get_settings, redact_database_url  # noqa: E402
 from core.trace_logger import SemanticTraceLogger  # noqa: E402
 from data_platform.services.shared.normalization_pipeline import (
     NormalizationPipeline,
@@ -230,7 +230,7 @@ if __name__ == "__main__":
             expire_on_commit=False,
             class_=AsyncSession,
         )
-        logger.info("Connecting to database: %s", settings.data_platform_database_url)
+        logger.info("Connecting to database: %s", redact_database_url(settings.data_platform_database_url))
         trace = SemanticTraceLogger(
             parent_type="Normalization",
             child_target="Message Normalization",

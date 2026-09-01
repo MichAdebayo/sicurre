@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import argparse
 import asyncio
 import json
@@ -32,6 +34,10 @@ from data_platform.services.common_crawl.promotion_review import (  # noqa: E402
 )
 from data_platform.services.common_crawl.signal_synthetic import (  # noqa: E402
     CommonCrawlSignalSyntheticService,
+)
+from data_platform.services.certfr.lane import (  # noqa: E402
+    CERTFR_SOURCE,
+    build_certfr_generation_bundle,
 )
 from data_platform.services.shared.generation_lineage import (  # noqa: E402
     build_adapted_generation_bundle,
@@ -98,13 +104,14 @@ def parse_args() -> argparse.Namespace:
             "  adapted       — French cultural adaptation from EN phishing seeds\n"
             "  cc-signal     — Common Crawl phishing signal synthetic drafts\n"
             "  cc-acceptance — Common Crawl legit/spam acceptance review\n"
-            "  all           — Run adapted + cc-signal + cc-acceptance\n"
+            "  certfr        — CERT-FR CTI to French phishing drafts\n"
+            "  all           — Run adapted + cc-signal + cc-acceptance + certfr\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--mode",
-        choices=["adapted", "cc-signal", "cc-acceptance", "all"],
+        choices=["adapted", "cc-signal", "cc-acceptance", "certfr", "all"],
         default="all",
         help="Which generation lane to run.",
     )
@@ -339,6 +346,61 @@ def _build_cc_signal_generation_bundle(
         generated_at=str(drafts_payload.get("generated_at", "")),
         samples=samples,
     )
+
+
+async def _run_certfr_generation(
+    session: AsyncSession,
+    args: argparse.Namespace,
+) -> dict[str, object]:
+    """Turn ingested CERT-FR CTI into staged French phishing drafts.
+
+    The four CERT-FR services this composes were built and unit-tested, and none
+    of them had a caller: stage_two routed records to a destination nothing
+    reached. This lane is that destination, and it reuses the same bundle and
+    persistence contract as the adapted and Common Crawl lanes rather than
+    introducing a second path.
+    """
+    records_result = await session.execute(
+        select(DataRawRecord)
+        .join(DataSourceSystem, DataRawRecord.source_system_id == DataSourceSystem.id)
+        .where(
+            DataSourceSystem.name == CERTFR_SOURCE,
+            DataRawRecord.is_usable.is_(True),
+        )
+    )
+    raw_records = records_result.scalars().all()
+
+    records: list[dict[str, Any]] = []
+    for record in raw_records:
+        try:
+            raw_content = json.loads(record.raw_content)
+        except (TypeError, ValueError):
+            continue
+        records.append(
+            {"raw_record_id": str(record.id), "raw_content": raw_content}
+        )
+
+    logger.info("CERT-FR lane: %d CTI records loaded", len(records))
+    bundle = build_certfr_generation_bundle(records, run_timestamp=args.run_timestamp)
+    samples = bundle.get("samples", []) or []
+
+    persistence: dict[str, object] | None = None
+    if samples:
+        logger.info("Persisting CERT-FR bundle: %d drafts", len(samples))
+        persistence = await _persist_bundle(
+            session,
+            payload=bundle,
+            pipeline_version=args.pipeline_version,
+            lineage_only=args.persist_lineage,
+        )
+    else:
+        logger.info("CERT-FR lane produced no drafts; nothing to persist.")
+
+    return {
+        "cti_records": len(records),
+        "generated_count": len(samples),
+        "persistence": persistence,
+    }
 
 
 async def _run_cc_signal_generation(
@@ -586,6 +648,9 @@ async def main() -> None:
                 output["cc_acceptance"] = await _run_cc_acceptance(
                     session, args, cc_export
                 )
+
+            if args.mode in {"certfr", "all"}:
+                output["certfr"] = await _run_certfr_generation(session, args)
     finally:
         await engine.dispose()
 

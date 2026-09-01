@@ -397,3 +397,26 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Return the process-wide cached settings instance."""
     return Settings()
+
+
+def redact_database_url(url: str | None) -> str:
+    """Return *url* with any password replaced, safe for logs.
+
+    Connection strings were being written verbatim into the cron log files, so a
+    live Neon password sat in world-readable plaintext on the server and was
+    rewritten on every scheduled run. Logging the target database is genuinely
+    useful when a job connects somewhere unexpected; logging the credential is
+    never useful.
+
+    The host, port, database and user are preserved because those are what make
+    the line worth reading. Only the secret is removed.
+    """
+    if not url:
+        return "(unset)"
+    # The password is matched greedily up to the LAST "@" so that a password
+    # containing "@" is removed whole rather than truncated at its first one,
+    # which would leave the remainder in the log.
+    match = re.match(r"^(?P<head>[^:]+://)(?P<user>[^:/@]+):(?P<pw>.*)@(?P<tail>[^@]*)$", url)
+    if not match:
+        return url
+    return f"{match['head']}{match['user']}:***@{match['tail']}"
