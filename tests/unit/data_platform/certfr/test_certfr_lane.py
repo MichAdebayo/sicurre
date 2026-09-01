@@ -75,9 +75,7 @@ def test_an_unlisted_router_subtype_is_surfaced_not_discarded() -> None:
         "Bonjour, votre compte sera suspendu. Veuillez confirmer votre RIB "
         "via le portail securise. Objet: verification de votre compte."
     )
-    bank = build_signal_bank(
-        [{"raw_record_id": "x", "raw_content": {"text": embedded_lure}}]
-    )
+    bank = build_signal_bank([{"raw_record_id": "x", "raw_content": {"text": embedded_lure}}])
 
     keys = {rule["key"] for rule in bank["sources"][0]["rules"]}
     routed = CertFRStageTwoService.review(embedded_lure, {}).route_subtype
@@ -95,3 +93,99 @@ def test_empty_input_does_not_raise() -> None:
     bundle = build_certfr_generation_bundle([])
 
     assert bundle.get("samples") == []
+
+
+def test_a_cleaner_is_applied_before_routing() -> None:
+    """Ingestion passes a cleaner; routing must see the cleaned text.
+
+    Routing on uncleaned text would classify on boilerplate the cleaner exists
+    to strip, so the lane and the ingestion path would disagree about what a
+    record is.
+    """
+    seen: list[str] = []
+
+    def cleaner(text: str) -> str:
+        seen.append(text)
+        return text.replace("BOILERPLATE ", "")
+
+    bank = build_signal_bank(
+        [{"raw_record_id": "r1", "raw_content": {"text": "BOILERPLATE " + CTI_REPORT}}],
+        cleaner=cleaner,
+    )
+
+    assert seen, "the cleaner was never called"
+    rules = {r["key"]: r["current_count"] for r in bank["sources"][0]["rules"]}
+    assert rules["threat_intel"] >= 1
+
+
+def test_blank_records_are_skipped_without_raising() -> None:
+    bank = build_signal_bank(
+        [
+            {"raw_record_id": "empty", "raw_content": {"text": "   \n  "}},
+            {"raw_record_id": "missing", "raw_content": {}},
+            {"raw_record_id": "good", "raw_content": {"text": CTI_REPORT}},
+        ]
+    )
+
+    counts = {r["key"]: r["current_count"] for r in bank["sources"][0]["rules"]}
+    assert sum(counts.values()) == 1, "only the one usable record should be banked"
+
+
+def test_a_draft_with_no_text_is_dropped_rather_than_written_empty() -> None:
+    """An empty draft would become a zero-length training row.
+
+    text_sha256 of "" is a valid hash, so nothing downstream would reject it;
+    the guard has to be here.
+    """
+    import data_platform.services.certfr.lane as lane
+
+    original = lane.CertFRReviewStagingService.build_stage_payload
+    try:
+        lane.CertFRReviewStagingService.build_stage_payload = staticmethod(  # type: ignore[method-assign]
+            lambda _drafts: {"drafts": [{"draft_id": "d1", "full_text": "   "}]}
+        )
+        bundle = build_certfr_generation_bundle(_records())
+    finally:
+        lane.CertFRReviewStagingService.build_stage_payload = original  # type: ignore[method-assign]
+
+    assert bundle["samples"] == []
+
+
+def test_summarise_reports_the_draft_count_for_logs() -> None:
+    import json
+
+    from data_platform.services.certfr.lane import summarise
+
+    bundle = build_certfr_generation_bundle(_records())
+    line = json.loads(summarise(bundle))
+
+    assert line["generator"] == "certfr_lure_generator"
+    assert line["samples"] == len(bundle["samples"])
+
+
+def test_a_subtype_the_router_invents_gets_its_own_bucket() -> None:
+    """The guard for a subtype added to the router with no consumer here.
+
+    CONSUMED_SUBTYPES is the declared contract; a router that starts emitting
+    something outside it must produce a visible bucket rather than a KeyError
+    or a silent drop. Forcing the router is the only way to reach this, because
+    today it emits exactly the three declared values.
+    """
+    import data_platform.services.certfr.lane as lane
+
+    class _Routed:
+        route_subtype = "newly_invented_subtype"
+        extracted_text = "texte extrait"
+        derived_payload: dict = {}
+
+    original = lane.CertFRStageTwoService.review
+    try:
+        lane.CertFRStageTwoService.review = staticmethod(  # type: ignore[method-assign]
+            lambda _text, _raw: _Routed()
+        )
+        bank = build_signal_bank(_records())
+    finally:
+        lane.CertFRStageTwoService.review = original  # type: ignore[method-assign]
+
+    keys = {r["key"]: r["current_count"] for r in bank["sources"][0]["rules"]}
+    assert keys.get("newly_invented_subtype") == 1, "the unknown subtype vanished"
