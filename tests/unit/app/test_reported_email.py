@@ -515,3 +515,92 @@ async def test_dmarc_ingestion_rejects_unknown_domain(
         await router.ingest_dmarc_email(_request(_dmarc_message()), "worker-secret")
 
     assert exc_info.value.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_reported_email_list_is_scoped_to_the_caller_workspace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A report belongs to the workspace that received it, and to nobody else.
+
+    The list inherits the same workspace_id filter as every other tenant route;
+    a foreign row is absent rather than refused.
+    """
+    from data_platform.api.routers import reported_email
+
+    captured: dict[str, object] = {}
+
+    async def fake_query(sql: str, params: tuple = ()) -> list[dict[str, object]]:
+        captured["sql"] = sql
+        captured["params"] = params
+        return [
+            {
+                "id": "rep-1",
+                "received_at": "2026-08-30T21:04:00+00:00",
+                "size_bytes": 4200,
+                "status": "received",
+            }
+        ]
+
+    monkeypatch.setattr(reported_email, "auth_query", fake_query)
+
+    user = SimpleNamespace(workspace_id="ws-alpha")
+    result = await reported_email.list_reported_emails(current_user=user)  # type: ignore[arg-type]
+
+    assert "WHERE workspace_id = ?" in str(captured["sql"])
+    assert captured["params"] == ("ws-alpha",)
+    assert result["items"][0]["id"] == "rep-1"
+
+
+@pytest.mark.anyio
+async def test_reported_email_list_never_returns_message_content(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Metadata only.
+
+    The ingest path anonymises the forwarded message into private R2 so the
+    content stops circulating. Returning a body, a subject or the storage URI
+    here would undo that, so the response shape is pinned.
+    """
+    from data_platform.api.routers import reported_email
+
+    async def fake_query(sql: str, params: tuple = ()) -> list[dict[str, object]]:
+        # The row carries more than the response is allowed to expose.
+        return [
+            {
+                "id": "rep-1",
+                "received_at": "2026-08-30T21:04:00+00:00",
+                "size_bytes": 4200,
+                "status": "received",
+                "storage_uri": "r2://bucket/ws-alpha/rep-1.eml",
+                "content_hash": "deadbeef",
+            }
+        ]
+
+    monkeypatch.setattr(reported_email, "auth_query", fake_query)
+
+    user = SimpleNamespace(workspace_id="ws-alpha")
+    result = await reported_email.list_reported_emails(current_user=user)  # type: ignore[arg-type]
+
+    assert set(result["items"][0]) == {"id", "received_at", "size_bytes", "status"}
+    serialised = str(result)
+    assert "storage_uri" not in serialised
+    assert "r2://" not in serialised
+
+
+@pytest.mark.anyio
+async def test_reported_email_list_is_empty_before_any_report(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An empty list, not an error — a workspace with no reports is normal."""
+    from data_platform.api.routers import reported_email
+
+    async def fake_query(sql: str, params: tuple = ()) -> list[dict[str, object]]:
+        return []
+
+    monkeypatch.setattr(reported_email, "auth_query", fake_query)
+
+    user = SimpleNamespace(workspace_id="ws-empty")
+    result = await reported_email.list_reported_emails(current_user=user)  # type: ignore[arg-type]
+
+    assert result == {"items": []}
