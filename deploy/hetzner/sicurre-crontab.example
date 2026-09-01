@@ -26,9 +26,9 @@ COMPOSE="docker compose -f /home/sicurre-prod/sicurre/docker-compose.prod.yml"
 # exits cleanly without publishing when no new eligible records are available.
 #
 # TEMPORARY - 1 Sept 2026, verification run. Normally `30 6 3 * *`.
-# Moved to 22:00 on the 1st to prove the scheduled trigger actually fires and
+# Moved to 20:40 on the 1st to prove the scheduled trigger actually fires and
 # that the release builds on the previous dataset version, rather than waiting
 # for 3 Sept. This is the first release since generate-data was wired into the
 # monthly job, and the 3 August run published nothing (preflight exit 3), so
 # the trigger has not been observed working end to end. RESTORE AFTER.
-00 22 1 * * cd /home/sicurre-prod/sicurre && $COMPOSE --profile release run --rm --no-deps sicurre-data-release >> /home/sicurre-prod/sicurre/cron-dataset-release.log 2>&1
+40 20 1 * * cd /home/sicurre-prod/sicurre && $COMPOSE --profile release run --rm --no-deps sicurre-data-release >> /home/sicurre-prod/sicurre/cron-dataset-release.log 2>&1
