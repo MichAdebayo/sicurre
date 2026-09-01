@@ -13,6 +13,7 @@ and stays available as adaptation source material.
 
 from data_platform.base_ingest.file.parsers.txt_email_ingestion import (
     _detect_language,
+    _parse_email_block,
     parse_txt_emails_from_bytes,
 )
 
@@ -58,3 +59,62 @@ def test_parsed_records_carry_a_language_instead_of_null() -> None:
     assert records, "expected at least one parsed record"
     assert records[0].language == "fr"
     assert records[0].label == "spam"
+
+
+def test_undetectable_text_yields_none_not_an_exception() -> None:
+    """langdetect raises on text with no linguistic features.
+
+    A raised LangDetectException here would abort ingestion of the whole file
+    on one junk block, so the detector swallows it and returns None. None means
+    "not selected for normalization", which is the safe outcome: an
+    undetectable record must not be assumed French.
+    """
+    assert _detect_language("======== ==== ==== 12345 6789 !!!! ???? ....") is None
+
+
+def test_text_shorter_than_the_sample_floor_is_not_guessed() -> None:
+    """Short strings make langdetect unstable, so they are not classified.
+
+    "Merci" is French, but three words is not enough signal to distinguish it
+    from several other languages, and a wrong guess of "fr" is worse than None:
+    it puts the record into a French-only corpus.
+    """
+    assert _detect_language("Merci") is None
+    assert _detect_language("") is None
+
+
+def test_a_parsed_block_carries_its_detected_language_through() -> None:
+    """The record the parser emits is what sets detected_language downstream."""
+    record = _parse_email_block(
+        "Subject: Offre speciale reservee\n"
+        "----------------------------------------------------------------\n"
+        f"{FRENCH}\n",
+        "spam_2",
+    )
+
+    assert record is not None
+    assert record.language == "fr"
+    assert record.label == "spam"
+    assert record.source == "spam_2"
+
+
+def test_an_empty_block_produces_no_record() -> None:
+    assert _parse_email_block("   \n\n   ", "spam_2") is None
+
+
+def test_the_fallback_record_also_detects_language() -> None:
+    """A file with no recognizable block markers still yields a record.
+
+    This is a separate construction site from _parse_email_block, so it needs
+    its own detection call - hardcoding None here would reintroduce the exact
+    bug for every file that fails block parsing.
+    """
+    from data_platform.base_ingest.file.parsers.txt_email_ingestion import _fallback_record
+
+    record = _fallback_record(FRENCH, "spam_4")
+
+    assert record is not None
+    assert record.language == "fr"
+    assert record.label == "spam"
+
+    assert _fallback_record("   ", "spam_4") is None
