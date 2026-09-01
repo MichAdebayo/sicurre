@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import logging
 from datetime import datetime, timezone
 from hashlib import sha256
 from pathlib import Path
@@ -103,6 +104,8 @@ async def _validate_existing_raw_record_ids(
             f"{context} references {len(missing_ids)} raw_record_id value(s) not present in the current DB: {sample_ids}"
         )
 
+
+logger = logging.getLogger(__name__)
 
 def _text_sha256(value: str) -> str:
     return sha256(value.encode("utf-8")).hexdigest()
@@ -544,6 +547,75 @@ class ReviewPersistenceService:
         return promoted_samples, selected_draft_ids
 
     @staticmethod
+    async def _drop_already_curated(
+        session: AsyncSession,
+        promotable_samples: list[dict[str, Any]],
+        run_payload: Any,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Split promotable samples into those not yet curated, and a skip count.
+
+        Hashes are computed exactly as persist_generated_promotion_review computes
+        them - same hydration, same fallback to text_sha256 - so this filter and
+        that guard can never disagree about what a sample's text is.
+        """
+        generated_text_index = _load_generated_text_index(run_payload)
+
+        hashed: list[tuple[dict[str, Any], str]] = []
+        for sample_payload in promotable_samples:
+            normalized_text = _hydrate_sample_text(sample_payload, generated_text_index)
+            if not normalized_text:
+                # Left in place: the downstream guard rejects an empty text with a
+                # clearer message than anything this filter could produce.
+                hashed.append((sample_payload, ""))
+                continue
+            hashed.append(
+                (
+                    sample_payload,
+                    str(sample_payload.get("text_sha256") or _text_sha256(normalized_text)),
+                )
+            )
+
+        candidate_hashes = [h for _, h in hashed if h]
+        if not candidate_hashes:
+            return promotable_samples, 0
+
+        existing = {
+            row[0]
+            for row in (
+                await session.execute(
+                    select(DataNormalizedMessage.text_sha256).where(
+                        DataNormalizedMessage.text_sha256.in_(candidate_hashes)
+                    )
+                )
+            ).all()
+        }
+
+        # Two separate sources of duplication, and both reach the same unique
+        # index on data_normalized_message.text_sha256:
+        #
+        #   * already curated  - a previous release wrote this text. The lanes are
+        #     deterministic, so every monthly run reproduces its own back
+        #     catalogue.
+        #   * repeated in this batch - two lanes in one run can synthesise the
+        #     same text from the same seed material, and an earlier lane in the
+        #     same run may already have committed it.
+        #
+        # Filtering only the first still lets the second reach the database,
+        # where it surfaces as IntegrityError mid-INSERT and aborts the release
+        # after earlier lanes have already committed - a half-finished release,
+        # which is worse than one that never started.
+        kept: list[dict[str, Any]] = []
+        seen_in_batch: set[str] = set()
+        for sample, text_hash in hashed:
+            if text_hash and (text_hash in existing or text_hash in seen_in_batch):
+                continue
+            if text_hash:
+                seen_in_batch.add(text_hash)
+            kept.append(sample)
+
+        return kept, len(promotable_samples) - len(kept)
+
+    @staticmethod
     async def persist_generation_bundle_with_gated_promotion(
         session: AsyncSession,
         payload: dict[str, Any],
@@ -566,6 +638,27 @@ class ReviewPersistenceService:
             if str(sample.get("review_state") or "")
             == GenerationReviewState.USABLE.value
         ]
+        # A monthly release re-runs every generation lane, and the adapted lane is
+        # deterministic: the same seeds produce the same texts. Everything already
+        # curated therefore comes back on the next run and trips the duplicate
+        # guard in persist_generated_promotion_review, which raises and takes the
+        # whole release down with it - normalize succeeds, generation aborts, no
+        # dataset is ever built.
+        #
+        # Skip what is already curated and promote what is new. The guard stays
+        # in place downstream: it still fires for a duplicate this filter did not
+        # anticipate, which is the case it was written for.
+        promotable_samples, already_curated = (
+            await ReviewPersistenceService._drop_already_curated(
+                session, promotable_samples, payload.get("run")
+            )
+        )
+        if already_curated:
+            logger.info(
+                "Skipping %d generated sample(s) whose text is already curated",
+                already_curated,
+            )
+
         if not promotable_samples:
             await session.commit()
             return {
