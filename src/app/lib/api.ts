@@ -609,6 +609,28 @@ export function useReportAddress() {
   });
 }
 
+export interface ReportedEmailSummary {
+  id: string;
+  received_at: string;
+  size_bytes: number;
+  status: string;
+}
+
+/**
+ * Forwarded false-negative reports for the signed-in workspace.
+ *
+ * Metadata only by design: the ingest pipeline anonymises the message into
+ * private R2 so the forwarded content stops circulating, and the endpoint
+ * returns nothing that would put it back on screen.
+ */
+export function useReportedEmails() {
+  return useQuery<{ items: ReportedEmailSummary[] }>({
+    queryKey: ["feedback-reports"],
+    queryFn: () => fetchJson<{ items: ReportedEmailSummary[] }>("/feedback/reports"),
+    staleTime: 60 * 1000,
+  });
+}
+
 export function useUpdateThreatStatus(domain: string) {
   const queryClient = useQueryClient();
   return useMutation({

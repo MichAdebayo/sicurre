@@ -28,6 +28,8 @@ from __future__ import annotations
 
 import logging
 import re
+
+from langdetect import LangDetectException, detect
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -47,6 +49,30 @@ class TxtEmailRecord:
     label: str  # always "spam" for these files
     source: str  # file stem, e.g. "spam_1"
     language: str | None
+
+
+def _detect_language(text: str) -> str | None:
+    """Return the ISO code for *text*, or None when it cannot be determined.
+
+    The parser previously hardcoded ``language=None``, which propagated through
+    file_dropzone into ``detected_language`` on every raw record. The
+    normalization query selects on ``detected_language == "fr"``, so a null
+    meant the record was never selected - not rejected, never examined. 281
+    messages sat that way.
+
+    Detection matters more than filling the column in: these exports are
+    93.6% English. Writing "fr" blindly would have pushed 263 English messages
+    into a French-only corpus. Detected English simply is not selected for
+    normalization and remains available as adaptation source material, which is
+    how the other English corpora are already handled.
+    """
+    sample = text.strip()[:1500]
+    if len(sample) < 20:
+        return None
+    try:
+        return str(detect(sample))
+    except LangDetectException:
+        return None
 
 
 def _parse_email_block(block: str, source: str) -> TxtEmailRecord | None:
@@ -81,14 +107,18 @@ def _parse_email_block(block: str, source: str) -> TxtEmailRecord | None:
     else:
         text = body
 
-    return TxtEmailRecord(text=text, label="spam", source=source, language=None)
+    return TxtEmailRecord(
+        text=text, label="spam", source=source, language=_detect_language(text)
+    )
 
 
 def _fallback_record(raw_text: str, source: str) -> TxtEmailRecord | None:
     text = raw_text.strip()
     if not text:
         return None
-    return TxtEmailRecord(text=text, label="spam", source=source, language=None)
+    return TxtEmailRecord(
+        text=text, label="spam", source=source, language=_detect_language(text)
+    )
 
 
 def _parse_txt_content(
