@@ -378,7 +378,17 @@ pipeline-push: normalize annotate dataset-build dataset-export
 dataset-release: normalize annotate dataset-build dataset-export publish-latest
 	@echo "Monthly dataset release completed."
 
-monthly-release: normalize annotate
+# generate-data runs the adapted, Common Crawl and CERT-FR lanes. It was wired
+# into demo-v1 but not into the scheduled release, so the monthly job ingested
+# and normalized without ever running generation: 32,672 English records were
+# never adapted, Common Crawl's records were re-scanned and re-skipped every
+# month, and CERT-FR CTI never became drafts.
+#
+# Order matters. Generation produces new normalized messages, so it has to run
+# before annotate and before release_preflight counts eligible records - place
+# it after and preflight returns exit 3, "no new eligible records", which is
+# exactly what the 3 August log reported.
+monthly-release: normalize generate-data annotate
 	@set +e; uv run --no-sync python scripts/data_platform/release_preflight.py; code=$$?; set -e; \
 	if [ $$code -eq 3 ]; then echo "Monthly release skipped: no new eligible records."; exit 0; fi; \
 	if [ $$code -ne 0 ]; then exit $$code; fi; \
