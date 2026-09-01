@@ -287,6 +287,11 @@
     "direct_contact_desc": "You can also write to support@sicurre.com."
   },
   "quarantine": {
+    "reports_title": "Reports received",
+    "reports_subtitle": "Emails you forwarded to us because they slipped past the filter.",
+    "reports_empty": "No reports yet. Forward a suspicious email to your reporting address and it will appear here.",
+    "report_status_received": "received",
+    "report_status_processed": "processed",
     "title": "Quarantine Zone",
     "subtitle": "Safe holding area for suspicious emails. Items auto-purge after 14 days.",
     "sender": "Sender",

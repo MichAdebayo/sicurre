@@ -42,7 +42,7 @@ SRC_ROOT = ROOT_DIR / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from core.config import get_settings  # noqa: E402
+from core.config import get_settings, redact_database_url  # noqa: E402
 from core.database import Base  # noqa: E402
 from db.models import (  # noqa: E402
     DataIngestionRun,
@@ -362,7 +362,7 @@ async def _run_db_ingestion(
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """Insert all snapshots into the DB. Returns (rows, totals)."""
     settings = get_settings()
-    logger.info("Using database: %s", settings.data_platform_database_url)
+    logger.info("Using database: %s", redact_database_url(settings.data_platform_database_url))
     engine = create_async_engine(settings.data_platform_database_url, echo=False)
 
     async with engine.begin() as conn:

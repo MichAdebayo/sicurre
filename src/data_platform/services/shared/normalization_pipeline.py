@@ -152,6 +152,22 @@ class NormalizationPipeline:
             lane=NormalizationLane.DIRECT_MESSAGE,
             normalize_messages=True,
         ),
+        # Operator-exported spam from a real French mailbox, ingested by
+        # base_ingest/file/parsers/txt_email_ingestion.py, which hardcodes
+        # label="spam" and writes the body under "text". They need no label
+        # mapping and no extractor branch - the default case already reads them.
+        #
+        # Without an entry here get_source_policy returns None, the source is
+        # left out of normalizable_source_ids, and the records are never selected
+        # at all. 281 real messages sat invisible that way: not rejected, never
+        # examined. normalize_text calls every one of them usable.
+        **{
+            f"spam_{index}": SourceNormalizationPolicy(
+                lane=NormalizationLane.DIRECT_MESSAGE,
+                normalize_messages=True,
+            )
+            for index in range(1, 6)
+        },
         "kaggle_multilingual_spam": SourceNormalizationPolicy(
             lane=NormalizationLane.DIRECT_MESSAGE,
             normalize_messages=True,
@@ -699,6 +715,14 @@ class NormalizationPipeline:
                         label = NormalizedLabel.LEGITIMATE
                     case _:
                         label = None
+            case "spam_1" | "spam_2" | "spam_3" | "spam_4" | "spam_5":
+                # Mailbox exports carry label="spam" on every record, written by
+                # txt_email_ingestion. Without an arm here the default is
+                # `label = None`, and the write path rejects on a null label -
+                # so these would be selected, extract cleanly, and then be
+                # dropped for want of a label that was present all along.
+                raw_label = str(raw_content.get("label", "")).lower()
+                label = NormalizedLabel.SPAM if raw_label == "spam" else None
             case "database-historical":
                 label = self.historical_stage_two.map_label(raw_content)
             case "common-crawl-bigdata":

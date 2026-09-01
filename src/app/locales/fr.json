@@ -287,6 +287,11 @@
     "direct_contact_desc": "Vous pouvez aussi écrire à support@sicurre.com."
   },
   "quarantine": {
+    "reports_title": "Signalements reçus",
+    "reports_subtitle": "Les emails que vous nous avez transférés parce qu'ils sont passés au travers du filtre.",
+    "reports_empty": "Aucun signalement pour le moment. Transférez un email suspect à votre adresse de signalement pour le voir apparaître ici.",
+    "report_status_received": "reçu",
+    "report_status_processed": "traité",
     "title": "Zone de Quarantaine",
     "subtitle": "Espace sécurisé pour les emails suspects. Purge automatique après 14 jours.",
     "sender": "Expéditeur",
