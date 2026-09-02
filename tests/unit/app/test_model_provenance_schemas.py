@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from data_platform.api.schemas.mlops import (
+    PHISHING_RECALL_REGRESSION_TOLERANCE,
     EvaluationSetRegistration,
     ModelCandidateRegistration,
     ModelDeploymentRegistration,
@@ -35,7 +36,12 @@ def test_candidate_requires_immutable_code_and_artifact_revisions() -> None:
 
 
 def test_promotion_snapshot_applies_three_simple_gates() -> None:
-    """F1, phishing recall, and legitimate false positives determine passage."""
+    """F1, phishing recall, and legitimate false positives determine passage.
+
+    Phishing recall carries a non-inferiority margin, so the failing case drops
+    well past it. A one-point drop would now pass, which is the intended
+    behaviour and is pinned separately below.
+    """
     passing = PromotionMetricSnapshot(
         candidate_weighted_f1=0.92,
         production_weighted_f1=0.92,
@@ -44,9 +50,52 @@ def test_promotion_snapshot_applies_three_simple_gates() -> None:
         candidate_legitimate_false_positives=1,
         production_legitimate_false_positives=1,
     )
-    failing = passing.model_copy(update={"candidate_phishing_recall": 0.96})
+    failing = passing.model_copy(update={"candidate_phishing_recall": 0.80})
     assert passing.passes() is True
     assert failing.passes() is False
+
+
+def test_recall_margin_matches_the_training_repository() -> None:
+    """The margin is duplicated across repositories and must not drift.
+
+    ``sicurre-ml`` decides the gate and this schema re-derives it as a
+    cross-check. When the two disagree every evaluation is rejected with HTTP
+    422 and no obvious cause, which is what happened on the first candidate ever
+    to pass. Pin the value so a change here is deliberate.
+    """
+    assert PHISHING_RECALL_REGRESSION_TOLERANCE == 0.099
+
+    inside = PromotionMetricSnapshot(
+        candidate_weighted_f1=0.92,
+        production_weighted_f1=0.92,
+        candidate_phishing_recall=0.97 - 0.08,
+        production_phishing_recall=0.97,
+        candidate_legitimate_false_positives=1,
+        production_legitimate_false_positives=1,
+    )
+    assert inside.passes() is True, "a drop inside the margin is not a regression"
+
+    outside = inside.model_copy(update={"candidate_phishing_recall": 0.97 - 0.12})
+    assert outside.passes() is False, "a drop beyond the margin still fails"
+
+
+def test_margin_does_not_apply_to_f1_or_false_positives() -> None:
+    """Only recall carries a margin; the other two admit no regression."""
+    base = {
+        "candidate_weighted_f1": 0.92,
+        "production_weighted_f1": 0.92,
+        "candidate_phishing_recall": 0.97,
+        "production_phishing_recall": 0.97,
+        "candidate_legitimate_false_positives": 1,
+        "production_legitimate_false_positives": 1,
+    }
+    assert PromotionMetricSnapshot(**{**base, "candidate_weighted_f1": 0.90}).passes() is False
+    assert (
+        PromotionMetricSnapshot(
+            **{**base, "candidate_legitimate_false_positives": 2}
+        ).passes()
+        is False
+    )
 
 
 def test_approved_evaluation_set_requires_review_and_balanced_counts() -> None:
