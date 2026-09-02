@@ -28,10 +28,10 @@ from __future__ import annotations
 
 import logging
 import re
-
-from langdetect import LangDetectException, detect
 from dataclasses import dataclass
 from pathlib import Path
+
+from langdetect import LangDetectException, detect
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,36 @@ class TxtEmailRecord:
     label: str  # always "spam" for these files
     source: str  # file stem, e.g. "spam_1"
     language: str | None
+
+
+#: Dropzone filename prefix -> corpus label.
+#:
+#: The dropzone turns a filename into a source name
+#: (``entry.filename.rsplit(".", 1)[0].lower()``), so ``spam_1.txt`` arrives as
+#: source ``spam_1``. The label used to be hardcoded to "spam" here, which meant
+#: a file could only ever contribute spam no matter what it was called - and a
+#: ``legitimate_1.txt`` would have been ingested, labelled spam, and then sat
+#: under a source with no normalization policy: never examined, never rejected.
+#:
+#: Legitimate is the class the corpus is shortest of (26.8% and static) and the
+#: one the model actually misreads, so it needs a way in.
+TXT_SOURCE_LABELS: dict[str, str] = {
+    "spam": "spam",
+    "phishing": "phishing",
+    "legitimate": "legitimate",
+}
+
+
+def label_for_source(source: str) -> str:
+    """Corpus label for a dropzone source name, from its prefix.
+
+    Unknown prefixes fall back to "spam" so the five existing ``spam_*`` exports
+    keep behaving exactly as before; the fallback is deliberate rather than a
+    guess, and any new prefix should be registered above rather than relying on
+    it.
+    """
+    prefix = source.split("_", 1)[0].strip().lower()
+    return TXT_SOURCE_LABELS.get(prefix, "spam")
 
 
 def _detect_language(text: str) -> str | None:
@@ -108,7 +138,10 @@ def _parse_email_block(block: str, source: str) -> TxtEmailRecord | None:
         text = body
 
     return TxtEmailRecord(
-        text=text, label="spam", source=source, language=_detect_language(text)
+        text=text,
+        label=label_for_source(source),
+        source=source,
+        language=_detect_language(text),
     )
 
 
@@ -117,7 +150,10 @@ def _fallback_record(raw_text: str, source: str) -> TxtEmailRecord | None:
     if not text:
         return None
     return TxtEmailRecord(
-        text=text, label="spam", source=source, language=_detect_language(text)
+        text=text,
+        label=label_for_source(source),
+        source=source,
+        language=_detect_language(text),
     )
 
 
