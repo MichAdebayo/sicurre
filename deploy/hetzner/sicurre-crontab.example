@@ -22,13 +22,18 @@ COMPOSE="docker compose -f /home/sicurre-prod/sicurre/docker-compose.prod.yml"
 10 4 1 * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/database/run_sql_ingestion.py >> /home/sicurre-prod/sicurre/cron-database.log 2>&1
 10 5 2 * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py >> /home/sicurre-prod/sicurre/cron-common-crawl.log 2>&1
 
-# Monthly release runs after the monthly DB and Common Crawl jobs. The preflight
-# exits cleanly without publishing when no new eligible records are available.
+# Release schedule. Normally monthly: `30 6 3 * *`, after the monthly DB and
+# Common Crawl jobs. TEMPORARILY DAILY until the defence, deliberately.
 #
-# TEMPORARY - 1 Sept 2026, verification run. Normally `30 6 3 * *`.
-# Moved to 20:40 on the 1st to prove the scheduled trigger actually fires and
-# that the release builds on the previous dataset version, rather than waiting
-# for 3 Sept. This is the first release since generate-data was wired into the
-# monthly job, and the 3 August run published nothing (preflight exit 3), so
-# the trigger has not been observed working end to end. RESTORE AFTER.
-40 20 1 * * cd /home/sicurre-prod/sicurre && $COMPOSE --profile release run --rm --no-deps sicurre-data-release >> /home/sicurre-prod/sicurre/cron-dataset-release.log 2>&1
+# Daily is cheap here rather than noisy, because the preflight gates it. With
+# no new eligible records it runs normalize, generate-data and annotate, then
+# exits 3 without building - no dataset version, no Kaggle publish, no GPU
+# dispatch. What it does exercise every day is generate-data, which is where
+# the 1 September release died on a unique-index collision. A daily clean
+# exit is the signal that the failure has not come back.
+#
+# RESTORE to `30 6 3 * *` after the defence.
+30 6 * * * cd /home/sicurre-prod/sicurre && $COMPOSE --profile release run --rm --no-deps sicurre-data-release >> /home/sicurre-prod/sicurre/cron-dataset-release.log 2>&1
+
+# One-off end-to-end check, 2 September. Remove after it has run.
+30 11 2 * * cd /home/sicurre-prod/sicurre && $COMPOSE --profile release run --rm --no-deps sicurre-data-release >> /home/sicurre-prod/sicurre/cron-dataset-release.log 2>&1
