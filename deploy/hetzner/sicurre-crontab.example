@@ -35,5 +35,6 @@ COMPOSE="docker compose -f /home/sicurre-prod/sicurre/docker-compose.prod.yml"
 # RESTORE to `30 6 3 * *` after the defence.
 30 6 * * * cd /home/sicurre-prod/sicurre && $COMPOSE --profile release run --rm --no-deps sicurre-data-release >> /home/sicurre-prod/sicurre/cron-dataset-release.log 2>&1
 
-# One-off end-to-end check, 2 September. Remove after it has run.
-30 11 2 * * cd /home/sicurre-prod/sicurre && $COMPOSE --profile release run --rm --no-deps sicurre-data-release >> /home/sicurre-prod/sicurre/cron-dataset-release.log 2>&1
+# The 2 September one-off end-to-end check has run and is removed. It fired at
+# 11:30 and produced base-20260902-113227 (frozen 11:32), which confirmed the
+# release path end to end after the 1 September unique-index failure.
