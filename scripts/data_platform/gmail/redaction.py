@@ -59,6 +59,20 @@ _CARD_TAIL = re.compile(
     re.IGNORECASE,
 )
 
+#: Tracking links dominate real bulk mail. A single CAF newsletter body was
+#: ~75% URLs of the form
+#:   https://lettreinfo.cafnord.fr/l/6158/800320996/393/76527/1141476/cc03bf2d
+#: where every path segment is a per-recipient identifier - the recipient id,
+#: the send id, the link id. Keeping them would leak those identifiers, consume
+#: most of the token budget, and teach "many tracking URLs = legitimate", which
+#: is a shortcut phishing defeats trivially because phishing has URLs too.
+#:
+#: The host is kept because the sending domain is real signal; the path is not.
+_TRACKING_URL = re.compile(r"https?://([A-Za-z0-9.\-]+)/[^\s]*")
+
+#: A line that is nothing but a link, left over after the above.
+_BARE_LINK_LINE = re.compile(r"^\s*\[LIEN:[^\]]*\]\s*$", re.MULTILINE)
+
 _URL_QUERY = re.compile(r"(https?://[^\s?]+)\?[^\s]*")
 
 
@@ -81,7 +95,14 @@ def redact(text: str, *, owner_names: tuple[str, ...] = ()) -> str:
     # them before reference matching stops a label like "Suivi :" swallowing the
     # URL that follows it.
     text = _URL_QUERY.sub(r"\1", text)
+    # Collapse tracking links to their host before reference matching, so a
+    # label followed by a URL cannot swallow it and the identifiers in the path
+    # never reach the corpus.
+    text = _TRACKING_URL.sub(lambda m: f"[LIEN:{m.group(1)}]", text)
+    text = _BARE_LINK_LINE.sub("", text)
     text = _REFERENCE.sub(r"\1[REF]", text)
+    # Bulk mail leaves runs of blank lines once the link lines are gone.
+    text = re.sub(r"\n{3,}", "\n\n", text)
     for name in owner_names:
         if len(name) >= 3:
             text = re.sub(rf"\b{re.escape(name)}\b", "[DESTINATAIRE]", text, flags=re.IGNORECASE)
