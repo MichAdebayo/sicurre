@@ -190,3 +190,36 @@ def test_active_deployment_requires_revision_and_time() -> None:
                 "status": "active",
             }
         )
+
+
+def test_evaluation_stage_transitions_are_not_sticky() -> None:
+    """A pass must undo a previous rejection, and neither arm may touch production.
+
+    The failure arm was once the only one written, so a rejection was sticky: a
+    candidate marked ``rejected`` stayed rejected after a later evaluation
+    passed, leaving MLflow reading ``candidate`` while the database read
+    ``rejected``. It surfaced on the first candidate ever to pass its gate.
+
+    ``production`` and ``retired`` belong to the promotion workflow. Re-running
+    an evaluation against the live model must not move it in either direction.
+    """
+    from data_platform.services.model_provenance import _apply_evaluation_stage
+
+    class _Version:
+        def __init__(self, stage: str) -> None:
+            self.stage = stage
+
+    cases = [
+        ("rejected", "passed", "candidate"),
+        ("candidate", "failed", "rejected"),
+        ("candidate", "passed", "candidate"),
+        ("rejected", "failed", "rejected"),
+        ("candidate", "inconclusive", "candidate"),
+        ("production", "passed", "production"),
+        ("production", "failed", "production"),
+        ("retired", "failed", "retired"),
+    ]
+    for start, outcome, expected in cases:
+        version = _Version(start)
+        _apply_evaluation_stage(version, outcome)
+        assert version.stage == expected, f"{start} + {outcome} became {version.stage}"
