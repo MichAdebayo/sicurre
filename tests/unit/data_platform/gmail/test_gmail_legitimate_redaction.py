@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "scripts/data_platform/gmail"))
-from build_legitimate_dropzone import group_for, to_block  # noqa: E402
+from make_legitimate_dropzone import group_for, to_block  # noqa: E402
 from redaction import redact  # noqa: E402
 
 OWNER = ("Michael Adebayo", "Adebayo", "Michael")
@@ -136,7 +136,7 @@ def test_the_denylist_wins_over_the_allowlist() -> None:
     A future allowlist entry could easily overlap a denied domain, and then
     ordering is the only thing preventing personal mail entering the corpus.
     """
-    import build_legitimate_dropzone as mod
+    import make_legitimate_dropzone as mod
 
     original = mod.SENDER_GROUPS
     try:
@@ -146,3 +146,27 @@ def test_the_denylist_wins_over_the_allowlist() -> None:
         )
     finally:
         mod.SENDER_GROUPS = original
+
+
+def test_the_extractor_module_is_actually_committed() -> None:
+    """A test that imports an ignored file passes locally and fails in CI.
+
+    .gitignore carries a broad ``build*.py`` rule. The first version of the
+    extractor was named build_legitimate_dropzone.py, was silently skipped by
+    ``git add -A``, and reached CI as a ModuleNotFoundError - after the pull
+    request had already been merged, because the failing check was not read
+    before merging.
+    """
+    import subprocess
+
+    root = Path(__file__).resolve().parents[4]
+    for name in ("make_legitimate_dropzone.py", "redaction.py"):
+        path = f"scripts/data_platform/gmail/{name}"
+        assert (root / path).exists(), f"{path} is missing"
+        ignored = subprocess.run(
+            ["git", "check-ignore", path], cwd=root, capture_output=True
+        )
+        assert ignored.returncode != 0, (
+            f"{path} is gitignored, so it will not reach CI even though the "
+            f"tests importing it pass locally"
+        )
