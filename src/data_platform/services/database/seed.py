@@ -187,6 +187,32 @@ def redact_pii(text: str) -> str:
     return re.sub(r"\b0[1-9][ .-]?(?:\d{2}[ .-]?){4}\b", "[PHONE]", text)
 
 
+def split_subject_and_body(text: str) -> tuple[str, str]:
+    """Split a generated email into (subject, body), bounded and PII-redacted.
+
+    Extracted because this was written out twice, and the 200-character
+    truncation bug therefore existed twice: fixing one site would have left
+    every phishing record still stored as its opening paragraph. Two copies of a
+    rule are two places for it to drift, and the sites had already drifted -
+    only one of them handled the "Objet : " prefix.
+
+    Returns the body bounded by MAX_BODY_CHARS rather than a preview. The column
+    is still called body_preview for schema compatibility; it is no longer one.
+    """
+    text = str(text or "")
+    subject = ""
+    body = text[:MAX_BODY_CHARS]
+    if text.startswith("Objet : "):
+        parts = text.split("\n\n", 1)
+        subject = parts[0].replace("Objet : ", "", 1)[:MAX_SUBJECT_CHARS]
+        body = (parts[1] if len(parts) > 1 else text)[:MAX_BODY_CHARS]
+    elif "\n\n" in text:
+        parts = text.split("\n\n", 1)
+        subject = parts[0][:MAX_SUBJECT_CHARS]
+        body = (parts[1] if len(parts) > 1 else text)[:MAX_BODY_CHARS]
+    return subject, redact_pii(body)
+
+
 def seed_external_database(seed: int = SEED) -> None:
     random.seed(seed)
     fake = Faker("fr_FR")
@@ -337,18 +363,7 @@ def seed_external_database(seed: int = SEED) -> None:
                 if action_taken == "trashed"
                 else None
             )
-            text = str(row.get("text", ""))
-            subject = ""
-            body_preview = text[:MAX_BODY_CHARS]
-            if text.startswith("Objet : "):
-                parts = text.split("\n\n", 1)
-                subject = parts[0].replace("Objet : ", "", 1)
-                body_preview = parts[1][:MAX_BODY_CHARS] if len(parts) > 1 else text[:MAX_BODY_CHARS]
-            elif "\n\n" in text:
-                parts = text.split("\n\n", 1)
-                subject = parts[0][:MAX_SUBJECT_CHARS]
-                body_preview = parts[1][:MAX_BODY_CHARS] if len(parts) > 1 else text[:MAX_BODY_CHARS]
-            body_preview = redact_pii(body_preview)
+            subject, body_preview = split_subject_and_body(row.get("text", ""))
             threat = ExternalThreatLog(
                 user_id=user_id,
                 message_id=f"msg_{uuid.uuid4().hex[:12]}",
@@ -495,13 +510,7 @@ def append_to_database(
         inserted = 0
         for _, row in df.iterrows():
             text_content = str(row.get("text", ""))
-            subject = ""
-            body_preview = text_content[:MAX_BODY_CHARS]
-            if "\n\n" in text_content:
-                parts = text_content.split("\n\n", 1)
-                subject = parts[0][:MAX_SUBJECT_CHARS]
-                body_preview = parts[1][:MAX_BODY_CHARS] if len(parts) > 1 else text_content[:MAX_BODY_CHARS]
-            body_preview = redact_pii(body_preview)
+            subject, body_preview = split_subject_and_body(text_content)
 
             confidence = round(rng.uniform(0.80, 0.99), 3)
             received_at = now - timedelta(
