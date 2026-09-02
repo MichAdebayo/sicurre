@@ -107,6 +107,30 @@ class ExternalModelVersion(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
+#: Upper bound on a stored body, in characters.
+#:
+#: The column was called body_preview and was cut to 200 characters, which is a
+#: sensible size for a preview and the wrong size for training data. The
+#: archetype templates that feed it run 297-611 characters, so every synthetic
+#: email in the corpus was stored as its opening paragraph and nothing else -
+#: 23,822 records across all three classes, each missing its back half.
+#:
+#: That cost the corpus its long-form register. Real French business mail runs
+#: 400-1200 characters, and the model had never seen a full-length example of
+#: any class. Measured on the current tokenizer, full templates reach a median
+#: of 133 tokens and a maximum of 214, so nothing approaches max_length=256:
+#: the truncation was discarding content the model had room for.
+#:
+#: 4000 is a guard against a pathological input rather than a working limit;
+#: no template comes close.
+MAX_BODY_CHARS = 4_000
+
+#: Subjects stay short. A subject line is genuinely bounded, unlike a body,
+#: and letting it grow would just move the truncation problem into a field
+#: that never needed the room.
+MAX_SUBJECT_CHARS = 200
+
+
 def generate_adapted_emails(seed: int = SEED) -> pd.DataFrame:
     if not CORPUS_PATH.exists():
         logger.warning(
@@ -161,6 +185,32 @@ def redact_pii(text: str) -> str:
         text,
     )
     return re.sub(r"\b0[1-9][ .-]?(?:\d{2}[ .-]?){4}\b", "[PHONE]", text)
+
+
+def split_subject_and_body(text: str) -> tuple[str, str]:
+    """Split a generated email into (subject, body), bounded and PII-redacted.
+
+    Extracted because this was written out twice, and the 200-character
+    truncation bug therefore existed twice: fixing one site would have left
+    every phishing record still stored as its opening paragraph. Two copies of a
+    rule are two places for it to drift, and the sites had already drifted -
+    only one of them handled the "Objet : " prefix.
+
+    Returns the body bounded by MAX_BODY_CHARS rather than a preview. The column
+    is still called body_preview for schema compatibility; it is no longer one.
+    """
+    text = str(text or "")
+    subject = ""
+    body = text[:MAX_BODY_CHARS]
+    if text.startswith("Objet : "):
+        parts = text.split("\n\n", 1)
+        subject = parts[0].replace("Objet : ", "", 1)[:MAX_SUBJECT_CHARS]
+        body = (parts[1] if len(parts) > 1 else text)[:MAX_BODY_CHARS]
+    elif "\n\n" in text:
+        parts = text.split("\n\n", 1)
+        subject = parts[0][:MAX_SUBJECT_CHARS]
+        body = (parts[1] if len(parts) > 1 else text)[:MAX_BODY_CHARS]
+    return subject, redact_pii(body)
 
 
 def seed_external_database(seed: int = SEED) -> None:
@@ -313,18 +363,7 @@ def seed_external_database(seed: int = SEED) -> None:
                 if action_taken == "trashed"
                 else None
             )
-            text = str(row.get("text", ""))
-            subject = ""
-            body_preview = text[:200]
-            if text.startswith("Objet : "):
-                parts = text.split("\n\n", 1)
-                subject = parts[0].replace("Objet : ", "", 1)
-                body_preview = parts[1][:200] if len(parts) > 1 else text[:200]
-            elif "\n\n" in text:
-                parts = text.split("\n\n", 1)
-                subject = parts[0][:200]
-                body_preview = parts[1][:200] if len(parts) > 1 else text[:200]
-            body_preview = redact_pii(body_preview)
+            subject, body_preview = split_subject_and_body(row.get("text", ""))
             threat = ExternalThreatLog(
                 user_id=user_id,
                 message_id=f"msg_{uuid.uuid4().hex[:12]}",
@@ -471,13 +510,7 @@ def append_to_database(
         inserted = 0
         for _, row in df.iterrows():
             text_content = str(row.get("text", ""))
-            subject = ""
-            body_preview = text_content[:200]
-            if "\n\n" in text_content:
-                parts = text_content.split("\n\n", 1)
-                subject = parts[0][:200]
-                body_preview = parts[1][:200] if len(parts) > 1 else text_content[:200]
-            body_preview = redact_pii(body_preview)
+            subject, body_preview = split_subject_and_body(text_content)
 
             confidence = round(rng.uniform(0.80, 0.99), 3)
             received_at = now - timedelta(
