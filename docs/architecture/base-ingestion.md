@@ -299,19 +299,43 @@ result = await service.run(session, trigger_mode="manual")
 
 ---
 
-## Source 5 — External DB (historical) 🔜 Planned
+## Source 5 — External DB (historical) ✅ Implemented
 
-**Make target** (to be added): `db-ingest-base`  
-**Input**: `data/raw/db/external_threats.db` (seed + read)  
+**Make target**: `db-ingest-base`
+**Input**: canonical feeder downloaded from R2, `raw-snapshots/base/database/external_threats.db`
 **Script location**: `src/data_platform/base_ingest/db/ingest.py`
+
+The feeder is fetched from R2 rather than read from a local file, so a rebuild
+on any machine produces the same records. Regenerating it from the archetypes
+and re-uploading is a deliberate manual step.
+
+Records are attributed to leaf sources — `database/faker/synthetic_phishing_hard`,
+`database/adapted/adapted_en_fr` and their siblings — while ingestion *runs* are
+logged against the parent `database-historical`. That is why the leaf sources
+show zero runs and non-zero records, and it is not a fault.
+
+**Contribution to `base-20260902-162626`**: 34,700 raw records across ten leaf
+sources, of which **31,701** reach the frozen dataset — the largest single
+contributor, and the whole of the synthetic and adapted material.
 
 ---
 
-## Source 6 — Common Crawl (bigdata) 🔜 Planned
+## Source 6 — Common Crawl (bigdata) ✅ Implemented
 
-**Make target** (to be added): `bigdata-ingest-base`  
-**Input**: R2 `raw-snapshots/bigdata/common_crawl/` + local `data/raw/bigdata/`  
+**Make target**: `bigdata-ingest-base`
+**Input**: R2 `raw-snapshots/bigdata/common_crawl/` + local `data/raw/bigdata/`
 **Script location**: `src/data_platform/base_ingest/bigdata/common_crawl/ingest.py`
+
+**Contribution to `base-20260902-162626`**: 3,609 raw records, of which **11**
+reach the frozen dataset.
+
+That yield is not a defect and should not be reported as one. Common Crawl
+supplies French *web* text, and 3,591 of its records are routed to the Common
+Crawl stage-two service rather than the direct normalization lane — they are
+handled by a different pipeline, not rejected. Web text is also not
+email-shaped, so little of it survives a cleaner tuned for correspondence. The
+source earns its place as a French-language signal, not as a volume
+contributor.
 
 ---
 
@@ -323,5 +347,11 @@ result = await service.run(session, trigger_mode="manual")
 | File (CSV + TXT) ✅ | **163,367** |
 | CERT-FR ✅ | 163,459 |
 | SAP Labs ✅ | **163,477** |
-| External DB (est.) | TBD |
-| Common Crawl (est.) | TBD |
+| External DB ✅ | 34,700 raw · 31,701 in the frozen dataset |
+| Common Crawl ✅ | 3,609 raw · 11 in the frozen dataset |
+
+Counts verified against the data-platform database on 3 September 2026 for
+release `base-20260902-162626` (43,700 items, checksum `2edfb5074503`). Raw
+totals are cumulative across the archive; the second figure is what the release
+actually contains, and the two differ mostly because normalization admits French
+only.
