@@ -294,9 +294,15 @@ normalize-dry:
 	@echo "Previewing normalization (no DB writes)..."
 	uv run python src/data_platform/cli/normalize/messages.py --dry-run $(NORMALIZE_ARGS)
 
+# --no-sync is load-bearing here, not cosmetic. The release image installs only
+# the runtime and release groups (uv sync --frozen --no-default-groups). A bare
+# `uv run` re-syncs to the DEFAULT groups, which tears out the release group -
+# kaggle, which publish-latest needs - and pulls dev dependencies the image was
+# deliberately built without. Every other step in the release path already
+# passes --no-sync; this one did not, and it was the only one that did not.
 generate-data:
 	@echo "Running canonical generation pipeline (adapted + Common Crawl + CERT-FR lanes)..."
-	uv run python src/data_platform/cli/datasets/generate.py $(GENERATE_ARGS)
+	uv run --no-sync python src/data_platform/cli/datasets/generate.py $(GENERATE_ARGS)
 
 annotate:
 	@echo "Persisting missing annotations on normalized messages..."
