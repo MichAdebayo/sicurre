@@ -43,7 +43,21 @@ CORPUS_PATH = (
 SEED = 42
 SYNTHETIC_PHISHING_COUNT = 7_500
 SYNTHETIC_SPAM_COUNT = 10_000
-SYNTHETIC_LEGITIMATE_COUNT = 5_000
+#: Raised from 5_000. At 5_000 the corpus came out 45.8% phishing to 24.4%
+#: legitimate - a 1.88x ratio - once the faker sources grew to a larger share
+#: of it after the truncation fix.
+#:
+#: That ratio is the axis the model fails on. inverse_freq balances the
+#: gradient exactly, so the loss is not the problem; the problem is
+#: information. At 1.88x the model sees nearly twice as many distinct phishing
+#: emails as legitimate ones, learns a richer phishing concept and a thinner
+#: legitimate one, and reads legitimate mail as phishing - 22 of 42 on the
+#: golden set at worst.
+#:
+#: 10_000 brings the corpus to roughly 1.23x. Deliberately not parity: real
+#: inboxes are not balanced either, and the aim is to stop starving the
+#: legitimate class rather than to invent a uniform world.
+SYNTHETIC_LEGITIMATE_COUNT = 10_000
 
 
 class Base(DeclarativeBase):
