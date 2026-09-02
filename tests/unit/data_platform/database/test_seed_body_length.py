@@ -92,3 +92,34 @@ def test_personal_identifiers_are_still_redacted() -> None:
 @pytest.mark.parametrize("value", ["", None])
 def test_empty_input_does_not_raise(value: str | None) -> None:
     assert split_subject_and_body(value) == ("", "")
+
+
+def test_appended_rows_carry_full_length_bodies(tmp_path) -> None:
+    """The call site must actually use the rule, not just have it available.
+
+    Extracting split_subject_and_body made the rule testable but left both call
+    sites uncovered, because they sit inside functions that need a database.
+    This exercises one of them end to end against a temporary SQLite file, so a
+    future edit that stops calling the helper - and reintroduces a local
+    truncation - fails here rather than silently shortening the corpus again.
+    """
+    from sqlalchemy import create_engine, select
+    from sqlalchemy.orm import sessionmaker
+
+    from data_platform.services.database.seed import ExternalThreatLog, append_to_database
+
+    db_url = f"sqlite:///{tmp_path / 'external_threats.db'}"
+    inserted = append_to_database(25, db_url=db_url, seed=42)
+    assert inserted == 25
+
+    engine = create_engine(db_url, echo=False)
+    with sessionmaker(bind=engine)() as session:
+        bodies = [r.body_preview for r in session.scalars(select(ExternalThreatLog)).all()]
+
+    assert len(bodies) == 25
+    longest = max(len(b) for b in bodies)
+    assert longest > 200, (
+        f"longest stored body is {longest} chars - the 200-character truncation "
+        f"is back, and every synthetic email is an opening paragraph again"
+    )
+    assert all(len(b) <= MAX_BODY_CHARS for b in bodies)
