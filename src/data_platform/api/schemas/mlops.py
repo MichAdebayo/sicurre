@@ -52,6 +52,24 @@ class ModelCandidateRegistration(BaseModel):
     training_dataset_version_tag: str = Field(min_length=1, max_length=120)
 
 
+#: Non-inferiority margin on phishing recall, mirroring
+#: ``sicurre-ml/src/evaluation/promotion.py::PromotionThresholds``.
+#:
+#: DUPLICATED RULE - the two must move together. This class re-derives the gate
+#: independently so a reported pass cannot contradict the metrics behind it,
+#: which is deliberate defence in depth; the cost is that a margin changed in
+#: one repository and not the other rejects every evaluation with HTTP 422 and
+#: no obvious cause. That is exactly what happened on 2 September 2026, on the
+#: first candidate ever to pass.
+#:
+#: The value is derived, not chosen: phishing recall is estimated on 42 golden
+#: samples, where the incumbent's 0.8810 carries a Wilson 95% half-width of
+#: 0.0990. A margin of 0.099 declines to reject on a difference the evaluation
+#: set cannot distinguish from zero. Re-derive it when the golden set changes
+#: size, in both repositories.
+PHISHING_RECALL_REGRESSION_TOLERANCE = 0.099
+
+
 class PromotionMetricSnapshot(BaseModel):
     """Minimal reproducible values used by the non-regression gate."""
 
@@ -63,10 +81,17 @@ class PromotionMetricSnapshot(BaseModel):
     production_legitimate_false_positives: int = Field(ge=0)
 
     def passes(self) -> bool:
-        """Apply the provisional three-part non-regression policy."""
+        """Apply the provisional three-part non-regression policy.
+
+        Weighted F1 and legitimate false positives admit no regression: they are
+        what a candidate is expected to improve. Phishing recall carries a
+        non-inferiority margin, because a zero margin rejects on differences
+        smaller than the evaluation set can resolve.
+        """
         return (
             self.candidate_weighted_f1 >= self.production_weighted_f1
-            and self.candidate_phishing_recall >= self.production_phishing_recall
+            and self.candidate_phishing_recall
+            >= self.production_phishing_recall - PHISHING_RECALL_REGRESSION_TOLERANCE
             and self.candidate_legitimate_false_positives
             <= self.production_legitimate_false_positives
         )
