@@ -18,8 +18,11 @@ File format (4 files: Spam_1.txt … Spam_4.txt):
 begins a new block.  The header/body boundary is the first ``---`` separator
 line.)
 
-All emails in these files are spam/phishing samples — ``label`` is hardcoded
-to ``"spam"``.  The persisted text combines the subject and body.
+The label comes from the filename prefix, not from the content: ``spam_1.txt``
+contributes spam, ``legitimate_1.txt`` contributes legitimate, ``phishing_1.txt``
+contributes phishing.  See ``TXT_SOURCE_LABELS``.  An unrecognised prefix falls
+back to ``"spam"``, which is what the original four Spam_*.txt exports relied
+on.  The persisted text combines the subject and body.
 
 Returns a plain list of parsed records; the caller owns DB persistence.
 """
