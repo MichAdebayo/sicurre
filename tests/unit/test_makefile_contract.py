@@ -156,3 +156,42 @@ def test_targets_referenced_by_ci_and_docs_are_defined() -> None:
 
     missing = sorted(referenced - defined)
     assert not missing, f"referenced in CI/docs but not defined in the Makefile: {missing}"
+
+
+def test_every_release_path_step_runs_without_resyncing() -> None:
+    """A bare `uv run` in the release image destroys the environment it runs in.
+
+    The release container is built with
+    `uv sync --frozen --no-default-groups --group runtime --group release`, so it
+    holds exactly two dependency groups. `uv run` without --no-sync re-syncs to
+    the DEFAULT groups: it removes the release group - kaggle, which
+    publish-latest needs - and installs dev dependencies the image was
+    deliberately built without.
+
+    This is not hypothetical. On 1 September the scheduled release normalized 933
+    records and then stopped dead before generation, and `generate-data` was the
+    only step in the release path invoking `uv run` without --no-sync.
+    """
+    text = _text()
+    recipes = re.findall(r"^\t(?:@)?(uv run[^\n]*)", text, re.MULTILINE)
+
+    release_steps = (
+        "cli/normalize/messages.py",
+        "cli/datasets/generate.py",
+        "cli/maintenance/annotation_backfill.py",
+        "cli/datasets/build.py",
+        "cli/datasets/export.py",
+        "publish_latest.py",
+    )
+
+    for step in release_steps:
+        matching = [r for r in recipes if step in r]
+        assert matching, f"no recipe found invoking {step}"
+        for recipe in matching:
+            if "--dry-run" in recipe:
+                continue  # dry-run targets are developer tools, not release steps
+            assert "--no-sync" in recipe, (
+                f"release step '{step}' runs `uv run` without --no-sync; in the "
+                f"release image that re-syncs to the default groups and removes "
+                f"the release group the later steps depend on"
+            )
