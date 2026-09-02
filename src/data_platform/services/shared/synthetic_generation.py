@@ -21,10 +21,26 @@ from data_platform.services.shared.preprocessing import (
 TODAY = date.today().strftime("%Y%m%d")
 ARCHETYPE_DIR = ROOT_DIR / "data" / "archetypes"
 PROC = ROOT_DIR / "data" / "processed"
+#: Generation targets per class.
+#:
+#: legitimate was 5_000 against phishing's 7_500, which put the corpus at 45.8%
+#: phishing to 24.4% legitimate - a 1.88x ratio - once the faker sources became
+#: a larger share of it.
+#:
+#: That ratio is the failure axis. inverse_freq balances the gradient exactly,
+#: so the loss is not the problem; the problem is information. At 1.88x the
+#: model sees nearly twice as many distinct phishing emails as legitimate ones
+#: and learns a correspondingly richer phishing concept and a thinner
+#: legitimate one, which is measurably what goes wrong: legitimate mail read as
+#: phishing, 22 of 42 on the golden set at worst.
+#:
+#: 10_000 brings it to roughly 1.23x. Deliberately not 1.0 - real inboxes are
+#: not balanced either, and the aim is to stop starving the legitimate class,
+#: not to invent a uniform world.
 DEFAULT_TARGETS: dict[str, int] = {
     "phishing": 7_500,
     "spam": 10_000,
-    "legitimate": 5_000,
+    "legitimate": 10_000,
 }
 
 
