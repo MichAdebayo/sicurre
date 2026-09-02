@@ -3,7 +3,11 @@
     "class_label": 0,
     "class_name": "phishing",
     "description": "French phishing email archetypes for synthetic generation",
-    "tier_distribution": {"simple": 0.30, "medium": 0.40, "hard": 0.30}
+    "tier_distribution": {
+      "simple": 0.3,
+      "medium": 0.4,
+      "hard": 0.3
+    }
   },
   "archetypes": [
     {
@@ -18,11 +22,42 @@
         "Objet : URGENT - Gain de {montant} EUR en attente !\n\nBonjour,\n\nVous êtes l'heureux gagnant d'un prix de {montant} EUR organisé par {organisme}.\n\nPour valider votre gain, envoyez-nous :\n1. Votre nom complet\n2. Votre adresse\n3. Votre numéro de téléphone\n4. Votre RIB\n\nContactez notre agent : {agent} via {email_agent}\n\nNe tardez pas, l'offre expire le {date_expiry}.\n\nBien à vous,\nDépartement des prix\n{organisme}"
       ],
       "variables": {
-        "prix": ["100 000 EUR", "50 000 EUR", "25 000 EUR", "un voyage aux Maldives", "une voiture Renault Clio", "un chèque de 75 000 EUR"],
-        "organisme": ["EuroMillions International", "Loterie Nationale Européenne", "Fondation des Gagnants Internationaux", "Tirage Microsoft-Google", "Programme de Fidélité Orange"],
-        "cadeau": ["ensemble 3 pièces Parkside", "coffret Thermomix", "iPhone 16 Pro", "TV Samsung 55 pouces", "robot Dyson V15"],
-        "delai": ["48", "72", "24", "96", "5"],
-        "montant": ["50 000", "100 000", "250 000", "15 000", "500 000"]
+        "prix": [
+          "100 000 EUR",
+          "50 000 EUR",
+          "25 000 EUR",
+          "un voyage aux Maldives",
+          "une voiture Renault Clio",
+          "un chèque de 75 000 EUR"
+        ],
+        "organisme": [
+          "EuroMillions International",
+          "Loterie Nationale Européenne",
+          "Fondation des Gagnants Internationaux",
+          "Tirage Microsoft-Google",
+          "Programme de Fidélité Orange"
+        ],
+        "cadeau": [
+          "ensemble 3 pièces Parkside",
+          "coffret Thermomix",
+          "iPhone 16 Pro",
+          "TV Samsung 55 pouces",
+          "robot Dyson V15"
+        ],
+        "delai": [
+          "48",
+          "72",
+          "24",
+          "96",
+          "5"
+        ],
+        "montant": [
+          "50 000",
+          "100 000",
+          "250 000",
+          "15 000",
+          "500 000"
+        ]
       }
     },
     {
@@ -36,13 +71,51 @@
         "Objet : Votre dossier d'héritage concernant feu M. {nom_defunt}\n\nMadame, Monsieur,\n\nJe suis Maître {agent}, notaire à {ville}. Suite au décès de M. {nom_defunt}, ressortissant français décédé sans héritier direct, une somme de {montant} EUR a été identifiée sur un compte dormant.\n\nVotre nom a été sélectionné comme bénéficiaire potentiel. Pour initier la procédure de transfert, merci de nous fournir :\n- Copie de votre pièce d'identité\n- Justificatif de domicile\n- Coordonnées bancaires (RIB)\n\nLes frais de notariat ({frais} EUR) seront déduits du montant total.\n\nMerci de votre diligence.\n\nMaître {agent}\nÉtude Notariale de {ville}"
       ],
       "variables": {
-        "montant": ["2 500 000", "4 800 000", "1 200 000", "30 500 000", "950 000"],
-        "organisme": ["Commission Internationale des Finances", "Banque Mondiale - Comité de la Dette", "Fonds Monétaire de Développement", "Trésor Public International"],
-        "banque": ["HSBC International", "Crédit Suisse", "Barclays Offshore", "BNP Paribas International"],
-        "titre": ["Directeur du Comité de Paiement", "Avocat Principal", "Secrétaire Général", "Commissaire aux Comptes"],
-        "frais": ["485", "350", "275", "590", "750"],
-        "nom_defunt": ["Jean-Pierre Dumont", "Henri Lavoisier", "Marcel Beaumont", "François Delacroix", "Robert Martineau"],
-        "code": ["AG/H4400501FR", "REF/2026/FR-001", "BNF-7742-EU", "TX-8891-FR"]
+        "montant": [
+          "2 500 000",
+          "4 800 000",
+          "1 200 000",
+          "30 500 000",
+          "950 000"
+        ],
+        "organisme": [
+          "Commission Internationale des Finances",
+          "Banque Mondiale - Comité de la Dette",
+          "Fonds Monétaire de Développement",
+          "Trésor Public International"
+        ],
+        "banque": [
+          "HSBC International",
+          "Crédit Suisse",
+          "Barclays Offshore",
+          "BNP Paribas International"
+        ],
+        "titre": [
+          "Directeur du Comité de Paiement",
+          "Avocat Principal",
+          "Secrétaire Général",
+          "Commissaire aux Comptes"
+        ],
+        "frais": [
+          "485",
+          "350",
+          "275",
+          "590",
+          "750"
+        ],
+        "nom_defunt": [
+          "Jean-Pierre Dumont",
+          "Henri Lavoisier",
+          "Marcel Beaumont",
+          "François Delacroix",
+          "Robert Martineau"
+        ],
+        "code": [
+          "AG/H4400501FR",
+          "REF/2026/FR-001",
+          "BNF-7742-EU",
+          "TX-8891-FR"
+        ]
       }
     },
     {
@@ -56,10 +129,31 @@
         "Objet : Nouveau message vocal en attente\n\n{app} - Notification\n\nBonjour {prenom},\n\nVous avez {nb_messages} nouveau(x) message(s) vocal(aux) non écouté(s).\n\nÉcoutez vos messages : [URL]\n\nCe lien expire dans {delai} heures.\n\n© {app} {annee}"
       ],
       "variables": {
-        "app": ["WhatsApp", "Telegram", "Signal", "Viber"],
-        "suffix": ["05", "12", "87", "31", "44"],
-        "nb_messages": ["1", "3", "2", "5"],
-        "delai": ["24", "48", "12", "6"]
+        "app": [
+          "WhatsApp",
+          "Telegram",
+          "Signal",
+          "Viber"
+        ],
+        "suffix": [
+          "05",
+          "12",
+          "87",
+          "31",
+          "44"
+        ],
+        "nb_messages": [
+          "1",
+          "3",
+          "2",
+          "5"
+        ],
+        "delai": [
+          "24",
+          "48",
+          "12",
+          "6"
+        ]
       }
     },
     {
@@ -74,19 +168,95 @@
         "Objet : {prenom}, profitez de la hausse de {entreprise} ({pourcentage}% de rendement)\n\nBonjour {prenom},\n\nDepuis le début de l'année, l'action {entreprise} a surperformé le CAC 40 avec un rendement exceptionnel de +{pourcentage}%.\n\nNos analystes prévoient une hausse supplémentaire de {prev_hausse}% d'ici {horizon}, portée par :\n• {raison_1}\n• {raison_2}\n• {raison_3}\n\nOuvrez votre position dès maintenant avec un bonus de {nb_actions} actions offertes.\n\n→ Accéder à la plateforme d'investissement : [URL]\n\nAvertissement : les performances passées ne préjugent pas des performances futures.\n\n© {annee} - Service Investisseurs"
       ],
       "variables": {
-        "entreprise": ["Dassault Aviation", "TotalEnergies", "LVMH", "Airbus", "Hermès International", "Safran", "Schneider Electric", "BNP Paribas"],
-        "description_entreprise": ["leader mondial de l'aéronautique militaire et civil", "géant français de l'énergie", "numéro un mondial du luxe", "constructeur aéronautique européen", "maison de luxe française emblématique"],
-        "description_courte": ["Aéronautique & Défense", "Énergie renouvelable", "Luxe & Mode", "Aéronautique", "Luxe"],
-        "pourcentage": ["52,72", "47,31", "38,95", "61,20", "33,88", "42,15"],
-        "nb_actions": ["20", "15", "10", "25", "30", "50"],
-        "duree": ["6", "3", "9", "12"],
-        "capitalisation": ["32 milliards EUR", "150 milliards EUR", "420 milliards EUR", "85 milliards EUR"],
-        "produit": ["notre nouveau Rafale F5", "notre plan stratégique 2030", "notre programme d'actionnariat salarié", "notre partenariat avec l'ESA"],
-        "prev_hausse": ["15", "22", "18", "30", "25"],
-        "horizon": ["fin 2026", "T3 2026", "décembre", "6 mois"],
-        "raison_1": ["Commandes record pour l'export militaire", "Transition énergétique accélérée", "Croissance en Asie-Pacifique", "Carnet de commandes historique"],
-        "raison_2": ["Marge opérationnelle en hausse", "Dividende exceptionnel prévu", "Résultats T1 au-dessus des attentes", "Partenariat stratégique"],
-        "raison_3": ["Faible endettement", "Position de trésorerie solide", "Innovation technologique de rupture", "Expansion sur de nouveaux marchés"]
+        "entreprise": [
+          "Dassault Aviation",
+          "TotalEnergies",
+          "LVMH",
+          "Airbus",
+          "Hermès International",
+          "Safran",
+          "Schneider Electric",
+          "BNP Paribas"
+        ],
+        "description_entreprise": [
+          "leader mondial de l'aéronautique militaire et civil",
+          "géant français de l'énergie",
+          "numéro un mondial du luxe",
+          "constructeur aéronautique européen",
+          "maison de luxe française emblématique"
+        ],
+        "description_courte": [
+          "Aéronautique & Défense",
+          "Énergie renouvelable",
+          "Luxe & Mode",
+          "Aéronautique",
+          "Luxe"
+        ],
+        "pourcentage": [
+          "52,72",
+          "47,31",
+          "38,95",
+          "61,20",
+          "33,88",
+          "42,15"
+        ],
+        "nb_actions": [
+          "20",
+          "15",
+          "10",
+          "25",
+          "30",
+          "50"
+        ],
+        "duree": [
+          "6",
+          "3",
+          "9",
+          "12"
+        ],
+        "capitalisation": [
+          "32 milliards EUR",
+          "150 milliards EUR",
+          "420 milliards EUR",
+          "85 milliards EUR"
+        ],
+        "produit": [
+          "notre nouveau Rafale F5",
+          "notre plan stratégique 2030",
+          "notre programme d'actionnariat salarié",
+          "notre partenariat avec l'ESA"
+        ],
+        "prev_hausse": [
+          "15",
+          "22",
+          "18",
+          "30",
+          "25"
+        ],
+        "horizon": [
+          "fin 2026",
+          "T3 2026",
+          "décembre",
+          "6 mois"
+        ],
+        "raison_1": [
+          "Commandes record pour l'export militaire",
+          "Transition énergétique accélérée",
+          "Croissance en Asie-Pacifique",
+          "Carnet de commandes historique"
+        ],
+        "raison_2": [
+          "Marge opérationnelle en hausse",
+          "Dividende exceptionnel prévu",
+          "Résultats T1 au-dessus des attentes",
+          "Partenariat stratégique"
+        ],
+        "raison_3": [
+          "Faible endettement",
+          "Position de trésorerie solide",
+          "Innovation technologique de rupture",
+          "Expansion sur de nouveaux marchés"
+        ]
       }
     },
     {
@@ -100,11 +270,38 @@
         "Objet : Action requise concernant l'expiration de votre espace {service}\n\n{service} - Service de Facturation\n\nBonjour,\n\nNous n'avons pas pu traiter le renouvellement automatique de votre abonnement {service} (réf. {sub_id}).\n\nSans action de votre part avant le {date}, votre espace de stockage sera désactivé et vos fichiers pourraient être supprimés de manière permanente.\n\nEspace utilisé : {espace} sur {espace_total}\nFichiers concernés : {nb_fichiers} documents, photos et vidéos\n\nMettre à jour mon moyen de paiement : [URL]\n\nPour votre sécurité :\n• Accédez toujours à votre compte via notre site officiel\n• Ne partagez jamais votre mot de passe\n• Assurez-vous que vos coordonnées sont à jour\n\nCordialement,\nÉquipe {service}"
       ],
       "variables": {
-        "service": ["Cloud", "iCloud", "Google One", "Cloud Storage Premium", "OneDrive"],
-        "sub_id": ["9647937", "8485026", "5573821", "7712094", "3398615"],
-        "espace": ["48,7 Go", "12,3 Go", "127,5 Go", "5,2 Go"],
-        "espace_total": ["50 Go", "15 Go", "200 Go", "50 Go"],
-        "nb_fichiers": ["2 347", "856", "4 129", "1 503"]
+        "service": [
+          "Cloud",
+          "iCloud",
+          "Google One",
+          "Cloud Storage Premium",
+          "OneDrive"
+        ],
+        "sub_id": [
+          "9647937",
+          "8485026",
+          "5573821",
+          "7712094",
+          "3398615"
+        ],
+        "espace": [
+          "48,7 Go",
+          "12,3 Go",
+          "127,5 Go",
+          "5,2 Go"
+        ],
+        "espace_total": [
+          "50 Go",
+          "15 Go",
+          "200 Go",
+          "50 Go"
+        ],
+        "nb_fichiers": [
+          "2 347",
+          "856",
+          "4 129",
+          "1 503"
+        ]
       }
     },
     {
@@ -118,9 +315,25 @@
         "Objet : Votre remboursement Ameli de {montant} EUR est en attente\n\nBonjour {prenom} {nom},\n\nVotre remboursement de {montant} EUR (réf. {ref}) est en attente de validation de vos coordonnées bancaires.\n\nPour recevoir ce virement sous {delai} jours ouvrés, veuillez confirmer votre RIB sur votre espace personnel :\n\n→ Confirmer mes coordonnées bancaires : [URL]\n\nSans confirmation avant le {date}, le remboursement sera annulé.\n\nVotre numéro de dossier : {ref}\n\nBien cordialement,\nAssurance Maladie - Service des Remboursements"
       ],
       "variables": {
-        "montant": ["247,86", "89,50", "312,45", "156,30", "478,92"],
-        "ref": ["AME-2026-7841", "RBT-9982-FR", "AME-2026-3315", "VIR-2026-0156"],
-        "delai": ["3", "5", "7", "2"]
+        "montant": [
+          "247,86",
+          "89,50",
+          "312,45",
+          "156,30",
+          "478,92"
+        ],
+        "ref": [
+          "AME-2026-7841",
+          "RBT-9982-FR",
+          "AME-2026-3315",
+          "VIR-2026-0156"
+        ],
+        "delai": [
+          "3",
+          "5",
+          "7",
+          "2"
+        ]
       }
     },
     {
@@ -134,10 +347,29 @@
         "Objet : Avis de remboursement pour un trop-perçu de {montant} EUR\n\nBonjour {prenom} {nom},\n\nÀ la suite du recalcul de votre impôt sur le revenu {annee}, nous avons constaté un trop-perçu de {montant} EUR.\n\nCe montant vous sera remboursé sous {delai} jours ouvrés après confirmation de vos coordonnées.\n\nRéférence : {ref}\n\nValider mon remboursement : [URL]\n\nLe Service des Impôts des Particuliers\n{centre}"
       ],
       "variables": {
-        "montant": ["387,42", "1 254,80", "528,15", "743,60", "219,30"],
-        "ref": ["1043-3218-19", "2026-FR-47291", "DGFIP-8834-2026", "SIP-5521-B"],
-        "annee": ["2025", "2024"],
-        "centre": ["Centre des Finances Publiques de Paris 15e", "SIP de Lyon 3e", "Centre de Bordeaux Sud", "SIP de Marseille Nord"]
+        "montant": [
+          "387,42",
+          "1 254,80",
+          "528,15",
+          "743,60",
+          "219,30"
+        ],
+        "ref": [
+          "1043-3218-19",
+          "2026-FR-47291",
+          "DGFIP-8834-2026",
+          "SIP-5521-B"
+        ],
+        "annee": [
+          "2025",
+          "2024"
+        ],
+        "centre": [
+          "Centre des Finances Publiques de Paris 15e",
+          "SIP de Lyon 3e",
+          "Centre de Bordeaux Sud",
+          "SIP de Marseille Nord"
+        ]
       }
     },
     {
@@ -151,10 +383,30 @@
         "Objet : [La Poste] Une action est requise pour votre colis en attente\n\nBonjour,\n\nNous vous informons que votre colis (réf. {tracking}) est actuellement bloqué dans notre centre de tri de {ville}.\n\nRaison : {motif}\n\nPour débloquer la livraison, un complément d'affranchissement de {frais} EUR est nécessaire.\n\n→ Payer les frais et reprogrammer : [URL]\n\nDate limite : {date}\n\nLa Poste - Service Colissimo"
       ],
       "variables": {
-        "tracking": ["8R12345678901", "CC098765432FR", "6A88412390127", "9V55123876401"],
-        "motif": ["Adresse incomplète", "Destinataire absent", "Affranchissement insuffisant", "Taxes douanières impayées"],
-        "frais": ["1,95", "2,99", "4,50", "3,45"],
-        "ville": ["Roissy-Charles de Gaulle", "Lyon-Satolas", "Bordeaux-Mérignac", "Lille-Lesquin"]
+        "tracking": [
+          "8R12345678901",
+          "CC098765432FR",
+          "6A88412390127",
+          "9V55123876401"
+        ],
+        "motif": [
+          "Adresse incomplète",
+          "Destinataire absent",
+          "Affranchissement insuffisant",
+          "Taxes douanières impayées"
+        ],
+        "frais": [
+          "1,95",
+          "2,99",
+          "4,50",
+          "3,45"
+        ],
+        "ville": [
+          "Roissy-Charles de Gaulle",
+          "Lyon-Satolas",
+          "Bordeaux-Mérignac",
+          "Lille-Lesquin"
+        ]
       }
     },
     {
@@ -168,11 +420,35 @@
         "Objet : Remboursement de {montant} EUR suite à un double prélèvement {fournisseur}\n\nBonjour {prenom},\n\nSuite à une erreur technique, un double prélèvement de {montant} EUR a été effectué sur votre compte le {date_facture}.\n\nPour recevoir votre remboursement, veuillez confirmer vos coordonnées bancaires :\n→ Confirmer mon RIB : [URL]\n\nLe remboursement sera effectué sous {delai} jours ouvrés.\n\nNous vous prions de nous excuser pour ce désagrément.\n\n{fournisseur} - Service Client"
       ],
       "variables": {
-        "fournisseur": ["EDF", "Engie", "TotalEnergies", "Eni"],
-        "service": ["électricité", "gaz", "énergie"],
-        "montant": ["387,42", "156,80", "245,30", "512,15", "89,90"],
-        "ref": ["EDF-2026-887421", "FAC-553219", "CLI-774102", "ENI-2026-0341"],
-        "date_facture": ["15 janvier 2026", "28 février 2026", "3 février 2026"]
+        "fournisseur": [
+          "EDF",
+          "Engie",
+          "TotalEnergies",
+          "Eni"
+        ],
+        "service": [
+          "électricité",
+          "gaz",
+          "énergie"
+        ],
+        "montant": [
+          "387,42",
+          "156,80",
+          "245,30",
+          "512,15",
+          "89,90"
+        ],
+        "ref": [
+          "EDF-2026-887421",
+          "FAC-553219",
+          "CLI-774102",
+          "ENI-2026-0341"
+        ],
+        "date_facture": [
+          "15 janvier 2026",
+          "28 février 2026",
+          "3 février 2026"
+        ]
       }
     },
     {
@@ -185,8 +461,20 @@
         "Objet : Action requise pour éviter la suspension de vos allocations\n\nCaisse d'Allocations Familiales\n\nMadame, Monsieur {nom},\n\nNous vous informons que le versement de vos allocations a été temporairement suspendu suite à un défaut de mise à jour de votre dossier.\n\nAllocations concernées : {allocation}\nMontant mensuel : {montant} EUR\n\nPour rétablir vos droits, veuillez mettre à jour votre situation dans un délai de {delai} jours :\n→ Mettre à jour mon dossier : [URL]\n\nSans réponse de votre part, la suspension sera maintenue.\n\nService des prestations\nCAF - caf.fr"
       ],
       "variables": {
-        "allocation": ["APL (Aide Personnalisée au Logement)", "RSA (Revenu de Solidarité Active)", "Allocation de rentrée scolaire", "Prime d'activité", "AAH (Allocation aux Adultes Handicapés)"],
-        "montant": ["485,00", "607,75", "312,45", "156,90", "971,37"]
+        "allocation": [
+          "APL (Aide Personnalisée au Logement)",
+          "RSA (Revenu de Solidarité Active)",
+          "Allocation de rentrée scolaire",
+          "Prime d'activité",
+          "AAH (Allocation aux Adultes Handicapés)"
+        ],
+        "montant": [
+          "485,00",
+          "607,75",
+          "312,45",
+          "156,90",
+          "971,37"
+        ]
       }
     },
     {
@@ -200,10 +488,37 @@
         "Objet : Activité suspecte détectée sur votre compte {banque}\n\nBonjour {prenom},\n\nNotre système de surveillance a détecté une activité inhabituelle sur votre compte se terminant par ****{digits}.\n\nDétails de la transaction suspecte :\n- Montant : {montant} EUR\n- {lieu}\n- Date : {date}\n\nSi vous n'êtes pas à l'origine de cette opération, veuillez sécuriser immédiatement votre compte :\n→ Bloquer ma carte et vérifier : [URL]\n\nSi cette transaction est légitime, vous pouvez ignorer ce message.\n\nService Fraude\n{banque}"
       ],
       "variables": {
-        "banque": ["BNP Paribas", "Crédit Agricole", "Société Générale", "Caisse d'Épargne", "LCL", "Banque Populaire", "CIC", "La Banque Postale", "Boursorama"],
-        "digits": ["4821", "7793", "3156", "9408", "6247"],
-        "lieu": ["Achat en ligne - Amazon.co.uk", "Retrait DAB - Abidjan, Côte d'Ivoire", "Virement SEPA - Bucarest, Roumanie", "Paiement TPE - Istanbul, Turquie"],
-        "montant": ["849,90", "1 247,00", "432,50", "2 100,00", "599,99"]
+        "banque": [
+          "BNP Paribas",
+          "Crédit Agricole",
+          "Société Générale",
+          "Caisse d'Épargne",
+          "LCL",
+          "Banque Populaire",
+          "CIC",
+          "La Banque Postale",
+          "Boursorama"
+        ],
+        "digits": [
+          "4821",
+          "7793",
+          "3156",
+          "9408",
+          "6247"
+        ],
+        "lieu": [
+          "Achat en ligne - Amazon.co.uk",
+          "Retrait DAB - Abidjan, Côte d'Ivoire",
+          "Virement SEPA - Bucarest, Roumanie",
+          "Paiement TPE - Istanbul, Turquie"
+        ],
+        "montant": [
+          "849,90",
+          "1 247,00",
+          "432,50",
+          "2 100,00",
+          "599,99"
+        ]
       }
     },
     {
@@ -217,10 +532,32 @@
         "Objet : Votre remboursement de péage {entreprise} de {montant} EUR\n\nBonjour {prenom},\n\nSuite à une erreur de facturation sur l'autoroute {autoroute} le {date}, un trop-perçu de {montant} EUR a été identifié.\n\nPour recevoir votre remboursement :\n→ Valider mes coordonnées bancaires : [URL]\n\nNuméro de dossier : {ref}\n\nCordialement,\n{entreprise} - Service Client"
       ],
       "variables": {
-        "entreprise": ["Vinci Autoroutes", "APRR", "Sanef", "ASF Autoroutes", "SNCF"],
-        "cadeau": ["un badge Télépéage offert pendant 1 an", "un coffret voyage d'une valeur de 200 EUR", "100 EUR de carburant", "un abonnement autoroute illimité 3 mois"],
-        "autoroute": ["A6", "A1", "A7", "A10", "A13"],
-        "montant": ["23,50", "47,80", "15,90", "82,30"]
+        "entreprise": [
+          "Vinci Autoroutes",
+          "APRR",
+          "Sanef",
+          "ASF Autoroutes",
+          "SNCF"
+        ],
+        "cadeau": [
+          "un badge Télépéage offert pendant 1 an",
+          "un coffret voyage d'une valeur de 200 EUR",
+          "100 EUR de carburant",
+          "un abonnement autoroute illimité 3 mois"
+        ],
+        "autoroute": [
+          "A6",
+          "A1",
+          "A7",
+          "A10",
+          "A13"
+        ],
+        "montant": [
+          "23,50",
+          "47,80",
+          "15,90",
+          "82,30"
+        ]
       }
     },
     {
@@ -234,8 +571,23 @@
         "Objet : {expediteur} vous a partagé le document {nom_fichier}\n\nGoogle Drive\n\n{expediteur} ({email_exp}) a partagé un élément avec vous.\n\n{nom_fichier}\n\nOuvrir dans Drive : [URL]\n\nSi vous ne souhaitez plus recevoir d'emails quand quelqu'un partage des éléments avec vous, vous pouvez vous désabonner.\n\nGoogle LLC, 1600 Amphitheatre Parkway, Mountain View, CA 94043"
       ],
       "variables": {
-        "expediteur": ["Marie Dupont", "Jean-Luc Martin", "Felicia Jaquet", "Pierre Lefebvre", "Sophie Bernard", "Directeur RH"],
-        "nom_fichier": ["Rapport Q1 2026.pdf", "Contrat de prestation.docx", "Facture février 2026.xlsx", "Planning réunions mars.pdf", "Intrigant 05", "Note de frais validée.pdf", "Devis_projet_2026.pdf"]
+        "expediteur": [
+          "Marie Dupont",
+          "Jean-Luc Martin",
+          "Felicia Jaquet",
+          "Pierre Lefebvre",
+          "Sophie Bernard",
+          "Directeur RH"
+        ],
+        "nom_fichier": [
+          "Rapport Q1 2026.pdf",
+          "Contrat de prestation.docx",
+          "Facture février 2026.xlsx",
+          "Planning réunions mars.pdf",
+          "Intrigant 05",
+          "Note de frais validée.pdf",
+          "Devis_projet_2026.pdf"
+        ]
       }
     },
     {
@@ -249,13 +601,44 @@
         "Objet : Mise en demeure pour vos cotisations impayées (Réf {ref})\n\nURSSAF\n\nMadame, Monsieur {nom},\n\nMalgré nos précédentes relances, nous constatons que vos cotisations sociales restent impayées.\n\nDétail :\n- Période : T{trimestre} {annee}\n- Montant principal : {montant} EUR\n- Majorations : {majorations} EUR\n- Total dû : {total} EUR\n\nÀ défaut de paiement sous {delai} jours, nous engagerons une procédure de recouvrement forcé auprès du tribunal compétent.\n\nRégularisez votre situation en ligne :\n→ [URL]\n\nURSSAF - Service du Recouvrement"
       ],
       "variables": {
-        "trimestre": ["1", "2", "3", "4"],
-        "annee": ["2025", "2026"],
-        "montant": ["1 247,00", "834,50", "2 156,80", "567,30"],
-        "majorations": ["124,70", "83,45", "215,68", "56,73"],
-        "total": ["1 371,70", "917,95", "2 372,48", "624,03"],
-        "taux": ["10", "5", "15"],
-        "ref": ["URSSAF-2026-MED-4471", "COT-2026-IDF-8821", "REC-2025-T4-3319"]
+        "trimestre": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ],
+        "annee": [
+          "2025",
+          "2026"
+        ],
+        "montant": [
+          "1 247,00",
+          "834,50",
+          "2 156,80",
+          "567,30"
+        ],
+        "majorations": [
+          "124,70",
+          "83,45",
+          "215,68",
+          "56,73"
+        ],
+        "total": [
+          "1 371,70",
+          "917,95",
+          "2 372,48",
+          "624,03"
+        ],
+        "taux": [
+          "10",
+          "5",
+          "15"
+        ],
+        "ref": [
+          "URSSAF-2026-MED-4471",
+          "COT-2026-IDF-8821",
+          "REC-2025-T4-3319"
+        ]
       }
     },
     {
@@ -270,13 +653,45 @@
         "Objet : Mise à jour de votre RIB pour le prochain virement de salaire\n\nBonjour {prenom},\n\nSuite à un changement de notre prestataire de paie, nous vous demandons de bien vouloir mettre à jour vos coordonnées bancaires avant le {date}.\n\nCela permettra d'éviter tout retard dans le versement de votre salaire du mois de {mois}.\n\n→ Mettre à jour mon RIB : [URL]\n\nMerci de votre diligence.\n\n{patron}\nDirection des Ressources Humaines"
       ],
       "variables": {
-        "patron": ["Marc Lefèvre", "Isabelle Moreau", "Philippe Durand", "Catherine Blanc"],
-        "titre": ["Directeur Général", "PDG", "Gérant", "Directrice Administrative"],
-        "beneficiaire": ["SCI Horizon Conseil", "TechParts International SARL", "Cabinet Juridique Mercier & Associés"],
-        "iban": ["FR76 3000 4000 0300 0012 3456 789", "FR76 1820 6000 1112 3456 7890 142", "FR76 3000 3041 0000 0500 0010 023"],
-        "motif": ["Prestation conseil Q1 2026", "Acompte dossier confidentiel", "Frais juridiques urgents"],
-        "collegue": ["Sophie", "Laurent", "Nathalie", "Julien"],
-        "mois": ["mars", "avril", "février", "mai"]
+        "patron": [
+          "Marc Lefèvre",
+          "Isabelle Moreau",
+          "Philippe Durand",
+          "Catherine Blanc"
+        ],
+        "titre": [
+          "Directeur Général",
+          "PDG",
+          "Gérant",
+          "Directrice Administrative"
+        ],
+        "beneficiaire": [
+          "SCI Horizon Conseil",
+          "TechParts International SARL",
+          "Cabinet Juridique Mercier & Associés"
+        ],
+        "iban": [
+          "FR76 3000 4000 0300 0012 3456 789",
+          "FR76 1820 6000 1112 3456 7890 142",
+          "FR76 3000 3041 0000 0500 0010 023"
+        ],
+        "motif": [
+          "Prestation conseil Q1 2026",
+          "Acompte dossier confidentiel",
+          "Frais juridiques urgents"
+        ],
+        "collegue": [
+          "Sophie",
+          "Laurent",
+          "Nathalie",
+          "Julien"
+        ],
+        "mois": [
+          "mars",
+          "avril",
+          "février",
+          "mai"
+        ]
       }
     },
     {
@@ -290,10 +705,32 @@
         "Objet : Vérification d'identité requise pour votre compte {plateforme}\n\nBonjour {prenom},\n\nConformément aux obligations réglementaires (KYC), nous devons vérifier votre identité pour maintenir votre compte {plateforme} actif.\n\nSans vérification avant le {date}, votre compte sera suspendu et les fonds en attente ({montant} EUR) seront gelés.\n\nDocuments requis :\n- Pièce d'identité recto/verso\n- Justificatif de domicile de moins de 3 mois\n- RIB professionnel\n\n→ Commencer la vérification : [URL]\n\nÉquipe Conformité\n{plateforme}"
       ],
       "variables": {
-        "plateforme": ["Stripe", "PayPal", "Wise", "Revolut Business", "SumUp"],
-        "motif": ["Carte expirée", "Fonds insuffisants", "Refus de la banque émettrice", "Vérification d'identité requise"],
-        "montant": ["149,99", "2 340,00", "87,50", "1 150,00", "450,00"],
-        "ref": ["TXN-20260304-8821", "PAY-FR-55123", "WIS-2026-09941", "INV-2026-03-0047"]
+        "plateforme": [
+          "Stripe",
+          "PayPal",
+          "Wise",
+          "Revolut Business",
+          "SumUp"
+        ],
+        "motif": [
+          "Carte expirée",
+          "Fonds insuffisants",
+          "Refus de la banque émettrice",
+          "Vérification d'identité requise"
+        ],
+        "montant": [
+          "149,99",
+          "2 340,00",
+          "87,50",
+          "1 150,00",
+          "450,00"
+        ],
+        "ref": [
+          "TXN-20260304-8821",
+          "PAY-FR-55123",
+          "WIS-2026-09941",
+          "INV-2026-03-0047"
+        ]
       }
     },
     {
@@ -306,7 +743,11 @@
         "Objet : Une vérification de votre identité numérique FranceConnect est requise\n\nFranceConnect\n\nBonjour {prenom} {nom},\n\nSuite aux nouvelles exigences de sécurité du {organisme}, votre identité numérique FranceConnect doit être revérifiée.\n\nSans cette vérification avant le {date} :\n- Votre accès aux services publics en ligne sera suspendu\n- Vos démarches en cours seront interrompues\n- Vous devrez vous présenter physiquement en mairie\n\n→ Vérifier mon identité : [URL]\n\nCette procédure prend moins de 5 minutes.\n\nService FranceConnect\nDirection interministérielle du numérique"
       ],
       "variables": {
-        "organisme": ["Ministère de l'Intérieur", "ANTS (Agence Nationale des Titres Sécurisés)", "Direction interministérielle du numérique"]
+        "organisme": [
+          "Ministère de l'Intérieur",
+          "ANTS (Agence Nationale des Titres Sécurisés)",
+          "Direction interministérielle du numérique"
+        ]
       }
     },
     {
@@ -321,12 +762,51 @@
         "Objet : [NOTIFICATION] Livraison en attente pour le colis {tracking}\n\nBonjour {prenom},\n\nUn colis expédié par {expediteur} est en attente de livraison à votre adresse.\n\nLe livreur n'a pas pu vous remettre le colis : {motif}.\n\nVeuillez choisir un nouveau créneau de livraison et régler les frais de {frais} EUR pour la réexpédition.\n\n→ Reprogrammer ma livraison : [URL]\n\nCe lien est valable {delai} jours.\n\nMerci,\nÉquipe Livraison - {transporteur}"
       ],
       "variables": {
-        "transporteur": ["Chronopost", "DHL Express", "GLS France", "UPS", "Mondial Relay", "Relais Colis", "Colissimo"],
-        "motif": ["Adresse incomplète", "Destinataire absent lors du passage du livreur", "Frais de douane impayés", "Affranchissement insuffisant", "Colis surdimensionné - supplément requis"],
-        "frais": ["1,95", "2,49", "3,99", "4,50", "1,49", "2,99"],
-        "poids": ["0,8", "2,3", "1,5", "4,7", "0,3"],
-        "expediteur": ["Amazon Marketplace", "Temu France", "Shein", "AliExpress", "Wish", "un vendeur Vinted"],
-        "delai": ["3", "5", "7", "2"]
+        "transporteur": [
+          "Chronopost",
+          "DHL Express",
+          "GLS France",
+          "UPS",
+          "Mondial Relay",
+          "Relais Colis",
+          "Colissimo"
+        ],
+        "motif": [
+          "Adresse incomplète",
+          "Destinataire absent lors du passage du livreur",
+          "Frais de douane impayés",
+          "Affranchissement insuffisant",
+          "Colis surdimensionné - supplément requis"
+        ],
+        "frais": [
+          "1,95",
+          "2,49",
+          "3,99",
+          "4,50",
+          "1,49",
+          "2,99"
+        ],
+        "poids": [
+          "0,8",
+          "2,3",
+          "1,5",
+          "4,7",
+          "0,3"
+        ],
+        "expediteur": [
+          "Amazon Marketplace",
+          "Temu France",
+          "Shein",
+          "AliExpress",
+          "Wish",
+          "un vendeur Vinted"
+        ],
+        "delai": [
+          "3",
+          "5",
+          "7",
+          "2"
+        ]
       }
     },
     {
@@ -341,12 +821,49 @@
         "Objet : {prenom}, félicitations ! Vous avez été sélectionné(e)\n\nLidl Récompenses\n\nBonjour {prenom},\n\nEn tant que client fidèle, vous faites partie des {nb_gagnants} personnes sélectionnées pour recevoir un {cadeau}.\n\nPour confirmer votre participation :\n1. Répondez à notre court sondage ({duree} min)\n2. Confirmez votre adresse de livraison\n3. Recevez votre cadeau sous {delai_livraison} jours\n\n→ Participer maintenant : [URL]\n\nOffre valable jusqu'au {date}.\n\n© {annee} Lidl France - Tous droits réservés"
       ],
       "variables": {
-        "cadeau": ["Coffret d'outils Makita", "Coffret Outils Lidl", "Set de couteaux Silvercrest", "Robot cuiseur Monsieur Cuisine", "Perceuse-visseuse Parkside", "Nettoyeur haute pression Parkside", "Barbecue à gaz Grillmeister", "Aspirateur cyclonique Silvercrest"],
-        "valeur": ["199", "149", "89", "299", "249", "179"],
-        "nb_questions": ["5", "7", "4", "8", "6"],
-        "nb_gagnants": ["500", "250", "100", "1 000", "750"],
-        "duree": ["2", "3", "1"],
-        "delai_livraison": ["5 à 7", "7 à 10", "3 à 5", "10 à 14"]
+        "cadeau": [
+          "Coffret d'outils Makita",
+          "Coffret Outils Lidl",
+          "Set de couteaux Silvercrest",
+          "Robot cuiseur Monsieur Cuisine",
+          "Perceuse-visseuse Parkside",
+          "Nettoyeur haute pression Parkside",
+          "Barbecue à gaz Grillmeister",
+          "Aspirateur cyclonique Silvercrest"
+        ],
+        "valeur": [
+          "199",
+          "149",
+          "89",
+          "299",
+          "249",
+          "179"
+        ],
+        "nb_questions": [
+          "5",
+          "7",
+          "4",
+          "8",
+          "6"
+        ],
+        "nb_gagnants": [
+          "500",
+          "250",
+          "100",
+          "1 000",
+          "750"
+        ],
+        "duree": [
+          "2",
+          "3",
+          "1"
+        ],
+        "delai_livraison": [
+          "5 à 7",
+          "7 à 10",
+          "3 à 5",
+          "10 à 14"
+        ]
       }
     },
     {
@@ -361,14 +878,51 @@
         "Objet : Participez à notre enquête Vinci Autoroutes et gagnez un {cadeau}\n\nBonjour {prenom},\n\nNous souhaitons améliorer nos services et votre avis est essentiel.\n\nEn guise de remerciement, nous offrons un {cadeau} aux {nb_kits} premiers répondants.\n\nLe questionnaire ne prend que {duree} minutes :\n→ Participer : [URL]\n\nDate limite : {date}\n\nMerci de votre confiance,\nVinci Autoroutes - Service Qualité"
       ],
       "variables": {
-        "cadeau": ["Kit d'urgence pour voiture", "Kit de sécurité routière Winter", "Coffret brise-vitre et coupe-ceinture", "Kit d'urgence hiver", "Trousse de premiers secours auto"],
-        "nb_kits": ["500", "300", "1 000", "750", "200"],
-        "nb_outils": ["6", "8", "5", "10"],
-        "duree": ["2", "3", "1"],
-        "outil_1": ["Brise-vitre en acier trempé", "Lampe torche LED rechargeable", "Triangle de signalisation homologué"],
-        "outil_2": ["Coupe-ceinture de sécurité", "Gilet réfléchissant haute visibilité", "Câbles de démarrage 500A"],
-        "outil_3": ["Couverture de survie", "Paire de gants de protection", "Extincteur poudre ABC 1 kg"],
-        "outil_4": ["Lampe de détresse magnétique", "Trousse de premiers secours", "Câble de remorquage 5 tonnes"]
+        "cadeau": [
+          "Kit d'urgence pour voiture",
+          "Kit de sécurité routière Winter",
+          "Coffret brise-vitre et coupe-ceinture",
+          "Kit d'urgence hiver",
+          "Trousse de premiers secours auto"
+        ],
+        "nb_kits": [
+          "500",
+          "300",
+          "1 000",
+          "750",
+          "200"
+        ],
+        "nb_outils": [
+          "6",
+          "8",
+          "5",
+          "10"
+        ],
+        "duree": [
+          "2",
+          "3",
+          "1"
+        ],
+        "outil_1": [
+          "Brise-vitre en acier trempé",
+          "Lampe torche LED rechargeable",
+          "Triangle de signalisation homologué"
+        ],
+        "outil_2": [
+          "Coupe-ceinture de sécurité",
+          "Gilet réfléchissant haute visibilité",
+          "Câbles de démarrage 500A"
+        ],
+        "outil_3": [
+          "Couverture de survie",
+          "Paire de gants de protection",
+          "Extincteur poudre ABC 1 kg"
+        ],
+        "outil_4": [
+          "Lampe de détresse magnétique",
+          "Trousse de premiers secours",
+          "Câble de remorquage 5 tonnes"
+        ]
       }
     },
     {
@@ -383,12 +937,40 @@
         "Objet : {prenom}, une action est requise pour votre expédition FedEx®\n\nFedEx®\n\nInformation importante sur votre envoi\n\nNous avons tenté de livrer votre colis le {date_facture} à l'adresse indiquée, mais la livraison n'a pas abouti.\n\nRéférence envoi : {tracking}\nDestination : {ville}, France\nExpéditeur : {expediteur}\nPoids : {poids} kg\n\nAction requise : veuillez confirmer votre disponibilité et mettre à jour vos préférences de livraison.\n\n→ Gérer ma livraison : [URL]\n\nSi vous ne prenez aucune mesure avant le {date}, le colis sera mis en attente pendant {delai} jours puis retourné.\n\nCordialement,\nFedEx® - Service Expéditions France\n\n© {annee} FedEx. Tous droits réservés."
       ],
       "variables": {
-        "nb_colis": ["1", "2"],
-        "motif": ["Destinataire absent", "Boîte aux lettres pleine", "Adresse vérifiée - accès refusé par interphone", "Complément d'adresse manquant"],
-        "frais": ["2,49", "3,99", "1,95"],
-        "poids": ["1,2", "0,5", "3,8", "2,1", "0,9"],
-        "expediteur": ["Amazon.fr", "Zalando", "Fnac", "Cdiscount", "Nike Europe"],
-        "delai": ["5", "7", "10"]
+        "nb_colis": [
+          "1",
+          "2"
+        ],
+        "motif": [
+          "Destinataire absent",
+          "Boîte aux lettres pleine",
+          "Adresse vérifiée - accès refusé par interphone",
+          "Complément d'adresse manquant"
+        ],
+        "frais": [
+          "2,49",
+          "3,99",
+          "1,95"
+        ],
+        "poids": [
+          "1,2",
+          "0,5",
+          "3,8",
+          "2,1",
+          "0,9"
+        ],
+        "expediteur": [
+          "Amazon.fr",
+          "Zalando",
+          "Fnac",
+          "Cdiscount",
+          "Nike Europe"
+        ],
+        "delai": [
+          "5",
+          "7",
+          "10"
+        ]
       }
     },
     {
@@ -403,13 +985,59 @@
         "Objet : Gagnez un {cadeau} grâce à cette offre exclusive {enseigne}\n\nBonjour {prenom},\n\nFélicitations ! Vous avez été sélectionné(e) pour participer à notre programme de récompenses.\n\nRépondez à {nb_questions} questions rapides et tentez de remporter :\n🎁 {cadeau} (valeur {valeur} EUR)\n\nÉtapes :\n1. Répondez à notre sondage ({duree} min)\n2. Renseignez votre adresse de livraison\n3. Recevez votre cadeau sous {delai_livraison} jours\n\n→ Participer : [URL]\n\nLes quantités sont limitées à {nb_gagnants} lots.\n\n{enseigne} - Service Client"
       ],
       "variables": {
-        "enseigne": ["Carrefour", "Leroy Merlin", "ManoMano", "Decathlon", "Boulanger", "Castorama", "Action"],
-        "cadeau": ["Rasoir électrique Braun Series 9", "Pack RYOBI Perceuse + Visseuse sans fil", "Kit d'outils Makita 18V", "Tente de camping Quechua 4 places", "Perceuse à colonne Bosch Professional", "Machine à café De'Longhi Magnifica", "Robot tondeuse Gardena Sileno", "Barbecue Weber Spirit II"],
-        "valeur": ["189", "249", "149", "299", "99", "349", "199"],
-        "nb_questions": ["5", "7", "4", "8", "3"],
-        "nb_gagnants": ["500", "250", "100", "1 000", "750"],
-        "duree": ["2", "3", "1"],
-        "delai_livraison": ["5 à 7", "7 à 10", "3 à 5", "10 à 14"]
+        "enseigne": [
+          "Carrefour",
+          "Leroy Merlin",
+          "ManoMano",
+          "Decathlon",
+          "Boulanger",
+          "Castorama",
+          "Action"
+        ],
+        "cadeau": [
+          "Rasoir électrique Braun Series 9",
+          "Pack RYOBI Perceuse + Visseuse sans fil",
+          "Kit d'outils Makita 18V",
+          "Tente de camping Quechua 4 places",
+          "Perceuse à colonne Bosch Professional",
+          "Machine à café De'Longhi Magnifica",
+          "Robot tondeuse Gardena Sileno",
+          "Barbecue Weber Spirit II"
+        ],
+        "valeur": [
+          "189",
+          "249",
+          "149",
+          "299",
+          "99",
+          "349",
+          "199"
+        ],
+        "nb_questions": [
+          "5",
+          "7",
+          "4",
+          "8",
+          "3"
+        ],
+        "nb_gagnants": [
+          "500",
+          "250",
+          "100",
+          "1 000",
+          "750"
+        ],
+        "duree": [
+          "2",
+          "3",
+          "1"
+        ],
+        "delai_livraison": [
+          "5 à 7",
+          "7 à 10",
+          "3 à 5",
+          "10 à 14"
+        ]
       }
     },
     {
@@ -424,14 +1052,94 @@
         "Objet : Votre {produit} est prêt à être expédié\n\n{marque_telecom}\n\nBonjour {prenom},\n\nSuite au tirage au sort de notre programme fidélité, votre {produit} a été sélectionné pour expédition.\n\nDétails :\n- Produit : {produit}\n- Valeur : {valeur} EUR\n- Référence : {ref}\n- Statut : En attente de confirmation\n\nConfirmez et réclamez votre {produit} :\n→ [URL]\n\nVous avez {delai} heures pour finaliser cette demande.\n\nService Client\n{marque_telecom}\n\n© {annee} - Tous droits réservés"
       ],
       "variables": {
-        "produit": ["MacBook Pro", "MacBook Air M4", "iPhone 17 Pro Max", "iPhone 16 Pro", "Samsung Galaxy S25 Ultra", "iPad Pro 13 pouces", "Apple Watch Ultra 3"],
-        "marque_telecom": ["Free Mobile", "SFR", "Orange", "Bouygues Telecom", "Sosh", "RED by SFR", "B&You"],
-        "valeur": ["1 499", "2 199", "1 299", "1 999", "899", "1 799"],
-        "nb_gagnants": ["100", "250", "50", "500"],
-        "duree": ["2", "3", "1"],
-        "delai_livraison": ["5 à 7", "7 à 10", "3 à 5"],
-        "delai": ["24", "48", "72", "12"]
+        "produit": [
+          "MacBook Pro",
+          "MacBook Air M4",
+          "iPhone 17 Pro Max",
+          "iPhone 16 Pro",
+          "Samsung Galaxy S25 Ultra",
+          "iPad Pro 13 pouces",
+          "Apple Watch Ultra 3"
+        ],
+        "marque_telecom": [
+          "Free Mobile",
+          "SFR",
+          "Orange",
+          "Bouygues Telecom",
+          "Sosh",
+          "RED by SFR",
+          "B&You"
+        ],
+        "valeur": [
+          "1 499",
+          "2 199",
+          "1 299",
+          "1 999",
+          "899",
+          "1 799"
+        ],
+        "nb_gagnants": [
+          "100",
+          "250",
+          "50",
+          "500"
+        ],
+        "duree": [
+          "2",
+          "3",
+          "1"
+        ],
+        "delai_livraison": [
+          "5 à 7",
+          "7 à 10",
+          "3 à 5"
+        ],
+        "delai": [
+          "24",
+          "48",
+          "72",
+          "12"
+        ]
       }
+    },
+    {
+      "id": "p_hard_longform_usurpation_institution",
+      "tier": "hard",
+      "weight": 1.0,
+      "variables": {
+        "organisme": [
+          "la Caisse d'Allocations Familiales",
+          "l'Assurance Maladie",
+          "la Direction Générale des Finances Publiques",
+          "France Travail"
+        ],
+        "motif": [
+          "un trop-perçu constaté sur votre dossier",
+          "une régularisation de vos droits",
+          "un remboursement non réclamé",
+          "une mise à jour réglementaire de votre situation"
+        ],
+        "montant": [
+          "148,32 €",
+          "276,90 €",
+          "94,15 €",
+          "412,60 €"
+        ],
+        "portail": [
+          "https://espace-beneficiaire-verif.com",
+          "https://portail-regularisation-fr.net",
+          "https://mon-dossier-actualisation.org"
+        ],
+        "delai": [
+          "sous 72 heures",
+          "avant le 15 du mois",
+          "dans un délai de cinq jours ouvrés"
+        ]
+      },
+      "templates": [
+        "Objet : {organisme} - régularisation de votre dossier n°{ref}\n\nMadame, Monsieur,\n\nDans le cadre de la revue annuelle des dossiers, nos services ont constaté {motif} vous concernant. Le montant de {montant} peut vous être reversé après vérification de vos coordonnées bancaires.\n\nCette vérification est rendue nécessaire par la migration de notre système de paiement vers la nouvelle norme européenne. Les coordonnées enregistrées avant cette migration doivent être confirmées par le bénéficiaire lui-même, conformément aux dispositions en vigueur.\n\nNous vous invitons à procéder à cette confirmation {delai} à l'adresse suivante :\n\n{portail}\n\nMunissez-vous de votre numéro d'allocataire et d'un relevé d'identité bancaire. À défaut de confirmation dans les délais, le versement sera suspendu et votre dossier basculé en traitement manuel, ce qui peut allonger les délais de plusieurs semaines.\n\nNous vous prions d'agréer, Madame, Monsieur, l'expression de nos salutations distinguées.\n\nService des prestations\n{organisme}",
+        "Objet : Action requise - votre dossier {ref} sera suspendu\n\nMadame, Monsieur,\n\nNous vous informons qu'une anomalie a été détectée lors du contrôle automatisé de votre dossier auprès de {organisme}.\n\nNature de l'anomalie : {motif}\nMontant concerné : {montant}\nRéférence dossier : {ref}\nDate limite de régularisation : {date}\n\nEn l'absence de régularisation de votre part {delai}, le traitement de vos droits sera interrompu et une procédure de recouvrement pourra être engagée. Cette mesure est automatique et ne fait pas l'objet d'un rappel supplémentaire.\n\nLa régularisation s'effectue en ligne, après authentification, à l'adresse ci-dessous :\n\n{portail}\n\nLe formulaire vous demandera de confirmer votre identité, votre adresse postale et vos coordonnées bancaires. L'opération prend moins de cinq minutes.\n\nCe message est généré automatiquement, merci de ne pas y répondre.\n\n{organisme} - Service contentieux"
+      ]
     }
   ]
 }
