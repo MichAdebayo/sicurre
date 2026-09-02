@@ -68,9 +68,19 @@ def test_a_reference_match_does_not_swallow_the_prose_after_it() -> None:
 
 
 def test_a_label_does_not_consume_a_following_url() -> None:
+    """The label survives and the link collapses to its host, not to ``[REF]``.
+
+    ``Suivi :`` is a reference label, so the risk is ``_REFERENCE`` matching
+    across the colon and swallowing the link behind a ``[REF]``. It must not:
+    the link is handled by ``_TRACKING_URL`` first, which keeps the sending
+    host (real signal) and drops the path (per-recipient identifiers).
+    """
     out = redact("Suivi : https://exemple.fr/suivi?uid=abc123", owner_names=OWNER)
-    assert out.startswith("Suivi : https://exemple.fr/suivi")
+    assert out.startswith("Suivi : "), "the label itself must survive"
+    assert "[LIEN:exemple.fr]" in out, "the host is kept as signal"
+    assert "[REF]" not in out, "the reference pattern must not swallow the link"
     assert "uid=abc123" not in out, "tracking parameters identify the recipient"
+    assert "/suivi" not in out, "the path carries per-recipient identifiers"
 
 
 @pytest.mark.parametrize(
