@@ -3,7 +3,11 @@
     "class_label": 2,
     "class_name": "legitimate",
     "description": "French legitimate email archetypes for synthetic generation - includes hard-tier emails that mimic spam/phishing patterns",
-    "tier_distribution": {"simple": 0.30, "medium": 0.40, "hard": 0.30}
+    "tier_distribution": {
+      "simple": 0.3,
+      "medium": 0.4,
+      "hard": 0.3
+    }
   },
   "archetypes": [
     {
@@ -17,21 +21,98 @@
         "Objet : Votre commande {ref} chez {boutique} a bien été enregistrée\n\nBonjour {prenom} {nom},\n\nNous vous confirmons la bonne réception de votre commande.\n\nRéférence : {ref}\nMontant : {total}\nPaiement : Carte bancaire se terminant par ****{digits}\n\nRécapitulatif :\n• {produit_1} - {prix_1}\n• {produit_2} - {prix_2}\n\nDélai de livraison estimé : {delai_livraison}\n\nSuivre ma commande : [URL]\n\nMerci de votre confiance !\n{boutique}"
       ],
       "variables": {
-        "boutique": ["Amazon.fr", "Fnac", "Cdiscount", "Darty", "Leroy Merlin", "Cultura", "Boulanger"],
-        "ref": ["FR-20260304-78841", "CMD-2026-55123", "W789456123", "ORD-FR-8834521"],
-        "produit_1": ["Câble USB-C 2m", "Livre 'Le Petit Prince'", "Casque Audio Sony WH-1000XM5", "Lot de 3 ampoules LED", "Clavier mécanique Logitech"],
-        "produit_2": ["Housse de protection", "Marque-page artisanal", "Adaptateur Bluetooth", "Rallonge électrique 3m", "Repose-poignet ergonomique"],
-        "qte_1": ["1", "2", "1"],
-        "qte_2": ["1", "1", "2"],
-        "prix_1": ["12,99 EUR", "8,50 EUR", "299,99 EUR", "15,90 EUR"],
-        "prix_2": ["9,99 EUR", "4,50 EUR", "24,99 EUR", "11,90 EUR"],
-        "sous_total": ["22,98 EUR", "13,00 EUR", "324,98 EUR", "27,80 EUR"],
-        "livraison": ["Gratuite", "4,99 EUR", "6,90 EUR", "Offerte"],
-        "total": ["22,98 EUR", "17,99 EUR", "324,98 EUR", "34,70 EUR"],
-        "mode_livraison": ["Colissimo domicile", "Point Relais Mondial Relay", "Chronopost Express", "Livraison standard"],
-        "adresse": ["12 rue des Lilas, 75011 Paris", "45 avenue Foch, 69003 Lyon", "8 place de la Mairie, 33000 Bordeaux"],
-        "delai_livraison": ["2-3 jours ouvrés", "3-5 jours ouvrés", "Demain avant 13h", "sous 48h"],
-        "digits": ["4821", "7793", "3156", "9408"]
+        "boutique": [
+          "Amazon.fr",
+          "Fnac",
+          "Cdiscount",
+          "Darty",
+          "Leroy Merlin",
+          "Cultura",
+          "Boulanger"
+        ],
+        "ref": [
+          "FR-20260304-78841",
+          "CMD-2026-55123",
+          "W789456123",
+          "ORD-FR-8834521"
+        ],
+        "produit_1": [
+          "Câble USB-C 2m",
+          "Livre 'Le Petit Prince'",
+          "Casque Audio Sony WH-1000XM5",
+          "Lot de 3 ampoules LED",
+          "Clavier mécanique Logitech"
+        ],
+        "produit_2": [
+          "Housse de protection",
+          "Marque-page artisanal",
+          "Adaptateur Bluetooth",
+          "Rallonge électrique 3m",
+          "Repose-poignet ergonomique"
+        ],
+        "qte_1": [
+          "1",
+          "2",
+          "1"
+        ],
+        "qte_2": [
+          "1",
+          "1",
+          "2"
+        ],
+        "prix_1": [
+          "12,99 EUR",
+          "8,50 EUR",
+          "299,99 EUR",
+          "15,90 EUR"
+        ],
+        "prix_2": [
+          "9,99 EUR",
+          "4,50 EUR",
+          "24,99 EUR",
+          "11,90 EUR"
+        ],
+        "sous_total": [
+          "22,98 EUR",
+          "13,00 EUR",
+          "324,98 EUR",
+          "27,80 EUR"
+        ],
+        "livraison": [
+          "Gratuite",
+          "4,99 EUR",
+          "6,90 EUR",
+          "Offerte"
+        ],
+        "total": [
+          "22,98 EUR",
+          "17,99 EUR",
+          "324,98 EUR",
+          "34,70 EUR"
+        ],
+        "mode_livraison": [
+          "Colissimo domicile",
+          "Point Relais Mondial Relay",
+          "Chronopost Express",
+          "Livraison standard"
+        ],
+        "adresse": [
+          "12 rue des Lilas, 75011 Paris",
+          "45 avenue Foch, 69003 Lyon",
+          "8 place de la Mairie, 33000 Bordeaux"
+        ],
+        "delai_livraison": [
+          "2-3 jours ouvrés",
+          "3-5 jours ouvrés",
+          "Demain avant 13h",
+          "sous 48h"
+        ],
+        "digits": [
+          "4821",
+          "7793",
+          "3156",
+          "9408"
+        ]
       }
     },
     {
@@ -45,12 +126,44 @@
         "Objet : Votre livraison {transporteur} est prévue pour le {date_livraison}\n\nBonjour,\n\nVotre colis expédié par {expediteur} sera livré le {date_livraison} entre {creneau}.\n\nRéférence : {tracking}\nPoids : {poids}\n\nOptions disponibles :\n• Modifier la date de livraison\n• Choisir un point de retrait\n• Autoriser le dépôt devant la porte\n\n→ Gérer ma livraison : [URL]\n\n{transporteur} - Service Client"
       ],
       "variables": {
-        "transporteur": ["Colissimo", "Chronopost", "Mondial Relay", "DPD France", "GLS", "UPS"],
-        "tracking": ["8R12345678901", "FR98765432100", "6A88412390127"],
-        "expediteur": ["Amazon.fr", "Fnac.com", "Vinted", "Le Bon Coin", "Cdiscount"],
-        "date_livraison": ["mercredi 5 mars", "demain", "jeudi 6 mars entre 9h et 12h", "vendredi 7 mars"],
-        "creneau": ["8h et 12h", "14h et 18h", "10h et 14h", "9h et 13h"],
-        "poids": ["0,8 kg", "2,3 kg", "0,4 kg", "5,1 kg"]
+        "transporteur": [
+          "Colissimo",
+          "Chronopost",
+          "Mondial Relay",
+          "DPD France",
+          "GLS",
+          "UPS"
+        ],
+        "tracking": [
+          "8R12345678901",
+          "FR98765432100",
+          "6A88412390127"
+        ],
+        "expediteur": [
+          "Amazon.fr",
+          "Fnac.com",
+          "Vinted",
+          "Le Bon Coin",
+          "Cdiscount"
+        ],
+        "date_livraison": [
+          "mercredi 5 mars",
+          "demain",
+          "jeudi 6 mars entre 9h et 12h",
+          "vendredi 7 mars"
+        ],
+        "creneau": [
+          "8h et 12h",
+          "14h et 18h",
+          "10h et 14h",
+          "9h et 13h"
+        ],
+        "poids": [
+          "0,8 kg",
+          "2,3 kg",
+          "0,4 kg",
+          "5,1 kg"
+        ]
       }
     },
     {
@@ -64,10 +177,34 @@
         "Objet : Accusé de réception : {sujet}\n\nBonjour {prenom},\n\nMerci de nous avoir contactés. Votre message a bien été pris en compte.\n\nUn conseiller vous répondra sous {delai}.\n\nPour accélérer le traitement, merci de ne pas créer une nouvelle demande pour le même sujet.\n\nCordialement,\n{entreprise} - Support"
       ],
       "variables": {
-        "entreprise": ["Free", "Orange", "SFR", "Bouygues Telecom", "OVHcloud", "Maif", "Macif"],
-        "ref": ["48821", "55134", "77291", "33451"],
-        "sujet": ["Problème de connexion internet", "Demande de résiliation", "Modification de forfait", "Question sur ma facture", "Changement d'adresse"],
-        "delai": ["24 heures ouvrées", "48 heures", "2 jours ouvrés", "72 heures"]
+        "entreprise": [
+          "Free",
+          "Orange",
+          "SFR",
+          "Bouygues Telecom",
+          "OVHcloud",
+          "Maif",
+          "Macif"
+        ],
+        "ref": [
+          "48821",
+          "55134",
+          "77291",
+          "33451"
+        ],
+        "sujet": [
+          "Problème de connexion internet",
+          "Demande de résiliation",
+          "Modification de forfait",
+          "Question sur ma facture",
+          "Changement d'adresse"
+        ],
+        "delai": [
+          "24 heures ouvrées",
+          "48 heures",
+          "2 jours ouvrés",
+          "72 heures"
+        ]
       }
     },
     {
@@ -81,19 +218,74 @@
         "Objet : Premiers pas pour bien démarrer sur {service}\n\n{service}\n\nSalut {prenom} 👋\n\nBienvenue ! Voici 3 étapes pour bien démarrer :\n\n1️⃣ {etape_1}\n2️⃣ {etape_2}\n3️⃣ {etape_3}\n\nBesoin d'inspiration ? Consultez nos tutoriels :\n→ Centre d'aide : [URL]\n\nVotre essai gratuit expire dans {jours} jours. Profitez de toutes les fonctionnalités !\n\nL'équipe {service}"
       ],
       "variables": {
-        "service": ["Notion", "Snowflake", "Figma", "Linear", "Vercel", "Stripe Dashboard", "Crisp"],
-        "sujet": ["Astuce de la semaine", "Nouveautés de mars 2026", "5 fonctionnalités que vous n'utilisez peut-être pas", "Votre récap hebdomadaire"],
-        "intro": ["Voici votre récapitulatif hebdomadaire et les nouveautés à ne pas manquer.", "On a quelques astuces pour vous aider à tirer le meilleur parti de votre espace."],
-        "section_1_titre": ["📊 Nouvelle fonctionnalité : tableaux de bord", "🚀 Performance améliorée", "🔧 Mise à jour de l'API v3"],
-        "section_1_contenu": ["Créez des dashboards personnalisés en quelques clics.", "Les temps de chargement ont été réduits de 40%.", "De nouveaux endpoints sont disponibles pour l'automatisation."],
-        "section_2_titre": ["📚 Tutoriel : automatisez vos workflows", "💡 Astuce pro", "🎯 Bonnes pratiques"],
-        "section_2_contenu": ["Découvrez comment connecter vos outils préférés via notre API.", "Utilisez les raccourcis clavier pour gagner du temps : Ctrl+K pour la recherche rapide.", "Structurez vos projets avec des labels et des priorités pour un meilleur suivi."],
-        "cta_texte": ["Découvrez toutes les nouveautés dans votre tableau de bord.", "Essayez ces fonctionnalités dès maintenant."],
-        "cta_label": ["Accéder à mon espace", "Découvrir les nouveautés", "Essayer maintenant"],
-        "etape_1": ["Complétez votre profil", "Importez vos données", "Créez votre premier projet"],
-        "etape_2": ["Invitez votre équipe", "Configurez vos intégrations", "Personnalisez vos paramètres"],
-        "etape_3": ["Explorez les templates", "Lancez votre premier dashboard", "Consultez notre documentation"],
-        "jours": ["14", "30", "7"]
+        "service": [
+          "Notion",
+          "Snowflake",
+          "Figma",
+          "Linear",
+          "Vercel",
+          "Stripe Dashboard",
+          "Crisp"
+        ],
+        "sujet": [
+          "Astuce de la semaine",
+          "Nouveautés de mars 2026",
+          "5 fonctionnalités que vous n'utilisez peut-être pas",
+          "Votre récap hebdomadaire"
+        ],
+        "intro": [
+          "Voici votre récapitulatif hebdomadaire et les nouveautés à ne pas manquer.",
+          "On a quelques astuces pour vous aider à tirer le meilleur parti de votre espace."
+        ],
+        "section_1_titre": [
+          "📊 Nouvelle fonctionnalité : tableaux de bord",
+          "🚀 Performance améliorée",
+          "🔧 Mise à jour de l'API v3"
+        ],
+        "section_1_contenu": [
+          "Créez des dashboards personnalisés en quelques clics.",
+          "Les temps de chargement ont été réduits de 40%.",
+          "De nouveaux endpoints sont disponibles pour l'automatisation."
+        ],
+        "section_2_titre": [
+          "📚 Tutoriel : automatisez vos workflows",
+          "💡 Astuce pro",
+          "🎯 Bonnes pratiques"
+        ],
+        "section_2_contenu": [
+          "Découvrez comment connecter vos outils préférés via notre API.",
+          "Utilisez les raccourcis clavier pour gagner du temps : Ctrl+K pour la recherche rapide.",
+          "Structurez vos projets avec des labels et des priorités pour un meilleur suivi."
+        ],
+        "cta_texte": [
+          "Découvrez toutes les nouveautés dans votre tableau de bord.",
+          "Essayez ces fonctionnalités dès maintenant."
+        ],
+        "cta_label": [
+          "Accéder à mon espace",
+          "Découvrir les nouveautés",
+          "Essayer maintenant"
+        ],
+        "etape_1": [
+          "Complétez votre profil",
+          "Importez vos données",
+          "Créez votre premier projet"
+        ],
+        "etape_2": [
+          "Invitez votre équipe",
+          "Configurez vos intégrations",
+          "Personnalisez vos paramètres"
+        ],
+        "etape_3": [
+          "Explorez les templates",
+          "Lancez votre premier dashboard",
+          "Consultez notre documentation"
+        ],
+        "jours": [
+          "14",
+          "30",
+          "7"
+        ]
       }
     },
     {
@@ -107,16 +299,65 @@
         "Objet : Votre reçu pour le paiement de {montant_ttc}\n\n{entreprise}\n\nBonjour {prenom},\n\nNous vous confirmons la bonne réception de votre paiement.\n\nMontant : {montant_ttc}\nDate : {date}\nRéférence : {ref}\nMode de paiement : {paiement}\n\nVotre prochain prélèvement est prévu le {date_prochain}.\n\nConsulter mon historique de facturation : [URL]\n\nMerci de votre confiance.\n{entreprise}"
       ],
       "variables": {
-        "entreprise": ["OVHcloud", "Scaleway", "Orange Pro", "Free Pro", "Adobe", "Spotify", "Netflix"],
-        "ref": ["FA-2026-03-0047", "INV-8834521", "FACT-2026-0312", "REC-FR-55123"],
-        "periode": ["1er au 28 février 2026", "1er au 31 janvier 2026", "mars 2026"],
-        "montant_ht": ["41,58 EUR", "19,92 EUR", "83,25 EUR", "9,99 EUR"],
-        "tva": ["8,32 EUR", "3,98 EUR", "16,65 EUR", "2,00 EUR"],
-        "taux_tva": ["20", "20", "20", "20"],
-        "montant_ttc": ["49,90 EUR", "23,90 EUR", "99,90 EUR", "11,99 EUR"],
-        "date_echeance": ["15 mars 2026", "31 mars 2026", "10 avril 2026"],
-        "date_prochain": ["1er avril 2026", "15 avril 2026", "1er mai 2026"],
-        "paiement": ["Prélèvement automatique SEPA", "Carte bancaire ****4821", "Virement bancaire"]
+        "entreprise": [
+          "OVHcloud",
+          "Scaleway",
+          "Orange Pro",
+          "Free Pro",
+          "Adobe",
+          "Spotify",
+          "Netflix"
+        ],
+        "ref": [
+          "FA-2026-03-0047",
+          "INV-8834521",
+          "FACT-2026-0312",
+          "REC-FR-55123"
+        ],
+        "periode": [
+          "1er au 28 février 2026",
+          "1er au 31 janvier 2026",
+          "mars 2026"
+        ],
+        "montant_ht": [
+          "41,58 EUR",
+          "19,92 EUR",
+          "83,25 EUR",
+          "9,99 EUR"
+        ],
+        "tva": [
+          "8,32 EUR",
+          "3,98 EUR",
+          "16,65 EUR",
+          "2,00 EUR"
+        ],
+        "taux_tva": [
+          "20",
+          "20",
+          "20",
+          "20"
+        ],
+        "montant_ttc": [
+          "49,90 EUR",
+          "23,90 EUR",
+          "99,90 EUR",
+          "11,99 EUR"
+        ],
+        "date_echeance": [
+          "15 mars 2026",
+          "31 mars 2026",
+          "10 avril 2026"
+        ],
+        "date_prochain": [
+          "1er avril 2026",
+          "15 avril 2026",
+          "1er mai 2026"
+        ],
+        "paiement": [
+          "Prélèvement automatique SEPA",
+          "Carte bancaire ****4821",
+          "Virement bancaire"
+        ]
       }
     },
     {
@@ -130,18 +371,78 @@
         "Objet : Rappel concernant votre rendez-vous du {date} à {heure}\n\n{organisation}\n\nBonjour {prenom} {nom},\n\nNous vous rappelons votre rendez-vous :\n\nDate : {date}\nHeure : {heure}\nAvec : {expediteur}\nLieu : {lieu}\n\nDocuments à apporter :\n• {document_1}\n• {document_2}\n\nPour modifier ou annuler votre rendez-vous :\n→ [URL]\n\nÀ bientôt,\n{organisation}"
       ],
       "variables": {
-        "sujet": ["la réunion trimestrielle", "l'assemblée générale", "l'entretien annuel", "la formation sécurité", "la réunion d'équipe"],
-        "lieu": ["Salle Voltaire, 3e étage", "En visioconférence (lien Teams ci-joint)", "Bureau 204, bâtiment B", "15 rue de la Paix, 75002 Paris"],
-        "heure": ["10h00", "14h30", "9h00", "16h00"],
-        "point_1": ["Bilan d'activité du trimestre", "Présentation des comptes annuels", "Retour sur les objectifs", "État des lieux du projet"],
-        "point_2": ["Prévisions pour le prochain trimestre", "Vote des résolutions", "Plan de développement", "Planification des sprints"],
-        "point_3": ["Planning des congés", "Nomination des administrateurs", "Formation continue", "Roadmap produit"],
-        "date_confirmation": ["lundi 3 mars", "vendredi 28 février", "mercredi 5 mars"],
-        "expediteur": ["Marie Dupont", "Jean-Luc Martin", "Dr. Lefèvre", "Me Moreau"],
-        "titre": ["Directrice des Ressources Humaines", "Responsable d'équipe", "Médecin du travail", "Avocat associé"],
-        "organisation": ["Votre entreprise", "Cabinet Médical du Parc", "Étude Moreau & Associés", "Mairie de Lyon"],
-        "document_1": ["Pièce d'identité", "Dernier bulletin de salaire", "Carte Vitale", "Contrat signé"],
-        "document_2": ["Justificatif de domicile", "Rapport d'activité", "Résultats d'analyse", "Statuts de la société"]
+        "sujet": [
+          "la réunion trimestrielle",
+          "l'assemblée générale",
+          "l'entretien annuel",
+          "la formation sécurité",
+          "la réunion d'équipe"
+        ],
+        "lieu": [
+          "Salle Voltaire, 3e étage",
+          "En visioconférence (lien Teams ci-joint)",
+          "Bureau 204, bâtiment B",
+          "15 rue de la Paix, 75002 Paris"
+        ],
+        "heure": [
+          "10h00",
+          "14h30",
+          "9h00",
+          "16h00"
+        ],
+        "point_1": [
+          "Bilan d'activité du trimestre",
+          "Présentation des comptes annuels",
+          "Retour sur les objectifs",
+          "État des lieux du projet"
+        ],
+        "point_2": [
+          "Prévisions pour le prochain trimestre",
+          "Vote des résolutions",
+          "Plan de développement",
+          "Planification des sprints"
+        ],
+        "point_3": [
+          "Planning des congés",
+          "Nomination des administrateurs",
+          "Formation continue",
+          "Roadmap produit"
+        ],
+        "date_confirmation": [
+          "lundi 3 mars",
+          "vendredi 28 février",
+          "mercredi 5 mars"
+        ],
+        "expediteur": [
+          "Marie Dupont",
+          "Jean-Luc Martin",
+          "Dr. Lefèvre",
+          "Me Moreau"
+        ],
+        "titre": [
+          "Directrice des Ressources Humaines",
+          "Responsable d'équipe",
+          "Médecin du travail",
+          "Avocat associé"
+        ],
+        "organisation": [
+          "Votre entreprise",
+          "Cabinet Médical du Parc",
+          "Étude Moreau & Associés",
+          "Mairie de Lyon"
+        ],
+        "document_1": [
+          "Pièce d'identité",
+          "Dernier bulletin de salaire",
+          "Carte Vitale",
+          "Contrat signé"
+        ],
+        "document_2": [
+          "Justificatif de domicile",
+          "Rapport d'activité",
+          "Résultats d'analyse",
+          "Statuts de la société"
+        ]
       }
     },
     {
@@ -155,9 +456,24 @@
         "Objet : N'oubliez pas votre actualisation mensuelle\n\nFrance Travail\n\nBonjour {prenom},\n\nN'oubliez pas de procéder à votre actualisation mensuelle avant le {date}.\n\nRappel : l'actualisation est obligatoire pour maintenir vos droits.\n\nPour vous actualiser :\n→ Connectez-vous sur francetravail.fr\n→ Rubrique \"Mon actualisation\"\n\nSi vous avez repris une activité, même partielle, pensez à la déclarer.\n\nVotre conseiller : {expediteur}\nAgence : {agence}\n\nFrance Travail"
       ],
       "variables": {
-        "sujet": ["Convocation à un atelier", "Proposition de formation", "Mise à jour de votre dossier", "Offre d'emploi correspondant à votre profil"],
-        "expediteur": ["Votre conseiller dédié", "Service des prestations", "Équipe recrutement", "Pôle accompagnement"],
-        "agence": ["France Travail Paris 11e", "France Travail Lyon Part-Dieu", "France Travail Bordeaux Centre", "France Travail Marseille Prado"]
+        "sujet": [
+          "Convocation à un atelier",
+          "Proposition de formation",
+          "Mise à jour de votre dossier",
+          "Offre d'emploi correspondant à votre profil"
+        ],
+        "expediteur": [
+          "Votre conseiller dédié",
+          "Service des prestations",
+          "Équipe recrutement",
+          "Pôle accompagnement"
+        ],
+        "agence": [
+          "France Travail Paris 11e",
+          "France Travail Lyon Part-Dieu",
+          "France Travail Bordeaux Centre",
+          "France Travail Marseille Prado"
+        ]
       }
     },
     {
@@ -171,13 +487,45 @@
         "Objet : Mise à jour des conditions d'utilisation de {entreprise}\n\nBonjour,\n\nNous souhaitons vous informer de modifications importantes apportées à nos conditions d'utilisation, effectives à partir du {date}.\n\nRésumé des changements :\n• {changement_1}\n• {changement_2}\n\nEn continuant à utiliser nos services après le {date}, vous acceptez les nouvelles conditions.\n\nLire les conditions mises à jour : [URL]\n\nÉquipe {entreprise}\n\nVous recevez cet email car vous avez un compte {entreprise}.\nGérer mes préférences : [URL]"
       ],
       "variables": {
-        "entreprise": ["OpenAI", "Google", "Microsoft", "Meta", "Spotify", "Netflix", "Slack", "Notion"],
-        "changement_1": ["Clarification de l'utilisation des données pour l'amélioration de nos services", "Ajout d'une section sur les transferts de données internationaux", "Mise à jour des droits de suppression de données"],
-        "changement_2": ["Nouveau mécanisme de consentement conforme au RGPD", "Précisions sur le partage de données avec nos sous-traitants", "Introduction d'un délai de conservation réduit à 12 mois"],
-        "changement_3": ["Possibilité de télécharger l'intégralité de vos données", "Ajout d'un mécanisme d'opt-out pour la publicité ciblée", "Nouvelle procédure de suppression de compte simplifiée"],
-        "explication": ["Votre utilisation du service reste inchangée. Ces modifications visent à mieux protéger vos données.", "Ces changements n'affectent pas les fonctionnalités que vous utilisez au quotidien."],
-        "date_limite": ["31 mars 2026", "15 avril 2026", "1er mai 2026"],
-        "email_dpo": ["dpo@entreprise.com", "privacy@entreprise.com", "rgpd@entreprise.com"]
+        "entreprise": [
+          "OpenAI",
+          "Google",
+          "Microsoft",
+          "Meta",
+          "Spotify",
+          "Netflix",
+          "Slack",
+          "Notion"
+        ],
+        "changement_1": [
+          "Clarification de l'utilisation des données pour l'amélioration de nos services",
+          "Ajout d'une section sur les transferts de données internationaux",
+          "Mise à jour des droits de suppression de données"
+        ],
+        "changement_2": [
+          "Nouveau mécanisme de consentement conforme au RGPD",
+          "Précisions sur le partage de données avec nos sous-traitants",
+          "Introduction d'un délai de conservation réduit à 12 mois"
+        ],
+        "changement_3": [
+          "Possibilité de télécharger l'intégralité de vos données",
+          "Ajout d'un mécanisme d'opt-out pour la publicité ciblée",
+          "Nouvelle procédure de suppression de compte simplifiée"
+        ],
+        "explication": [
+          "Votre utilisation du service reste inchangée. Ces modifications visent à mieux protéger vos données.",
+          "Ces changements n'affectent pas les fonctionnalités que vous utilisez au quotidien."
+        ],
+        "date_limite": [
+          "31 mars 2026",
+          "15 avril 2026",
+          "1er mai 2026"
+        ],
+        "email_dpo": [
+          "dpo@entreprise.com",
+          "privacy@entreprise.com",
+          "rgpd@entreprise.com"
+        ]
       }
     },
     {
@@ -192,22 +540,95 @@
         "Objet : Votre carte bancaire expire bientôt\n\n{banque}\n\nBonjour {prenom},\n\nVotre carte bancaire se terminant par ****{digits} expire le {date_expiration}.\n\nVotre nouvelle carte a été commandée et sera envoyée à votre adresse postale dans un délai de {delai}.\n\nVous n'avez rien à faire. Votre code PIN restera le même.\n\nSi vous avez changé d'adresse, mettez-la à jour dans votre espace client avant l'envoi :\n→ {banque_url}\n\n{banque} - Service Cartes"
       ],
       "variables": {
-        "banque": ["BNP Paribas", "Crédit Agricole", "Société Générale", "La Banque Postale", "Boursorama", "LCL", "Caisse d'Épargne"],
-        "banque_url": ["mabanque.bnpparibas", "mon-espace.credit-agricole.fr", "particuliers.sg.fr", "labanquepostale.fr", "boursorama.com"],
-        "montant": ["1 247,50 EUR", "850,00 EUR", "2 340,00 EUR", "456,78 EUR"],
-        "expediteur": ["URSSAF ILE DE FRANCE", "POLE EMPLOI", "DGFiP IMPOTS", "SCI HABITAT LOGEMENT"],
-        "ref": ["VIR-2026-03-8841", "SEPA-FR-55123", "TRF-20260304"],
-        "type_compte": ["courant", "professionnel", "joint"],
-        "mois": ["février 2026", "janvier 2026", "mars 2026"],
-        "solde": ["3 456,78 EUR", "12 890,45 EUR", "1 234,56 EUR", "8 765,32 EUR"],
-        "entrees": ["4 500,00 EUR", "2 890,00 EUR", "6 120,00 EUR"],
-        "sorties": ["3 210,00 EUR", "1 950,00 EUR", "4 870,00 EUR"],
-        "operation_1": ["Virement reçu - Salaire", "Prélèvement - EDF", "CB - Carrefour"],
-        "operation_2": ["Prélèvement - Loyer", "Virement émis - Épargne", "CB - Amazon.fr"],
-        "operation_3": ["CB - SNCF", "Prélèvement - Assurance", "Virement reçu - Remboursement"],
-        "digits": ["4821", "7793", "3156"],
-        "date_expiration": ["04/2026", "05/2026", "06/2026"],
-        "delai": ["5 à 10 jours ouvrés", "7 jours", "2 semaines"]
+        "banque": [
+          "BNP Paribas",
+          "Crédit Agricole",
+          "Société Générale",
+          "La Banque Postale",
+          "Boursorama",
+          "LCL",
+          "Caisse d'Épargne"
+        ],
+        "banque_url": [
+          "mabanque.bnpparibas",
+          "mon-espace.credit-agricole.fr",
+          "particuliers.sg.fr",
+          "labanquepostale.fr",
+          "boursorama.com"
+        ],
+        "montant": [
+          "1 247,50 EUR",
+          "850,00 EUR",
+          "2 340,00 EUR",
+          "456,78 EUR"
+        ],
+        "expediteur": [
+          "URSSAF ILE DE FRANCE",
+          "POLE EMPLOI",
+          "DGFiP IMPOTS",
+          "SCI HABITAT LOGEMENT"
+        ],
+        "ref": [
+          "VIR-2026-03-8841",
+          "SEPA-FR-55123",
+          "TRF-20260304"
+        ],
+        "type_compte": [
+          "courant",
+          "professionnel",
+          "joint"
+        ],
+        "mois": [
+          "février 2026",
+          "janvier 2026",
+          "mars 2026"
+        ],
+        "solde": [
+          "3 456,78 EUR",
+          "12 890,45 EUR",
+          "1 234,56 EUR",
+          "8 765,32 EUR"
+        ],
+        "entrees": [
+          "4 500,00 EUR",
+          "2 890,00 EUR",
+          "6 120,00 EUR"
+        ],
+        "sorties": [
+          "3 210,00 EUR",
+          "1 950,00 EUR",
+          "4 870,00 EUR"
+        ],
+        "operation_1": [
+          "Virement reçu - Salaire",
+          "Prélèvement - EDF",
+          "CB - Carrefour"
+        ],
+        "operation_2": [
+          "Prélèvement - Loyer",
+          "Virement émis - Épargne",
+          "CB - Amazon.fr"
+        ],
+        "operation_3": [
+          "CB - SNCF",
+          "Prélèvement - Assurance",
+          "Virement reçu - Remboursement"
+        ],
+        "digits": [
+          "4821",
+          "7793",
+          "3156"
+        ],
+        "date_expiration": [
+          "04/2026",
+          "05/2026",
+          "06/2026"
+        ],
+        "delai": [
+          "5 à 10 jours ouvrés",
+          "7 jours",
+          "2 semaines"
+        ]
       }
     },
     {
@@ -221,11 +642,36 @@
         "Objet : Nous avons bien reçu votre déclaration (T{trimestre} {annee})\n\nURSSAF - Espace Auto-Entrepreneur\n\nBonjour {prenom},\n\nNous accusons réception de votre déclaration de chiffre d'affaires :\n\nPériode : T{trimestre} {annee}\nChiffre d'affaires déclaré : {ca}\nCotisations calculées : {montant}\nDate de prélèvement : {date_prelevement}\n\nVos cotisations seront prélevées sur le compte bancaire enregistré.\n\nConsulter mon historique de déclarations :\n→ autoentrepreneur.urssaf.fr\n\nCordialement,\nURSSAF"
       ],
       "variables": {
-        "trimestre": ["1", "2", "3", "4"],
-        "annee": ["2025", "2026"],
-        "montant": ["487,50 EUR", "234,80 EUR", "0,00 EUR", "1 123,45 EUR", "89,40 EUR"],
-        "ca": ["2 250,00 EUR", "1 080,00 EUR", "0,00 EUR", "5 175,00 EUR", "412,00 EUR"],
-        "date_prelevement": ["5 avril 2026", "5 juillet 2026", "5 octobre 2026", "5 janvier 2027"]
+        "trimestre": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ],
+        "annee": [
+          "2025",
+          "2026"
+        ],
+        "montant": [
+          "487,50 EUR",
+          "234,80 EUR",
+          "0,00 EUR",
+          "1 123,45 EUR",
+          "89,40 EUR"
+        ],
+        "ca": [
+          "2 250,00 EUR",
+          "1 080,00 EUR",
+          "0,00 EUR",
+          "5 175,00 EUR",
+          "412,00 EUR"
+        ],
+        "date_prelevement": [
+          "5 avril 2026",
+          "5 juillet 2026",
+          "5 octobre 2026",
+          "5 janvier 2027"
+        ]
       }
     },
     {
@@ -239,9 +685,28 @@
         "Objet : Comment s'est passée votre expérience avec {entreprise} ?\n\n{entreprise}\n\nBonjour {prenom},\n\nVotre commande du {date} a-t-elle répondu à vos attentes ?\n\n😊 Très satisfait(e)\n🙂 Satisfait(e)\n😐 Neutre\n😕 Insatisfait(e)\n😟 Très insatisfait(e)\n\n→ Évaluer mon expérience : [URL]\n\nMerci,\n{entreprise}"
       ],
       "variables": {
-        "entreprise": ["Fiverr", "SNCF", "Booking.com", "Doctolib", "Vinted", "Leroy Merlin", "Decathlon"],
-        "action": ["effectué un achat", "utilisé nos services", "contacté notre support", "fait une réservation", "passé une commande"],
-        "duree": ["2 minutes", "3 minutes", "1 minute", "30 secondes"]
+        "entreprise": [
+          "Fiverr",
+          "SNCF",
+          "Booking.com",
+          "Doctolib",
+          "Vinted",
+          "Leroy Merlin",
+          "Decathlon"
+        ],
+        "action": [
+          "effectué un achat",
+          "utilisé nos services",
+          "contacté notre support",
+          "fait une réservation",
+          "passé une commande"
+        ],
+        "duree": [
+          "2 minutes",
+          "3 minutes",
+          "1 minute",
+          "30 secondes"
+        ]
       }
     },
     {
@@ -255,12 +720,128 @@
         "Objet : Votre mot de passe {service} a été modifié\n\n{service}\n\nBonjour {prenom},\n\nLe mot de passe de votre compte {service} ({email}) a été modifié le {date} à {heure}.\n\nSi vous êtes à l'origine de cette modification, vous pouvez ignorer cet email.\n\nSi vous n'avez pas effectué cette modification, veuillez sécuriser votre compte immédiatement :\n→ Réinitialiser mon mot de passe : [URL]\n\nL'équipe Sécurité {service}"
       ],
       "variables": {
-        "service": ["Google", "Microsoft", "GitHub", "Slack", "LinkedIn", "Twitter", "Notion"],
-        "lieu": ["Paris, France", "Lyon, France", "Non reconnu - Moscou, Russie", "Marseille, France"],
-        "appareil": ["MacBook Pro", "iPhone 15", "Windows 11 PC", "Android - Samsung Galaxy S24"],
-        "navigateur": ["Chrome 122", "Safari 17", "Firefox 124", "Edge 122"],
-        "heure": ["14h23", "09h45", "22h17", "07h02"]
+        "service": [
+          "Google",
+          "Microsoft",
+          "GitHub",
+          "Slack",
+          "LinkedIn",
+          "Twitter",
+          "Notion"
+        ],
+        "lieu": [
+          "Paris, France",
+          "Lyon, France",
+          "Non reconnu - Moscou, Russie",
+          "Marseille, France"
+        ],
+        "appareil": [
+          "MacBook Pro",
+          "iPhone 15",
+          "Windows 11 PC",
+          "Android - Samsung Galaxy S24"
+        ],
+        "navigateur": [
+          "Chrome 122",
+          "Safari 17",
+          "Firefox 124",
+          "Edge 122"
+        ],
+        "heure": [
+          "14h23",
+          "09h45",
+          "22h17",
+          "07h02"
+        ]
       }
+    },
+    {
+      "id": "l_medium_candidature_spontanee",
+      "tier": "medium",
+      "weight": 1.0,
+      "variables": {
+        "poste": [
+          "développeur back-end",
+          "chargée de communication",
+          "technicien de maintenance",
+          "assistante administrative",
+          "data analyst"
+        ],
+        "structure": [
+          "votre agence",
+          "votre cabinet",
+          "votre entreprise",
+          "votre service"
+        ],
+        "canal": [
+          "sur votre site",
+          "sur LinkedIn",
+          "par une connaissance commune",
+          "lors du salon de l'emploi"
+        ],
+        "disponibilite": [
+          "dès le mois prochain",
+          "sous préavis d'un mois",
+          "immédiatement",
+          "à compter de la rentrée"
+        ]
+      },
+      "templates": [
+        "Objet : Candidature spontanée - {poste}\n\nBonjour {prenom},\n\nJ'ai découvert {structure} {canal} et je me permets de vous adresser ma candidature spontanée pour un poste de {poste}.\n\nJ'ai exercé cette fonction pendant plusieurs années dans un contexte comparable au vôtre, sur des projets où l'autonomie et la coordination avec les équipes métier étaient déterminantes. Ce qui m'intéresse dans votre structure, c'est la place laissée à l'initiative sur les sujets techniques, ce qui correspond à la manière dont j'aime travailler.\n\nVous trouverez mon CV en pièce jointe. Je serais disponible {disponibilite} et je reste bien entendu à votre disposition pour un échange, en visioconférence ou dans vos locaux selon ce qui vous arrange.\n\nJe vous remercie par avance de l'attention que vous porterez à ma candidature.\n\nBien cordialement,\n\n{agent}\n{phone}\n{email}",
+        "Objet : Suite à notre échange - transmission de mon dossier\n\nBonjour {prenom},\n\nComme convenu lors de notre conversation de la semaine dernière, je vous transmets mon CV ainsi que deux références professionnelles.\n\nPour rappel du contexte : je recherche un poste de {poste} et notre échange m'a confirmé que le profil recherché correspond assez précisément à mon parcours, en particulier sur la partie coordination technique dont vous m'aviez parlé.\n\nJ'ai ajouté au dossier un court descriptif des deux derniers projets sur lesquels je suis intervenu, avec le périmètre exact de mon rôle, cela vous donnera une idée plus concrète que le CV seul.\n\nJe reste disponible {disponibilite}. N'hésitez pas si vous souhaitez que je complète le dossier.\n\nBien à vous,\n\n{agent}\n{phone}"
+      ]
+    },
+    {
+      "id": "l_medium_artisan_devis",
+      "tier": "medium",
+      "weight": 1.0,
+      "variables": {
+        "travaux": [
+          "le remplacement de la chaudière",
+          "la réfection de la toiture",
+          "l'installation électrique du garage",
+          "le remplacement des menuiseries"
+        ],
+        "delai_chantier": [
+          "environ trois jours",
+          "une semaine",
+          "deux jours ouvrés",
+          "une dizaine de jours"
+        ],
+        "montant_devis": [
+          "2 340 €",
+          "4 780 €",
+          "1 260 €",
+          "6 950 €",
+          "3 415 €"
+        ]
+      },
+      "templates": [
+        "Objet : Devis pour {travaux}\n\nBonjour {prenom},\n\nSuite à ma visite de {date_facture}, je vous adresse le devis pour {travaux}.\n\nLe montant s'élève à {montant_devis} TTC, matériel et main d'œuvre compris. Le détail poste par poste figure dans le document joint. J'ai retenu la solution intermédiaire dont nous avions parlé, plutôt que l'entrée de gamme : la différence de prix est faible et la durée de vie n'est pas comparable.\n\nCompter {delai_chantier} d'intervention. Je peux commencer à partir du {date}, sous réserve de la disponibilité du fournisseur pour le matériel.\n\nLe devis est valable trente jours. Si vous le validez, un acompte de 30 % est demandé à la commande, le solde à la fin du chantier.\n\nJe reste joignable au {phone} pour toute question.\n\nCordialement,\n\n{agent}\nRéf. devis : {ref}",
+        "Objet : Facture {ref} - intervention du {date_facture}\n\nBonjour {prenom},\n\nVous trouverez ci-joint la facture correspondant à l'intervention réalisée le {date_facture}.\n\nMontant : {montant_devis} TTC\nRéférence : {ref}\nÉchéance : {date}\n\nLe règlement peut se faire par virement sur le compte indiqué au bas de la facture, ou par chèque à l'ordre de l'entreprise. Merci de rappeler la référence en objet du virement, cela m'évite des recherches en fin de mois.\n\nPour information, la garantie décennale court à compter de la date de fin de chantier. L'attestation est jointe au même envoi, pensez à la conserver avec la facture.\n\nMerci de votre confiance, et n'hésitez pas à me rappeler si quelque chose ne va pas dans les semaines qui viennent.\n\nCordialement,\n\n{agent}\n{phone}"
+      ]
+    },
+    {
+      "id": "l_medium_copropriete_voisinage",
+      "tier": "medium",
+      "weight": 1.0,
+      "variables": {
+        "sujet_travaux": [
+          "le ravalement de la façade côté cour",
+          "le remplacement de la porte du hall",
+          "la réfection de la cage d'escalier",
+          "la mise aux normes de l'ascenseur"
+        ],
+        "creneau": [
+          "mardi entre 9h et 12h",
+          "jeudi après-midi",
+          "lundi matin",
+          "vendredi entre 14h et 17h"
+        ]
+      },
+      "templates": [
+        "Objet : {sujet_travaux} - intervention {creneau}\n\nBonjour à tous,\n\nComme évoqué en assemblée générale, {sujet_travaux} est programmé et l'entreprise interviendra {creneau}.\n\nConcrètement, cela veut dire du bruit sur la matinée et un accès restreint pour la durée de l'intervention. Les personnes en télétravail voudront peut-être s'organiser en conséquence. L'entreprise s'est engagée à laisser le passage libre pour les poussettes et les personnes à mobilité réduite.\n\nSi vous devez impérativement accéder au local à vélos ce jour-là, faites-le moi savoir avant {date} et je verrai avec eux pour décaler leur passage sur cette partie.\n\nLe compte rendu de l'AG et le devis retenu restent consultables auprès du syndic aux horaires habituels.\n\nBonne journée,\n\n{agent}\nConseil syndical"
+      ]
     }
   ]
 }
