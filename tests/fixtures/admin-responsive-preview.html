@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Responsive admin UI fixture</title>
+    <style>body{margin:0;background:#e2e8f0}iframe{display:block;border:0;max-width:100%;margin:0 auto}</style>
+  </head>
+  <body>
+    <iframe title="Admin preview"></iframe>
+    <script type="module">
+      const params = new URLSearchParams(location.search);
+      const frame = document.querySelector("iframe");
+      frame.width = String(Math.min(1280, Math.max(320, Number(params.get("width")) || 390)));
+      frame.height = "720";
+      frame.src = `/tests/fixtures/admin-preview.html?${params.toString()}`;
+    </script>
+  </body>
+</html>
