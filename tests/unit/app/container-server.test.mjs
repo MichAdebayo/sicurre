@@ -21,6 +21,11 @@ beforeAll(async () => {
   await writeFile(path.join(dist, "app.js"), "console.log('asset')");
 
   upstream = http.createServer((request, response) => {
+    if (["/docs", "/redoc", "/docs/oauth2-redirect", "/openapi.json", "/api/auth/reference", "/api/auth/open-api/generate-schema"].includes(request.url)) {
+      response.writeHead(404, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ detail: "Not Found" }));
+      return;
+    }
     if (request.url === "/v1/fail") {
       request.socket.destroy();
       return;
@@ -61,6 +66,11 @@ afterAll(async () => {
 });
 
 describe("app gateway routing and metrics", () => {
+  it.each(["/docs", "/redoc", "/docs/oauth2-redirect", "/openapi.json", "/api/auth/reference", "/api/auth/open-api/generate-schema"])("preserves disabled documentation 404 for %s", async (pathname) => {
+    const response = await fetch(`${gatewayBase}${pathname}`);
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ detail: "Not Found" });
+  });
   it.each(["/admin", "/admin/operations", "/admin/incidents", "/admin/integrations", "/admin/reviews"])("serves the application shell for direct %s navigation", async (pathname) => {
     expect(gateway.shouldProxy(pathname)).toBeNull();
     const response = await fetch(`${gatewayBase}${pathname}`);
