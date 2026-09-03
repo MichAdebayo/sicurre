@@ -186,3 +186,34 @@ The pipeline aggregates reasons per run, so a release can be explained without
 re-running it: a lane whose yield drops is a lane whose reason mix has changed,
 and the mix says whether that is a French-language filter doing its job or an
 extractor that started failing.
+
+## Superseded releases of 2 September 2026
+
+Three dataset versions were published that day. Only the last is current.
+
+| Version | Status | Why |
+|---|---|---|
+| `base-20260902-113227` | superseded | Built before the length audit, so it carries the truncated generated text |
+| `base-20260902-161622` | superseded | Rebuilt after the re-seed but before the final freeze ten minutes later |
+| `base-20260902-162626` | **current** | 43,700 items, checksum `2edfb5074503` |
+
+The cause was a length audit finding generated text truncated to 200
+characters. 22,562 affected normalized messages and their 88,093 dataset items
+were archived to R2 and then removed, and the corpus was re-seeded. A model
+trained on either superseded version learned from truncated examples, which is
+why they are recorded here rather than quietly left in the table: a released
+model's dataset version has to be resolvable to a statement about what that
+data was.
+
+**Not yet applied:** the two superseded rows still carry their original
+`status` in `data_dataset`. Setting them to `archived` requires a write against
+the production database:
+
+```sql
+UPDATE data_dataset SET status = 'archived'
+WHERE version_tag IN ('base-20260902-113227', 'base-20260902-161622');
+```
+
+The reason is recorded here rather than in the row because `data_dataset` has
+no column for it — the same gap as `data_source_system.is_active`, which is a
+boolean with nowhere to say why.
