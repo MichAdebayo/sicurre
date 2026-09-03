@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Bell,
-  Cpu,
   Globe,
   Inbox,
   ArrowRight,
@@ -11,7 +10,6 @@ import {
 import { SidebarPage } from "./sidebar";
 import {
   useAlertHistory,
-  useAdminRuntimeHealth,
   useMarkAlertRead,
   useMarkDomainAlertsRead,
 } from "../../lib/api";
@@ -33,7 +31,6 @@ export function TopBar({
 }: TopBarProps) {
   const { t, i18n } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
-  const runtimeHealth = useAdminRuntimeHealth(administration);
   const { activeDomain } = useActiveDomain();
   const { data: alertHistory } = useAlertHistory(administration ? "" : activeDomain);
   const markAlertReadMutation = useMarkAlertRead(activeDomain);
@@ -124,43 +121,11 @@ export function TopBar({
     <header className="h-14 min-w-0 flex-1 bg-transparent px-0 flex items-center justify-between shrink-0 relative z-40">
       {/* Title Placeholder / Brand Space to balance the header layout */}
       <div className="truncate font-display font-semibold text-sm text-on-surface-variant opacity-80">
-        {!administration && activeDomain
-          ? activeDomain
-          : t("topbar.console_name")}
+        {administration ? t("topbar.console_name") : activeDomain || t("sidebar.no_domain")}
       </div>
 
       {/* Right Actions */}
       <div className="flex items-center gap-4 relative">
-        {/* System Status (Visible ONLY to platform administrators) */}
-        {administration && (
-          <div className="flex items-center gap-2 pr-2 border-r border-border-subtle/50">
-            <span className="relative flex h-2 w-2">
-              {runtimeHealth.data?.status === "ok" && (
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-safe" />
-              )}
-              <span className={`relative inline-flex rounded-full h-2 w-2 ${
-                runtimeHealth.data?.status === "down"
-                  ? "bg-error"
-                  : runtimeHealth.data?.status === "degraded"
-                  ? "bg-warning"
-                  : runtimeHealth.data?.status === "unknown"
-                  ? "bg-on-surface-variant"
-                  : "bg-safe"
-              }`} />
-            </span>
-            <span className="text-[9px] font-bold text-on-surface-variant/80 uppercase flex items-center gap-1">
-              <Cpu className="w-3 h-3 text-primary" />
-              {runtimeHealth.data?.status === "down"
-                ? t("topbar.runtime_incident")
-                : runtimeHealth.data?.status === "degraded"
-                ? t("topbar.runtime_degraded")
-                : runtimeHealth.isLoading
-                ? t("topbar.checking")
-                : t("topbar.system_operational")}
-            </span>
-          </div>
-        )}
-
         {/* Notifications Icon Button */}
         {!administration && <button
           onClick={(e) => {
