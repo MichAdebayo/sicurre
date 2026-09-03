@@ -5,10 +5,50 @@ import json
 
 import pandas as pd
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import SQLAlchemyError
 
 from core.config import ROOT_DIR, get_settings
 from data_platform.services.shared.dataset_manifest import build_dataset_manifest
 from data_platform.services.shared.snapshot_storage import build_snapshot_store
+
+
+#: Written when provenance could not be read. It is an explicit statement in
+#: the manifest rather than a missing key, so a consumer can tell "this split
+#: came from nowhere" from "we did not manage to look".
+_UNAVAILABLE_PROVENANCE = {
+    "available": False,
+    "reason": "provenance tables could not be read",
+}
+
+
+def _split_provenance(split_df: "pd.DataFrame") -> dict:
+    """Per-source counts for one split, for the sidecar manifest.
+
+    Provenance travels beside the CSV rather than inside it. The training
+    contract is `text,label`: adding a third column would change what every
+    consumer parses, and a source name sitting next to the text is a feature
+    the model can learn from. The confound is not hypothetical here - the
+    deployed classifier was previously found to have learned provenance rather
+    than intent, because each class arrived from its own corpus.
+
+    So the export answers "where did this split come from" as a separate
+    artifact, which a report can cite and a training run never reads.
+    """
+    frame = split_df.assign(source_name=split_df["source_name"].fillna("unattributed"))
+    counts = frame["source_name"].value_counts()
+    by_source = {str(name): int(count) for name, count in counts.items()}
+
+    by_source_and_label: dict[str, dict[str, int]] = {}
+    for (name, label), count in frame.groupby(["source_name", "label"]).size().items():
+        by_source_and_label.setdefault(str(name), {})[str(label)] = int(count)
+
+    return {
+        "available": True,
+        "by_source": by_source,
+        "by_source_and_label": by_source_and_label,
+        "source_count": len(by_source),
+        "unattributed": by_source.get("unattributed", 0),
+    }
 
 
 class DatasetExportService:
@@ -24,14 +64,71 @@ class DatasetExportService:
         # We use a sync engine specifically tailored to fast dataframe exports
         self.engine = create_engine(self.settings.sync_data_platform_database_url)
 
+    def _read_provenance(self, conn, version_tag: str, *, sqlite: bool) -> dict[str, dict]:
+        """Per-split source counts, read separately from the dataset itself.
+
+        This is a second query rather than a join on the export query on
+        purpose. The CSV is the deliverable; provenance is commentary on it. A
+        join would make a schema problem in the lineage tables fail the export
+        that those tables have no part in producing, which is the wrong
+        failure: a dataset with unknown provenance is still a dataset, while no
+        dataset at all is a broken release.
+
+        The joins are LEFT for the same reason at row level - a record whose
+        raw row was since removed still belongs in the split, and is counted as
+        `unattributed` rather than dropped.
+        """
+        message_join = (
+            "di.normalized_message_id = replace(nm.id, '-', '')"
+            if sqlite
+            else "di.normalized_message_id = nm.id"
+        )
+        # Both sides of this one are stored the same way, so it joins directly.
+        # Wrapping either side in replace() would cost the index and turn a
+        # 32k-row join into a full scan - measured as a multi-minute hang on the
+        # local database before this was written as plain equality.
+        raw_join = "nm.raw_record_id = rr.id"
+        # This one genuinely differs: data_source_system stores its id without
+        # dashes under SQLite. The normalisation is cheap because the table it
+        # scans has single-digit row counts.
+        source_join = (
+            "replace(rr.source_system_id, '-', '') = ss.id"
+            if sqlite
+            else "rr.source_system_id = ss.id"
+        )
+        query = text(f"""
+            SELECT
+                di.split_name,
+                nm.current_label as label,
+                ss.name as source_name
+            FROM data_dataset d
+            JOIN data_dataset_item di ON d.id = di.dataset_id
+            JOIN data_normalized_message nm ON {message_join}
+            LEFT JOIN data_raw_record rr ON {raw_join}
+            LEFT JOIN data_source_system ss ON {source_join}
+            WHERE d.version_tag = :version_tag
+        """)
+
+        try:
+            frame = pd.read_sql(query, conn, params={"version_tag": version_tag})
+        except SQLAlchemyError as exc:
+            print(f"  ⚠️  Provenance unavailable, exporting without it: {type(exc).__name__}")
+            return {}
+
+        return {
+            str(split): _split_provenance(rows)
+            for split, rows in frame.groupby("split_name")
+        }
+
     def export_dataset(self, version_tag: str) -> None:
         print("=" * 60)
         print(f"SICURRE — Export ML Dataset Version: {version_tag}")
         print("=" * 60)
 
+        sqlite = self.engine.dialect.name == "sqlite"
         message_join = (
             "di.normalized_message_id = replace(nm.id, '-', '')"
-            if self.engine.dialect.name == "sqlite"
+            if sqlite
             else "di.normalized_message_id = nm.id"
         )
         query = text(f"""
@@ -52,6 +149,7 @@ class DatasetExportService:
 
         with self.engine.connect() as conn:
             dataframe = pd.read_sql(query, conn, params={"version_tag": version_tag})
+            provenance = self._read_provenance(conn, version_tag, sqlite=sqlite)
 
         if dataframe.empty:
             raise ValueError(f"No records found for dataset version: {version_tag}")
@@ -79,6 +177,7 @@ class DatasetExportService:
                 "item_count": len(split_df),
                 "class_distribution": label_stats,
                 "class_weights": sample_weights,
+                "provenance": provenance.get(split, _UNAVAILABLE_PROVENANCE),
             }
 
             csv_payload = split_df[["text", "label"]].to_csv(index=False).encode("utf-8")

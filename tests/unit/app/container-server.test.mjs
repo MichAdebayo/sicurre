@@ -81,6 +81,14 @@ describe("app gateway routing and metrics", () => {
     expect(gateway.shouldProxy("/internal/ml/evaluations")).toBe(process.env.API_SERVICE_URL);
     expect(gateway.shouldProxy("/internal/phishtank/snapshot")).toBeNull();
     expect(gateway.shouldProxy("/dashboard")).toBeNull();
+    // The API documentation must reach FastAPI rather than the SPA. Without
+    // these, /docs and /redoc answered 200 with the application shell, so the
+    // documentation appeared published while being unreachable — the failure
+    // mode a status-code check cannot see.
+    expect(gateway.shouldProxy("/docs")).toBe(process.env.API_SERVICE_URL);
+    expect(gateway.shouldProxy("/redoc")).toBe(process.env.API_SERVICE_URL);
+    expect(gateway.shouldProxy("/docs/oauth2-redirect")).toBe(process.env.API_SERVICE_URL);
+    expect(gateway.shouldProxy("/openapi.json")).toBe(process.env.API_SERVICE_URL);
   });
 
   it("rejects path traversal and maps the root document", () => {
