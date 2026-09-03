@@ -122,3 +122,67 @@ The original single-file Kaggle `train.csv` was a connectivity smoke test, not
 a valid training dataset release. It has been superseded by a frozen replay
 publish containing `train.csv`, `val.csv`, and `test.csv` generated from
 `data_dataset.version_tag = 20260506-075504`.
+
+## Why a raw record does not reach the corpus
+
+The raw archive is cumulative and the release is a subset of it — 163,477 raw
+records against 43,700 items in `base-20260902-162626`. The gap is not loss.
+Most of it is normalization declining records on purpose, and until recently
+the pipeline recorded *that* a record was dropped without recording *why*, so
+the difference between the two numbers could only be explained by re-running
+the pipeline and watching it.
+
+Every drop point now writes a `rejection_reason`. The values are a closed set,
+and they fall into four groups.
+
+### The source was never meant to produce training text
+
+| Reason | Meaning |
+|--------|---------|
+| `url_intelligence_source` | The source yields URLs and indicators, not messages. PhishTank and Sekoia are threat intelligence: valuable as signal, not as email text. |
+| `ioc_reference_only_not_email_training_text` | The record is an indicator reference rather than a message body. |
+| `cert_fr_message_candidate` | CERT-FR bulletins describe campaigns; they are not themselves the mail a user receives. |
+| `source_not_normalized` | The source has no normalization route, so nothing claims to know how to read it. |
+
+These are the largest contributors and the least alarming. A record dropped
+here was never a candidate: counting it as a loss would mean expecting email
+text from a feed that publishes URLs.
+
+### The record is not French
+
+| Reason | Meaning |
+|--------|---------|
+| `english_adaptation_source` | English source material held for adaptation, not admitted directly. |
+| `mixed_language_adaptation_source` | Mixed-language source, same treatment. |
+
+The corpus is French-only. This is the single largest reason the external-DB
+lane contributes 31,701 of 34,700, and the Common Crawl lane 11 of 3,609 — the
+crawl is a general web sample, so almost none of it is French email.
+
+### The record is unusable
+
+| Reason | Meaning |
+|--------|---------|
+| `empty_after_extraction` | Extraction produced no text. An empty body is not a training example. |
+| `no_label` / `missing_normalized_label` | No class could be assigned. An unlabelled record cannot supervise anything. |
+| `extract_error:{ExceptionType}` | Extraction raised. Only the exception **class** is recorded — never its message, which can carry a fragment of the record being parsed. |
+| `duplicate_text_sha256` | The same text is already in the corpus. Duplicates inflate the count and bias whichever class carries them. |
+
+### The record has no governance
+
+| Reason | Meaning |
+|--------|---------|
+| `missing_source_policy` | The source declares no legal basis, personal-data flag or retention. |
+
+This one is a refusal rather than a filter. A record whose source cannot say
+its legal basis is not admitted, because admitting it would put material in the
+corpus that the RGPD register cannot describe. It should stay at zero; a
+non-zero count means a source was added without governance, not that data was
+lost.
+
+### Reading the counts
+
+The pipeline aggregates reasons per run, so a release can be explained without
+re-running it: a lane whose yield drops is a lane whose reason mix has changed,
+and the mix says whether that is a French-language filter doing its job or an
+extractor that started failing.
