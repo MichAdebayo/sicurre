@@ -23,7 +23,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import get_settings
 from core.database import get_async_session
-from core.operational_exercises import EXERCISE_TYPES, OperationalExercise, operational_exercises
+from core.operational_exercises import (
+    EXERCISE_TYPES,
+    OperationalExercise,
+    log_exercise_event,
+    operational_exercises,
+)
 from core.rate_limit import limiter
 from core.secret_cipher import decrypt_secret
 from data_platform.api.auth import AuthUser, get_current_user
@@ -1338,13 +1343,14 @@ async def _persist_exercise_recovery(exercise_id: str, recovered_at: str) -> Non
     """Persist once; a manual recovery must not later be logged as automatic."""
     changed = await execute_runtime_query(
         "UPDATE app_operational_exercise SET status = ?, recovered_at = ? "
-        "WHERE id = ? AND status = 'active' RETURNING id",
+        "WHERE id = ? AND status = 'active' RETURNING id, exercise_type",
         ("recovered", recovered_at, exercise_id),
     )
     if changed:
-        logger.warning(
-            "Operational exercise expired",
-            extra={"exercise_id": exercise_id, "event": "operational_exercise_recovered"},
+        log_exercise_event(
+            message="Operational exercise expired", event="operational_exercise_recovered",
+            exercise_id=exercise_id, exercise_type=changed[0]["exercise_type"],
+            actor_id="system", recovery_mode="automatic",
         )
 
 
@@ -1460,13 +1466,9 @@ async def start_operational_exercise(
     )
     _operational_background_tasks.add(recovery_task)
     recovery_task.add_done_callback(_operational_background_tasks.discard)
-    logger.warning(
-        "Controlled operational exercise started",
-        extra={
-            "exercise_id": exercise_id,
-            "exercise_type": payload.exercise_type,
-            "event": "operational_exercise_started",
-        },
+    log_exercise_event(
+        message="Controlled operational exercise started", event="operational_exercise_started",
+        exercise_id=exercise_id, exercise_type=payload.exercise_type, actor_id=current_user.id,
     )
     return active
 
@@ -1496,9 +1498,10 @@ async def recover_operational_exercise(
         ("recovered", recovered_at, exercise_id),
     )
     operational_exercises.recover(exercise_id)
-    logger.warning(
-        "Controlled operational exercise recovered",
-        extra={"exercise_id": exercise_id, "event": "operational_exercise_recovered"},
+    log_exercise_event(
+        message="Controlled operational exercise recovered", event="operational_exercise_recovered",
+        exercise_id=exercise_id, exercise_type=recovered["exercise_type"],
+        actor_id=current_user.id, recovery_mode="manual",
     )
     return {**recovered, "status": "recovered", "recovered_at": recovered_at}
 
