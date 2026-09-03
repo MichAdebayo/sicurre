@@ -2,3 +2,7 @@
 dc596f738e17ea3c37091eaa4cc90a705c22a662:deploy/env.api.example:generic-api-key:37
 # Synthetic DQS fixture committed in 99b9371; never a usable credential.
 99b93714db4b117e825d029f95eacc0af4e51e9d:tests/unit/app/test_domain_reputation.py:generic-api-key:134
+# Same synthetic DQS fixture as above, reachable at the pre-rebase commit where
+# the literal still read `test-key-abc123`. Gitleaks fingerprints include the
+# commit, so renaming the value in 99b9371 did not cover the earlier SHA.
+5faeff69e720dc8a2eff042c58d37b03bf636e93:tests/unit/app/test_domain_reputation.py:generic-api-key:134
