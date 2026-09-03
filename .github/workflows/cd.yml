@@ -40,6 +40,12 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
+          # actions/checkout does NOT fetch tags when `ref` is pinned to a SHA,
+          # even with fetch-depth: 0. Without the tags, semantic-release finds no
+          # prior release, treats every commit as the first release, computes
+          # v1.0.0, and fails on `git tag v1.0.0` because that tag already exists.
+          # This keeps it aware of v1.26.x so it bumps from the real last release.
+          fetch-tags: true
 
       - name: Create semantic release
         if: github.event_name == 'workflow_run'
