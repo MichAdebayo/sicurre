@@ -129,25 +129,56 @@ def test_legacy_scheduler_aliases_still_resolve() -> None:
     assert _prerequisites("collect") == ["cron-orchestrate"]
 
 
+def _tracked_yaml_and_markdown() -> list[Path]:
+    """Workflow and doc files that are actually part of the repository.
+
+    Scanning the working tree instead would pick up untracked scratch files,
+    and those routinely *propose* targets that do not exist yet - a note
+    reading "Fix: a `make purge-expired` target" is a suggestion, not a caller.
+    This test is about callers: a reference that breaks when a target is
+    renamed. Something git does not track cannot break.
+    """
+    try:
+        listing = subprocess.run(
+            ["git", "ls-files", "-z", "--", ".github/workflows", "docs"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError):  # pragma: no cover
+        # Outside a checkout, fall back to the working tree rather than
+        # silently checking nothing.
+        return [
+            path
+            for source in (REPO_ROOT / ".github" / "workflows", REPO_ROOT / "docs")
+            for path in source.rglob("*")
+            if path.suffix in {".yml", ".yaml", ".md"}
+        ]
+
+    return [
+        REPO_ROOT / name
+        for name in listing.split("\0")
+        if name.endswith((".yml", ".yaml", ".md")) and (REPO_ROOT / name).is_file()
+    ]
+
+
 def test_targets_referenced_by_ci_and_docs_are_defined() -> None:
     """Renaming a target that CI or the defence script calls breaks them."""
     defined = set(re.findall(r"^([a-zA-Z0-9_-]+):", _text(), re.MULTILINE))
 
     referenced: set[str] = set()
-    for source in (REPO_ROOT / ".github" / "workflows", REPO_ROOT / "docs"):
-        for path in source.rglob("*"):
-            if path.suffix not in {".yml", ".yaml", ".md"}:
-                continue
-            # Only real invocations: a line starting with "make x", a CI
-            # "run: make x", or an inline `make x`. A bare \bmake\b also
-            # matches English prose ("make collection repeatable").
-            referenced |= set(
-                re.findall(
-                    r"(?:^|`|run:[ \t]*)make ([a-z][a-z0-9-]{2,})\b",
-                    path.read_text(encoding="utf-8"),
-                    re.MULTILINE,
-                )
+    for path in _tracked_yaml_and_markdown():
+        # Only real invocations: a line starting with "make x", a CI
+        # "run: make x", or an inline `make x`. A bare \bmake\b also
+        # matches English prose ("make collection repeatable").
+        referenced |= set(
+            re.findall(
+                r"(?:^|`|run:[ \t]*)make ([a-z][a-z0-9-]{2,})\b",
+                path.read_text(encoding="utf-8"),
+                re.MULTILINE,
             )
+        )
 
     # Pattern-rule targets are real but never appear as literal definitions.
     sources = _variable("SOURCES").split()

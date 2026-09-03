@@ -31,6 +31,10 @@ from sqlalchemy.ext.asyncio import (  # noqa: E402
 from core.config import get_settings  # noqa: E402
 from core.database import Base  # noqa: E402
 from core.trace_logger import SemanticTraceLogger  # noqa: E402
+from data_platform.api.schemas import (  # noqa: E402
+    DataSourceCreate,
+    IngestionRunCreate,
+)
 from db.models import (  # noqa: E402
     DataRawObject,
     DataRawRecord,
@@ -39,10 +43,6 @@ from db.models import (  # noqa: E402
 from db.queries import (  # noqa: E402
     IngestionRunQueries,
     SourceSystemQueries,
-)
-from data_platform.api.schemas import (  # noqa: E402
-    DataSourceCreate,
-    IngestionRunCreate,
 )
 
 logging.basicConfig(
@@ -72,14 +72,10 @@ def hash_text_for_dedup(text: str) -> str:
 
 
 def _normalize_csv_fieldnames(fieldnames: list[str] | None) -> tuple[str, ...]:
-    return tuple(
-        field.strip() for field in (fieldnames or []) if field and field.strip()
-    )
+    return tuple(field.strip() for field in (fieldnames or []) if field and field.strip())
 
 
-def _uses_text_only_historical_schema(
-    file_path: Path, fieldnames: tuple[str, ...]
-) -> bool:
+def _uses_text_only_historical_schema(file_path: Path, fieldnames: tuple[str, ...]) -> bool:
     return (
         file_path.name in CSV_TEXT_ONLY_HISTORICAL_FILES
         and "text" in fieldnames
@@ -127,9 +123,7 @@ def _validate_csv_rows(
         return True
 
     blank_label_rows = [
-        index
-        for index, row in enumerate(rows, start=1)
-        if not str(row.get("label", "")).strip()
+        index for index, row in enumerate(rows, start=1) if not str(row.get("label", "")).strip()
     ]
     if blank_label_rows:
         preview = ", ".join(str(index) for index in blank_label_rows[:5])
@@ -143,6 +137,50 @@ def _validate_csv_rows(
         return False
 
     return True
+
+
+#: Governance defaults for file sources, chosen by the shape of the source name.
+#:
+#: Every other extractor sets legal_basis, contains_personal_data and
+#: retention_days when it registers its source. File sources did not, so eleven
+#: rows carried NULL legal basis, no retention and contains_personal_data=False -
+#: including the operator's own mailbox exports, which hold real sender addresses
+#: and display names. Defaulting personal data to False is the wrong default for
+#: precisely the sources most likely to contain it.
+#:
+#: Dropzone exports (spam_1, legitimate_2, phishing_3 …) are mail from a real
+#: mailbox. Personal data is present in the raw record; normalization redacts it
+#: before anything reaches the corpus, but the raw record is what this field
+#: describes.
+_DROPZONE_GOVERNANCE = {
+    "legal_basis": "legitimate_interest_security",
+    "contains_personal_data": True,
+    "retention_days": 365,
+}
+
+#: Published research corpora. Enron is the exception that proves the rule: it is
+#: public and citable, and it is also real employee mail, so it is declared as
+#: carrying personal data rather than waved through because it is well known.
+_PUBLIC_CORPUS_GOVERNANCE = {
+    "legal_basis": "public_research_dataset",
+    "contains_personal_data": False,
+    "retention_days": 365,
+}
+
+_PERSONAL_DATA_CORPORA = frozenset({"enron_spam"})
+
+_DROPZONE_PREFIXES = ("spam_", "legitimate_", "phishing_")
+
+
+def file_source_governance(source_machine_name: str) -> dict[str, object]:
+    """Return legal basis, personal-data flag and retention for a file source."""
+    name = source_machine_name.strip().lower()
+    if any(name.startswith(prefix) for prefix in _DROPZONE_PREFIXES):
+        return dict(_DROPZONE_GOVERNANCE)
+    governance = dict(_PUBLIC_CORPUS_GOVERNANCE)
+    if name in _PERSONAL_DATA_CORPORA:
+        governance["contains_personal_data"] = True
+    return governance
 
 
 async def get_or_create_source_system(
@@ -166,6 +204,7 @@ async def get_or_create_source_system(
             name=source_machine_name,
             source_type="file",
             description=f"Automated CSV Dataset loader for {display_name}",
+            **file_source_governance(source_machine_name),
         ),
     )
 
@@ -204,9 +243,7 @@ async def ingest_csv_file(
                 entity_type="csv_file",
                 entity_id=file_path.name,
             )
-        return CsvIngestionResult(
-            file_path=file_path, inserted_count=0, status="read_error"
-        )
+        return CsvIngestionResult(file_path=file_path, inserted_count=0, status="read_error")
 
     if not rows:
         logger.warning("File is empty or has no rows. Skipping.")
@@ -230,9 +267,7 @@ async def ingest_csv_file(
     )
     result = await session.execute(query)
     if result.scalar_one_or_none():
-        logger.info(
-            "File %s is already ingested (hash matches). Skipping.", file_path.name
-        )
+        logger.info("File %s is already ingested (hash matches). Skipping.", file_path.name)
         if trace is not None:
             trace.trace(
                 stage="ingestion",
@@ -241,9 +276,7 @@ async def ingest_csv_file(
                 entity_type="csv_file",
                 entity_id=file_path.name,
             )
-        return CsvIngestionResult(
-            file_path=file_path, inserted_count=0, status="skipped_unchanged"
-        )
+        return CsvIngestionResult(file_path=file_path, inserted_count=0, status="skipped_unchanged")
 
     if not _validate_csv_schema(file_path, fieldnames):
         if trace is not None:
@@ -258,9 +291,7 @@ async def ingest_csv_file(
             file_path=file_path, inserted_count=0, status="skipped_invalid_schema"
         )
 
-    uses_text_only_historical_schema = _uses_text_only_historical_schema(
-        file_path, fieldnames
-    )
+    uses_text_only_historical_schema = _uses_text_only_historical_schema(file_path, fieldnames)
 
     if not _validate_csv_rows(
         file_path,
@@ -282,9 +313,7 @@ async def ingest_csv_file(
     first_row = rows[0]
     source_machine_name = first_row.get("source", "").strip() or file_path.stem.lower()
 
-    source_sys = await get_or_create_source_system(
-        session, source_repo, source_machine_name
-    )
+    source_sys = await get_or_create_source_system(session, source_repo, source_machine_name)
 
     started_at = datetime.now(timezone.utc)
     ingestion_run = await run_repo.create(
@@ -465,15 +494,11 @@ async def ingest_csv_bytes(
         rows = list(reader)
     except Exception as exc:
         logger.error("Failed to parse %s: %s", filename, exc)
-        return CsvIngestionResult(
-            file_path=virtual_path, inserted_count=0, status="read_error"
-        )
+        return CsvIngestionResult(file_path=virtual_path, inserted_count=0, status="read_error")
 
     if not rows:
         logger.warning("File %s is empty or has no rows. Skipping.", filename)
-        return CsvIngestionResult(
-            file_path=virtual_path, inserted_count=0, status="empty"
-        )
+        return CsvIngestionResult(file_path=virtual_path, inserted_count=0, status="empty")
 
     file_content_hash = hashlib.sha256(data).hexdigest()
 
@@ -511,13 +536,9 @@ async def ingest_csv_bytes(
         )
 
     first_row = rows[0]
-    source_machine_name = (
-        first_row.get("source", "").strip() or virtual_path.stem.lower()
-    )
+    source_machine_name = first_row.get("source", "").strip() or virtual_path.stem.lower()
 
-    source_sys = await get_or_create_source_system(
-        session, source_repo, source_machine_name
-    )
+    source_sys = await get_or_create_source_system(session, source_repo, source_machine_name)
 
     started_at = datetime.now(timezone.utc)
     ingestion_run = await run_repo.create(
@@ -617,9 +638,7 @@ async def ingest_csv_bytes(
         )
     except Exception as exc:
         await session.rollback()
-        logger.warning(
-            "Constraint violation for %s, retrying with merge... (%s)", filename, exc
-        )
+        logger.warning("Constraint violation for %s, retrying with merge... (%s)", filename, exc)
         inserted_count = 0
         for record in records_to_add:
             try:
@@ -717,9 +736,7 @@ async def run_ingestion(base_dir: str, *, trigger_mode: str = "manual") -> None:
                 total_inserted += result.inserted_count
                 status_counts[result.status] = status_counts.get(result.status, 0) + 1
 
-        logger.info(
-            "All CSV files processed. Total new records inserted: %d", total_inserted
-        )
+        logger.info("All CSV files processed. Total new records inserted: %d", total_inserted)
         logger.info(
             "CSV ingestion summary: ingested=%d, ingested_merged=%d, skipped_unchanged=%d, skipped_invalid_schema=%d, skipped_invalid_rows=%d, empty=%d, read_error=%d",
             status_counts["ingested"],
