@@ -44,8 +44,10 @@ Applied to interface work. Each is checkable by a reviewer without tooling.
    background, or 3:1 where it is large text. `#4A90D9` is not used for body
    text on a light surface; `#2E6BB5` is the accessible substitute.
 2. **Focus.** Every interactive element has a visible keyboard focus indicator
-   (WCAG 2.4.7). The codebase uses `ring-2 ring-primary`; focus must not be
-   removed without a replacement.
+   (WCAG 2.4.7). The codebase uses `focus-visible:ring-2` with
+   `focus-visible:ring-primary`, which is the right form: the ring appears on
+   keyboard focus and not on a mouse click. Where `focus-visible:outline-none`
+   removes the default outline, a ring must replace it in the same rule.
 3. **Names.** Every control has an accessible name — visible text, or
    `aria-label` where the control is iconographic.
 4. **Images.** Every `<img>` carries `alt`; decorative images carry `alt=""`
@@ -77,6 +79,21 @@ Accessibility work is present and deliberate rather than incidental — the
 purpose. It is also uneven: one `aria-live` region across the application is
 thin for a product whose primary output is an asynchronous verdict, and
 criterion 5 above is the least well met of the seven.
+
+## Known failure: danger text
+
+`text-danger` on `bg-danger-bg` measures **3.44:1** in light mode and 4.37:1 in
+dark. Both are below the 4.5:1 that criterion 1.4.3 requires for body text, and
+the Domain Shield status badge renders it at 11px, which is nowhere near the
+size that would qualify for the 3:1 large-text allowance.
+
+This is criterion 1 above, failing today. Red is the only accent without a
+darker text variant: blue has `#2E6BB5`, amber has `#7A4700`, green uses
+`#047857`. Adding the same for red closes it — `#B91C1C` measures 5.91:1 on the
+light danger surface and `#F87171` measures 5.94:1 on the dark one.
+
+It is recorded rather than fixed because changing a verdict colour is a product
+decision, not a documentation one.
 
 ## What has not been done
 
