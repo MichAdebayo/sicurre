@@ -220,3 +220,96 @@ async def test_ingest_csv_file_skips_blank_label_rows_with_error_log(
     assert not ingestion_runs
     assert not raw_records
     assert "label values are blank for row(s): 1" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_an_unreadable_file_returns_read_error_rather_than_raising(
+    session_factory: async_sessionmaker[AsyncSession],
+    tmp_path: Path,
+) -> None:
+    """One corrupt file must not abort the batch.
+
+    The dropzone is processed in a loop, so an exception escaping here would
+    stop every file after the bad one from being ingested at all. Returning a
+    status keeps the loop going and leaves the failure attributable to the file
+    that caused it.
+    """
+    file_path = tmp_path / "corrupt.csv"
+    # A lone surrogate cannot be decoded as UTF-8.
+    file_path.write_bytes(b"text,label\n\xed\xa0\x80broken,spam\n")
+
+    async with session_factory() as session:
+        result = await ingest_csv_file(
+            file_path, session, SourceSystemQueries(), IngestionRunQueries()
+        )
+        raw_records = list((await session.scalars(select(DataRawRecord))).all())
+
+    assert result.status == "read_error"
+    assert result.inserted_count == 0
+    assert not raw_records, "a file that could not be read must insert nothing"
+
+
+@pytest.mark.asyncio
+async def test_the_same_file_twice_is_ingested_once(
+    session_factory: async_sessionmaker[AsyncSession],
+    tmp_path: Path,
+) -> None:
+    """Content-hash dedup is what makes the daily cron idempotent.
+
+    The dropzone job re-reads the whole directory every night. Without this the
+    corpus would grow by a full copy of every unchanged file each run, and the
+    duplicate filter downstream would be doing work the ingest should never
+    have created.
+    """
+    file_path = tmp_path / "spam_1.csv"
+    file_path.write_text(
+        "text,label\nBonjour ceci est un message de test,spam\n", encoding="utf-8"
+    )
+
+    async with session_factory() as session:
+        first = await ingest_csv_file(
+            file_path, session, SourceSystemQueries(), IngestionRunQueries()
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        second = await ingest_csv_file(
+            file_path, session, SourceSystemQueries(), IngestionRunQueries()
+        )
+        await session.commit()
+        raw_records = list((await session.scalars(select(DataRawRecord))).all())
+
+    assert first.inserted_count == 1
+    assert second.status == "skipped_unchanged"
+    assert second.inserted_count == 0
+    assert len(raw_records) == 1, "the second pass must not duplicate the record"
+
+
+@pytest.mark.asyncio
+async def test_a_dropzone_file_registers_its_governance(
+    session_factory: async_sessionmaker[AsyncSession],
+    tmp_path: Path,
+) -> None:
+    """A source created by ingestion must not arrive without a legal basis.
+
+    Eleven file sources carried NULL legal basis and contains_personal_data
+    False, including mailbox exports that hold real sender addresses. The flag
+    defaulting to False was wrong for exactly the sources most likely to carry
+    personal data, so the governance is applied at creation rather than
+    backfilled later.
+    """
+    file_path = tmp_path / "spam_2.csv"
+    file_path.write_text(
+        "text,label\nMessage de test pour la gouvernance,spam\n", encoding="utf-8"
+    )
+
+    async with session_factory() as session:
+        await ingest_csv_file(
+            file_path, session, SourceSystemQueries(), IngestionRunQueries()
+        )
+        await session.commit()
+        source = (await session.scalars(select(DataSourceSystem))).one()
+
+    assert source.legal_basis == "legitimate_interest_security"
+    assert source.contains_personal_data is True
+    assert source.retention_days == 365
