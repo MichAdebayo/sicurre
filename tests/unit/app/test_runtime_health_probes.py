@@ -614,3 +614,45 @@ async def test_contract_probe_never_sends_client_content_or_leaks_the_key() -> N
     assert body["sender"].endswith("@sicurre.invalid")
     assert body["use_llm"] is False and body["use_virustotal"] is False
     assert "super-secret-key" not in str(result)
+
+
+@pytest.mark.asyncio
+async def test_contract_probe_degrades_on_an_unexpected_status() -> None:
+    """A 500 is not a credential problem, so it is not reported as one.
+
+    Down means "the classifier refuses us" and calls for a key rotation;
+    degraded means "something else is wrong" and calls for reading its logs.
+    Collapsing the two would send an operator to the wrong runbook.
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        result = await app_routes._probe_inference_contract(
+            client, "https://ml.example/v1/classify", "probe-key"
+        )
+
+    assert result["status"] == "degraded"
+    assert "500" in result["message"]
+
+
+@pytest.mark.asyncio
+async def test_contract_probe_survives_a_non_json_success() -> None:
+    """A 200 whose body will not parse must not raise inside the health page.
+
+    The probe runs while rendering an admin view. An exception here would take
+    out the whole runtime-health response, so the one component that failed
+    would hide the status of every component that did not.
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=b"<html>not json</html>")
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        result = await app_routes._probe_inference_contract(
+            client, "https://ml.example/v1/classify", "probe-key"
+        )
+
+    assert result["status"] == "degraded"
+    assert "verdict" in result["message"]
