@@ -530,7 +530,7 @@ export function useOperationalExercises(enabled = true) {
     queryFn: () => fetchJson<OperationalExerciseState>("/admin/operational-exercises"),
     enabled,
     retry: false,
-    refetchInterval: (query) => query.state.status === "error" ? false : 60000,
+    refetchInterval: (query) => query.state.status === "error" ? false : query.state.data?.active ? 5000 : 30000,
     refetchIntervalInBackground: false,
   });
 }

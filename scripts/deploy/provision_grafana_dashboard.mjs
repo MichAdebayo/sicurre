@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { TransientError, isRetryableStatus, withRetry } from "./retry.mjs";
+import { withOperationsRoutes } from "./notification-policy.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "../..");
@@ -23,6 +24,7 @@ const dashboardPaths = process.env.GRAFANA_DASHBOARD_PATH
       "sicurre-runtime-overview.json",
       "sicurre-infrastructure.json",
       "sicurre-telemetry-pipeline.json",
+      "sicurre-controlled-exercise.json",
     ].map((name) => path.join(rootDir, "deploy/grafana/dashboards", name));
 const alertingPath = process.env.GRAFANA_ALERTING_PATH
   || path.join(rootDir, "deploy/grafana/alerts/sicurre-alerts.json");
@@ -134,6 +136,7 @@ function alertQuery(rule, prometheusUid) {
       stack: "sicurre",
       severity: rule.uid.includes("controlled") ? "info" : "warning",
       managed_by: "repository",
+      ...rule.labels,
     },
     isPaused: false,
     data: [
@@ -194,23 +197,10 @@ async function ensureAlertRule(rule, prometheusUid) {
 
 async function ensureNotificationPolicy(receiver) {
   const { body: policy } = await grafanaFetch("/api/v1/provisioning/policies");
-  const managedRoute = {
-    receiver,
-    object_matchers: [["stack", "=", "sicurre"]],
-    group_by: ["grafana_folder", "alertname"],
-    group_wait: "30s",
-    group_interval: "5m",
-    repeat_interval: "4h",
-  };
-  const routes = (policy.routes || []).filter(
-    (route) => !route.object_matchers?.some(
-      (matcher) => matcher[0] === "stack" && matcher[1] === "=" && matcher[2] === "sicurre",
-    ),
-  );
   await grafanaFetch("/api/v1/provisioning/policies", {
     method: "PUT",
     headers: { "X-Disable-Provenance": "true" },
-    body: JSON.stringify({ ...policy, routes: [...routes, managedRoute] }),
+    body: JSON.stringify(withOperationsRoutes(policy, receiver)),
   });
 }
 
