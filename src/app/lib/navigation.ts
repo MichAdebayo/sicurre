@@ -7,6 +7,10 @@ export const sidebarPagePaths: Record<SidebarPage, string> = {
   alerts: "/app/alerts",
   "domain-shield": "/app/domain-shield",
   logs: "/admin",
+  "admin-operations": "/admin/operations",
+  "admin-incidents": "/admin/incidents",
+  "admin-integrations": "/admin/integrations",
+  "admin-reviews": "/admin/reviews",
   settings: "/app/settings",
   support: "/app/support",
 };
@@ -20,12 +24,17 @@ export function getSidebarPageFromPath(pathname: string): SidebarPage | null {
   return pathPages.get(normalized) ?? null;
 }
 
+export function isAdminPage(page: SidebarPage | null): boolean {
+  return page === "logs" || page === "admin-operations"
+    || page === "admin-incidents" || page === "admin-integrations" || page === "admin-reviews";
+}
+
 export function resolveAuthorizedPage(
   requested: SidebarPage | null,
   options: { isPlatformAdmin: boolean; onboardingRequired: boolean },
 ): SidebarPage {
-  if (requested === "logs" && options.isPlatformAdmin) return "logs";
+  if (requested && isAdminPage(requested) && options.isPlatformAdmin) return requested;
   if (requested === "support") return "support";
   if (options.onboardingRequired) return "settings";
-  return requested && requested !== "logs" ? requested : "dashboard";
+  return requested && !isAdminPage(requested) ? requested : "dashboard";
 }

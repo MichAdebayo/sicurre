@@ -2,10 +2,15 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ExternalLink, FlaskConical, Play, RefreshCw, Square } from "lucide-react";
 import { Button } from "../ui/button";
-import { useOperationalExercises, useRecoverOperationalExercise, useStartOperationalExercise } from "../../lib/api";
+import { useOperationalExercises, useRecoverOperationalExercise, useStartOperationalExercise, type OperationalExerciseType } from "../../lib/api";
 
 const EXERCISE_SECONDS = 240;
 const GRAFANA_URL = "https://sicurre.grafana.net";
+const ALERT_RULES: Record<OperationalExerciseType, string> = {
+  api_unavailable: "sicurre-controlled-exercise",
+  high_latency: "sicurre-controlled-latency",
+  elevated_5xx: "sicurre-controlled-server-errors",
+};
 
 export function OperationalExercisePanel() {
   const { t, i18n } = useTranslation();
@@ -13,12 +18,21 @@ export function OperationalExercisePanel() {
   const start = useStartOperationalExercise();
   const recover = useRecoverOperationalExercise();
   const [confirming, setConfirming] = useState(false);
+  const [selectedScenario, setSelectedScenario] = useState<OperationalExerciseType>("api_unavailable");
   const [now, setNow] = useState(Date.now);
   const active = query.data?.active;
-  const latest = active || query.data?.recent[0];
+  const scenario = active?.exercise_type || selectedScenario;
+  const supportedTypes = query.data?.supported_types || [];
+  const canStart = query.data?.enabled && supportedTypes.includes(scenario);
+  const history = query.data?.recent.filter((item) => item.exercise_type === scenario) || [];
+  const latest = active || history[0];
   const busy = start.isPending || recover.isPending;
   const stale = query.isError;
   const remaining = active ? Math.max(0, Math.ceil((Date.parse(active.expires_at) - now) / 1000)) : 0;
+
+  useEffect(() => {
+    if (active) setSelectedScenario(active.exercise_type);
+  }, [active?.exercise_type]);
 
   useEffect(() => {
     if (!active) return;
@@ -36,12 +50,12 @@ export function OperationalExercisePanel() {
   }
 
   return (
-    <section aria-labelledby="exercise-title" className="min-w-0 space-y-5 border-b border-border-subtle pb-6">
+    <section aria-labelledby="exercise-title" className="min-w-0 space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="exercise-title" className="app-h2 flex items-center gap-2">
             <FlaskConical className="h-5 w-5 shrink-0 text-navy-dark" aria-hidden="true" />
-            {t("operational_test.title")}
+            {t("operational_test.title", { scenario: t(`operational_test.scenarios.${scenario}`) })}
           </h2>
           <p className="mt-2 text-sm text-on-surface-variant">{t("operational_test.subtitle")}</p>
         </div>
@@ -53,6 +67,17 @@ export function OperationalExercisePanel() {
           </span>
         )}
       </div>
+
+      <label className="block max-w-md space-y-2 text-sm font-semibold text-on-surface">
+        <span>{t("operational_test.scenario")}</span>
+        <select value={scenario} disabled={!!active || busy || stale || !query.data?.enabled}
+          onChange={(event) => { setSelectedScenario(event.target.value as OperationalExerciseType); setConfirming(false); }}
+          className="min-h-11 w-full rounded-lg border border-border-subtle bg-surface-lowest px-3 py-2 text-sm text-on-surface focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-60 dark:bg-surface-low">
+          {(Object.keys(ALERT_RULES) as OperationalExerciseType[]).map((type) => (
+            <option key={type} value={type} disabled={!!query.data && !supportedTypes.includes(type)}>{t(`operational_test.scenarios.${type}`)}</option>
+          ))}
+        </select>
+      </label>
 
       {!query.data && !stale && <p role="status" className="text-sm text-on-surface-variant">{t("common.loading")}</p>}
       {stale && (
@@ -78,10 +103,10 @@ export function OperationalExercisePanel() {
         </div>
       ) : query.data && confirming ? (
         <div className="space-y-4 rounded-lg border border-primary/40 bg-primary-container p-4 text-on-primary-container">
-          <p>{t("operational_test.confirm")}</p>
+          <p>{t("operational_test.confirm", { scenario: t(`operational_test.scenarios.${scenario}`) })}</p>
           <div className="flex flex-wrap gap-3">
-            <Button disabled={busy || stale || !query.data.enabled} onClick={() => start.mutate(
-              { exercise_type: "api_unavailable", duration_seconds: EXERCISE_SECONDS },
+            <Button disabled={busy || stale || !canStart} onClick={() => start.mutate(
+              { exercise_type: scenario, duration_seconds: EXERCISE_SECONDS },
               { onSuccess: () => { setConfirming(false); setNow(Date.now()); } },
             )}>
               <Play className="h-4 w-4" aria-hidden="true" />{t(start.isPending ? "operational_test.starting" : "operational_test.launch")}
@@ -90,7 +115,7 @@ export function OperationalExercisePanel() {
           </div>
         </div>
       ) : query.data ? (
-        <Button disabled={!query.data.enabled || stale || busy} onClick={() => setConfirming(true)}>
+        <Button disabled={!canStart || stale || busy} onClick={() => setConfirming(true)}>
           <Play className="h-4 w-4" aria-hidden="true" />{t("operational_test.start")}
         </Button>
       ) : null}
@@ -101,12 +126,12 @@ export function OperationalExercisePanel() {
         <a className="inline-flex min-h-10 items-center gap-2 font-semibold text-navy-dark underline underline-offset-4" href={evidence.toString()} target="_blank" rel="noreferrer">
           {t("operational_test.evidence")}<ExternalLink className="h-4 w-4" aria-hidden="true" />
         </a>
-        <a className="inline-flex min-h-10 items-center gap-2 font-semibold text-navy-dark underline underline-offset-4" href={`${GRAFANA_URL}/alerting/grafana/sicurre-controlled-exercise/view`} target="_blank" rel="noreferrer">
+        <a className="inline-flex min-h-10 items-center gap-2 font-semibold text-navy-dark underline underline-offset-4" href={`${GRAFANA_URL}/alerting/grafana/${ALERT_RULES[scenario]}/view`} target="_blank" rel="noreferrer">
           {t("operational_test.alert_state")}<ExternalLink className="h-4 w-4" aria-hidden="true" />
         </a>
       </div>
 
-      {!!query.data?.recent.length && (
+      {!!history.length && (
         <table className="w-full table-fixed border-collapse text-left text-sm">
           <caption className="pb-3 text-left font-semibold text-on-surface">{t("operational_test.history")}</caption>
           <thead className="border-y border-border-subtle bg-surface-low text-on-surface-variant">
@@ -117,10 +142,11 @@ export function OperationalExercisePanel() {
             </tr>
           </thead>
           <tbody>
-            {query.data.recent.map((item) => (
+            {history.map((item) => (
               <tr key={item.id} className="border-b border-border-subtle align-top text-on-surface">
                 <td className="break-words p-2">
-                  <span className="font-mono" title={item.id}>{item.id.slice(0, 8)}</span>
+                  <span className="block font-semibold">{t(`operational_test.scenarios.${item.exercise_type}`)}</span>
+                  <span className="mt-1 block font-mono text-xs text-on-surface-variant" title={item.id}>{item.id.slice(0, 8)}</span>
                   <span className="mt-1 block break-all text-xs text-on-surface-variant">{item.initiated_by}</span>
                 </td>
                 <td className="p-2"><time dateTime={item.started_at}>{date(item.started_at)}</time></td>

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import logging
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
@@ -124,8 +126,9 @@ async def test_operational_exercise_requires_feature_flag(monkeypatch: pytest.Mo
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("scenario", ["api_unavailable", "high_latency", "elevated_5xx"])
 async def test_admin_starts_and_recovers_audited_exercise(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, scenario: str,
 ) -> None:
     manager = OperationalExerciseManager()
     queries: list[tuple[str, tuple]] = []
@@ -152,18 +155,34 @@ async def test_admin_starts_and_recovers_audited_exercise(
 
     started = await app_routes.start_operational_exercise.__wrapped__(
         _request(),
-        OperationalExerciseCreate(exercise_type="high_latency", duration_seconds=240),
+        OperationalExerciseCreate(exercise_type=scenario, duration_seconds=240),
         _user(admin=True),
     )
     await asyncio.sleep(0)
-    assert started["exercise_type"] == "high_latency"
+    assert started["exercise_type"] == scenario
     assert any("INSERT INTO app_operational_exercise" in sql for sql, _ in queries)
 
     recovered = await app_routes.recover_operational_exercise.__wrapped__(
-        _request(), started["id"], _user(admin=True)
+        _request(), started["id"], replace(_user(admin=True), id="operator-2")
     )
     assert recovered["status"] == "recovered"
     assert any("UPDATE app_operational_exercise" in sql for sql, _ in queries)
+    records = [record for record in caplog.records if record.name == "core.operational_exercises"]
+    events = [json.loads(logging.Formatter().format(record)) for record in records]
+    assert [event["actor_id"] for event in events] == ["owner-1", "operator-2"]
+    assert [event["event"] for event in events] == [
+        "operational_exercise_started", "operational_exercise_recovered",
+    ]
+    assert "recovery_mode" not in events[0]
+    assert events[1]["recovery_mode"] == "manual"
+    for event in events:
+        assert event["level"] == "warning"
+        assert event["actor_type"] == "user"
+        assert event["exercise_id"] == started["id"]
+        assert event["exercise_type"] == scenario
+        assert event["synthetic"] is True
+        assert datetime.fromisoformat(event["timestamp"]).tzinfo is not None
+        assert "@" not in json.dumps(event)
 
 
 @pytest.mark.asyncio
@@ -253,7 +272,7 @@ async def test_restore_unexpired_exercise_after_restart(monkeypatch: pytest.Monk
 
 
 @pytest.mark.asyncio
-async def test_expired_persisted_exercise_is_closed_without_reactivation(monkeypatch) -> None:
+async def test_expired_persisted_exercise_is_closed_without_reactivation(monkeypatch, caplog) -> None:
     manager = OperationalExerciseManager()
     expired = (datetime.now(UTC) - timedelta(seconds=30)).isoformat()
     queries = []
@@ -263,7 +282,7 @@ async def test_expired_persisted_exercise_is_closed_without_reactivation(monkeyp
         return (
             [{"id": "old", "status": "active", "expires_at": expired}]
             if sql.startswith("SELECT")
-            else [{"id": "old"}]
+            else [{"id": "old", "exercise_type": "high_latency"}]
         )
 
     monkeypatch.setattr(app_routes, "execute_runtime_query", execute)
@@ -271,6 +290,13 @@ async def test_expired_persisted_exercise_is_closed_without_reactivation(monkeyp
     await app_routes.synchronize_operational_exercises()
     assert manager.current() is None
     assert queries[-1][1] == ("recovered", expired, "old")
+    event = json.loads(caplog.records[-1].getMessage())
+    assert event["actor_id"] == "system"
+    assert event["actor_type"] == "system"
+    assert event["recovery_mode"] == "automatic"
+    assert event["exercise_type"] == "high_latency"
+    assert event["exercise_id"] == "old"
+    assert event["level"] == "warning"
 
 
 @pytest.mark.asyncio
