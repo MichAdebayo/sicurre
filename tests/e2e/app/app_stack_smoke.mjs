@@ -8,7 +8,6 @@ const checks = [
   { name: "auth sidecar proxy", path: "/api/auth/health", expect: "better-auth" },
   { name: "auth public config", path: "/api/auth/config", expect: '"enabled":false' },
   { name: "api health proxy", path: "/health", expect: "app-stack-smoke" },
-  { name: "openapi proxy", path: "/openapi.json", expect: "\"openapi\"" },
 ];
 
 for (const check of checks) {
@@ -21,6 +20,21 @@ for (const check of checks) {
     throw new Error(`${check.name} did not include expected marker: ${check.expect}`);
   }
   console.log(`ok: ${check.name} ${check.path}`);
+}
+
+for (const path of [
+  "/docs",
+  "/redoc",
+  "/openapi.json",
+  "/docs/oauth2-redirect",
+  "/api/auth/reference",
+  "/api/auth/open-api/generate-schema",
+]) {
+  const response = await fetch(`${baseUrl}${path}`);
+  if (response.status !== 404) {
+    throw new Error(`documentation path ${path} should return HTTP 404, received ${response.status}`);
+  }
+  console.log(`ok: production documentation disabled ${path}`);
 }
 
 const protectedDataResponse = await fetch(`${baseUrl}/v1/data/sources?limit=1`);
