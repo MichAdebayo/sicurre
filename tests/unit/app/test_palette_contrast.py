@@ -100,8 +100,10 @@ _REAL_PAIRINGS = {
 }
 
 #: Measured 3 September 2026. Red is the one accent with no darker text variant.
-_DANGER_TEXT_LIGHT = ("#ef4444", "#fef2f2")
-_DANGER_TEXT_DARK = ("#ef4444", "#3a1215")
+#: Danger TEXT is #b91c1c on the pale surface, #f87171 on the dark one -
+#: a dedicated text token, distinct from the #ef4444 fill/border accent.
+_DANGER_TEXT_LIGHT = ("#b91c1c", "#fef2f2")
+_DANGER_TEXT_DARK = ("#f87171", "#3a1215")
 
 
 def test_verdict_colours_pass_aa_where_they_are_actually_used() -> None:
@@ -109,29 +111,20 @@ def test_verdict_colours_pass_aa_where_they_are_actually_used() -> None:
         assert _contrast(fg, bg) >= _AA_BODY, f"{name} fell below AA"
 
 
-def test_danger_text_is_a_known_aa_failure() -> None:
-    """Documents a real failure so it cannot be quietly forgotten.
+def test_danger_text_passes_aa_on_both_danger_surfaces() -> None:
+    """The Domain Shield badge failure is fixed by a dedicated text token.
 
-    This asserts the bug, which is unusual and deliberate. The pairing is below
-    AA today and the fix is a product decision about a verdict colour, not a
-    documentation change. Pinning it means the day someone darkens the red,
-    this test fails and points at the docs that must be updated with it —
-    rather than the failure simply persisting because nothing watched it.
+    Danger text used the #ef4444 accent directly, which measured 3.44:1 on the
+    pale danger surface and 4.37:1 on the dark one - both below the 4.5:1 body
+    threshold, at 11px. #b91c1c and #f87171 are the text token now, while
+    #ef4444 stays the fill/border accent (which pairs with white or dark
+    on-danger foregrounds, not with the tinted background).
 
-    When it is fixed: raise both to >= _AA_BODY and delete this test.
-    #B91C1C reaches 5.91:1 on the light surface, #F87171 5.94:1 on the dark.
+    If either side ever drops below AA again, the token regressed - restore it
+    rather than relaxing this test.
     """
     light = _contrast(*_DANGER_TEXT_LIGHT)
     dark = _contrast(*_DANGER_TEXT_DARK)
 
-    assert light < _AA_BODY, (
-        f"danger text now measures {light:.2f}:1 in light mode. If this was "
-        f"fixed deliberately, update docs/architecture/accessibility.md and "
-        f"docs/brand/*.md, then delete this test."
-    )
-    assert dark < _AA_BODY, (
-        f"danger text now measures {dark:.2f}:1 in dark mode. Same follow-up."
-    )
-    # It is at least readable as large text, which is why it is a gap and not
-    # an emergency.
-    assert light >= _AA_LARGE
+    assert light >= _AA_BODY, f"danger text light is {light:.2f}:1, below AA"
+    assert dark >= _AA_BODY, f"danger text dark is {dark:.2f}:1, below AA"

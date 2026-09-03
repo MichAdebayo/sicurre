@@ -42,7 +42,8 @@ Applied to interface work. Each is checkable by a reviewer without tooling.
 
 1. **Contrast.** Text uses a palette entry that passes 4.5:1 on its own
    background, or 3:1 where it is large text. `#4A90D9` is not used for body
-   text on a light surface; `#2E6BB5` is the accessible substitute.
+   text on a light surface (`#2E6BB5` is the accessible substitute), and danger
+   text uses `--color-danger-text`, not the `#EF4444` fill accent.
 2. **Focus.** Every interactive element has a visible keyboard focus indicator
    (WCAG 2.4.7). The codebase uses `focus-visible:ring-2` with
    `focus-visible:ring-primary`, which is the right form: the ring appears on
@@ -80,20 +81,24 @@ purpose. It is also uneven: one `aria-live` region across the application is
 thin for a product whose primary output is an asynchronous verdict, and
 criterion 5 above is the least well met of the seven.
 
-## Known failure: danger text
+## Resolved: danger text
 
-`text-danger` on `bg-danger-bg` measures **3.44:1** in light mode and 4.37:1 in
-dark. Both are below the 4.5:1 that criterion 1.4.3 requires for body text, and
-the Domain Shield status badge renders it at 11px, which is nowhere near the
-size that would qualify for the 3:1 large-text allowance.
+Danger text used the `#EF4444` accent directly, which measured **3.44:1** on the
+pale danger surface and 4.37:1 on the dark one — both below the 4.5:1 that
+criterion 1.4.3 requires for body text, and rendered at 11px on the Domain
+Shield status badge, far too small for the 3:1 large-text allowance.
 
-This is criterion 1 above, failing today. Red is the only accent without a
-darker text variant: blue has `#2E6BB5`, amber has `#7A4700`, green uses
-`#047857`. Adding the same for red closes it — `#B91C1C` measures 5.91:1 on the
-light danger surface and `#F87171` measures 5.94:1 on the dark one.
+Red was the only accent without a dedicated text variant: blue has `#2E6BB5`,
+amber has `#7A4700`, green uses `#047857`. It now has one too. A
+`--color-danger-text` token carries `#B91C1C` in light mode (**5.91:1** on the
+danger surface) and `#F87171` in dark mode (**5.94:1**), and the badge uses it
+in place of the raw accent.
 
-It is recorded rather than fixed because changing a verdict colour is a product
-decision, not a documentation one.
+`#EF4444` is unchanged as the danger **fill, border and icon** accent, where it
+pairs with a white or dark `on-danger` foreground rather than with the tinted
+background — so verdict badges keep their identity while their text becomes
+legible. `test_palette_contrast.py` asserts both surfaces now pass AA; if either
+regresses, restore the token rather than relaxing the test.
 
 ## What has not been done
 

@@ -82,6 +82,11 @@
   --color-safe-bg: #ecfdf5;
   --color-danger: #ef4444;
   --color-danger-bg: #fef2f2;
+  /* Danger text on the pale danger surface. #ef4444 measures only
+     3.44:1 there; #b91c1c reaches 5.91:1 for WCAG AA body text, the
+     same split the spam palette already uses. #ef4444 stays for
+     fills, borders and icons. */
+  --color-danger-text: #b91c1c;
   /* Deep foreground in light mode; bright amber is reserved for dark surfaces. */
   --color-warning: #b45309;
   --color-on-warning: #ffffff;
@@ -455,6 +460,7 @@ html.dark {
   --color-safe: #34d399;
   --color-on-safe: #06111f;
   --color-danger-bg: #3a1215;
+  --color-danger-text: #f87171;
   --color-warning-bg: #332508;
   --color-warning: #f59e0b;
   --color-on-warning: #06111f;
