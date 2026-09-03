@@ -1051,16 +1051,22 @@ class NormalizationPipeline:
                 raw_dict = json.loads(rec.raw_content)
                 payload = self.extract_payload(source_name, raw_dict)
 
-                if (
-                    payload.route_outcome != "accepted"
-                    or not payload.text
-                    or payload.label is None
-                ):
+                if payload.route_outcome != "accepted":
+                    rec.rejection_reason = f"route:{payload.route_outcome}"
+                    skipped_count += 1
+                    continue
+                if not payload.text:
+                    rec.rejection_reason = "empty_after_extraction"
+                    skipped_count += 1
+                    continue
+                if payload.label is None:
+                    rec.rejection_reason = "no_label"
                     skipped_count += 1
                     continue
 
                 text_hash = hashlib.sha256(payload.text.encode("utf-8")).hexdigest()
                 if text_hash in seen_hashes:
+                    rec.rejection_reason = "duplicate_text_sha256"
                     skipped_count += 1
                     continue
 
@@ -1082,6 +1088,9 @@ class NormalizationPipeline:
 
             except Exception as e:
                 logger.error(f"Error processing record {rec.id}: {e}")
+                # Record the failure class, never the message: an exception string
+                # can carry a fragment of the email that caused it.
+                rec.rejection_reason = f"extract_error:{type(e).__name__}"
                 skipped_count += 1
 
         processing_run.status = IngestionStatus.COMPLETED.value

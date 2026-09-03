@@ -47,7 +47,7 @@ from core.config import get_settings
 from core.loops import send_loops_transactional
 from core.rate_limit import limiter
 from core.inference_client import get_inference_client
-from core.scan_metrics import observe_scan, observe_stage
+from core.scan_metrics import observe_scan, observe_scan_failure, observe_stage
 from core.secret_cipher import decrypt_secret, encrypt_secret
 from data_platform.api.auth import AuthUser, ensure_runtime_tables, get_current_user
 from data_platform.api.schemas.app_responses import (
@@ -576,6 +576,11 @@ async def scan_email(
 
         except (httpx.HTTPError, ValueError, TypeError) as exc:
             logger.error("Inference API unavailable during email scan: %s", exc)
+            observe_scan_failure(
+                "inference_unavailable"
+                if isinstance(exc, httpx.HTTPError)
+                else "inference_contract"
+            )
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Inference service is temporarily unavailable",

@@ -35,6 +35,17 @@
       "runbook": "Use the application dashboard and traces to identify the failing surface before rollback."
     },
     {
+      "uid": "sicurre-scan-failing",
+      "title": "Sicurre email scans are failing",
+      "expression": "sum(increase(sicurre_scan_failure_total{stack=\"sicurre\"}[10m]))",
+      "operator": "gte",
+      "threshold": 3,
+      "for": "5m",
+      "noDataState": "OK",
+      "summary": "Three or more emails reached no verdict in ten minutes. The gateway fails open, so mail is still delivered - it is delivered unclassified.",
+      "runbook": "Open the platform-admin runtime health page and read the inference_contract component: it makes the authenticated call that health and readiness do not. A down status there with health and readiness green is the incident 06 shape - the classifier is up and rejecting the API's credentials. Do not paste keys or message content into the incident channel; the component report carries neither."
+    },
+    {
       "uid": "sicurre-high-latency",
       "title": "Sicurre latency above SLO",
       "expression": "histogram_quantile(0.95, sum by (le) (rate(sicurre_app_gateway_request_duration_seconds_bucket{stack=\"sicurre\",route=~\"app|api|auth\"}[5m])))",
