@@ -572,7 +572,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                       );
                     } else {
                       statusBadge = (
-                        <span className="inline-flex items-center gap-1 rounded-md bg-danger-bg px-2.5 py-0.5 text-[11px] font-semibold text-danger">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-danger-bg px-2.5 py-0.5 text-[11px] font-semibold text-danger-text">
                           <AlertTriangle className="w-3.5 h-3.5" />
                           {t("domain_shield.status_missing")}
                         </span>

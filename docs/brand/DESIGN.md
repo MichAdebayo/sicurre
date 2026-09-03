@@ -9,6 +9,7 @@ colors:
   secondary-amber-dark: "#B45309"
   danger: "#EF4444"
   danger-bg: "#FEF2F2"
+  danger-text: "#B91C1C"   # dark-mode: #F87171
   safe: "#047857"
   safe-bg: "#ECFDF5"
   warning: "#B45309"
@@ -58,7 +59,7 @@ Sicurre is a task-focused security product for French auto-entrepreneurs and TPE
 
 - **Primary Blue (`#4A90D9`)**: Used for primary actions, active navigation, links, and focus rings (`focus-visible:ring-2 focus-visible:ring-primary`). For clickable text and links, use `#2E6BB5` for WCAG AA compliance (>4.5:1 ratio).
 - **Secondary Amber (`#F59E0B`)**: Attention and warnings only (spam verdicts, pending DNS, advisories). Use `#7A4700` for spam text in light mode and `#FBBF24` in dark mode so spam remains distinct from phishing. Do not use Amber as a primary action button or generic decoration.
-- **Red (`#EF4444`)**: Reserved for destructive actions, phishing verdict states, and critical alerts. **Known contrast gap:** unlike Blue and Amber, Red has no darker text variant, and `text-danger` on `bg-danger-bg` measures 3.44:1 in light mode and 4.37:1 in dark — both below the 4.5:1 that WCAG 2.1 AA requires for body text, and it is used at 11px. Closing it means adding the variant the other accents already have: `#B91C1C` reaches 5.91:1 on the light danger surface and `#F87171` reaches 5.94:1 on the dark one. Measured, not yet applied.
+- **Red (`#EF4444`)**: Reserved for destructive actions, phishing verdict states, and critical alerts, as a **fill, border and icon** accent — where it pairs with a white or dark `on-danger` foreground. For **danger text on the pale danger surface** it is too light (3.44:1, below WCAG 2.1 AA), so text uses the `--color-danger-text` token instead: `#B91C1C` in light mode (5.91:1) and `#F87171` in dark (5.94:1), the same fill-vs-text split Amber already uses. Do not use `text-danger` for body text; use `text-danger-text`.
 - **Green (`#047857`)**: Reserved for safe/success states. In light mode, use `#047857` for text, icons, and solid bars; reserve `#ECFDF5` for pale background tinting.
 - **Surface Budget (60-30-10)**: 60% neutral surfaces (`#F8FAFC`), 30% slate typography & hairline borders (`#0F172A`, `#E2E8F0`), 10% high-intent accents.
 

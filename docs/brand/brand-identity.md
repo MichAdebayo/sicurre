@@ -34,13 +34,9 @@ To prevent visual noise ("AI-generated slot-machine UI"), interfaces enforce a s
 |---|---:|---:|---|
 | Safe/success | `#047857` | `#ECFDF5` | Delivered, valid, completed |
 | Warning / Attention | `#B45309` (fg) / `#F59E0B` (badge) | `#FFFBEB` | Spam, partial DNS, attention required |
-| Danger/error | `#EF4444` ⚠️ | `#FEF2F2` | Phishing, failure, destructive action |
+| Danger/error | `#EF4444` (fill) · `#B91C1C` (text) | `#FEF2F2` | Phishing, failure, destructive action |
 
-⚠️ This pairing measures **3.44:1** in light mode and 4.37:1 in dark, below the
-4.5:1 WCAG 2.1 AA threshold for body text, and it is rendered at 11px in the
-Domain Shield badge. Red is the one accent without a darker text variant;
-`#B91C1C` would reach 5.91:1 on the light surface and `#F87171` 5.94:1 on the
-dark one. Measured 3 September 2026, not yet applied.
+Danger **text** on the pale danger surface uses `#B91C1C` (5.91:1 light) and `#F87171` (5.94:1 dark), not the `#EF4444` fill accent, which measures only 3.44:1 there. The `--color-danger-text` token carries these; `#EF4444` stays for fills, borders and icons.
 
 Semantic meaning must remain stable in both light and dark themes. Pale surface washes are reserved for compact status badges, never full-card background fills.
 
