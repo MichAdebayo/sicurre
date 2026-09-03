@@ -203,3 +203,8 @@ docs/architecture/diagrams/claude/
 
 # Stale editor and git lock debris staged for deletion.
 _to_delete/
+
+# Scratch architecture pages for an unrelated project, parked in this root.
+# Scoped rather than a bare *.html, which would also hide index.html
+# (the Vite entry point) and the tests/fixtures/*.html preview files.
+/vema-architecture-*.html
