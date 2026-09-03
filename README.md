@@ -61,8 +61,15 @@ make dev                     # full stack via Docker Compose
 make dev-stop                # tear it down
 ```
 
-See [deploy/README.md](deploy/README.md) for production deployment and
-[docs/README.md](docs/README.md) for the documentation index.
+### Going further
+
+| Document | Covers |
+|----------|--------|
+| [Development, CI and CD](docs/ops/development-setup.md) | Tooling versions, database setup, the five CI jobs, the delivery chain |
+| [RGPD processing register](docs/data-platform/rgpd-register.md) | Purpose, legal basis, categories, retention and review procedures per source |
+| [Logging and monitoring](docs/ops/logging-monitoring.md) | The metrics actually emitted, and which controls are declared but unverified |
+| [deploy/README.md](deploy/README.md) | Production deployment |
+| [docs/README.md](docs/README.md) | Documentation index |
 
 ## Navigate
 

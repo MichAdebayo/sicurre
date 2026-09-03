@@ -355,3 +355,23 @@ release `base-20260902-162626` (43,700 items, checksum `2edfb5074503`). Raw
 totals are cumulative across the archive; the second figure is what the release
 actually contains, and the two differ mostly because normalization admits French
 only.
+
+---
+
+## Not a source: the Gmail legitimate lane
+
+`scripts/data_platform/gmail/` contains extraction and redaction tooling for
+harvesting real French institutional mail into the legitimate class. It is
+written and unit-tested, and **it has never run**: the Gmail connector failed
+part-way through the harvest on 2 September 2026 and no records were produced.
+
+There is no `gmail` source system, no raw record, and nothing from this lane in
+any frozen dataset. It is listed here so the directory is not mistaken for a
+contributing source.
+
+Kept rather than deleted because the need it addresses is real and unmet. The
+legitimate class is 86% generated text, and the register it lacks — genuine
+French institutional and transactional mail — is exactly what this lane would
+supply. The redaction module (`redaction.py`) is the part worth keeping: it
+collapses tracking URLs to their host, and handles French PII shapes including
+IBAN, card tails and postal addresses.
