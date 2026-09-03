@@ -200,3 +200,6 @@ skills/
 ui-inspiration.png
 
 docs/architecture/diagrams/claude/
+
+# Stale editor and git lock debris staged for deletion.
+_to_delete/
