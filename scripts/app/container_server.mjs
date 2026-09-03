@@ -32,11 +32,22 @@ const mimeTypes = new Map([
   [".woff2", "font/woff2"],
 ]);
 
+// Paths that belong to the API rather than the single-page application.
+//
+// Anything not listed here falls through to the SPA, which answers every
+// unknown path with index.html and HTTP 200. That is correct for client-side
+// routing and misleading for everything else: /docs and /redoc returned 200
+// while serving the application shell, so the API documentation looked
+// published when it was unreachable. /openapi.json was listed, so the raw
+// specification worked while the two human-readable views did not.
 export function shouldProxy(pathname) {
   if (pathname.startsWith("/api/auth")) return authServiceUrl;
   if (
     pathname === "/health" ||
     pathname === "/openapi.json" ||
+    pathname === "/docs" ||
+    pathname === "/redoc" ||
+    pathname.startsWith("/docs/") ||
     pathname.startsWith("/v1") ||
     pathname.startsWith("/auth") ||
     pathname.startsWith("/internal/ml/")

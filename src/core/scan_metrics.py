@@ -11,6 +11,9 @@ Two instruments, deliberately separated:
   customer-facing SLA is judged on.
 * ``sicurre_scan_stage_duration_seconds`` — the same request split by stage, so
   a breach can be attributed instead of guessed at.
+* ``sicurre_scan_failure_total`` — scans that reached no verdict at all. The
+  duration and total instruments are only reached once a verdict exists, so a
+  failed scan would otherwise be absent rather than counted.
 
 Buckets straddle the 2 s objective closely enough to read compliance directly
 off the histogram, and extend far enough to keep provider stalls visible rather
@@ -55,6 +58,36 @@ scan_total = Counter(
     "Scan decisions reaching a verdict.",
     ("verdict",),
 )
+
+#: Reasons a scan can fail, as a closed set. The label is derived from the
+#: exception type rather than its message: an exception string can carry a URL,
+#: a header or a fragment of the message being scanned, and a metric label is
+#: retained far longer and read far more widely than a log line.
+_FAILURE_REASONS = {
+    "inference_unavailable",
+    "inference_contract",
+    "unknown",
+}
+
+scan_failure_total = Counter(
+    "sicurre_scan_failure_total",
+    "Scans that ended without a verdict because the decision path failed.",
+    ("reason",),
+)
+
+
+def observe_scan_failure(reason: str) -> None:
+    """Record a scan that produced no verdict.
+
+    ``observe_scan`` only fires once a verdict exists, so before this counter a
+    failed scan emitted nothing at all: the request vanished from
+    ``sicurre_scan_total`` instead of appearing in it as a failure. That is the
+    metric-level form of incident 06 — the outage was invisible because the
+    code path that would have reported it was never reached.
+    """
+    scan_failure_total.labels(
+        reason=reason if reason in _FAILURE_REASONS else "unknown"
+    ).inc()
 
 
 @contextmanager

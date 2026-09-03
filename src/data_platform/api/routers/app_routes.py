@@ -720,7 +720,7 @@ def _http_latency_ms(started_at: datetime) -> int:
 
 
 async def _probe_inference_runtime(
-    client: httpx.AsyncClient, inference_url: str | None
+    client: httpx.AsyncClient, inference_url: str | None, api_key: str | None = None
 ) -> list[dict]:
     if not inference_url:
         return [
@@ -759,7 +759,112 @@ async def _probe_inference_runtime(
                     checked_url=url,
                 )
             )
+
+    results.append(await _probe_inference_contract(client, inference_url, api_key))
     return results
+
+
+#: Sent to the classifier by the authenticated probe. It is deliberately
+#: synthetic: incident 06 asked for "un appel authentifié sans contenu client",
+#: because a health check that replays a real message turns every operator
+#: glance at the admin page into a fresh processing of someone's mail.
+_PROBE_PAYLOAD = {
+    "subject": "SICURRE-RUNTIME-PROBE",
+    "sender": "probe@sicurre.invalid",
+    "text": "Synthetic runtime probe. Not a client message.",
+    # The probe establishes the auth contract and the model path. Enabling the
+    # LLM or VirusTotal would spend third-party quota every time an admin loads
+    # the page, and their failure is not what this component reports on.
+    "use_llm": False,
+    "use_virustotal": False,
+}
+
+
+async def _probe_inference_contract(
+    client: httpx.AsyncClient, inference_url: str, api_key: str | None
+) -> dict:
+    """Authenticated call to /v1/classify — the check incident 06 was missing.
+
+    /v1/health and /v1/ready answer without credentials, so they stayed green
+    through the whole of incident 06: the classifier was healthy and the key
+    the API sent it was empty. The admin page reported ok while every real
+    classification failed. Only a call carrying the Authorization header the
+    gateway actually uses can distinguish those two states.
+    """
+    if not api_key:
+        return _runtime_status(
+            component="inference_contract",
+            status="down",
+            message="SICURRE_INFERENCE_API_KEY is not configured.",
+            detail="The classifier is reachable but the API would send an empty bearer token.",
+            checked_url=inference_url,
+        )
+
+    started = datetime.now(timezone.utc)
+    try:
+        response = await client.post(
+            inference_url,
+            json=_PROBE_PAYLOAD,
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+    except Exception as exc:
+        return _runtime_status(
+            component="inference_contract",
+            status="down",
+            message="Authenticated classification probe could not reach the classifier.",
+            detail=str(exc)[:220],
+            checked_url=inference_url,
+        )
+
+    latency = _http_latency_ms(started)
+
+    if response.status_code in (401, 403):
+        return _runtime_status(
+            component="inference_contract",
+            status="down",
+            message="Classifier rejected the API credentials.",
+            detail=(
+                f"HTTP {response.status_code}. The key is present but not accepted; "
+                "health and readiness stay green because they need no credentials."
+            ),
+            checked_url=inference_url,
+            latency_ms=latency,
+        )
+
+    if response.status_code != 200:
+        return _runtime_status(
+            component="inference_contract",
+            status="degraded",
+            message=f"Authenticated probe returned HTTP {response.status_code}.",
+            checked_url=inference_url,
+            latency_ms=latency,
+        )
+
+    # A 200 carrying no verdict means the route answered without classifying,
+    # which is the same operational outcome as a refusal.
+    try:
+        verdict = (response.json() or {}).get("verdict")
+    except ValueError:
+        verdict = None
+
+    if not verdict:
+        return _runtime_status(
+            component="inference_contract",
+            status="degraded",
+            message="Classifier answered without a verdict.",
+            detail="HTTP 200 but the response carries no verdict field.",
+            checked_url=inference_url,
+            latency_ms=latency,
+        )
+
+    return _runtime_status(
+        component="inference_contract",
+        status="ok",
+        message="Authenticated classification returned a verdict.",
+        detail=f"verdict={verdict}",
+        checked_url=inference_url,
+        latency_ms=latency,
+    )
 
 
 async def _probe_public_app_runtime(
@@ -1061,7 +1166,9 @@ async def get_admin_runtime_health(current_user: AuthUser = Depends(get_current_
 
     settings = get_settings()
     async with httpx.AsyncClient(timeout=6.0) as client:
-        inference_components = await _probe_inference_runtime(client, settings.inference_api_url)
+        inference_components = await _probe_inference_runtime(
+            client, settings.inference_api_url, settings.inference_api_key
+        )
         public_app_components, expected_scan_url = await _probe_public_app_runtime(
             client,
             settings.public_api_url,
