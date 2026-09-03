@@ -41,6 +41,11 @@ services:
       dockerfile: Dockerfile.app
       target: auth
     environment:
+      # Without this the auth service falls back to "development", which loads
+      # the Better Auth openAPI plugin and serves /api/auth/reference. The smoke
+      # test asserts documentation is absent, so the auth service has to be told
+      # it is not a development environment just as the API is.
+      SICURRE_ENVIRONMENT: app-stack-smoke
       SICURRE_BETTER_AUTH_PORT: "3005"
       SICURRE_BETTER_AUTH_URL: http://localhost:5174
       BETTER_AUTH_URL: http://localhost:5174

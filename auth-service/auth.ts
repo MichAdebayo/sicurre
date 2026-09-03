@@ -5,6 +5,7 @@ import Database from "better-sqlite3";
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { getMigrations } from "better-auth/db/migration";
+import { openAPI } from "better-auth/plugins";
 import { Pool } from "pg";
 
 import { ensureConfiguredAdmin, type AdminSeedResult } from "./admin-seed.js";
@@ -197,6 +198,7 @@ export const auth = betterAuth({
   basePath: "/api/auth",
   trustedOrigins,
   database: authDatabase,
+  plugins: ["dev", "development", "local"].includes(environment) ? [openAPI()] : [],
   advanced: {
     ipAddress: {
       ipAddressHeaders: ["x-real-ip"],
