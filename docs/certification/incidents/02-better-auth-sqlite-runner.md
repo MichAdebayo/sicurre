@@ -26,3 +26,11 @@ locale supposait donc un état du système de fichiers non garanti en CI.
 Joindre le run CI final et le test Better Auth exécuté avec un répertoire temporaire
 absent au départ. Un run « tous les tests passés » ne doit pas être reformulé en
 « 100% de couverture » sans artefact de couverture correspondant.
+
+## Traçabilité
+
+PR #54 · commit `570243b` · merge `1d9c5f9` · 14 juillet 2026
+
+Le commit ajoute l'import `mkdirSync`, l'appel
+`mkdirSync(path.dirname(resolvedLocalDatabasePath), { recursive: true })` avant
+`new Database(...)`, et le découplage de `createAuthApp` décrits ci-dessus.

@@ -34,3 +34,14 @@ la présence du compte propriétaire configuré et l'émission d'une session.
 Cette preuve confirme que les deux schémas sont exploitables. La capture du job
 CD montrant les sorties Alembic reste une annexe utile, mais elle n'est plus la
 seule preuve du schéma déployé.
+
+## Traçabilité
+
+Commit `e45da80` · merge `a5ef3ba` (« Merge develop into main for first
+production deployment ») · 11 juillet 2026
+
+**Pas de numéro de PR.** La séquence Alembic du service `sicurre-api` dans
+`docker-compose.prod.yml` est arrivée sur `main` par une fusion directe
+`develop → main` lors du premier déploiement de production, avant que le flux
+par pull request ne soit systématique. Le champ est laissé vide plutôt que
+rempli d'un numéro plausible.
