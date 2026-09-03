@@ -195,7 +195,7 @@ Three dataset versions were published that day. Only the last is current.
 |---|---|---|
 | `base-20260902-113227` | superseded | Built before the length audit, so it carries the truncated generated text |
 | `base-20260902-161622` | superseded | Rebuilt after the re-seed but before the final freeze ten minutes later |
-| `base-20260902-162626` | **current** | 43,700 items, checksum `2edfb5074503` |
+| `base-20260902-162626` | superseded by cadence | 43,700 items, checksum `2edfb5074503`; the last release of that day |
 
 The cause was a length audit finding generated text truncated to 200
 characters. 22,562 affected normalized messages and their 88,093 dataset items
@@ -205,15 +205,16 @@ why they are recorded here rather than quietly left in the table: a released
 model's dataset version has to be resolvable to a statement about what that
 data was.
 
-**Not yet applied:** the two superseded rows still carry their original
-`status` in `data_dataset`. Setting them to `archived` requires a write against
-the production database:
+**Applied.** Both rows carry `status = 'archived'` in production, verified
+against `data_dataset` on 3 September 2026. The allowed values are `draft`,
+`frozen` and `archived`.
 
-```sql
-UPDATE data_dataset SET status = 'archived'
-WHERE version_tag IN ('base-20260902-113227', 'base-20260902-161622');
-```
+The *reason* is recorded here rather than in the row because `data_dataset` has
+no column for one — the same gap as `data_source_system.is_active`, a boolean
+with nowhere to say why.
 
-The reason is recorded here rather than in the row because `data_dataset` has
-no column for it — the same gap as `data_source_system.is_active`, which is a
-boolean with nowhere to say why.
+**`frozen` does not mean current.** Five versions carry it simultaneously,
+because the daily release job freezes a new one each morning and never demotes
+its predecessor. The current release is the newest frozen row, not the only
+one — `base-20260903-063230` (45,320 items) as of this writing. Reading
+`status` alone to find the live dataset gives five answers.
