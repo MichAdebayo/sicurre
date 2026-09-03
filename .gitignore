@@ -92,22 +92,44 @@ data/final/
 data/processed/
 data/models/
 
-# Private-by-default documentation (internal only)
-docs/ops/
-docs/certification/
+# Documentation policy.
+#
+# This repository is public, so the default was "private unless proven safe" and
+# whole directories were excluded. That put the operational runbooks, the
+# incident records and the monitoring documentation - all of which the
+# certification reports cite - somewhere a reader cannot reach, and the reports
+# had to say so.
+#
+# The excluded tree was audited on 3 September 2026 for credentials, tokens,
+# connection strings, live hostnames, IP addresses, bucket names and personal
+# data. One finding: a Cloudflare Message-ID in the E4 dossier, since redacted.
+# Everything else was clean, so the default is inverted: versioned unless there
+# is a reason.
+#
+# What stays out, and why:
+#   notebook-*.md          working notes, superseded by the architecture docs
+#   diagrams/final/        exported binaries, regenerated from the .dot sources
+#   privacy-rgpd.md        working draft; the register is the versioned record
+#   *_superseded ADRs      already marked superseded in their filenames
+#   evaluation-word/       Word drafts of the reports plus a third-party
+#                          institutional brochure - drafts are not the
+#                          submission, and the brochure is not ours to publish
+#   screenshots/           unreviewed captures; a dashboard screenshot can
+#                          carry addresses, tokens or customer data
 docs/architecture/notebook-*.md
 docs/architecture/diagrams/final/
-docs/architecture/threat-model.md
 docs/architecture/privacy-rgpd.md
-docs/architecture/data-platform-cadence.md
 docs/architecture/diagrams/*.dot
 docs/adr/0001-post-delivery-gmail.md
 docs/adr/0006-scope-selection-gmail.md
+docs/certification/evaluation-word/
+docs/certification/screenshots/
+docs/**/*.docx
+docs/**/*.pdf
 docs/adr/0007-idempotency-pubsub-history.md
 docs/raw_sources/
 docs/simplon/
 docs/model/
-docs/brand/*.md
 docs/deployment/
 docs/email-intercept.md
 deploy/hetzner/*.md

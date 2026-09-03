@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from types import SimpleNamespace
 
 import httpx
@@ -53,15 +55,20 @@ async def test_inference_probe_reports_health_and_readiness() -> None:
     """Health and readiness remain separate, actionable classifier checks."""
 
     def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "POST":
+            return httpx.Response(200, json={"verdict": "legitimate"})
         status = 200 if request.url.path == "/v1/health" else 503
         return httpx.Response(status)
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        result = await app_routes._probe_inference_runtime(client, "https://ml.example/v1/classify")
+        result = await app_routes._probe_inference_runtime(
+            client, "https://ml.example/v1/classify", "probe-key"
+        )
 
     assert [(item["component"], item["status"]) for item in result] == [
         ("inference_health", "ok"),
         ("inference_ready", "degraded"),
+        ("inference_contract", "ok"),
     ]
 
 
@@ -73,9 +80,11 @@ async def test_inference_probe_reports_network_failure() -> None:
         raise httpx.ConnectError("offline", request=request)
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        result = await app_routes._probe_inference_runtime(client, "https://ml.example/v1/classify")
+        result = await app_routes._probe_inference_runtime(
+            client, "https://ml.example/v1/classify", "probe-key"
+        )
 
-    assert [item["status"] for item in result] == ["down", "down"]
+    assert [item["status"] for item in result] == ["down", "down", "down"]
     assert all(item["detail"] == "offline" for item in result)
 
 
@@ -516,3 +525,134 @@ def test_quarantine_storage_runtime_status(
     monkeypatch.setattr(app_routes, "build_quarantine_store", build)
 
     assert app_routes._quarantine_storage_status()["status"] == expected
+
+
+@pytest.mark.asyncio
+async def test_contract_probe_catches_the_incident_06_condition() -> None:
+    """Health and readiness green, classification refused — the actual outage.
+
+    On 17 July 2026 the classifier was healthy and the API sent it an empty
+    bearer token, so every unauthenticated check passed while no message was
+    ever classified. This is the shape of that failure, and the probe has to
+    report it as down rather than inheriting the green from its neighbours.
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "POST":
+            return httpx.Response(401)
+        return httpx.Response(200)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        result = await app_routes._probe_inference_runtime(
+            client, "https://ml.example/v1/classify", "wrong-key"
+        )
+
+    statuses = {item["component"]: item["status"] for item in result}
+    assert statuses["inference_health"] == "ok"
+    assert statuses["inference_ready"] == "ok"
+    assert statuses["inference_contract"] == "down"
+    assert app_routes._component_rollup(result) == "down"
+
+
+@pytest.mark.asyncio
+async def test_contract_probe_reports_a_missing_key_without_calling_out() -> None:
+    """An unset key is the incident's root cause and needs no network call."""
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(200)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        result = await app_routes._probe_inference_contract(
+            client, "https://ml.example/v1/classify", None
+        )
+
+    assert result["status"] == "down"
+    assert "SICURRE_INFERENCE_API_KEY" in result["message"]
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_contract_probe_rejects_a_verdictless_success() -> None:
+    """HTTP 200 without a verdict is not a working classifier."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"detail": "accepted"})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        result = await app_routes._probe_inference_contract(
+            client, "https://ml.example/v1/classify", "probe-key"
+        )
+
+    assert result["status"] == "degraded"
+
+
+@pytest.mark.asyncio
+async def test_contract_probe_never_sends_client_content_or_leaks_the_key() -> None:
+    """The probe payload is synthetic and the key stays out of the report.
+
+    Incident 06 asked for an authenticated call *without client content*: an
+    admin refreshing the health page must not cause a real message to be
+    reprocessed, and the component report is rendered in a browser, so the
+    bearer token must never appear in it.
+    """
+    seen: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["auth"] = request.headers.get("Authorization")
+        seen["body"] = request.content.decode()
+        return httpx.Response(200, json={"verdict": "legitimate"})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        result = await app_routes._probe_inference_contract(
+            client, "https://ml.example/v1/classify", "super-secret-key"
+        )
+
+    body = json.loads(seen["body"])
+    assert seen["auth"] == "Bearer super-secret-key"
+    assert body["sender"].endswith("@sicurre.invalid")
+    assert body["use_llm"] is False and body["use_virustotal"] is False
+    assert "super-secret-key" not in str(result)
+
+
+@pytest.mark.asyncio
+async def test_contract_probe_degrades_on_an_unexpected_status() -> None:
+    """A 500 is not a credential problem, so it is not reported as one.
+
+    Down means "the classifier refuses us" and calls for a key rotation;
+    degraded means "something else is wrong" and calls for reading its logs.
+    Collapsing the two would send an operator to the wrong runbook.
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        result = await app_routes._probe_inference_contract(
+            client, "https://ml.example/v1/classify", "probe-key"
+        )
+
+    assert result["status"] == "degraded"
+    assert "500" in result["message"]
+
+
+@pytest.mark.asyncio
+async def test_contract_probe_survives_a_non_json_success() -> None:
+    """A 200 whose body will not parse must not raise inside the health page.
+
+    The probe runs while rendering an admin view. An exception here would take
+    out the whole runtime-health response, so the one component that failed
+    would hide the status of every component that did not.
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=b"<html>not json</html>")
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        result = await app_routes._probe_inference_contract(
+            client, "https://ml.example/v1/classify", "probe-key"
+        )
+
+    assert result["status"] == "degraded"
+    assert "verdict" in result["message"]
