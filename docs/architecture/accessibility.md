@@ -1,8 +1,12 @@
 # Accessibility
 
 The target is WCAG 2.1 level AA. This document records what was verified, how,
-and what is not yet met — measured on 3 September 2026 against the palette in
-`docs/brand/DESIGN.md` and the components in `src/app/`.
+and what is not yet met — measured on 3 September 2026 against the design
+system's palette and the components in `src/app/`.
+
+The palette values are reproduced here rather than cited, because the brand
+document that defines them is not tracked in this repository. A reference a
+reader cannot follow is worse than the values themselves.
 
 It is written as a status, not as a claim of conformance. A conformance
 statement needs an audit of every page against every applicable criterion; what
@@ -26,10 +30,11 @@ luminance formula rather than accepted from the design document.
 | `#4A90D9` primary blue | `#0F172A` | 5.34:1 | Pass |
 
 The one value below 4.5:1 is the primary blue on white, and the design system
-already accounts for it: `DESIGN.md` directs clickable text to `#2E6BB5`.
-That instruction is load-bearing rather than stylistic — following it is what
-keeps link text at AA — so it is recorded here as a constraint, not a
-preference.
+already accounts for it by directing clickable text to `#2E6BB5`. That
+instruction is load-bearing rather than stylistic — following it is what keeps
+link text at AA — so it is recorded here as a constraint rather than a
+preference, and `tests/unit/app/test_palette_contrast.py` recomputes both
+ratios so a palette change cannot quietly drop link text below AA.
 
 ## Acceptance criteria
 
@@ -37,7 +42,7 @@ Applied to interface work. Each is checkable by a reviewer without tooling.
 
 1. **Contrast.** Text uses a palette entry that passes 4.5:1 on its own
    background, or 3:1 where it is large text. `#4A90D9` is not used for body
-   text on a light surface.
+   text on a light surface; `#2E6BB5` is the accessible substitute.
 2. **Focus.** Every interactive element has a visible keyboard focus indicator
    (WCAG 2.4.7). The codebase uses `ring-2 ring-primary`; focus must not be
    removed without a replacement.

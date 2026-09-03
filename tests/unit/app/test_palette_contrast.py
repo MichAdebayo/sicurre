@@ -13,10 +13,18 @@ instead.
 
 from __future__ import annotations
 
-import re
-from pathlib import Path
-
-DESIGN = Path("docs/brand/DESIGN.md")
+#: The palette is reproduced here rather than parsed out of
+#: `docs/brand/DESIGN.md`, which is not tracked by this repository. A test that
+#: reads an untracked file passes locally and fails in CI, and worse, silently
+#: checks nothing wherever the file happens to be absent. These values are the
+#: contract; if the design system moves away from them, this fails and someone
+#: re-derives the ratios deliberately.
+_LINK_BLUE = "#2E6BB5"
+_PRIMARY_BLUE = "#4A90D9"
+_ON_WHITE = ("#475569", "#B45309", "#7A4700", "#047857")
+_ON_DARK_SURFACE = ("#E2E8F0", "#B7C4D7", "#4A90D9")
+_DARK_SURFACE = "#0F172A"
+_WHITE = "#FFFFFF"
 
 #: WCAG 2.1 SC 1.4.3, verified against https://www.w3.org/TR/WCAG21/
 _AA_BODY = 4.5
@@ -36,7 +44,7 @@ def _contrast(a: str, b: str) -> float:
 
 
 def test_link_blue_passes_aa_for_body_text() -> None:
-    assert _contrast("#2E6BB5", "#FFFFFF") >= _AA_BODY
+    assert _contrast(_LINK_BLUE, _WHITE) >= _AA_BODY
 
 
 def test_primary_blue_is_below_aa_on_white() -> None:
@@ -46,22 +54,15 @@ def test_primary_blue_is_below_aa_on_white() -> None:
     directing clickable text to #2E6BB5 may no longer be necessary — but it
     must then be revisited deliberately rather than left as folklore.
     """
-    ratio = _contrast("#4A90D9", "#FFFFFF")
+    ratio = _contrast(_PRIMARY_BLUE, _WHITE)
     assert _AA_LARGE <= ratio < _AA_BODY
 
 
 def test_body_and_status_colours_pass_aa_on_white() -> None:
-    for colour in ("#475569", "#B45309", "#7A4700", "#047857"):
-        assert _contrast(colour, "#FFFFFF") >= _AA_BODY, f"{colour} fell below AA"
+    for colour in _ON_WHITE:
+        assert _contrast(colour, _WHITE) >= _AA_BODY, f"{colour} fell below AA"
 
 
 def test_text_on_the_dark_surface_passes_aa() -> None:
-    for colour in ("#E2E8F0", "#B7C4D7", "#4A90D9"):
-        assert _contrast(colour, "#0F172A") >= _AA_BODY, f"{colour} fell below AA"
-
-
-def test_design_doc_still_names_the_accessible_link_colour() -> None:
-    """The constraint lives in the design doc; the test guards it existing."""
-    text = DESIGN.read_text(encoding="utf-8")
-    assert "#2E6BB5" in text
-    assert re.search(r"WCAG", text), "the rationale must stay next to the value"
+    for colour in _ON_DARK_SURFACE:
+        assert _contrast(colour, _DARK_SURFACE) >= _AA_BODY, f"{colour} fell below AA"
