@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../../../src/app/App";
@@ -37,6 +37,9 @@ vi.mock("../../../src/app/components/common/app-shell", () => ({
     <main data-administration={String(administration)}>
       <button onClick={() => onPageChange("dashboard")}>Workspace</button>
       <button onClick={() => onPageChange("logs")}>Admin</button>
+      <button onClick={() => onPageChange("admin-operations")}>Operations</button>
+      <button onClick={() => onPageChange("admin-integrations")}>Integrations</button>
+      <button onClick={() => onPageChange("admin-reviews")}>Reviews</button>
       <button onClick={() => onPageChange("settings")}>Settings</button>
       <button onClick={() => onPageChange("support")}>Support</button>
       {children}
@@ -57,6 +60,10 @@ vi.mock("../../../src/app/routes/alerts", () => ({ default: DomainContent }));
 vi.mock("../../../src/app/routes/settings", () => ({ default: () => <h1>Settings page</h1> }));
 vi.mock("../../../src/app/routes/support", () => ({ default: () => <h1>Support page</h1> }));
 vi.mock("../../../src/app/routes/logs", () => ({ default: () => <h1>Admin console</h1> }));
+vi.mock("../../../src/app/routes/admin-operations", () => ({ default: () => <h1>Admin operations</h1> }));
+vi.mock("../../../src/app/routes/admin-incidents", () => ({ default: () => <h1>Admin incidents</h1> }));
+vi.mock("../../../src/app/routes/admin-integrations", () => ({ default: () => <h1>Admin integrations</h1> }));
+vi.mock("../../../src/app/routes/admin-reviews", () => ({ default: () => <h1>Admin reviews</h1> }));
 vi.mock("../../../src/app/routes/login", () => ({ default: ({ onLoginSuccess }: { onLoginSuccess: () => void }) => <button onClick={onLoginSuccess}>Sign in</button> }));
 vi.mock("../../../src/app/routes/landing", () => ({ default: ({ onNavigateToLogin }: { onNavigateToLogin: () => void }) => {
   state.publicRender();
@@ -87,6 +94,38 @@ describe("explicit platform admin access", () => {
       { id: "1", zone_name: "vinse.app", status: "active" },
     ] };
   }
+
+  it.each(["operations", "incidents", "integrations", "reviews"])("opens /admin/%s directly and rejects customers", async (page) => {
+    window.history.replaceState({}, "", `/admin/${page}`);
+    adminSession(true);
+    const { rerender } = render(<App />);
+    expect(await screen.findByText(`Admin ${page}`)).toBeInTheDocument();
+    expect(screen.getByRole("main")).toHaveAttribute("data-administration", "true");
+    state.session.data = { ...state.session.data, role: "admin", is_platform_admin: false };
+    rerender(<App />);
+    expect(await screen.findByText("Settings page")).toBeInTheDocument();
+    expect(screen.queryByText(`Admin ${page}`)).not.toBeInTheDocument();
+    expect(window.location.pathname).toBe("/app/settings");
+  });
+
+  it("keeps admin routes and shell in sync with browser Back and Forward", async () => {
+    window.history.replaceState({}, "", "/admin");
+    adminSession(true);
+    render(<App />);
+    await screen.findByText("Admin console");
+    fireEvent.click(screen.getByRole("button", { name: "Operations" }));
+    await screen.findByText("Admin operations");
+    expect(window.location.pathname).toBe("/admin/operations");
+    fireEvent.click(screen.getByRole("button", { name: "Integrations" }));
+    await screen.findByText("Admin integrations");
+    expect(document.title).toBe("admin.views.integrations | Sicurre");
+    act(() => { window.history.back(); });
+    await waitFor(() => expect(window.location.pathname).toBe("/admin/operations"));
+    expect(await screen.findByText("Admin operations")).toBeInTheDocument();
+    act(() => { window.history.forward(); });
+    expect(await screen.findByText("Admin integrations")).toBeInTheDocument();
+    expect(screen.getByRole("main")).toHaveAttribute("data-administration", "true");
+  });
 
   it.each(["/", "/login", "/app/dashboard", "/app/domain-shield"])("keeps an admin in their workspace at %s", async (path) => {
     window.history.replaceState({}, "", path);

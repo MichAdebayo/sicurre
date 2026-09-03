@@ -9,6 +9,7 @@ import {
 } from "./lib/api";
 import {
   getSidebarPageFromPath,
+  isAdminPage,
   resolveAuthorizedPage,
   sidebarPagePaths,
 } from "./lib/navigation";
@@ -24,6 +25,10 @@ const pageLoaders = {
   dashboard: () => import("./routes/dashboard"),
   threats: () => import("./routes/threats"),
   logs: () => import("./routes/logs"),
+  "admin-operations": () => import("./routes/admin-operations"),
+  "admin-incidents": () => import("./routes/admin-incidents"),
+  "admin-integrations": () => import("./routes/admin-integrations"),
+  "admin-reviews": () => import("./routes/admin-reviews"),
   settings: () => import("./routes/settings"),
   support: () => import("./routes/support"),
   quarantine: () => import("./routes/quarantine"),
@@ -37,6 +42,10 @@ const VerifyEmailRoute = lazy(() => import("./routes/verify-email"));
 const DashboardRoute = lazy(pageLoaders.dashboard);
 const ThreatsRoute = lazy(pageLoaders.threats);
 const LogsRoute = lazy(pageLoaders.logs);
+const AdminOperationsRoute = lazy(pageLoaders["admin-operations"]);
+const AdminIncidentsRoute = lazy(pageLoaders["admin-incidents"]);
+const AdminIntegrationsRoute = lazy(pageLoaders["admin-integrations"]);
+const AdminReviewsRoute = lazy(pageLoaders["admin-reviews"]);
 const SettingsRoute = lazy(pageLoaders.settings);
 const SupportRoute = lazy(pageLoaders.support);
 const QuarantineRoute = lazy(pageLoaders.quarantine);
@@ -161,7 +170,7 @@ function AppContent() {
   const sessionQuery = useCurrentSession(sessionLookupEnabled && !isVerificationEntry);
   const logoutMutation = useLogout();
   const session = isVerificationEntry || !sessionLookupEnabled ? undefined : sessionQuery.data;
-  const administration = activePage === "logs" && Boolean(session?.is_platform_admin);
+  const administration = isAdminPage(activePage) && Boolean(session?.is_platform_admin);
 
   useEffect(() => {
     if (!sessionQuery.isLoading || !getSidebarPageFromPath(window.location.pathname)) return;
@@ -346,7 +355,7 @@ function AppContent() {
       hasIntegration={session.has_cloudflare_integration}
     >
       <Suspense fallback={<PageLoading />}>
-        {!["logs", "settings", "support"].includes(activePage) ? (
+        {!isAdminPage(activePage) && !["settings", "support"].includes(activePage) ? (
           <DomainPageBoundary>
             {activePage === "dashboard" && <DashboardRoute session={session} onGoToSettings={handleGoToSettings} />}
             {activePage === "threats" && <ThreatsRoute />}
@@ -357,6 +366,10 @@ function AppContent() {
         ) : (
           <>
             {activePage === "logs" && session.is_platform_admin && <LogsRoute />}
+            {activePage === "admin-operations" && session.is_platform_admin && <AdminOperationsRoute />}
+            {activePage === "admin-incidents" && session.is_platform_admin && <AdminIncidentsRoute />}
+            {activePage === "admin-integrations" && session.is_platform_admin && <AdminIntegrationsRoute />}
+            {activePage === "admin-reviews" && session.is_platform_admin && <AdminReviewsRoute />}
             {activePage === "settings" && <SettingsRoute session={session} initialTab={settingsTab} />}
             {activePage === "support" && <SupportRoute session={session} />}
           </>

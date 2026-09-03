@@ -2,11 +2,19 @@ import { describe, expect, it } from "vitest";
 
 import {
   getSidebarPageFromPath,
+  isAdminPage,
   resolveAuthorizedPage,
   sidebarPagePaths,
 } from "../../../src/app/lib/navigation";
 
 describe("authenticated navigation", () => {
+  it.each(["logs", "admin-operations", "admin-incidents", "admin-integrations", "admin-reviews"] as const)("guards %s independently of onboarding", (page) => {
+    expect(isAdminPage(page)).toBe(true);
+    for (const onboardingRequired of [true, false]) {
+      expect(resolveAuthorizedPage(page, { isPlatformAdmin: true, onboardingRequired })).toBe(page);
+      expect(resolveAuthorizedPage(page, { isPlatformAdmin: false, onboardingRequired })).toBe(onboardingRequired ? "settings" : "dashboard");
+    }
+  });
   it("maps every sidebar page to a stable direct URL", () => {
     for (const [page, path] of Object.entries(sidebarPagePaths)) {
       expect(getSidebarPageFromPath(path)).toBe(page);
