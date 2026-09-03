@@ -313,3 +313,64 @@ async def test_a_dropzone_file_registers_its_governance(
     assert source.legal_basis == "legitimate_interest_security"
     assert source.contains_personal_data is True
     assert source.retention_days == 365
+
+
+@pytest.mark.asyncio
+async def test_empty_bytes_are_reported_as_empty_not_ingested(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """The R2 lane downloads bytes, so a zero-row object must be named as such.
+
+    `empty` and `read_error` are different operational facts: the first means
+    the object arrived and had no rows, the second that it could not be parsed.
+    Collapsing them would hide a truncated download behind a benign status.
+    """
+    from data_platform.base_ingest.file.parsers.csv_ingestion import ingest_csv_bytes
+
+    async with session_factory() as session:
+        result = await ingest_csv_bytes(
+            b"text,label\n",
+            "empty_spam_1.csv",
+            "r2://raw/empty_spam_1.csv",
+            "s3://bucket/empty_spam_1.csv",
+            session,
+            SourceSystemQueries(),
+            IngestionRunQueries(),
+        )
+        raw_records = list((await session.scalars(select(DataRawRecord))).all())
+
+    assert result.status == "empty"
+    assert result.inserted_count == 0
+    assert not raw_records
+
+
+@pytest.mark.asyncio
+async def test_bytes_from_r2_are_ingested_with_their_governance(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """The R2 lane must register governance the same way the file lane does.
+
+    Both lanes create source systems. If only one applied the legal basis and
+    personal-data flag, the same corpus would carry rows governed differently
+    depending on which path happened to ingest them.
+    """
+    from data_platform.base_ingest.file.parsers.csv_ingestion import ingest_csv_bytes
+
+    payload = "text,label\nBonjour ceci est un message de test R2,spam\n".encode()
+
+    async with session_factory() as session:
+        result = await ingest_csv_bytes(
+            payload,
+            "spam_9.csv",
+            "r2://raw/spam_9.csv",
+            "s3://bucket/spam_9.csv",
+            session,
+            SourceSystemQueries(),
+            IngestionRunQueries(),
+        )
+        await session.commit()
+        source = (await session.scalars(select(DataSourceSystem))).one()
+
+    assert result.inserted_count == 1
+    assert source.legal_basis == "legitimate_interest_security"
+    assert source.contains_personal_data is True
