@@ -51,3 +51,11 @@ Le contrôle réel a distingué validité du jeton et autorisations par capacit�
 Le provisionnement entrant est fonctionnel. La libération d'un faux positif par
 Email Sending reste bloquée jusqu'à l'ajout de cette permission, puis doit être
 testée sur un message contrôlé.
+
+## Traçabilité
+
+PR #67 · commit `3979746` · merge `ff7ef70` · 17 juillet 2026
+
+Le même commit corrige l'incident 01. Il introduit
+`test_enable_email_routing_surfaces_permission_error`, qui couvre la remontée du
+403 Cloudflare comme erreur de permission plutôt que comme « déjà activé ».

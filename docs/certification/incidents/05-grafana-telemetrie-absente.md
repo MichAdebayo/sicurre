@@ -36,3 +36,12 @@ Alloy, Better Auth, l'API et le gateway, ainsi que deux traces Tempo récentes.
 L'absence de logs applicatifs sur une fenêtre très courte sans trafic est normale
 car les sondes et accès routiniers sont filtrés ; elle ne doit pas être confondue
 avec une panne de collecte.
+
+## Traçabilité
+
+PR #52 · commit `10b30da` · merge `38b373e` · 13 juillet 2026
+
+Ce commit ajoute les dashboards Grafana d'infrastructure et de télémétrie et
+met à jour la collecte de métriques Alloy. Le durcissement complémentaire
+d'Alloy — épinglage de version et jetons opérationnels dédiés — arrive avec
+PR #64 · commit `aeb2ecc` · 14 juillet 2026.
