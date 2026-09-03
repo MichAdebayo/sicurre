@@ -5,7 +5,8 @@
     "type": "email",
     "settings": {
       "addresses": "michael@sicurre.com",
-      "singleEmail": false
+      "singleEmail": false,
+      "subject": "[{{ .Status | toUpper }}] {{ if .CommonLabels.alertname }}{{ .CommonLabels.alertname }}{{ else }}Sicurre monitoring{{ end }}"
     },
     "disableResolveMessage": false
   },
@@ -69,14 +70,39 @@
     },
     {
       "uid": "sicurre-controlled-exercise",
-      "title": "Sicurre controlled operational exercise",
-      "expression": "max(sicurre_operational_exercise_active{stack=\"sicurre\"})",
+      "title": "Sicurre API unavailable (synthetic test)",
+      "expression": "max(sicurre_operational_exercise_active{stack=\"sicurre\",exercise_type=\"api_unavailable\"})",
       "operator": "gt",
       "threshold": 0,
       "for": "1m",
       "noDataState": "OK",
-      "summary": "An owner-approved synthetic monitoring exercise is active.",
-      "runbook": "Confirm the exercise ID in the Sicurre admin console and wait for automatic recovery."
+      "labels": { "exercise": "synthetic", "exercise_type": "api_unavailable" },
+      "summary": "Synthetic API-unavailability alert test. The API and customer emails are unaffected.",
+      "runbook": "Stop the synthetic signal in the Sicurre admin console or wait for its automatic expiry, then verify Grafana recovery."
+    },
+    {
+      "uid": "sicurre-controlled-latency",
+      "title": "Sicurre high latency (synthetic test)",
+      "expression": "max(sicurre_operational_exercise_active{stack=\"sicurre\",exercise_type=\"high_latency\"})",
+      "operator": "gt",
+      "threshold": 0,
+      "for": "1m",
+      "noDataState": "OK",
+      "labels": { "exercise": "synthetic", "exercise_type": "high_latency" },
+      "summary": "Synthetic latency alert test. No request delay is injected.",
+      "runbook": "Stop the synthetic signal in the Sicurre admin console or wait for its automatic expiry, then verify Grafana recovery."
+    },
+    {
+      "uid": "sicurre-controlled-server-errors",
+      "title": "Sicurre server errors (synthetic test)",
+      "expression": "max(sicurre_operational_exercise_active{stack=\"sicurre\",exercise_type=\"elevated_5xx\"})",
+      "operator": "gt",
+      "threshold": 0,
+      "for": "1m",
+      "noDataState": "OK",
+      "labels": { "exercise": "synthetic", "exercise_type": "elevated_5xx" },
+      "summary": "Synthetic server-error alert test. No customer request is made to fail.",
+      "runbook": "Stop the synthetic signal in the Sicurre admin console or wait for its automatic expiry, then verify Grafana recovery."
     },
     {
       "uid": "sicurre-series-budget-warning",

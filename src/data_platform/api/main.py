@@ -15,6 +15,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+from sqlalchemy.exc import SQLAlchemyError
 
 from core.config import get_settings
 from core.db_keepalive import keepalive_enabled, run_db_keepalive
@@ -23,6 +24,7 @@ from core.provider_credentials import encrypt_legacy_provider_credentials
 from core.rate_limit import limiter
 from data_platform.api.routers import router as data_platform_router
 from data_platform.api.routers.app_routes import router as app_routes_router
+from data_platform.api.routers.app_routes import synchronize_operational_exercises
 from data_platform.api.routers.integrations import router as integrations_router
 from data_platform.api.routers.internal import router as internal_router
 from data_platform.api.routers.reported_email import router as reported_email_router
@@ -103,6 +105,11 @@ async def run_scheduler_loop() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
+    if settings.operational_tests_enabled:
+        try:
+            await synchronize_operational_exercises()
+        except SQLAlchemyError:
+            logger.warning("Exercise state restoration deferred until the next admin refresh")
     if settings.environment.lower() in {"production", "prod"}:
         migrated_credentials = await encrypt_legacy_provider_credentials(settings)
         if migrated_credentials:

@@ -18,6 +18,7 @@ def test_cd_copies_every_declared_deployment_asset() -> None:
 
     assert not missing, f"CD references missing deployment assets: {missing}"
     assert "deploy/grafana/alerts/sicurre-alerts.json" in deployment_assets
+    assert "deploy/grafana/dashboards/sicurre-controlled-exercise.json" in deployment_assets
 
 
 def test_cd_transfers_every_module_the_provisioning_script_imports() -> None:
