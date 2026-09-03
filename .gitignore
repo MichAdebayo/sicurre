@@ -130,7 +130,6 @@ docs/adr/0007-idempotency-pubsub-history.md
 docs/raw_sources/
 docs/simplon/
 docs/model/
-docs/brand/*.md
 docs/deployment/
 docs/email-intercept.md
 deploy/hetzner/*.md

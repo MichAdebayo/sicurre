@@ -66,3 +66,50 @@ def test_body_and_status_colours_pass_aa_on_white() -> None:
 def test_text_on_the_dark_surface_passes_aa() -> None:
     for colour in _ON_DARK_SURFACE:
         assert _contrast(colour, _DARK_SURFACE) >= _AA_BODY, f"{colour} fell below AA"
+
+
+#: Foreground/background pairs as the components actually combine them, rather
+#: than each colour against a notional white. `text-danger` is never rendered on
+#: white - it sits on `bg-danger-bg` - so white was the wrong thing to measure.
+_REAL_PAIRINGS = {
+    "safe on safe-bg (light)": ("#047857", "#ECFDF5"),
+    "safe on safe-bg (dark)": ("#34d399", "#0d2c24"),
+    "spam-text on warning-bg (dark)": ("#fbbf24", "#332508"),
+}
+
+#: Measured 3 September 2026. Red is the one accent with no darker text variant.
+_DANGER_TEXT_LIGHT = ("#ef4444", "#fef2f2")
+_DANGER_TEXT_DARK = ("#ef4444", "#3a1215")
+
+
+def test_verdict_colours_pass_aa_where_they_are_actually_used() -> None:
+    for name, (fg, bg) in _REAL_PAIRINGS.items():
+        assert _contrast(fg, bg) >= _AA_BODY, f"{name} fell below AA"
+
+
+def test_danger_text_is_a_known_aa_failure() -> None:
+    """Documents a real failure so it cannot be quietly forgotten.
+
+    This asserts the bug, which is unusual and deliberate. The pairing is below
+    AA today and the fix is a product decision about a verdict colour, not a
+    documentation change. Pinning it means the day someone darkens the red,
+    this test fails and points at the docs that must be updated with it —
+    rather than the failure simply persisting because nothing watched it.
+
+    When it is fixed: raise both to >= _AA_BODY and delete this test.
+    #B91C1C reaches 5.91:1 on the light surface, #F87171 5.94:1 on the dark.
+    """
+    light = _contrast(*_DANGER_TEXT_LIGHT)
+    dark = _contrast(*_DANGER_TEXT_DARK)
+
+    assert light < _AA_BODY, (
+        f"danger text now measures {light:.2f}:1 in light mode. If this was "
+        f"fixed deliberately, update docs/architecture/accessibility.md and "
+        f"docs/brand/*.md, then delete this test."
+    )
+    assert dark < _AA_BODY, (
+        f"danger text now measures {dark:.2f}:1 in dark mode. Same follow-up."
+    )
+    # It is at least readable as large text, which is why it is a gap and not
+    # an emergency.
+    assert light >= _AA_LARGE
