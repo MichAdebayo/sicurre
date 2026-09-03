@@ -13,6 +13,10 @@ export const documentTitleKeys = {
   alerts: "page_titles.notifications",
   "domain-shield": "page_titles.domain_shield",
   logs: "page_titles.admin",
+  "admin-operations": "admin.views.operations",
+  "admin-incidents": "admin.views.incidents",
+  "admin-integrations": "admin.views.integrations",
+  "admin-reviews": "admin.views.reviews",
   settings: "page_titles.settings",
   support: "page_titles.support",
 } as const;

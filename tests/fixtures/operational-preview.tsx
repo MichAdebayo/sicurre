@@ -11,7 +11,7 @@ import en from "../../src/app/locales/en.json";
 // Local visual fixture: every request is intercepted, never forwarded to production.
 const params = new URLSearchParams(location.search);
 document.documentElement.classList.toggle("dark", params.get("theme") === "dark");
-const state = { enabled: true, active: null as Record<string, unknown> | null, recent: [] as Record<string, unknown>[] };
+const state = { enabled: true, supported_types: ["api_unavailable", "high_latency", "elevated_5xx"], active: null as Record<string, unknown> | null, recent: [] as Record<string, unknown>[] };
 window.fetch = async (_input, init) => {
   if (params.get("state") === "error") return new Response("{}", { status: 503 });
   if (init?.method === "POST") {
@@ -20,7 +20,7 @@ window.fetch = async (_input, init) => {
       state.active.recovered_at = new Date().toISOString();
       state.active = null;
     } else {
-      state.active = { id: "local-visual-fixture", exercise_type: "api_unavailable", status: "active",
+      state.active = { id: "local-visual-fixture", exercise_type: JSON.parse(String(init.body)).exercise_type, status: "active",
         started_at: new Date().toISOString(), expires_at: new Date(Date.now() + 240000).toISOString(),
         initiated_by: "operator@example.test", recovered_at: null };
       state.recent.unshift(state.active);

@@ -11,6 +11,10 @@ const labels: Record<string, string> = {
   "page_titles.dashboard": "Tableau de bord",
   "page_titles.domain_shield": "Bouclier de domaine",
   "page_titles.admin": "Console d’administration",
+  "admin.views.operations": "Opérations",
+  "admin.views.incidents": "Incidents",
+  "admin.views.integrations": "Intégrations",
+  "admin.views.reviews": "À examiner",
 };
 
 const translate = (key: string) => labels[key] ?? key;
@@ -25,6 +29,10 @@ describe("browser document titles", () => {
     ["dashboard", "Tableau de bord | Sicurre"],
     ["domain-shield", "Bouclier de domaine | Sicurre"],
     ["logs", "Console d’administration | Sicurre"],
+    ["admin-operations", "Opérations | Sicurre"],
+    ["admin-incidents", "Incidents | Sicurre"],
+    ["admin-integrations", "Intégrations | Sicurre"],
+    ["admin-reviews", "À examiner | Sicurre"],
   ] as const)("builds the %s route title", (view, expected) => {
     expect(buildDocumentTitle(view, translate)).toBe(expected);
   });
