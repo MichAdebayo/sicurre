@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import HTTPException
@@ -12,6 +14,7 @@ from starlette.requests import Request
 
 from core.config import Settings
 from core.operational_exercises import OperationalExercise, OperationalExerciseManager
+from data_platform.api import main as api_main
 from data_platform.api.auth import AuthUser
 from data_platform.api.main import create_app
 from data_platform.api.routers import app_routes
@@ -307,3 +310,53 @@ async def test_failed_recovery_write_keeps_signal_active(monkeypatch: pytest.Mon
         assert manager.current() == active
     finally:
         manager.recover(active["id"])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("exercise_type,seconds", [("unknown", 120), ("api_unavailable", -1)])
+async def test_restore_ignores_invalid_or_expired_exercise(exercise_type: str, seconds: int) -> None:
+    manager = OperationalExerciseManager()
+    now = datetime.now(UTC)
+    manager.restore(OperationalExercise(
+        id="invalid", exercise_type=exercise_type, initiated_by="admin@example.test",
+        started_at=now.isoformat(), expires_at=(now + timedelta(seconds=seconds)).isoformat(),
+    ))
+    assert manager.current() is None
+    assert manager._recovery_task is None
+
+
+@pytest.mark.asyncio
+async def test_restore_does_not_replace_an_active_exercise() -> None:
+    manager = OperationalExerciseManager()
+    active = manager.start(
+        exercise_id="existing", exercise_type="api_unavailable",
+        initiated_by="admin@example.test", duration_seconds=120,
+    )
+    task = manager._recovery_task
+    try:
+        manager.restore(replace(OperationalExercise(**active), id="other"))
+        assert manager.current() == active
+        assert manager._recovery_task is task
+    finally:
+        manager.recover(active["id"])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("enabled,db_failure", [(False, False), (True, False), (True, True)])
+async def test_startup_restores_exercises_only_when_enabled_and_tolerates_database_failure(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+    enabled: bool, db_failure: bool,
+) -> None:
+    settings = Settings(
+        _env_file=None, environment="test", scheduler_enabled=False,
+        operational_tests_enabled=enabled,
+    )
+    restore = AsyncMock(side_effect=SQLAlchemyError("private database detail") if db_failure else None)
+    monkeypatch.setattr(api_main, "get_settings", lambda: settings)
+    monkeypatch.setattr(api_main, "keepalive_enabled", lambda: False)
+    monkeypatch.setattr(api_main, "synchronize_operational_exercises", restore)
+    monkeypatch.setattr(api_main, "close_inference_client", AsyncMock())
+    async with api_main.lifespan(None):
+        assert restore.await_count == int(enabled)
+    assert ("restoration deferred" in caplog.text) is db_failure
+    assert "private database detail" not in caplog.text
