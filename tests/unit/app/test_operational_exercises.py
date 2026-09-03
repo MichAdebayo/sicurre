@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy.exc import SQLAlchemyError
 from starlette.requests import Request
 
 from core.config import Settings
@@ -153,7 +154,7 @@ async def test_admin_starts_and_recovers_audited_exercise(
     )
     await asyncio.sleep(0)
     assert started["exercise_type"] == "high_latency"
-    assert "INSERT INTO app_operational_exercise" in queries[0][0]
+    assert any("INSERT INTO app_operational_exercise" in sql for sql, _ in queries)
 
     recovered = await app_routes.recover_operational_exercise.__wrapped__(
         _request(), started["id"], _user(admin=True)
@@ -198,6 +199,11 @@ async def test_operational_exercise_status_and_automatic_recovery(
 @pytest.mark.asyncio
 async def test_recovery_rejects_unknown_active_exercise(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(app_routes, "operational_exercises", OperationalExerciseManager())
+
+    async def no_rows(*_args):
+        return []
+
+    monkeypatch.setattr(app_routes, "execute_runtime_query", no_rows)
     with pytest.raises(HTTPException) as exc:
         await app_routes.recover_operational_exercise.__wrapped__(
             _request(), "missing", _user(admin=True)
@@ -213,3 +219,91 @@ async def test_metrics_endpoint_exposes_operational_metric() -> None:
     )
     response = await endpoint()
     assert b"sicurre_operational_exercise_active" in response.body
+
+
+@pytest.mark.asyncio
+async def test_restore_unexpired_exercise_after_restart(monkeypatch: pytest.MonkeyPatch) -> None:
+    manager = OperationalExerciseManager()
+    now = datetime.now(UTC)
+    row = {
+        "id": "restart-test",
+        "exercise_type": "api_unavailable",
+        "status": "active",
+        "initiated_by": "admin@example.test",
+        "started_at": now.isoformat(),
+        "expires_at": (now + timedelta(seconds=120)).isoformat(),
+    }
+
+    async def execute(_sql, _params=()):
+        return [row]
+
+    monkeypatch.setattr(app_routes, "execute_runtime_query", execute)
+    monkeypatch.setattr(app_routes, "operational_exercises", manager)
+    await app_routes.synchronize_operational_exercises()
+    assert manager.current()["id"] == row["id"]
+    task = manager._recovery_task
+    await app_routes.synchronize_operational_exercises()
+    assert manager._recovery_task is task
+    manager.recover(row["id"])
+    for pending in tuple(app_routes._operational_background_tasks):
+        pending.cancel()
+
+
+@pytest.mark.asyncio
+async def test_expired_persisted_exercise_is_closed_without_reactivation(monkeypatch) -> None:
+    manager = OperationalExerciseManager()
+    expired = (datetime.now(UTC) - timedelta(seconds=30)).isoformat()
+    queries = []
+
+    async def execute(sql, params=()):
+        queries.append((sql, params))
+        return (
+            [{"id": "old", "status": "active", "expires_at": expired}]
+            if sql.startswith("SELECT")
+            else [{"id": "old"}]
+        )
+
+    monkeypatch.setattr(app_routes, "execute_runtime_query", execute)
+    monkeypatch.setattr(app_routes, "operational_exercises", manager)
+    await app_routes.synchronize_operational_exercises()
+    assert manager.current() is None
+    assert queries[-1][1] == ("recovered", expired, "old")
+
+
+@pytest.mark.asyncio
+async def test_automatic_recovery_does_not_log_a_second_manual_recovery(
+    monkeypatch, caplog
+) -> None:
+    async def already_recovered(*_args):
+        return []
+
+    monkeypatch.setattr(app_routes, "execute_runtime_query", already_recovered)
+    await app_routes._persist_exercise_recovery("manual", datetime.now(UTC).isoformat())
+    assert "Operational exercise expired" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_failed_recovery_write_keeps_signal_active(monkeypatch: pytest.MonkeyPatch) -> None:
+    manager = OperationalExerciseManager()
+    active = manager.start(
+        exercise_id="db-failure",
+        exercise_type="api_unavailable",
+        initiated_by="admin@example.test",
+        duration_seconds=120,
+    )
+
+    async def execute(sql: str, _params: tuple = ()) -> list[dict]:
+        if sql.startswith("UPDATE"):
+            raise SQLAlchemyError("database unavailable")
+        return []
+
+    monkeypatch.setattr(app_routes, "operational_exercises", manager)
+    monkeypatch.setattr(app_routes, "execute_runtime_query", execute)
+    try:
+        with pytest.raises(SQLAlchemyError):
+            await app_routes.recover_operational_exercise.__wrapped__(
+                _request(), active["id"], _user(admin=True)
+            )
+        assert manager.current() == active
+    finally:
+        manager.recover(active["id"])
