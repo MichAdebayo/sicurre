@@ -3,13 +3,33 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import logging
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from threading import Lock
 
 from prometheus_client import Counter, Gauge
 
+logger = logging.getLogger(__name__)
 EXERCISE_TYPES = frozenset({"api_unavailable", "high_latency", "elevated_5xx"})
+
+
+def log_exercise_event(
+    *, event: str, message: str, exercise_id: str, exercise_type: str,
+    actor_id: str, recovery_mode: str | None = None,
+) -> None:
+    """Emit an audit JSON line that survives the default process log formatter."""
+    record = {
+        "level": "warning", "service": "sicurre-api", "event": event,
+        "message": message, "timestamp": datetime.now(UTC).isoformat(),
+        "exercise_id": exercise_id, "exercise_type": exercise_type,
+        "actor_id": actor_id, "actor_type": "system" if recovery_mode == "automatic" else "user",
+        "synthetic": True,
+    }
+    if recovery_mode:
+        record["recovery_mode"] = recovery_mode
+    logger.warning(json.dumps(record, ensure_ascii=True))
 
 _active_signal = Gauge(
     "sicurre_operational_exercise_active",

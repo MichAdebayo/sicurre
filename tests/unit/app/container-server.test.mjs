@@ -61,6 +61,14 @@ afterAll(async () => {
 });
 
 describe("app gateway routing and metrics", () => {
+  it.each(["/admin", "/admin/operations", "/admin/incidents", "/admin/integrations", "/admin/reviews"])("serves the application shell for direct %s navigation", async (pathname) => {
+    expect(gateway.shouldProxy(pathname)).toBeNull();
+    const response = await fetch(`${gatewayBase}${pathname}`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(await response.text()).toContain("sicurre shell");
+  });
+
   it.each([
     ["/api/auth/session", "auth"],
     ["/v1/threats", "api"],

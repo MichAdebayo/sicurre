@@ -4,7 +4,9 @@ import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard,
   Activity,
-  History,
+  FlaskConical,
+  Cloud,
+  Flag,
   Settings,
   HelpCircle,
   LogOut,
@@ -32,6 +34,10 @@ export type SidebarPage =
   | "alerts"
   | "domain-shield"
   | "logs"
+  | "admin-operations"
+  | "admin-incidents"
+  | "admin-integrations"
+  | "admin-reviews"
   | "settings"
   | "support";
 
@@ -89,6 +95,7 @@ function RailButton({
       onClick={onClick}
       disabled={disabled}
       aria-disabled={disabled}
+      aria-current={active ? "page" : undefined}
       aria-label={collapsed ? label : undefined}
       title={title ?? (collapsed ? label : undefined)}
       className={clsx(
@@ -155,9 +162,11 @@ export function Sidebar({
   ] as const;
 
   const adminNav = [
-    { id: "logs", label: t("sidebar.nav_admin_console"), icon: History },
-    { ...baseNav[0], label: t("sidebar.back_to_workspace") },
-    baseNav[5],
+    { id: "logs", label: t("admin.views.overview"), icon: LayoutDashboard },
+    { id: "admin-operations", label: t("admin.views.operations"), icon: Activity },
+    { id: "admin-incidents", label: t("admin.views.incidents"), icon: FlaskConical },
+    { id: "admin-integrations", label: t("admin.views.integrations"), icon: Cloud },
+    { id: "admin-reviews", label: t("admin.views.reviews"), icon: Flag },
   ] as const;
 
   const mainNav = administration ? adminNav : baseNav;
@@ -318,7 +327,7 @@ export function Sidebar({
 
       {/* Bottom Section */}
       <div className="space-y-1 border-t border-border-subtle px-3 pb-4 pt-3">
-        {bottomNav.map((item) => (
+        {!administration && bottomNav.map((item) => (
           <RailButton
             key={item.id}
             icon={item.icon}

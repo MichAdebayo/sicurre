@@ -7,8 +7,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppShell } from "../../../src/app/components/common/app-shell";
 import { AppToast } from "../../../src/app/components/common/app-toast";
 import { Sidebar } from "../../../src/app/components/common/sidebar";
+import { TopBar } from "../../../src/app/components/common/top-bar";
 
-const domainState = vi.hoisted(() => ({ isLoading: false, isError: false }));
+const domainState = vi.hoisted(() => ({ isLoading: false, isError: false, activeDomain: "vinse.app" }));
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: "fr" } }),
@@ -39,12 +40,23 @@ vi.mock("../../../src/app/lib/api", () => ({
 afterEach(() => {
   domainState.isLoading = false;
   domainState.isError = false;
+  domainState.activeDomain = "vinse.app";
   cleanup();
   localStorage.clear();
   vi.restoreAllMocks();
 });
 
 describe("application navigation", () => {
+  it("resets the admin page scroll container when changing destinations", () => {
+    const props = { onPageChange: vi.fn(), onLogout: vi.fn(), administration: true };
+    const { rerender } = render(<AppShell {...props} currentPage="admin-integrations"><p>Domains</p></AppShell>);
+    const previousMain = screen.getByRole("main");
+    previousMain.scrollTop = 800;
+    rerender(<AppShell {...props} currentPage="admin-operations"><p>Operations</p></AppShell>);
+    expect(screen.getByRole("main")).not.toBe(previousMain);
+    expect(screen.getByRole("main").scrollTop).toBe(0);
+  });
+
   it.each(["isLoading", "isError"] as const)("does not claim missing protection during %s", (state) => {
     domainState[state] = true;
     render(<Sidebar currentPage="domain-shield" onPageChange={vi.fn()} onLogout={vi.fn()} workspaceName="Workspace" userRole="owner" />);
@@ -89,7 +101,7 @@ describe("application navigation", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /sidebar.nav_admin_console/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: "admin.views.overview" })).toBeVisible();
     expect(screen.queryByRole("button", { name: /sidebar.nav_quarantine/i })).not.toBeInTheDocument();
   });
 
@@ -276,11 +288,29 @@ describe("workspace context in the rail", () => {
     expect(screen.queryByRole("button", { name: /sidebar.nav_admin_console/i })).not.toBeInTheDocument();
   });
 
-  it("offers a return to the workspace from administration", () => {
+  it("keeps all four admin destinations available without customer utilities", () => {
     const navigate = vi.fn();
     render(<Sidebar currentPage="logs" onPageChange={navigate} onLogout={vi.fn()} administration onboardingRequired />);
-    fireEvent.click(screen.getByRole("button", { name: /sidebar.back_to_workspace/i }));
-    expect(navigate).toHaveBeenCalledWith("dashboard");
+    expect(screen.queryByText("topbar.system_operational")).not.toBeInTheDocument();
+    for (const [name, page] of [["overview", "logs"], ["operations", "admin-operations"], ["incidents", "admin-incidents"], ["integrations", "admin-integrations"], ["reviews", "admin-reviews"]]) {
+      const button = screen.getByRole("button", { name: `admin.views.${name}` });
+      expect(button).toBeEnabled();
+      fireEvent.click(button);
+      expect(navigate).toHaveBeenLastCalledWith(page);
+    }
+    expect(screen.getByRole("button", { name: "admin.views.overview" })).toHaveAttribute("aria-current", "page");
+    for (const name of ["sidebar.back_to_workspace", "sidebar.nav_settings", "sidebar.nav_support"]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
+    expect(screen.getByRole("switch")).toBeEnabled();
+    expect(screen.getByRole("button", { name: "common.logout" })).toBeEnabled();
+  });
+
+  it("does not label a customer without a domain as the admin console", () => {
+    domainState.activeDomain = "";
+    render(<TopBar onboardingRequired />);
+    expect(screen.getByText("sidebar.no_domain")).toBeVisible();
+    expect(screen.queryByText("topbar.console_name")).not.toBeInTheDocument();
   });
 });
 
