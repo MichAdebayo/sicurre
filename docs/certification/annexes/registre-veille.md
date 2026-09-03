@@ -3,7 +3,7 @@
 ## Organisation
 
 - **Périmètre** : IA francophone, sécurité API, sécurité des données, routage
-  e-mail et accessibilité des livrables.
+  e-mail, accessibilité des livrables et accessibilité de l'interface.
 - **Cadence prévue** : une heure chaque semaine ; revue immédiate lors d'une
   alerte CERT-FR/ANSSI ou d'un changement de fournisseur critique.
 - **Agrégation** : flux RSS officiels lorsqu'ils existent, notifications de
@@ -26,6 +26,7 @@
 | Routage e-mail | Cloudflare, [Email Routing rules](https://developers.cloudflare.com/email-service/configuration/email-routing-addresses/) | mise à jour 09/06/2026, consultée le 17/07/2026 | Haute pour le comportement produit : documentation éditeur datée | Une règle associe une adresse à une destination vérifiée ou un Worker ; les destinations sont partagées au niveau compte | Worker par domaine et destination vérifiée ; provisionnement idempotent et erreurs de permission explicites |
 | Service managé alternatif | Hugging Face, [Inference Endpoints Security](https://huggingface.co/docs/inference-endpoints/security) et [Pricing](https://huggingface.co/docs/inference-endpoints/pricing) | consulté le 17/07/2026 | Moyenne-haute : documentation éditeur, intérêt commercial explicite | TLS, endpoints protégés/privés, logs annoncés 30 jours ; facturation à la minute selon l'instance | Alternative viable mais non retenue pour le POC : coût, rétention déclarée et dépendance fournisseur |
 | API générative alternative | OpenAI, [Enterprise privacy](https://openai.com/enterprise-privacy/) et [Data controls](https://platform.openai.com/docs/models/default-usage-policies-by-endpoint) | mise à jour 08/01/2026, consultée le 17/07/2026 | Moyenne-haute : documentation fournisseur ; conditions à vérifier contractuellement | Données API non utilisées pour l'entraînement par défaut ; conservation de surveillance pouvant atteindre 30 jours sauf contrôles éligibles | Ne pas envoyer les e-mails par défaut ; LLM optionnel seulement après analyse de traitement et consentement/configuration appropriée |
+| Accessibilité de l'interface | W3C, [WCAG 2.1](https://www.w3.org/TR/WCAG21/) | Recommandation, révision du 06/05/2025, consultée le 03/09/2026 | Haute : recommandation W3C, critères testables et versionnés | Le critère 1.4.3 exige 4,5:1 pour le texte courant et 3:1 pour le grand texte ; le critère 2.4.7 exige un indicateur de focus clavier visible | Palette vérifiée par calcul plutôt que par déclaration : le bleu primaire `#4A90D9` mesure 3,34:1 sur blanc et ne convient donc qu'au grand texte, d'où l'usage de `#2E6BB5` (5,40:1) pour tout texte cliquable |
 
 ## Synthèse communiquable
 
