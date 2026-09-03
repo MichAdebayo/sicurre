@@ -13,6 +13,9 @@ instead.
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 #: The palette is reproduced here rather than parsed out of
 #: `docs/brand/DESIGN.md`, which is not tracked by this repository. A test that
 #: reads an untracked file passes locally and fails in CI, and worse, silently
@@ -45,6 +48,25 @@ def _contrast(a: str, b: str) -> float:
 
 def test_link_blue_passes_aa_for_body_text() -> None:
     assert _contrast(_LINK_BLUE, _WHITE) >= _AA_BODY
+
+
+def test_operational_panel_token_pairs_pass_aa_in_both_themes() -> None:
+    css = (Path(__file__).resolve().parents[3] / "src/app/index.css").read_text()
+    light_css, dark_css = css.split("html.dark {", maxsplit=1)
+    declarations = r"--color-([\w-]+):\s*(#[0-9a-fA-F]{6})\s*;"
+    light = dict(re.findall(declarations, light_css))
+    dark = {**light, **dict(re.findall(declarations, dark_css.split("}", 1)[0]))}
+    pairs = [
+        ("on-primary", "navy-dark"),
+        ("on-primary-container", "primary-container"),
+        ("warning", "warning-bg"),
+        ("on-error-container", "error-container"),
+        ("on-surface-variant", "surface-low"),
+    ]
+    for mode, palette in [("light", light), ("dark", dark)]:
+        for foreground, background in pairs:
+            ratio = _contrast(palette[foreground], palette[background])
+            assert ratio >= _AA_BODY, f"{mode}: {foreground}/{background} is {ratio:.2f}:1"
 
 
 def test_primary_blue_is_below_aa_on_white() -> None:

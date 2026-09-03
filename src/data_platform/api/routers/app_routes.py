@@ -11,7 +11,7 @@ import uuid
 import xml.etree.ElementTree as ET
 import zipfile
 from contextlib import suppress
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import get_settings
 from core.database import get_async_session
-from core.operational_exercises import EXERCISE_TYPES, operational_exercises
+from core.operational_exercises import EXERCISE_TYPES, OperationalExercise, operational_exercises
 from core.rate_limit import limiter
 from core.secret_cipher import decrypt_secret
 from data_platform.api.auth import AuthUser, get_current_user
@@ -1334,19 +1334,51 @@ async def get_admin_domains(
     }
 
 
-async def _mark_exercise_recovered(exercise_id: str, duration_seconds: int) -> None:
-    """Persist automatic recovery after the synthetic signal expires."""
-    await asyncio.sleep(duration_seconds + 1)
-    recovered_at = datetime.now(timezone.utc).isoformat()
-    await execute_runtime_query(
+async def _persist_exercise_recovery(exercise_id: str, recovered_at: str) -> None:
+    """Persist once; a manual recovery must not later be logged as automatic."""
+    changed = await execute_runtime_query(
         "UPDATE app_operational_exercise SET status = ?, recovered_at = ? "
-        "WHERE id = ? AND status = 'active'",
+        "WHERE id = ? AND status = 'active' RETURNING id",
         ("recovered", recovered_at, exercise_id),
     )
-    logger.warning(
-        "Operational exercise recovered automatically",
-        extra={"exercise_id": exercise_id, "event": "operational_exercise_recovered"},
+    if changed:
+        logger.warning(
+            "Operational exercise expired",
+            extra={"exercise_id": exercise_id, "event": "operational_exercise_recovered"},
+        )
+
+
+async def synchronize_operational_exercises() -> None:
+    """Reconcile persisted exercises after expiry or an API process restart."""
+    rows = await execute_runtime_query(
+        "SELECT id, exercise_type, initiated_by, started_at, expires_at, status "
+        "FROM app_operational_exercise WHERE status = 'active' ORDER BY started_at DESC"
     )
+    now = datetime.now(UTC)
+    for row in rows:
+        if row.get("status") != "active":
+            continue
+        remaining = (datetime.fromisoformat(row["expires_at"]) - now).total_seconds()
+        if remaining <= 0:
+            await _persist_exercise_recovery(row["id"], row["expires_at"])
+        elif operational_exercises.current() is None:
+            operational_exercises.restore(OperationalExercise(
+                id=row["id"],
+                exercise_type=row["exercise_type"],
+                initiated_by=row["initiated_by"],
+                started_at=row["started_at"],
+                expires_at=row["expires_at"],
+            ))
+            task = asyncio.create_task(_mark_exercise_recovered(row["id"], remaining))
+            _operational_background_tasks.add(task)
+            task.add_done_callback(_operational_background_tasks.discard)
+
+
+async def _mark_exercise_recovered(exercise_id: str, duration_seconds: float) -> None:
+    """Persist automatic recovery after the synthetic signal expires."""
+    await asyncio.sleep(duration_seconds + 1)
+    recovered_at = datetime.now(UTC).isoformat()
+    await _persist_exercise_recovery(exercise_id, recovered_at)
 
 
 @router.get(
@@ -1358,6 +1390,7 @@ async def get_operational_exercises(current_user: AuthUser = Depends(get_current
     """Return active state and recent audit records for platform administrators."""
     if not current_user.is_platform_admin:
         raise HTTPException(status_code=403, detail="Platform admin access required")
+    await synchronize_operational_exercises()
     rows = await execute_runtime_query(
         "SELECT id, exercise_type, status, initiated_by, started_at, expires_at, recovered_at "
         "FROM app_operational_exercise ORDER BY started_at DESC LIMIT 10"
@@ -1394,6 +1427,7 @@ async def start_operational_exercise(
             status_code=422, detail="Exercise duration exceeds the configured limit"
         )
 
+    await synchronize_operational_exercises()
     exercise_id = str(uuid.uuid4())
     try:
         active = operational_exercises.start(
@@ -1452,14 +1486,16 @@ async def recover_operational_exercise(
     del request
     if not current_user.is_platform_admin:
         raise HTTPException(status_code=403, detail="Platform admin access required")
-    recovered = operational_exercises.recover(exercise_id)
-    if recovered is None:
+    await synchronize_operational_exercises()
+    recovered = operational_exercises.current()
+    if recovered is None or recovered["id"] != exercise_id:
         raise HTTPException(status_code=404, detail="Active operational exercise not found")
     recovered_at = datetime.now(timezone.utc).isoformat()
     await execute_runtime_query(
         "UPDATE app_operational_exercise SET status = ?, recovered_at = ? WHERE id = ?",
         ("recovered", recovered_at, exercise_id),
     )
+    operational_exercises.recover(exercise_id)
     logger.warning(
         "Controlled operational exercise recovered",
         extra={"exercise_id": exercise_id, "event": "operational_exercise_recovered"},

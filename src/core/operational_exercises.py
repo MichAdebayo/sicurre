@@ -21,6 +21,8 @@ _exercise_total = Counter(
     "Controlled operational exercises started by type.",
     ("exercise_type",),
 )
+for _exercise_type in sorted(EXERCISE_TYPES):
+    _active_signal.labels(exercise_type=_exercise_type).set(0)
 
 
 @dataclass(frozen=True)
@@ -81,6 +83,20 @@ class OperationalExerciseManager:
             )
         return asdict(exercise)
 
+    def restore(self, exercise: OperationalExercise) -> None:
+        """Resume a persisted, unexpired signal without counting a new test."""
+        remaining = (
+            datetime.fromisoformat(exercise.expires_at) - datetime.now(UTC)
+        ).total_seconds()
+        if exercise.exercise_type not in EXERCISE_TYPES or remaining <= 0:
+            return
+        with self._lock:
+            if self._active is not None:
+                return
+            self._active = exercise
+            _active_signal.labels(exercise_type=exercise.exercise_type).set(1)
+            self._recovery_task = asyncio.create_task(self._recover_after(exercise.id, remaining))
+
     def recover(self, exercise_id: str) -> dict[str, str] | None:
         """Clear an active exercise when its identifier matches."""
         with self._lock:
@@ -90,7 +106,7 @@ class OperationalExerciseManager:
             self._clear_locked()
             return recovered
 
-    async def _recover_after(self, exercise_id: str, duration_seconds: int) -> None:
+    async def _recover_after(self, exercise_id: str, duration_seconds: float) -> None:
         await asyncio.sleep(duration_seconds)
         self.recover(exercise_id)
 
