@@ -135,6 +135,7 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    local_docs = settings.environment.strip().lower() in {"dev", "development", "local"}
 
     app = FastAPI(
         title="Sicurre Platform API",
@@ -145,6 +146,9 @@ def create_app() -> FastAPI:
             "internal and email-gateway routes require their documented service credentials."
         ),
         version="1.0.0",
+        docs_url="/docs" if local_docs else None,
+        redoc_url="/redoc" if local_docs else None,
+        openapi_url="/openapi.json" if local_docs else None,
         openapi_tags=OPENAPI_TAGS,
         servers=[{"url": "/", "description": "Current Sicurre deployment"}],
         lifespan=lifespan,

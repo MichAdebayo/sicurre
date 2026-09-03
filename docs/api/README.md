@@ -15,6 +15,19 @@ document differs from `create_app().openapi()`. Update the route models and meta
 regenerate the artifact, and commit both in the same change. Do not edit generated
 schemas directly.
 
+## Local reference pages
+
+Run `make dev` for the local application stack:
+
+- Application API: `http://127.0.0.1:8001/docs` (ReDoc: `/redoc`, schema: `/openapi.json`).
+- Authentication: `http://127.0.0.1:3005/api/auth/reference` (schema: `/api/auth/open-api/generate-schema`).
+- ML: start the local server in `sicurre-ml`, then open `http://127.0.0.1:8000/docs`.
+
+Documentation is enabled only for `dev`, `development`, or `local` environments.
+Production serves neither the interactive references nor their JSON schemas.
+Generated contracts and authenticated API operations remain available as before.
+Disabling documentation is an exposure policy, not a replacement for authorization.
+
 ## API surfaces
 
 The current API contract intentionally exposes three runtime surfaces:
