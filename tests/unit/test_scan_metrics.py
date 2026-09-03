@@ -204,6 +204,7 @@ def test_lifespan_starts_and_stops_the_keepalive() -> None:
     class _S:
         environment = "test"
         scheduler_enabled = False
+        operational_tests_enabled = False
 
     orig_settings = api_main.get_settings
     orig_enabled = api_main.keepalive_enabled
