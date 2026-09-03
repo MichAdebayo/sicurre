@@ -7,26 +7,21 @@ import {
   BarChart3,
   Cloud,
   Flag,
-  FlaskConical,
   Inbox,
   LifeBuoy,
   RefreshCw,
   Search,
   Server,
   ShieldCheck,
-  Square,
   Users,
 } from "lucide-react";
 import {
   useAdminOverview,
   useAdminDomains,
   useAdminRuntimeHealth,
-  useOperationalExercises,
-  useRecoverOperationalExercise,
-  useStartOperationalExercise,
   type AdminRuntimeHealth,
-  type OperationalExerciseType,
 } from "../lib/api";
+import { OperationalExercisePanel } from "../components/admin/operational-exercise-panel";
 
 const MotionDiv = motion.div as any;
 
@@ -167,135 +162,6 @@ function RuntimeHealthPanel({
   );
 }
 
-const exerciseLabels: Record<OperationalExerciseType, string> = {
-  api_unavailable: "Indisponibilité API",
-  high_latency: "Latence élevée",
-  elevated_5xx: "Taux 5xx élevé",
-};
-
-function OperationalExercisePanel() {
-  const exercises = useOperationalExercises();
-  const startExercise = useStartOperationalExercise();
-  const recoverExercise = useRecoverOperationalExercise();
-  const [pendingType, setPendingType] = useState<OperationalExerciseType | null>(null);
-  const active = exercises.data?.active;
-
-  return (
-    <section className="border-y border-border-subtle py-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="max-w-3xl">
-          <div className="flex items-center gap-3">
-            <FlaskConical className="h-5 w-5 text-primary" />
-            <h2 className="app-h2">Tests opérationnels contrôlés</h2>
-          </div>
-          <p className="mt-2 text-sm leading-6 text-on-surface-variant">
-            Émet un signal synthétique borné pour vérifier Grafana, l’alerte e-mail et le retour à l’état normal. Aucun trafic client, conteneur ou contenu d’e-mail n’est modifié.
-          </p>
-        </div>
-        <span className={`w-fit rounded-full border px-3 py-1 text-sm font-bold ${
-          exercises.data?.enabled
-            ? "border-safe/25 bg-safe-bg text-safe"
-            : "border-border-subtle bg-surface-low text-on-surface-variant"
-        }`}>
-          {exercises.data?.enabled ? "Autorisé" : "Désactivé par configuration"}
-        </span>
-      </div>
-
-      {active ? (
-        <div role="status" className="mt-5 flex flex-col gap-4 border-l-4 border-warning bg-warning-bg p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="font-bold text-on-surface">{exerciseLabels[active.exercise_type]}</p>
-            <p className="mt-1 text-sm text-on-surface-variant">
-              Exercice {active.id.slice(0, 8)} · récupération automatique {formatDate(active.expires_at)}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => recoverExercise.mutate(active.id)}
-            disabled={recoverExercise.isPending}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-warning px-4 text-sm font-bold text-on-surface transition-colors hover:bg-warning/15 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Square className="h-4 w-4" />
-            Rétablir maintenant
-          </button>
-        </div>
-      ) : (
-        <div className="mt-5">
-          <div className="grid gap-3 md:grid-cols-3">
-            {(Object.keys(exerciseLabels) as OperationalExerciseType[]).map((exerciseType) => (
-              <button
-                key={exerciseType}
-                type="button"
-                onClick={() => setPendingType(exerciseType)}
-                disabled={!exercises.data?.enabled || startExercise.isPending}
-                className={`min-h-12 rounded-lg border px-4 py-3 text-left text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                  pendingType === exerciseType
-                    ? "border-primary bg-primary-fixed text-on-primary-container"
-                    : "border-border-subtle bg-surface-lowest text-on-surface hover:border-primary/50 dark:bg-surface-low"
-                }`}
-              >
-                {exerciseLabels[exerciseType]}
-              </button>
-            ))}
-          </div>
-          {pendingType && (
-            <div className="mt-4 flex flex-col gap-3 border-l-4 border-primary bg-primary-fixed p-4 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm leading-6 text-on-primary-container">
-                Confirmer l’exercice « {exerciseLabels[pendingType]} ». Le signal durera quatre minutes puis se rétablira automatiquement.
-              </p>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setPendingType(null)} className="h-10 px-3 text-sm font-bold text-on-primary-container">
-                  Annuler
-                </button>
-                <button
-                  type="button"
-                  onClick={() => startExercise.mutate(
-                    { exercise_type: pendingType, duration_seconds: 240 },
-                    { onSuccess: () => setPendingType(null) },
-                  )}
-                  className="h-10 rounded-lg bg-primary px-4 text-sm font-bold text-on-primary transition-colors hover:bg-primary-dark"
-                >
-                  Lancer le test
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {(startExercise.isError || recoverExercise.isError) && (
-        <p role="alert" className="mt-4 text-sm font-semibold text-error">
-          {(startExercise.error || recoverExercise.error)?.message}
-        </p>
-      )}
-
-      {exercises.data?.recent.length ? (
-        <div className="mt-6 overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="border-b border-border-subtle text-on-surface-variant">
-              <tr>
-                <th className="px-3 py-2 font-bold">Exercice</th>
-                <th className="px-3 py-2 font-bold">Début</th>
-                <th className="px-3 py-2 font-bold">Opérateur</th>
-                <th className="px-3 py-2 font-bold">État</th>
-              </tr>
-            </thead>
-            <tbody>
-              {exercises.data.recent.map((exercise) => (
-                <tr key={exercise.id} className="border-b border-border-subtle last:border-b-0">
-                  <td className="px-3 py-3 font-semibold text-on-surface">{exerciseLabels[exercise.exercise_type]}</td>
-                  <td className="px-3 py-3 text-on-surface-variant">{formatDate(exercise.started_at)}</td>
-                  <td className="px-3 py-3 text-on-surface-variant">{exercise.initiated_by}</td>
-                  <td className="px-3 py-3 font-semibold text-on-surface">{exercise.status === "active" ? "Actif" : "Rétabli"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
-    </section>
-  );
-}
 
 export default function LogsRoute() {
   const reduceMotion = useReducedMotion();
@@ -379,8 +245,11 @@ export default function LogsRoute() {
           )}
           {activeView === "operations" && (
             <>
-              <RuntimeHealthPanel health={runtimeHealth.data} isLoading={runtimeHealth.isLoading} />
               <OperationalExercisePanel />
+              <details className="min-w-0 border-b border-border-subtle pb-5">
+                <summary className="cursor-pointer py-3 font-semibold text-on-surface">{t("operational_test.dependencies")}</summary>
+                <RuntimeHealthPanel health={runtimeHealth.data} isLoading={runtimeHealth.isLoading} />
+              </details>
             </>
           )}
 
