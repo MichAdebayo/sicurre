@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 import pytest_asyncio
@@ -32,7 +32,7 @@ async def session() -> AsyncIterator[AsyncSession]:
 
 
 async def _seed_source(session: AsyncSession, source_name: str) -> None:
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     await session.execute(
         text(
             "INSERT INTO data_source_system (id, name, source_type,"
@@ -60,7 +60,7 @@ async def _seed_source(session: AsyncSession, source_name: str) -> None:
 
 
 async def _add_raw_record(session: AsyncSession, record_id: str, payload: dict) -> None:
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     await session.execute(
         text(
     # detected_language must be 'fr': run_batch isolates the French lane in its query.
@@ -150,7 +150,7 @@ async def test_an_extraction_failure_records_the_class_and_not_the_message(
 ) -> None:
     """An exception string can carry a fragment of the mail that caused it."""
     await _seed_source(session, "sap-labs-blog")
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     await session.execute(
         text(
             "INSERT INTO data_raw_record (id, raw_object_id, source_system_id,"

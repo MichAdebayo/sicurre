@@ -6,12 +6,10 @@ from pathlib import Path
 import pandas as pd
 
 from data_platform.cleaning.normalization import (
-    DEDUP_HASH_LEN,
     MIN_TEXT_LEN,
     TextNormalizationService,
     dedup_sha256,
 )
-
 
 OUTPUT_COLS: list[str] = [
     "text",

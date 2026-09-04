@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from hashlib import sha256
-from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -14,7 +13,7 @@ from data_platform.services.shared.review_persistence import ReviewPersistenceSe
 
 
 def _resolved_run_timestamp(run_timestamp: str | None) -> str:
-    return run_timestamp or datetime.now(timezone.utc).isoformat()
+    return run_timestamp or datetime.now(UTC).isoformat()
 
 
 def _coerce_source_parent(values: list[str]) -> str | None:

@@ -16,7 +16,7 @@ import asyncio
 import logging
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # ── Reserved-slot routing (must happen before settings are loaded) ─────────────
@@ -175,7 +175,7 @@ async def run_incremental_sql_cron() -> None:
 
     if result.raw_record_count > 0:
         # Update watermark in PipelineState
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         async with session_factory() as session:
             stmt = select(PipelineState).where(
                 PipelineState.pipeline_name == pipeline_name

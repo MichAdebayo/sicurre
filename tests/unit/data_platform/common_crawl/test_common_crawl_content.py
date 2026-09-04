@@ -5,11 +5,11 @@ from data_platform.services.common_crawl.content import CommonCrawlContentServic
 
 def test_common_crawl_content_service_extracts_message_from_noisy_text() -> None:
     cleaned = CommonCrawlContentService.clean_web_text(
-        (
+        
             "Accéder au Menu Principal Accéder au Contenu éditorial Comment me protéger des risques de vol ? "
             "Réinitialiser votre mot de passe. Choisissez l'envoi du mot de passe provisoire par SMS. "
             "Vous recevrez un code à usage unique sur votre numéro de téléphone mobile. Accéder au Pied de page"
-        )
+        
     )
 
     assert "mot de passe provisoire" in cleaned

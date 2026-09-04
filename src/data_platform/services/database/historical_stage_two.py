@@ -3,12 +3,12 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from db.models.lineage import NormalizedLabel
 from data_platform.services.database.source_naming import (
     database_source_family,
     database_source_leaf,
 )
 from data_platform.services.shared.stage_two_models import StageTwoReviewResult
+from db.models.lineage import NormalizedLabel
 
 
 class HistoricalStageTwoService:
@@ -101,11 +101,11 @@ class HistoricalStageTwoService:
         normalized_raw_label = (
             str(raw_label).strip().lower() if raw_label is not None else None
         )
-        if raw_label in {1, True} or normalized_raw_label in {"1", "phishing"}:
+        if raw_label in {1} or normalized_raw_label in {"1", "phishing"}:
             return NormalizedLabel.PHISHING
         if normalized_raw_label == "spam":
             return NormalizedLabel.SPAM
-        if raw_label in {0, False} or normalized_raw_label in {
+        if raw_label in {0} or normalized_raw_label in {
             "0",
             "legitimate",
             "ham",

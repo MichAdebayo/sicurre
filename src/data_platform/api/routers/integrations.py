@@ -26,7 +26,7 @@ import json
 import logging
 import secrets
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from time import perf_counter
 from typing import Any, Literal
 from uuid import NAMESPACE_URL, uuid4, uuid5
@@ -44,10 +44,10 @@ from fastapi import (
 from pydantic import BaseModel, Field
 
 from core.config import get_settings
-from core.loops import send_loops_transactional
-from core.rate_limit import limiter
 from core.inference_client import get_inference_client
+from core.loops import send_loops_transactional
 from core.mime_headers import decode_mime_header, extract_mime_body
+from core.rate_limit import limiter
 from core.scan_metrics import observe_scan, observe_scan_failure, observe_stage
 from core.secret_cipher import decrypt_secret, encrypt_secret
 from data_platform.api.auth import AuthUser, ensure_runtime_tables, get_current_user
@@ -222,7 +222,7 @@ async def _sync_domain_shield_dns(
     else:
         grade = "F"
 
-    ts = datetime.now(timezone.utc).isoformat()
+    ts = datetime.now(UTC).isoformat()
     await _async_query(
         """
         INSERT INTO app_domain_shield_status (
@@ -403,7 +403,7 @@ async def scan_email(
     integration = rows[0]
     settings = get_settings()
     workspace_id = integration.get("workspace_id")
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     message_id = payload.message_id.strip() if payload.message_id else ""
     event_id = (
         str(
@@ -588,7 +588,7 @@ async def scan_email(
     if verdict_safety == "phishing":
         quarantine_id = str(uuid4())
         expires_at = (
-            datetime.now(timezone.utc) + timedelta(days=settings.quarantine_retention_days)
+            datetime.now(UTC) + timedelta(days=settings.quarantine_retention_days)
         ).isoformat()
         try:
             await _async_query(
@@ -637,7 +637,7 @@ async def scan_email(
                 "WHERE workspace_id = ? AND lower(domain) = lower(?) LIMIT 1",
                 (workspace_id, integration.get("zone_name") or ""),
             )
-            notification_time = datetime.now(timezone.utc)
+            notification_time = datetime.now(UTC)
             if notification_is_allowed(
                 preference_rows[0] if preference_rows else None,
                 notification_time,
@@ -668,7 +668,7 @@ async def scan_email(
             logger.warning("Could not quarantine phishing email: %s", exc)
 
     # ── Persist to audit log ────────────────────────────────────────────────
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     db_subject = payload.subject[:240]
     db_sender = payload.sender[:200]
@@ -877,7 +877,7 @@ async def setup_cloudflare(
                 detail=f"An auto-configuration for {payload.zone_name} is already running in the background. Please wait.",
             )
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         try:
             provisioner = CloudflareProvisioner(api_token=api_token)
             dns_sync_result = await _sync_domain_shield_dns(
@@ -993,7 +993,7 @@ async def setup_cloudflare(
 
     # Insert a "provisioning" record so the UI can poll while setup runs
     integration_id = str(uuid4())
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     await _async_query(
         """
         INSERT INTO cloudflare_integration
@@ -1050,7 +1050,7 @@ async def setup_cloudflare(
     except CloudflareAPIError as exc:
         await _async_query(
             "UPDATE cloudflare_integration SET status='error', error_message=?, updated_at=? WHERE id=?",
-            (str(exc)[:500], datetime.now(timezone.utc).isoformat(), integration_id),
+            (str(exc)[:500], datetime.now(UTC).isoformat(), integration_id),
         )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -1065,7 +1065,7 @@ async def setup_cloudflare(
                 destination_email=str(payload.destination_email),
                 scan_url=scan_url,
             )
-            ts = datetime.now(timezone.utc).isoformat()
+            ts = datetime.now(UTC).isoformat()
             initial_status = "active" if result.destination_verified else "pending_verification"
             await _async_query(
                 """
@@ -1229,7 +1229,7 @@ async def setup_cloudflare(
             logger.info("Cloudflare provisioning complete for zone %s", payload.zone_name)
         except (CloudflareAPIError, Exception) as exc:
             logger.exception("Cloudflare provisioning failed: %s", exc)
-            ts = datetime.now(timezone.utc).isoformat()
+            ts = datetime.now(UTC).isoformat()
             await _async_query(
                 "UPDATE cloudflare_integration SET status='error', error_message=?, updated_at=? WHERE id=?",
                 (str(exc)[:500], ts, integration_id),
@@ -1473,7 +1473,7 @@ async def save_workspace_cloudflare_token(
             detail=f"Token verification failed: {str(exc)}",
         ) from exc
 
-    ts = datetime.now(timezone.utc).isoformat()
+    ts = datetime.now(UTC).isoformat()
     await _async_query(
         """
         INSERT INTO app_cloudflare_config (workspace_id, api_token, created_at, updated_at)

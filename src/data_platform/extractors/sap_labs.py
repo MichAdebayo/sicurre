@@ -1,21 +1,27 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import httpx
-from bs4 import BeautifulSoup
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import ROOT_DIR, get_settings
 from core.trace_logger import SemanticTraceLogger
+from data_platform.api.schemas import (
+    DataSourceCreate,
+    IngestionRunCreate,
+)
+from data_platform.services.shared.snapshot_storage import (
+    SnapshotStore,
+    SnapshotWriteResult,
+    build_snapshot_store,
+)
 from db.models import (
     DataIngestionRun,
     DataRawObject,
@@ -26,18 +32,9 @@ from db.models import (
     SourceType,
 )
 from db.queries import SourceSystemQueries
-from data_platform.api.schemas import (
-    DataSourceCreate,
-    IngestionRunCreate,
-)
 from db.services.lineage import (
     IngestionRunService,
     SourceSystemService,
-)
-from data_platform.services.shared.snapshot_storage import (
-    SnapshotStore,
-    SnapshotWriteResult,
-    build_snapshot_store,
 )
 
 logger = logging.getLogger(__name__)
@@ -86,8 +83,6 @@ class SapLabsScraperClient:
                     self.url, headers={"User-Agent": user_agent}
                 )
                 response.raise_for_status()
-                # Test parsing the HTML structure
-                soup = BeautifulSoup(response.text, "html.parser")
 
                 # Verify we actually hit the blog text, not a Cloudflare captcha or redirect
                 if (
@@ -160,7 +155,7 @@ class SapLabsIngestionService:
         trigger_mode: str = "manual",
         started_at: datetime | None = None,
     ) -> SapLabsIngestionResult:
-        run_started_at = started_at or datetime.now(timezone.utc)
+        run_started_at = started_at or datetime.now(UTC)
         self.trace.trace(
             stage="orchestration", status="start", message="SAP Labs ingestion starting"
         )
@@ -187,7 +182,7 @@ class SapLabsIngestionService:
             total_scraped_count = len(entries)
 
             if not entries:
-                ingestion_run.finished_at = datetime.now(timezone.utc)
+                ingestion_run.finished_at = datetime.now(UTC)
                 ingestion_run.status = IngestionStatus.COMPLETED
                 ingestion_run.log_message = "Scraper returned 0 entries"
                 self.trace.trace(
@@ -211,7 +206,7 @@ class SapLabsIngestionService:
             skipped_count = len(entries) - len(new_entries)
 
             if not new_entries:
-                ingestion_run.finished_at = datetime.now(timezone.utc)
+                ingestion_run.finished_at = datetime.now(UTC)
                 ingestion_run.status = IngestionStatus.COMPLETED
                 ingestion_run.log_message = f"All {len(entries)} SAP Labs entries already ingested — nothing new."
                 self.trace.trace(
@@ -272,7 +267,7 @@ class SapLabsIngestionService:
                 f"SAP Labs scraping completed: "
                 f"{len(raw_records)} new entries, {skipped_count} skipped."
             )
-            ingestion_run.finished_at = datetime.now(timezone.utc)
+            ingestion_run.finished_at = datetime.now(UTC)
             ingestion_run.status = IngestionStatus.COMPLETED
             ingestion_run.raw_object_count = 1
             ingestion_run.raw_record_count = len(raw_records)
@@ -301,7 +296,7 @@ class SapLabsIngestionService:
             )
 
         except Exception as exc:
-            ingestion_run.finished_at = datetime.now(timezone.utc)
+            ingestion_run.finished_at = datetime.now(UTC)
             ingestion_run.status = IngestionStatus.FAILED
             ingestion_run.log_message = f"SAP Labs ingestion failed: {exc}"
             self.trace.trace(
@@ -437,10 +432,10 @@ class SapLabsIngestionService:
         entries: list[dict[str, Any]],
         source_system: DataSourceSystem,
     ) -> list[DataRawRecord]:
-        extracted_at = datetime.now(timezone.utc)
+        extracted_at = datetime.now(UTC)
         raw_records: list[DataRawRecord] = []
 
-        for index, entry in enumerate(entries, start=1):
+        for _index, entry in enumerate(entries, start=1):
             record_key = self._entry_key(entry)
 
             subject = entry.get("subject", "")

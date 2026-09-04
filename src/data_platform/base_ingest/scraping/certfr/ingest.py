@@ -29,7 +29,7 @@ import logging
 import re
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -44,17 +44,16 @@ if str(SRC_ROOT) not in sys.path:
 
 from core.config import get_settings, redact_database_url  # noqa: E402
 from core.database import Base  # noqa: E402
+from data_platform.api.schemas import DataSourceCreate, IngestionRunCreate  # noqa: E402
+from data_platform.extractors.certfr_cti import CertFRCtiExtractor  # noqa: E402
+from data_platform.services.shared.r2_read_client import R2ReadClient  # noqa: E402
 from db.models import (  # noqa: E402
-    DataIngestionRun,
     DataRawObject,
     DataRawRecord,
     IngestionStatus,
     ObjectType,
 )
 from db.queries import IngestionRunQueries, SourceSystemQueries  # noqa: E402
-from data_platform.api.schemas import DataSourceCreate, IngestionRunCreate  # noqa: E402
-from data_platform.extractors.certfr_cti import CertFRCtiExtractor  # noqa: E402
-from data_platform.services.shared.r2_read_client import R2ReadClient  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -170,7 +169,7 @@ def _save_manifest(entries: list[_SnapshotEntry]) -> None:
         for e in entries
     ]
     manifest = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "description": (
             "R2-only CERT-FR TXT snapshots used for base ingestion. "
             "Replay with 'make certfr-ingest-base' on a DB that has already "
@@ -240,7 +239,7 @@ async def _ingest_snapshot(
             }
 
         source_sys = await _get_or_create_source_system(session, source_repo)
-        started_at = datetime.now(timezone.utc)
+        started_at = datetime.now(UTC)
 
         ingestion_run = await run_repo.create(
             session,
@@ -301,7 +300,7 @@ async def _ingest_snapshot(
         )
         session.add(raw_record)
 
-        ingestion_run.finished_at = datetime.now(timezone.utc)
+        ingestion_run.finished_at = datetime.now(UTC)
         ingestion_run.status = IngestionStatus.COMPLETED
         ingestion_run.raw_record_count = 1
         ingestion_run.raw_object_count = 1

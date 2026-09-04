@@ -128,7 +128,7 @@ def test_ping_issues_one_trivial_statement() -> None:
     executed: list[str] = []
 
     class _Conn:
-        async def __aenter__(self) -> "_Conn":
+        async def __aenter__(self) -> _Conn:
             return self
 
         async def __aexit__(self, *_: object) -> None:
@@ -138,7 +138,7 @@ def test_ping_issues_one_trivial_statement() -> None:
             executed.append(str(statement))
 
     class _Engine:
-        def connect(self) -> "_Conn":
+        def connect(self) -> _Conn:
             return _Conn()
 
     original = db_keepalive.get_app_engine

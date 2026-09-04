@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
@@ -12,6 +12,9 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from data_platform.services.common_crawl.promotion_review import (
+    CommonCrawlPromotionReviewService,
+)
 from db.models import (
     AnnotationLabelSource,
     DataAnnotation,
@@ -24,15 +27,12 @@ from db.models import (
     DataRawObject,
     DataRawRecord,
     DataSourceSystem,
-    GenerationSourceLinkRole,
     GenerationReviewState,
+    GenerationSourceLinkRole,
     IngestionStatus,
     ObjectType,
     RedactionStatus,
     SourceType,
-)
-from data_platform.services.common_crawl.promotion_review import (
-    CommonCrawlPromotionReviewService,
 )
 
 
@@ -439,7 +439,7 @@ class ReviewPersistenceService:
     ) -> tuple[DataGenerationRun, list[dict[str, Any]]]:
         run_payload = dict(payload.get("run") or {})
         created_at = _parse_datetime(run_payload.get("created_at")) or datetime.now(
-            timezone.utc
+            UTC
         )
         generation_run = DataGenerationRun(
             generator_name=str(run_payload.get("generator_name") or "unknown"),
@@ -792,7 +792,7 @@ class ReviewPersistenceService:
                     "Promotion payload references draft variants that are not staged in the provided generation run."
                 )
 
-        started_at = datetime.now(timezone.utc)
+        started_at = datetime.now(UTC)
         resolved_source_system_name = (
             source_system_name
             or _build_synthetic_source_system_name(
@@ -1051,7 +1051,7 @@ class ReviewPersistenceService:
         accepted_candidates = list(payload.get("accepted_candidates") or [])
         proposed_messages = list(payload.get("proposed_normalized_messages") or [])
         proposed_annotations = list(payload.get("proposed_annotations") or [])
-        started_at = datetime.now(timezone.utc)
+        started_at = datetime.now(UTC)
 
         accepted_candidates, proposed_messages, already_present = (
             await ReviewPersistenceService._drop_duplicate_cc_candidates(

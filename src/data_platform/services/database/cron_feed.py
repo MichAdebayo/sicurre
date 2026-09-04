@@ -4,7 +4,7 @@ import json
 import random
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from typing import Any
 
@@ -18,8 +18,8 @@ from data_platform.services.database.cron_scenarios import (
     CronArchetypeScenario,
 )
 from data_platform.services.database.seed import (
-    Base,
     DB_DIR,
+    Base,
     ExternalModelVersion,
     ExternalThreatLog,
     ExternalUser,
@@ -29,7 +29,6 @@ from data_platform.services.database.source_naming import build_database_source_
 from data_platform.services.shared.synthetic_generation import (
     SyntheticGenerationService,
 )
-
 
 DEFAULT_CRON_FEED_DB_PATH = DB_DIR / "external_threats.db"
 DEFAULT_CRON_FEED_DB_URL = f"sqlite:///{DEFAULT_CRON_FEED_DB_PATH}"
@@ -138,7 +137,7 @@ def append_cron_generation_batch(
         model_tags = _ensure_model_versions(session)
 
         generator = SyntheticGenerationService(seed=effective_seed)
-        generated_at = datetime.now(timezone.utc)
+        generated_at = datetime.now(UTC)
         inserted_by_class: dict[str, int] = {}
         inserted_by_scenario: dict[str, int] = {}
         seen_text_hashes: set[str] = set()

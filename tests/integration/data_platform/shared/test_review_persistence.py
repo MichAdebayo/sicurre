@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
-from datetime import datetime, timezone
 import json
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -12,9 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 from core.database import Base
+from data_platform.services.shared.review_persistence import ReviewPersistenceService
 from db.models import (
-    DataAnnotation,
     AnnotationLabelSource,
+    DataAnnotation,
     DataGenerationRun,
     DataGenerationSample,
     DataGenerationSampleSourceLink,
@@ -26,11 +27,10 @@ from db.models import (
     DataSourceSystem,
     GenerationSourceLinkRole,
 )
-from data_platform.services.shared.review_persistence import ReviewPersistenceService
 
 
 def utc_timestamp() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 @pytest_asyncio.fixture

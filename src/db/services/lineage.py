@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.queries import (
-    IngestionRunQueries,
-    SourceSystemQueries,
-)
 from data_platform.api.schemas import (
     DataSourceCreate,
     IngestionRunCreate,
+)
+from db.queries import (
+    IngestionRunQueries,
+    SourceSystemQueries,
 )
 
 

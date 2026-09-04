@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -19,21 +19,20 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.pool import StaticPool
 
 from core.database import Base
-from db.models import (
-    DataIngestionRun,
-    DataRawObject,
-    DataRawRecord,
-)
 from data_platform.extractors.phishtank import (
-    PhishTankFetchedPayload,
     PhishTankFeedClient,
+    PhishTankFetchedPayload,
     PhishTankIngestionService,
 )
 from data_platform.services.shared.snapshot_storage import (
     LocalSnapshotStore,
     SnapshotWriteResult,
 )
-
+from db.models import (
+    DataIngestionRun,
+    DataRawObject,
+    DataRawRecord,
+)
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -261,7 +260,7 @@ async def test_phishtank_ingestion_persists_lineage(
         result = await service.run(
             session,
             trigger_mode="manual",
-            started_at=datetime(2026, 3, 25, 8, 0, tzinfo=timezone.utc),
+            started_at=datetime(2026, 3, 25, 8, 0, tzinfo=UTC),
         )
 
         ingestion_run = await session.scalar(select(DataIngestionRun))
@@ -295,9 +294,9 @@ async def test_phishtank_ingestion_preserves_fetched_csv_payload(
     tmp_path: Path,
 ) -> None:
     raw_csv = (
-        "phish_id,url,phish_detail_url,submission_time,verified,verification_time,online,target\n"
-        "7001,https://secure-urssaf.example.fr/login,,,yes,,yes,URSSAF\n"
-    ).encode("utf-8")
+        b"phish_id,url,phish_detail_url,submission_time,verified,verification_time,online,target\n"
+        b"7001,https://secure-urssaf.example.fr/login,,,yes,,yes,URSSAF\n"
+    )
 
     async def fetch_entries() -> PhishTankFetchedPayload:
         return PhishTankFetchedPayload(

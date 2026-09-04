@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +15,16 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from core.config import ROOT_DIR
 from core.trace_logger import SemanticTraceLogger
+from data_platform.api.schemas import (
+    DataSourceCreate,
+    IngestionRunCreate,
+)
 from data_platform.services.database.source_naming import build_database_source_path
+from data_platform.services.shared.snapshot_storage import (
+    SnapshotStore,
+    SnapshotWriteResult,
+    build_snapshot_store,
+)
 from db.models import (
     DataIngestionRun,
     DataRawObject,
@@ -26,18 +35,9 @@ from db.models import (
     SourceType,
 )
 from db.queries import SourceSystemQueries
-from data_platform.api.schemas import (
-    DataSourceCreate,
-    IngestionRunCreate,
-)
 from db.services.lineage import (
     IngestionRunService,
     SourceSystemService,
-)
-from data_platform.services.shared.snapshot_storage import (
-    SnapshotStore,
-    SnapshotWriteResult,
-    build_snapshot_store,
 )
 
 logger = logging.getLogger(__name__)
@@ -182,7 +182,7 @@ class LegacyDbIngestionService:
         started_at: datetime | None = None,
         since_date: str | None = None,
     ) -> LegacyDbIngestionResult:
-        run_started_at = started_at or datetime.now(timezone.utc)
+        run_started_at = started_at or datetime.now(UTC)
         self.trace.trace(
             stage="orchestration",
             status="start",
@@ -217,7 +217,7 @@ class LegacyDbIngestionService:
             )
 
             if not entries:
-                ingestion_run.finished_at = datetime.now(timezone.utc)
+                ingestion_run.finished_at = datetime.now(UTC)
                 ingestion_run.status = IngestionStatus.COMPLETED
                 ingestion_run.log_message = "DB extraction returned 0 entries"
                 self.trace.trace(
@@ -235,7 +235,7 @@ class LegacyDbIngestionService:
             skipped_count = len(entries) - len(new_entries)
 
             if not new_entries:
-                ingestion_run.finished_at = datetime.now(timezone.utc)
+                ingestion_run.finished_at = datetime.now(UTC)
                 ingestion_run.status = IngestionStatus.COMPLETED
                 ingestion_run.log_message = (
                     f"No new entries — all {skipped_count} already ingested"
@@ -311,7 +311,7 @@ class LegacyDbIngestionService:
                 f"Historical DB extraction completed: "
                 f"{len(raw_records)} entries extracted."
             )
-            ingestion_run.finished_at = datetime.now(timezone.utc)
+            ingestion_run.finished_at = datetime.now(UTC)
             ingestion_run.status = IngestionStatus.COMPLETED
             ingestion_run.raw_object_count = 1
             ingestion_run.raw_record_count = len(raw_records)
@@ -346,7 +346,7 @@ class LegacyDbIngestionService:
             )
 
         except Exception as exc:
-            ingestion_run.finished_at = datetime.now(timezone.utc)
+            ingestion_run.finished_at = datetime.now(UTC)
             ingestion_run.status = IngestionStatus.FAILED
             ingestion_run.log_message = f"Historical DB ingestion failed: {exc}"
             self.trace.trace(
@@ -505,10 +505,10 @@ class LegacyDbIngestionService:
         entries: list[dict[str, Any]],
         source_systems_by_name: dict[str, DataSourceSystem],
     ) -> list[DataRawRecord]:
-        extracted_at = datetime.now(timezone.utc)
+        extracted_at = datetime.now(UTC)
         raw_records: list[DataRawRecord] = []
 
-        for index, entry in enumerate(entries, start=1):
+        for _index, entry in enumerate(entries, start=1):
             record_key = self._entry_key(entry)
             child_source_name = self._resolved_child_source_name(entry)
             child_source_system = source_systems_by_name[child_source_name]

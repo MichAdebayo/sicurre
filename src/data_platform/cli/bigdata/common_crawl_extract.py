@@ -13,13 +13,13 @@ SRC_ROOT = ROOT_DIR / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
+from core.trace_logger import SemanticTraceLogger  # noqa: E402
 from data_platform.extractors.common_crawl_archive import (  # noqa: E402
     CC_CRAWL_INDICES,
     CommonCrawlArchiveExtractor,
     CommonCrawlArchiveSettings,
     CrawlQuery,
 )
-from core.trace_logger import SemanticTraceLogger  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,

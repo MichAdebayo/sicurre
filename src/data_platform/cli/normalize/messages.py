@@ -4,7 +4,7 @@ import argparse
 import asyncio
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -42,7 +42,7 @@ def _render_dry_run_markdown(
     lines = [
         "# Normalization Dry Run Review",
         "",
-        f"- Generated at: {datetime.now(timezone.utc).isoformat()}",
+        f"- Generated at: {datetime.now(UTC).isoformat()}",
         f"- Source filter: {title_source}",
         f"- Batch size: {batch_size}",
         f"- Records examined: {result.get('processed')}",
@@ -113,7 +113,7 @@ def _render_review_markdown(
     lines = [
         "# Normalization Route Review",
         "",
-        f"- Generated at: {datetime.now(timezone.utc).isoformat()}",
+        f"- Generated at: {datetime.now(UTC).isoformat()}",
         f"- Target: {title_target}",
         f"- Samples per source: {result.get('samples_per_source')}",
         f"- Reviewed source systems: {result.get('reviewed_source_count')}",

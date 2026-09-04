@@ -575,7 +575,7 @@ async def test_scan_email_runs_independent_lookups_concurrently(
 
     class FailingClient:
         def __init__(self, *args: Any, **kwargs: Any) -> None: ...
-        async def __aenter__(self) -> "FailingClient":
+        async def __aenter__(self) -> FailingClient:
             return self
         async def __aexit__(self, *args: Any) -> None: ...
         async def post(self, *args: Any, **kwargs: Any) -> Any:

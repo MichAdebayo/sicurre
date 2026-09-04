@@ -2,11 +2,15 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import Select, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from data_platform.services.database.source_naming import (
+    DATABASE_PARENT_SOURCE,
+    DATABASE_SOURCE_PREFIX,
+)
 from db.models import (
     AnnotationLabelSource,
     DataAnnotation,
@@ -14,10 +18,6 @@ from db.models import (
     DataProcessingRun,
     DataRawRecord,
     DataSourceSystem,
-)
-from data_platform.services.database.source_naming import (
-    DATABASE_PARENT_SOURCE,
-    DATABASE_SOURCE_PREFIX,
 )
 
 
@@ -135,7 +135,7 @@ class AnnotationBackfillService:
                 )
             ).all()
         ]
-        started_at = datetime.now(timezone.utc)
+        started_at = datetime.now(UTC)
         label_counts: Counter[str] = Counter()
         source_counts: Counter[tuple[str, str]] = Counter()
 

@@ -11,7 +11,6 @@ from core.config import ROOT_DIR, get_settings
 from data_platform.services.shared.dataset_manifest import build_dataset_manifest
 from data_platform.services.shared.snapshot_storage import build_snapshot_store
 
-
 #: Written when provenance could not be read. It is an explicit statement in
 #: the manifest rather than a missing key, so a consumer can tell "this split
 #: came from nowhere" from "we did not manage to look".
@@ -21,7 +20,7 @@ _UNAVAILABLE_PROVENANCE = {
 }
 
 
-def _split_provenance(split_df: "pd.DataFrame") -> dict:
+def _split_provenance(split_df: pd.DataFrame) -> dict:
     """Per-source counts for one split, for the sidecar manifest."""
     frame = split_df.assign(source_name=split_df["source_name"].fillna("unattributed"))
     counts = frame["source_name"].value_counts()

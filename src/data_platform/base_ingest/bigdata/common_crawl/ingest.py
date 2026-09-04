@@ -25,11 +25,11 @@ import hashlib
 import json
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import select, func, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 ROOT_DIR = Path(__file__).resolve().parents[5]  # repo root
@@ -45,10 +45,10 @@ from data_platform.extractors.common_crawl_ingestion import (  # noqa: E402
     CommonCrawlIngestionService,
     LocalCommonCrawlClient,
 )
+from data_platform.services.shared.r2_read_client import R2ReadClient  # noqa: E402
 from data_platform.services.shared.snapshot_storage import (  # noqa: E402
     SnapshotWriteResult,
 )
-from data_platform.services.shared.r2_read_client import R2ReadClient  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -116,7 +116,7 @@ async def _existing_cc_record_count(engine) -> int:
 def _save_manifest(result: CommonCrawlIngestionResult) -> None:
     MANIFEST_DIR.mkdir(parents=True, exist_ok=True)
     manifest: dict[str, Any] = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "description": (
             "Common Crawl base ingestion — merged R2 + legacy local CSVs "
             "(3606 unique fr rows by content_hash) ingested via LocalCommonCrawlClient. "

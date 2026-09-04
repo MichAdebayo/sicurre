@@ -17,7 +17,6 @@ from data_platform.services.shared.preprocessing import (
     save_processed_csv,
 )
 
-
 TODAY = date.today().strftime("%Y%m%d")
 ARCHETYPE_DIR = ROOT_DIR / "data" / "archetypes"
 PROC = ROOT_DIR / "data" / "processed"

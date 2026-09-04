@@ -16,7 +16,7 @@ import csv
 import logging
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from io import StringIO
 from pathlib import Path
 
@@ -122,7 +122,7 @@ async def run_incremental_phishtank_cron() -> None:
         return
 
     # Build the delta CSV content in memory
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     timestamp_str = now.strftime("%Y%m%d_%H%M%S")
 
     fieldnames = [

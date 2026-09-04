@@ -11,13 +11,12 @@ Scheduler).  Most runs will find zero new reports and exit cheaply.
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import io
 import json
 import re
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +25,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import ROOT_DIR
+from core.trace_logger import SemanticTraceLogger
+from data_platform.api.schemas import (
+    DataSourceCreate,
+    IngestionRunCreate,
+)
+from data_platform.services.shared.snapshot_storage import (
+    SnapshotStore,
+    build_snapshot_store,
+)
 from db.models import (
     DataIngestionRun,
     DataRawObject,
@@ -36,20 +44,10 @@ from db.models import (
     SourceType,
 )
 from db.queries import SourceSystemQueries
-from data_platform.api.schemas import (
-    DataSourceCreate,
-    IngestionRunCreate,
-)
 from db.services.lineage import (
     IngestionRunService,
     SourceSystemService,
 )
-from data_platform.services.shared.snapshot_storage import (
-    SnapshotStore,
-    SnapshotWriteResult,
-    build_snapshot_store,
-)
-from core.trace_logger import SemanticTraceLogger
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -217,7 +215,7 @@ class CertFRCtiExtractor:
         started_at: datetime | None = None,
         fetch_historical: bool = False,
     ) -> CertFRCtiResult:
-        run_started_at = started_at or datetime.now(timezone.utc)
+        run_started_at = started_at or datetime.now(UTC)
 
         trace = SemanticTraceLogger(
             parent_type="Web Scraping",
@@ -362,7 +360,7 @@ class CertFRCtiExtractor:
             return result
 
         except Exception as exc:
-            ingestion_run.finished_at = datetime.now(timezone.utc)
+            ingestion_run.finished_at = datetime.now(UTC)
             ingestion_run.status = IngestionStatus.FAILED
             ingestion_run.log_message = f"CERT-FR CTI extraction failed: {exc}"
             await session.commit()
@@ -415,8 +413,9 @@ class CertFRCtiExtractor:
                 unlimited (full backfill).  Default ``None`` (set by caller
                 via ``max_discovery_pages``).
         """
-        from bs4 import BeautifulSoup
         from urllib.parse import urljoin
+
+        from bs4 import BeautifulSoup
 
         entries: list[dict[str, Any]] = []
         base_urls = [
@@ -723,7 +722,7 @@ class CertFRCtiExtractor:
             detected_language="fr",
             is_usable=True,
             rejection_reason=None,
-            extracted_at=datetime.now(timezone.utc),
+            extracted_at=datetime.now(UTC),
         )
         session.add(raw_record)
         await session.flush()
@@ -778,7 +777,7 @@ class CertFRCtiExtractor:
         status: IngestionStatus,
         result: CertFRCtiResult,
     ) -> None:
-        ingestion_run.finished_at = datetime.now(timezone.utc)
+        ingestion_run.finished_at = datetime.now(UTC)
         ingestion_run.status = status
         ingestion_run.raw_object_count = result.extracted_count
         ingestion_run.raw_record_count = result.extracted_count

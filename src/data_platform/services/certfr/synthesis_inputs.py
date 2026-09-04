@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -67,7 +67,7 @@ class CertFRSynthesisInputService:
 
         return {
             "mode": "certfr_synthesis_inputs",
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
             "phishing_relevant_sampled_count": int(
                 signal_summary.get("phishing_relevant_sampled_count", 0)
             ),

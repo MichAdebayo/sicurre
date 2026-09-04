@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import csv
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -113,7 +113,7 @@ class StageTwoReviewedExportService:
 
         return {
             "mode": "stage_two_reviewed_export",
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
             "eligible_review_states": list(eligible_review_states),
             "exported_candidate_count": len(candidates),
             "skipped_state_summary": dict(skipped_state_summary),
