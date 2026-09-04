@@ -3,6 +3,23 @@ line-length = 100
 
 [lint]
 select = ["E4", "E7", "E9", "F", "I", "B", "UP"]
+ignore = [
+  # B008 flags calls in argument defaults. That is exactly how FastAPI declares
+  # dependencies (`Depends`, `Query`, `Header`), so every hit is a false positive.
+  "B008",
+  # UP017 rewrites `timezone.utc` to `UTC`. Deferred, not accepted: the rewrite
+  # has no behaviour change but touches 129 lines, most of them inside code with
+  # no test coverage, which spends the changed-line coverage budget on churn.
+  # Worth doing alongside tests for those paths, not before them.
+  "UP017",
+]
+
+[lint.per-file-ignores]
+# CLI entrypoints and cron schedulers are run as scripts. They insert `src` into
+# sys.path and call load_dotenv before importing project modules, so those
+# imports cannot sit at the top of the file and cannot be sorted with the rest.
+"src/data_platform/cli/**" = ["E402", "I001"]
+"src/data_platform/cron_schedulers/**" = ["E402", "I001"]
 
 [lint.isort]
 known-first-party = ["core", "data_platform", "db"]

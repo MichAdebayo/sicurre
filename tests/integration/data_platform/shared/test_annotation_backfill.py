@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 from core.database import Base
+from data_platform.services.shared.annotation_backfill import AnnotationBackfillService
 from db.models import (
     AnnotationLabelSource,
     DataAnnotation,
@@ -20,7 +21,6 @@ from db.models import (
     DataRawRecord,
     DataSourceSystem,
 )
-from data_platform.services.shared.annotation_backfill import AnnotationBackfillService
 
 
 def utc_timestamp() -> datetime:

@@ -26,7 +26,6 @@ from data_platform.extractors.common_crawl_ingestion import (
 )
 from data_platform.services.shared.snapshot_storage import SnapshotWriteResult
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

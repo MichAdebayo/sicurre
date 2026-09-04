@@ -265,7 +265,7 @@ class CommonCrawlSignalSyntheticService:
             or "seed"
         )
         digest = (
-            hashlib.sha256(f"{stable_key}:{variant_index}".encode("utf-8"))
+            hashlib.sha256(f"{stable_key}:{variant_index}".encode())
             .hexdigest()
             .upper()
         )

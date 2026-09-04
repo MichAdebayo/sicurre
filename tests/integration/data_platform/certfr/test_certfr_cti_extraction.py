@@ -18,18 +18,17 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.pool import StaticPool
 
 from core.database import Base
-from db.models import (
-    DataIngestionRun,
-    DataRawObject,
-    DataRawRecord,
-)
 from data_platform.extractors.certfr_cti import (
     CertFRCtiExtractor,
-    ExtractedContent,
 )
 from data_platform.services.shared.snapshot_storage import (
     LocalSnapshotStore,
     SnapshotWriteResult,
+)
+from db.models import (
+    DataIngestionRun,
+    DataRawObject,
+    DataRawRecord,
 )
 
 

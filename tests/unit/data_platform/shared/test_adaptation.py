@@ -5,7 +5,6 @@ from pathlib import Path
 import pandas as pd
 
 from data_platform.services.shared.adaptation import (
-    DEFAULT_TARGET_PER_ARCHETYPE,
     EXPORT_COLUMNS,
     FrenchCulturalAdaptationService,
 )

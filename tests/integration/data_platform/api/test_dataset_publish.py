@@ -23,7 +23,6 @@ from data_platform.services.dataset_publish import (
     DatasetNotFrozenError,
     DatasetPublishConfigError,
     DatasetPublishResult,
-    DatasetPublishService,
     GitHubDispatchPublishError,
     KagglePushPublishError,
 )

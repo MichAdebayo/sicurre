@@ -11,11 +11,10 @@ Scheduler).  Most runs will find zero new reports and exit cheaply.
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import io
 import json
 import re
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,6 +25,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import ROOT_DIR
+from core.trace_logger import SemanticTraceLogger
+from data_platform.api.schemas import (
+    DataSourceCreate,
+    IngestionRunCreate,
+)
+from data_platform.services.shared.snapshot_storage import (
+    SnapshotStore,
+    build_snapshot_store,
+)
 from db.models import (
     DataIngestionRun,
     DataRawObject,
@@ -36,20 +44,10 @@ from db.models import (
     SourceType,
 )
 from db.queries import SourceSystemQueries
-from data_platform.api.schemas import (
-    DataSourceCreate,
-    IngestionRunCreate,
-)
 from db.services.lineage import (
     IngestionRunService,
     SourceSystemService,
 )
-from data_platform.services.shared.snapshot_storage import (
-    SnapshotStore,
-    SnapshotWriteResult,
-    build_snapshot_store,
-)
-from core.trace_logger import SemanticTraceLogger
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -415,8 +413,9 @@ class CertFRCtiExtractor:
                 unlimited (full backfill).  Default ``None`` (set by caller
                 via ``max_discovery_pages``).
         """
-        from bs4 import BeautifulSoup
         from urllib.parse import urljoin
+
+        from bs4 import BeautifulSoup
 
         entries: list[dict[str, Any]] = []
         base_urls = [

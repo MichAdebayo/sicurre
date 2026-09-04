@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 from core.database import Base, get_async_session
+from data_platform.api.main import create_app
 from db.models import (
     DataAnnotation,
     DataDataset,
@@ -23,8 +24,6 @@ from db.models import (
 )
 from db.queries import DuplicateDatasetError
 from db.services import DatasetService
-from data_platform.api.main import create_app
-
 
 AUTH_HEADERS = {"Authorization": "Bearer dev-token"}
 

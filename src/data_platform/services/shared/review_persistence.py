@@ -12,6 +12,9 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from data_platform.services.common_crawl.promotion_review import (
+    CommonCrawlPromotionReviewService,
+)
 from db.models import (
     AnnotationLabelSource,
     DataAnnotation,
@@ -24,15 +27,12 @@ from db.models import (
     DataRawObject,
     DataRawRecord,
     DataSourceSystem,
-    GenerationSourceLinkRole,
     GenerationReviewState,
+    GenerationSourceLinkRole,
     IngestionStatus,
     ObjectType,
     RedactionStatus,
     SourceType,
-)
-from data_platform.services.common_crawl.promotion_review import (
-    CommonCrawlPromotionReviewService,
 )
 
 

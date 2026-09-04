@@ -527,7 +527,6 @@ class StageTwoRewriteDraftService:
 
     @classmethod
     def _build_payment_notification(cls, source_preview: str) -> tuple[str, str]:
-        lowered = source_preview.lower()
         focus = cls._extract_legitimate_topic(
             source_preview,
             fallback=cls._infer_legitimate_focus(source_preview),

@@ -7,6 +7,10 @@ from datetime import datetime, timezone
 from sqlalchemy import Select, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from data_platform.services.database.source_naming import (
+    DATABASE_PARENT_SOURCE,
+    DATABASE_SOURCE_PREFIX,
+)
 from db.models import (
     AnnotationLabelSource,
     DataAnnotation,
@@ -14,10 +18,6 @@ from db.models import (
     DataProcessingRun,
     DataRawRecord,
     DataSourceSystem,
-)
-from data_platform.services.database.source_naming import (
-    DATABASE_PARENT_SOURCE,
-    DATABASE_SOURCE_PREFIX,
 )
 
 

@@ -46,8 +46,6 @@ if str(SRC_ROOT) not in sys.path:
 from core.config import get_settings, redact_database_url  # noqa: E402
 from core.database import Base  # noqa: E402
 from core.trace_logger import SemanticTraceLogger  # noqa: E402
-from db.models import DataRawObject, DataRawRecord  # noqa: E402
-from db.queries import IngestionRunQueries, SourceSystemQueries  # noqa: E402
 from data_platform.api.schemas import IngestionRunCreate  # noqa: E402
 from data_platform.base_ingest.file.parsers.csv_ingestion import (  # noqa: E402
     get_or_create_source_system,
@@ -60,6 +58,8 @@ from data_platform.base_ingest.file.parsers.txt_email_ingestion import (  # noqa
     parse_txt_emails_from_bytes,
 )
 from data_platform.services.shared.r2_read_client import R2ReadClient  # noqa: E402
+from db.models import DataRawObject, DataRawRecord  # noqa: E402
+from db.queries import IngestionRunQueries, SourceSystemQueries  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,

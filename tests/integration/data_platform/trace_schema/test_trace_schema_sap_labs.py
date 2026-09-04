@@ -25,7 +25,6 @@ from data_platform.extractors.sap_labs import (
 )
 from data_platform.services.shared.snapshot_storage import SnapshotWriteResult
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

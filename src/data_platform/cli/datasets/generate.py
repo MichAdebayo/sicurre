@@ -29,9 +29,6 @@ from data_platform.services.shared.adaptation import (  # noqa: E402
     DEFAULT_TARGET_PER_ARCHETYPE,
     FrenchCulturalAdaptationService,
 )
-from data_platform.services.common_crawl.promotion_review import (  # noqa: E402
-    CommonCrawlPromotionReviewService,
-)
 from data_platform.services.common_crawl.signal_synthetic import (  # noqa: E402
     CommonCrawlSignalSyntheticService,
 )

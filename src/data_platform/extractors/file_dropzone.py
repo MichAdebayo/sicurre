@@ -12,7 +12,6 @@ original ``r2://`` storage URI instead of creating a second derived snapshot.
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import json
 import logging

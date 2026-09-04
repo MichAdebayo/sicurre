@@ -6,6 +6,7 @@
 [![Node](https://img.shields.io/badge/node-24-5FA04E?logo=nodedotjs&logoColor=white)](package.json)
 [![Model](https://img.shields.io/badge/model-CamemBERTaV2-FCC624?logo=huggingface&logoColor=black)](https://github.com/MichAdebayo/sicurre-ml)
 [![Runtime](https://img.shields.io/badge/runtime-Cloudflare%20Email%20Routing-F38020?logo=cloudflare&logoColor=white)](docs/adr/0001-cloudflare-email-routing-runtime.md)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Phishing detection for French auto-entrepreneurs and TPEs. Inbound mail for a
 protected domain arrives through Cloudflare Email Routing; an Email Worker calls

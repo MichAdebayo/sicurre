@@ -4,14 +4,13 @@ import hashlib
 import random
 import re
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable
 
 import pandas as pd
 from faker import Faker
-
 
 TemplateFactory = Callable[[], tuple[str, str]]
 

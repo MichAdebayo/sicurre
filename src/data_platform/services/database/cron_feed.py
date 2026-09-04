@@ -18,8 +18,8 @@ from data_platform.services.database.cron_scenarios import (
     CronArchetypeScenario,
 )
 from data_platform.services.database.seed import (
-    Base,
     DB_DIR,
+    Base,
     ExternalModelVersion,
     ExternalThreatLog,
     ExternalUser,
@@ -29,7 +29,6 @@ from data_platform.services.database.source_naming import build_database_source_
 from data_platform.services.shared.synthetic_generation import (
     SyntheticGenerationService,
 )
-
 
 DEFAULT_CRON_FEED_DB_PATH = DB_DIR / "external_threats.db"
 DEFAULT_CRON_FEED_DB_URL = f"sqlite:///{DEFAULT_CRON_FEED_DB_PATH}"

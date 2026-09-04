@@ -19,13 +19,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 from core.database import Base
-from db.models import DataRawObject, DataRawRecord, DataSourceSystem
 from data_platform.extractors.legacy_db import (
     LegacyDbConnector,
     LegacyDbIngestionService,
 )
 from data_platform.services.shared.snapshot_storage import SnapshotWriteResult
-
+from db.models import DataRawObject, DataRawRecord, DataSourceSystem
 
 # ---------------------------------------------------------------------------
 # Helpers

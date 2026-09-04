@@ -19,10 +19,10 @@ import io
 import logging
 import os
 import tempfile
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
 
 import boto3
 from dotenv import load_dotenv

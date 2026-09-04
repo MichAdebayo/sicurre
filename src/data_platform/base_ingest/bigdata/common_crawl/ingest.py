@@ -29,7 +29,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import select, func, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 ROOT_DIR = Path(__file__).resolve().parents[5]  # repo root
@@ -45,10 +45,10 @@ from data_platform.extractors.common_crawl_ingestion import (  # noqa: E402
     CommonCrawlIngestionService,
     LocalCommonCrawlClient,
 )
+from data_platform.services.shared.r2_read_client import R2ReadClient  # noqa: E402
 from data_platform.services.shared.snapshot_storage import (  # noqa: E402
     SnapshotWriteResult,
 )
-from data_platform.services.shared.r2_read_client import R2ReadClient  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,

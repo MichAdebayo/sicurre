@@ -12,9 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 from core.database import Base
+from data_platform.base_ingest.file.parsers.csv_ingestion import ingest_csv_file
 from db.models import DataIngestionRun, DataRawRecord, DataSourceSystem
 from db.queries import IngestionRunQueries, SourceSystemQueries
-from data_platform.base_ingest.file.parsers.csv_ingestion import ingest_csv_file
 
 
 @pytest_asyncio.fixture
@@ -327,7 +327,7 @@ async def test_bytes_from_r2_are_ingested_with_their_governance(
     """The R2 lane must register governance the same way the file lane does."""
     from data_platform.base_ingest.file.parsers.csv_ingestion import ingest_csv_bytes
 
-    payload = "text,label\nBonjour ceci est un message de test R2,spam\n".encode()
+    payload = b"text,label\nBonjour ceci est un message de test R2,spam\n"
 
     async with session_factory() as session:
         result = await ingest_csv_bytes(

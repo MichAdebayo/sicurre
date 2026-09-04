@@ -44,17 +44,16 @@ if str(SRC_ROOT) not in sys.path:
 
 from core.config import get_settings, redact_database_url  # noqa: E402
 from core.database import Base  # noqa: E402
+from data_platform.api.schemas import DataSourceCreate, IngestionRunCreate  # noqa: E402
+from data_platform.extractors.certfr_cti import CertFRCtiExtractor  # noqa: E402
+from data_platform.services.shared.r2_read_client import R2ReadClient  # noqa: E402
 from db.models import (  # noqa: E402
-    DataIngestionRun,
     DataRawObject,
     DataRawRecord,
     IngestionStatus,
     ObjectType,
 )
 from db.queries import IngestionRunQueries, SourceSystemQueries  # noqa: E402
-from data_platform.api.schemas import DataSourceCreate, IngestionRunCreate  # noqa: E402
-from data_platform.extractors.certfr_cti import CertFRCtiExtractor  # noqa: E402
-from data_platform.services.shared.r2_read_client import R2ReadClient  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,

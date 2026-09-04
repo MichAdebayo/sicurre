@@ -44,10 +44,10 @@ from fastapi import (
 from pydantic import BaseModel, Field
 
 from core.config import get_settings
-from core.loops import send_loops_transactional
-from core.rate_limit import limiter
 from core.inference_client import get_inference_client
+from core.loops import send_loops_transactional
 from core.mime_headers import decode_mime_header, extract_mime_body
+from core.rate_limit import limiter
 from core.scan_metrics import observe_scan, observe_scan_failure, observe_stage
 from core.secret_cipher import decrypt_secret, encrypt_secret
 from data_platform.api.auth import AuthUser, ensure_runtime_tables, get_current_user

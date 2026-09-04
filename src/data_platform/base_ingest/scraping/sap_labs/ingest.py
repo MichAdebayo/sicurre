@@ -41,10 +41,10 @@ from data_platform.extractors.sap_labs import (  # noqa: E402
     SapLabsIngestionService,
     SapLabsScraperClient,
 )
+from data_platform.services.shared.r2_read_client import R2ReadClient  # noqa: E402
 from data_platform.services.shared.snapshot_storage import (  # noqa: E402
     SnapshotWriteResult,
 )
-from data_platform.services.shared.r2_read_client import R2ReadClient  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,

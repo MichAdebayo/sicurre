@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import re
 from collections import Counter
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
-import re
 from typing import Any
 
 from data_platform.cleaning.normalization import clean_text, text_sha256

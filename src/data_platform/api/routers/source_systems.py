@@ -5,15 +5,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_async_session
 from core.rate_limit import limiter, touch_rate_limit_request
-from db.models import SourceType
-from db.queries import DuplicateDataSourceError
 from data_platform.api.schemas import (
     DataSourceCreate,
     DataSourceListResponse,
     DataSourceRead,
 )
+from db.models import SourceType
+from db.queries import DuplicateDataSourceError
 from db.services import SourceSystemService
-
 
 router = APIRouter(tags=["data-sources"])
 service = SourceSystemService()

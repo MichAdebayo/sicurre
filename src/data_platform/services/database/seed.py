@@ -31,7 +31,6 @@ from data_platform.services.shared.synthetic_generation import (
     SyntheticGenerationService,
 )
 
-
 logger = logging.getLogger(__name__)
 DB_DIR = ROOT_DIR / "data" / "raw" / "db"
 DB_DIR.mkdir(parents=True, exist_ok=True)
