@@ -129,7 +129,9 @@ def ensure_local_auth_db() -> None:
                 stage_scores_json TEXT NOT NULL,
                 stage_labels_json TEXT NOT NULL,
                 stage_breakdown_json TEXT NOT NULL,
-                expected_label TEXT NULL
+                expected_label TEXT NULL,
+                model_version TEXT NULL,
+                model_revision TEXT NULL
             )
             """)
 
@@ -156,6 +158,15 @@ def ensure_local_auth_db() -> None:
             conn.execute("ALTER TABLE app_inference_event ADD COLUMN override_by TEXT NULL")
         if "overridden_at" not in event_columns:
             conn.execute("ALTER TABLE app_inference_event ADD COLUMN overridden_at TEXT NULL")
+        # Identity of the model that produced the verdict. Nullable because a
+        # blocklist rule decides without consulting the model, and because rows
+        # written before this existed genuinely do not know. Added here as well
+        # as in the CREATE so an existing POC database self-heals on next start
+        # rather than needing to be deleted.
+        if "model_version" not in event_columns:
+            conn.execute("ALTER TABLE app_inference_event ADD COLUMN model_version TEXT NULL")
+        if "model_revision" not in event_columns:
+            conn.execute("ALTER TABLE app_inference_event ADD COLUMN model_revision TEXT NULL")
         for account in _seed_accounts():
             row = conn.execute(
                 "SELECT id FROM poc_user WHERE email = ?",

@@ -2760,6 +2760,16 @@ components:
           - type: string
           - type: 'null'
           title: Message Id
+        model_revision:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Model Revision
+        model_version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Model Version
         privacy_reference:
           title: Privacy Reference
           type: string

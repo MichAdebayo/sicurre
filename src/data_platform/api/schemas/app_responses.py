@@ -57,6 +57,11 @@ class ThreatLogResponse(ApiResponse):
     status: Literal["active", "trashed", "restored"]
     latency_ms: float | None = Field(default=None, ge=0)
     explanation: str | None = None
+    #: Identity of the model that produced this verdict. Null for verdicts a
+    #: blocklist rule decided without consulting the model, and for events
+    #: recorded before the identity was captured.
+    model_version: str | None = None
+    model_revision: str | None = None
 
 
 class ThreatPageResponse(ApiResponse):

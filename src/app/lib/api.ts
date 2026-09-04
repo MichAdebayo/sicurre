@@ -85,6 +85,10 @@ export interface ThreatLog {
   received_at: string;
   latency_ms?: number;
   explanation?: string;
+  /** Model that produced this verdict. Absent when a blocklist rule decided it
+   *  without consulting the model, or for events predating identity capture. */
+  model_version?: string | null;
+  model_revision?: string | null;
   privacy_reference: string;
   content_redacted: boolean;
 }

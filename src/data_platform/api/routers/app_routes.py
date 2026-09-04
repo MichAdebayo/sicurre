@@ -459,7 +459,9 @@ async def get_threats(
                 created_at AS received_at,
                 COALESCE(override_verdict, 'active') AS status,
                 latency_ms,
-                explanation
+                explanation,
+                model_version,
+                model_revision
             FROM app_inference_event
             WHERE {where_sql}
             ORDER BY created_at DESC
