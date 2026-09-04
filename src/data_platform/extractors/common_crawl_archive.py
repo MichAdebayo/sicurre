@@ -7,7 +7,7 @@ import json
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -363,7 +363,7 @@ class CommonCrawlArchiveExtractor:
         logger.info("Phase 3: writing datasets to snapshot storage...")
         dataframe_all = pd.DataFrame(extracted_pages)
         usable_frame = self._build_usable_frame(dataframe_all)
-        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         artifacts = await self._write_outputs(
             dataframe_all=dataframe_all,
             download_frame=download_frame,

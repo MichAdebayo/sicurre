@@ -8,7 +8,7 @@ import logging
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -312,7 +312,7 @@ class PhishTankIngestionService:
         trigger_mode: str = "scheduled",
         started_at: datetime | None = None,
     ) -> PhishTankIngestionResult:
-        run_started_at = started_at or datetime.now(UTC)
+        run_started_at = started_at or datetime.now(timezone.utc)
 
         trace = SemanticTraceLogger(
             parent_type="API Source", child_target="PhishTank", domain="data_platform"
@@ -352,7 +352,7 @@ class PhishTankIngestionService:
             total_feed_count = len(all_entries)
 
             if not all_entries:
-                ingestion_run.finished_at = datetime.now(UTC)
+                ingestion_run.finished_at = datetime.now(timezone.utc)
                 ingestion_run.status = IngestionStatus.COMPLETED
                 ingestion_run.log_message = "PhishTank feed returned 0 entries"
                 await session.commit()
@@ -376,7 +376,7 @@ class PhishTankIngestionService:
             filtered_count = total_feed_count - len(entries)
 
             if not entries:
-                ingestion_run.finished_at = datetime.now(UTC)
+                ingestion_run.finished_at = datetime.now(timezone.utc)
                 ingestion_run.status = IngestionStatus.COMPLETED
                 ingestion_run.log_message = (
                     f"PhishTank feed had {total_feed_count} entries but "
@@ -398,7 +398,7 @@ class PhishTankIngestionService:
             skipped_count = len(entries) - len(new_entries)
 
             if not new_entries:
-                ingestion_run.finished_at = datetime.now(UTC)
+                ingestion_run.finished_at = datetime.now(timezone.utc)
                 ingestion_run.status = IngestionStatus.COMPLETED
                 ingestion_run.log_message = (
                     f"All {len(entries)} French PhishTank entries already "
@@ -465,7 +465,7 @@ class PhishTankIngestionService:
                 f"{filtered_count} non-French filtered "
                 f"(feed={total_feed_count})"
             )
-            ingestion_run.finished_at = datetime.now(UTC)
+            ingestion_run.finished_at = datetime.now(timezone.utc)
             ingestion_run.status = IngestionStatus.COMPLETED
             ingestion_run.raw_object_count = 1
             ingestion_run.raw_record_count = len(raw_records)
@@ -492,7 +492,7 @@ class PhishTankIngestionService:
                 log_message=log_message,
             )
         except Exception as exc:
-            ingestion_run.finished_at = datetime.now(UTC)
+            ingestion_run.finished_at = datetime.now(timezone.utc)
             ingestion_run.status = IngestionStatus.FAILED
             ingestion_run.log_message = f"PhishTank ingestion failed: {exc}"
             await session.commit()
@@ -681,7 +681,7 @@ class PhishTankIngestionService:
         entries: list[dict[str, Any]],
         source_system: DataSourceSystem,
     ) -> list[DataRawRecord]:
-        extracted_at = datetime.now(UTC)
+        extracted_at = datetime.now(timezone.utc)
         raw_records: list[DataRawRecord] = []
 
         for index, entry in enumerate(entries, start=1):

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
@@ -260,7 +260,7 @@ async def test_phishtank_ingestion_persists_lineage(
         result = await service.run(
             session,
             trigger_mode="manual",
-            started_at=datetime(2026, 3, 25, 8, 0, tzinfo=UTC),
+            started_at=datetime(2026, 3, 25, 8, 0, tzinfo=timezone.utc),
         )
 
         ingestion_run = await session.scalar(select(DataIngestionRun))

@@ -25,7 +25,7 @@ import hashlib
 import json
 import logging
 import sys
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -116,7 +116,7 @@ async def _existing_cc_record_count(engine) -> int:
 def _save_manifest(result: CommonCrawlIngestionResult) -> None:
     MANIFEST_DIR.mkdir(parents=True, exist_ok=True)
     manifest: dict[str, Any] = {
-        "generated_at": datetime.now(UTC).isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "description": (
             "Common Crawl base ingestion — merged R2 + legacy local CSVs "
             "(3606 unique fr rows by content_hash) ingested via LocalCommonCrawlClient. "

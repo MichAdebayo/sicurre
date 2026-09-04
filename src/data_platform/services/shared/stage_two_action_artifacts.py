@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 
@@ -78,7 +78,7 @@ class StageTwoActionArtifactsService:
                     int(rule.get("current_count", 0)) for rule in archive_rules
                 )
 
-        generated_at = datetime.now(UTC).isoformat()
+        generated_at = datetime.now(timezone.utc).isoformat()
         return {
             "adaptation_queue": {
                 "mode": "stage_two_adaptation_queue",

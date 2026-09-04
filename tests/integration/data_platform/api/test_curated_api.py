@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 import pytest
 import pytest_asyncio
@@ -29,7 +29,7 @@ AUTH_HEADERS = {"Authorization": "Bearer dev-token"}
 
 
 def utc_timestamp() -> datetime:
-    return datetime.now(UTC)
+    return datetime.now(timezone.utc)
 
 
 @pytest_asyncio.fixture

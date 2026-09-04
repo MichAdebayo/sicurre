@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from typing import Any
 
@@ -194,7 +194,7 @@ class CertFRGeneratedDraftService:
 
         return {
             "mode": "certfr_generated_drafts",
-            "generated_at": datetime.now(UTC).isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "draft_count": len(drafts),
             "review_summary": dict(Counter(draft["review_state"] for draft in drafts)),
             "theme_summary": dict(

@@ -26,7 +26,7 @@ import json
 import logging
 import os
 import sys
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -97,7 +97,7 @@ class NoOpSnapshotStore:
 def _save_manifest(result: LegacyDbIngestionResult, feeder_db_sha256: str) -> None:
     MANIFEST_DIR.mkdir(parents=True, exist_ok=True)
     manifest: dict[str, Any] = {
-        "generated_at": datetime.now(UTC).isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "description": (
             "External DB base ingestion — adapted EN→FR phishing + synthetic "
             "phishing/spam/legitimate from R2 canonical external_threats.db (seed=42), "

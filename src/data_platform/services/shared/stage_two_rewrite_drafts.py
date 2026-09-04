@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import re
 from collections import Counter
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from typing import Any
 
@@ -322,7 +322,7 @@ class StageTwoRewriteDraftService:
 
         return {
             "mode": "stage_two_rewrite_drafts",
-            "generated_at": datetime.now(UTC).isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "draft_count": len(drafts),
             "review_summary": dict(review_summary),
             "target_label_summary": dict(target_label_summary),

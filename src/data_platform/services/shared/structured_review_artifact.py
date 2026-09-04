@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -21,7 +21,7 @@ class StructuredReviewArtifactService:
         route_subtype_filter: str | None,
     ) -> dict[str, Any]:
         return {
-            "generated_at": datetime.now(UTC).isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "source_name": source_name,
             "source_type": source_type,
             "route_outcome_filter": route_outcome_filter,

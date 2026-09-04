@@ -11,7 +11,7 @@ import uuid
 import xml.etree.ElementTree as ET
 import zipfile
 from contextlib import suppress
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -154,7 +154,7 @@ def _epoch_to_iso(value: str | None) -> str | None:
     if not value:
         return None
     with suppress(Exception):
-        return datetime.fromtimestamp(int(value), UTC).isoformat()
+        return datetime.fromtimestamp(int(value), timezone.utc).isoformat()
     return None
 
 
@@ -415,7 +415,7 @@ async def get_threats(
         where.append(f"{verdict_expr} = ?")
         params.append(verdict)
 
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     if date_range == "today":
         where.append("created_at >= ?")
         params.append(now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat())
@@ -522,7 +522,7 @@ async def update_threat_status(
             (
                 is_del,
                 payload.status,
-                datetime.now(UTC).isoformat(),
+                datetime.now(timezone.utc).isoformat(),
                 id,
                 current_user.workspace_id,
                 active_domain,
@@ -586,7 +586,7 @@ async def create_feedback(
         event_row = rows[0]
 
     feedback_id = str(uuid.uuid4())
-    now = datetime.now(UTC).isoformat() + "Z"
+    now = datetime.now(timezone.utc).isoformat() + "Z"
     original_verdict = event_row["safety_verdict"] if event_row else None
 
     try:
@@ -657,7 +657,7 @@ async def create_support_request(
     """Create a durable tenant-scoped support ticket."""
     _ = request
     ticket_id = str(uuid.uuid4())
-    now = datetime.now(UTC).isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     await async_query_auth_db(
         "INSERT INTO app_support_request (id, workspace_id, workspace_member_user_id, "
         "requester_name, requester_email, category, message, status, created_at, updated_at) "
@@ -723,7 +723,7 @@ def _component_rollup(components: list[dict]) -> str:
 
 
 def _http_latency_ms(started_at: datetime) -> int:
-    return int((datetime.now(UTC) - started_at).total_seconds() * 1000)
+    return int((datetime.now(timezone.utc) - started_at).total_seconds() * 1000)
 
 
 async def _probe_inference_runtime(
@@ -743,7 +743,7 @@ async def _probe_inference_runtime(
     ready_url = f"{base_url}/v1/ready"
     results = []
     for name, url in (("inference_health", health_url), ("inference_ready", ready_url)):
-        started = datetime.now(UTC)
+        started = datetime.now(timezone.utc)
         try:
             response = await client.get(url)
             latency = _http_latency_ms(started)
@@ -798,7 +798,7 @@ async def _probe_inference_contract(
             checked_url=inference_url,
         )
 
-    started = datetime.now(UTC)
+    started = datetime.now(timezone.utc)
     try:
         response = await client.post(
             inference_url,
@@ -886,7 +886,7 @@ async def _probe_public_app_runtime(
     health_url = f"{probe_base}/health"
     results = []
 
-    started = datetime.now(UTC)
+    started = datetime.now(timezone.utc)
     try:
         response = await client.get(health_url)
         results.append(
@@ -909,7 +909,7 @@ async def _probe_public_app_runtime(
             )
         )
 
-    started = datetime.now(UTC)
+    started = datetime.now(timezone.utc)
     try:
         response = await client.post(
             probe_scan_url,
@@ -1186,7 +1186,7 @@ async def get_admin_runtime_health(current_user: AuthUser = Depends(get_current_
     parsed_public = urlparse(settings.public_api_url or "")
     return {
         "status": _component_rollup(components),
-        "checked_at": datetime.now(UTC).isoformat(),
+        "checked_at": datetime.now(timezone.utc).isoformat(),
         "public_api_host": parsed_public.netloc or None,
         "inference_api_url": settings.inference_api_url,
         "expected_worker_scan_url": expected_scan_url,
@@ -1485,7 +1485,7 @@ async def recover_operational_exercise(
     recovered = operational_exercises.current()
     if recovered is None or recovered["id"] != exercise_id:
         raise HTTPException(status_code=404, detail="Active operational exercise not found")
-    recovered_at = datetime.now(UTC).isoformat()
+    recovered_at = datetime.now(timezone.utc).isoformat()
     await execute_runtime_query(
         "UPDATE app_operational_exercise SET status = ?, recovered_at = ? WHERE id = ?",
         ("recovered", recovered_at, exercise_id),
@@ -1733,7 +1733,7 @@ async def _release_quarantine_item(*, id: str, domain: str, current_user: AuthUs
             detail="Quarantine storage is temporarily unavailable",
         ) from exc
 
-    delivered_at = datetime.now(UTC).isoformat()
+    delivered_at = datetime.now(timezone.utc).isoformat()
     await async_query_auth_db(
         "UPDATE app_quarantine_item SET status = 'released', delivery_message_id = ?, "
         "delivered_at = ?, last_delivery_error = NULL WHERE id = ? AND workspace_id = ? "
@@ -1771,7 +1771,7 @@ async def _record_release_feedback(*, item: dict, current_user: AuthUser) -> Non
                 item["message_id"],
                 item["safety_verdict"],
                 "Released from quarantine by the user",
-                datetime.now(UTC).isoformat(),
+                datetime.now(timezone.utc).isoformat(),
             ),
         )
 
@@ -1851,7 +1851,7 @@ async def release_and_whitelist_item(
                 current_user.workspace_id,
                 active_domain,
                 sender,
-                datetime.now(UTC).isoformat(),
+                datetime.now(timezone.utc).isoformat(),
             ),
         )
     return {**result, "whitelisted_pattern": sender}
@@ -1963,7 +1963,7 @@ async def create_security_rule(
 ):
     active_domain = await _owned_domain(domain, current_user)
     rule_id = str(uuid.uuid4())
-    now = datetime.now(UTC).isoformat() + "Z"
+    now = datetime.now(timezone.utc).isoformat() + "Z"
     await async_query_auth_db(
         "INSERT INTO app_security_rule (id, workspace_id, domain, rule_type, pattern, created_at) "
         "VALUES (?, ?, ?, ?, ?, ?)",
@@ -2078,7 +2078,7 @@ async def mark_alert_read(
             active_domain,
             current_user.id,
             id,
-            datetime.now(UTC).isoformat(),
+            datetime.now(timezone.utc).isoformat(),
         ),
     )
     return {"status": "read"}
@@ -2090,7 +2090,7 @@ async def mark_domain_alerts_read(
     current_user: AuthUser = Depends(get_current_user),
 ):
     active_domain = await _owned_domain(domain, current_user)
-    now = datetime.now(UTC).isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     await async_query_auth_db(
         "INSERT INTO app_alert_read (workspace_id, domain, auth_user_id, alert_id, read_at) "
         "SELECT ?, ?, ?, id, ? FROM app_alert_history "
@@ -2249,8 +2249,8 @@ async def check_domain_shield_status(
             with suppress(TypeError, ValueError):
                 updated_at = datetime.fromisoformat(str(row["updated_at"]).rstrip("Z"))
                 if updated_at.tzinfo is None:
-                    updated_at = updated_at.replace(tzinfo=UTC)
-                elapsed_days = max(0, (datetime.now(UTC) - updated_at).days)
+                    updated_at = updated_at.replace(tzinfo=timezone.utc)
+                elapsed_days = max(0, (datetime.now(timezone.utc) - updated_at).days)
                 cached_ssl_days = max(0, cached_ssl_days - elapsed_days)
             if blacklists_listed:
                 score = max(30, score - 30 * len(blacklists_listed))
@@ -2477,7 +2477,7 @@ async def check_domain_shield_status(
         status["score_grade"] = "F"
 
     # Save to status & handle SCD Type 2 history
-    now_str = datetime.now(UTC).isoformat() + "Z"
+    now_str = datetime.now(timezone.utc).isoformat() + "Z"
 
     # Check current active record in history
     hist_rows = await async_query_auth_db(
@@ -2542,7 +2542,7 @@ async def check_domain_shield_status(
             )
             if notification_is_allowed(
                 preference_rows[0] if preference_rows else None,
-                datetime.now(UTC),
+                datetime.now(timezone.utc),
                 "domain_shield",
             ):
                 from core.loops import send_loops_transactional
@@ -2717,7 +2717,7 @@ async def persist_dmarc_report(
     _ensure_app_runtime_tables()
     xml_payload = _extract_dmarc_xml_payload(payload)
     records = _parse_dmarc_report(xml_payload, domain)
-    now = datetime.now(UTC).isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     imported_count = 0
     report_digest = hashlib.sha256(xml_payload).hexdigest()
     for record_index, record in enumerate(records):

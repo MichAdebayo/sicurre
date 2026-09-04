@@ -16,7 +16,7 @@ import json
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -215,7 +215,7 @@ class CertFRCtiExtractor:
         started_at: datetime | None = None,
         fetch_historical: bool = False,
     ) -> CertFRCtiResult:
-        run_started_at = started_at or datetime.now(UTC)
+        run_started_at = started_at or datetime.now(timezone.utc)
 
         trace = SemanticTraceLogger(
             parent_type="Web Scraping",
@@ -360,7 +360,7 @@ class CertFRCtiExtractor:
             return result
 
         except Exception as exc:
-            ingestion_run.finished_at = datetime.now(UTC)
+            ingestion_run.finished_at = datetime.now(timezone.utc)
             ingestion_run.status = IngestionStatus.FAILED
             ingestion_run.log_message = f"CERT-FR CTI extraction failed: {exc}"
             await session.commit()
@@ -722,7 +722,7 @@ class CertFRCtiExtractor:
             detected_language="fr",
             is_usable=True,
             rejection_reason=None,
-            extracted_at=datetime.now(UTC),
+            extracted_at=datetime.now(timezone.utc),
         )
         session.add(raw_record)
         await session.flush()
@@ -777,7 +777,7 @@ class CertFRCtiExtractor:
         status: IngestionStatus,
         result: CertFRCtiResult,
     ) -> None:
-        ingestion_run.finished_at = datetime.now(UTC)
+        ingestion_run.finished_at = datetime.now(timezone.utc)
         ingestion_run.status = status
         ingestion_run.raw_object_count = result.extracted_count
         ingestion_run.raw_record_count = result.extracted_count

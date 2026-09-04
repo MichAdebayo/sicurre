@@ -4,7 +4,7 @@ import hashlib
 import re
 import unicodedata
 from collections import Counter
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from data_platform.cleaning.normalization import text_sha256
@@ -114,7 +114,7 @@ class CommonCrawlSignalSyntheticService:
         )
         return {
             "mode": "common_crawl_signal_synthetic_drafts",
-            "generated_at": datetime.now(UTC).isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "seed_count": len(seeds),
             "draft_count": len(drafts),
             "review_summary": dict(review_summary),

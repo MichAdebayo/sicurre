@@ -18,7 +18,7 @@ import logging
 import os
 import sys
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -157,7 +157,7 @@ async def _persist_txt_records(
         session, source_repo, source_machine_name
     )
 
-    started_at = datetime.now(UTC)
+    started_at = datetime.now(timezone.utc)
     ingestion_run = await run_repo.create(
         session,
         payload=IngestionRunCreate(
@@ -187,7 +187,7 @@ async def _persist_txt_records(
     session.add(raw_object)
     await session.flush()
 
-    extracted_at = datetime.now(UTC)
+    extracted_at = datetime.now(timezone.utc)
     records_to_add: list[DataRawRecord] = []
     raw_keys_seen: set[str] = set()
 
@@ -228,7 +228,7 @@ async def _persist_txt_records(
     for offset in range(0, len(records_to_add), 5_000):
         session.add_all(records_to_add[offset : offset + 5_000])
 
-    ingestion_run.finished_at = datetime.now(UTC)
+    ingestion_run.finished_at = datetime.now(timezone.utc)
     ingestion_run.status = "completed"
     ingestion_run.raw_object_count = 1
     ingestion_run.raw_record_count = len(records_to_add)

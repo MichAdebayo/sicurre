@@ -6,7 +6,7 @@ import re
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -378,7 +378,7 @@ class FrenchCulturalAdaptationService:
         output_dir: Path,
     ) -> AdaptationExportResult:
         output_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now(UTC).strftime("%Y%m%d")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d")
         timestamped_path = (
             output_dir / f"adapted_fr_phishing_{len(adapted_df)}_{timestamp}.csv"
         )

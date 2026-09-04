@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Select, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -135,7 +135,7 @@ class AnnotationBackfillService:
                 )
             ).all()
         ]
-        started_at = datetime.now(UTC)
+        started_at = datetime.now(timezone.utc)
         label_counts: Counter[str] = Counter()
         source_counts: Counter[tuple[str, str]] = Counter()
 

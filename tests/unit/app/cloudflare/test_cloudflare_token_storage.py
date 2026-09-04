@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from typing import Any
 
@@ -59,13 +59,13 @@ def test_phishing_email_notification_respects_opt_out() -> None:
     """A disabled phishing preference suppresses the outbound notification."""
     assert not notification_is_allowed(
         {"notify_phishing": 0, "quiet_hours_enabled": 0},
-        datetime(2026, 7, 15, 12, tzinfo=UTC),
+        datetime(2026, 7, 15, 12, tzinfo=timezone.utc),
     )
 
 
 def test_notification_master_switch_and_event_switches_are_independent() -> None:
     """Each domain has one master switch and explicit event-type switches."""
-    now = datetime(2026, 7, 15, 12, tzinfo=UTC)
+    now = datetime(2026, 7, 15, 12, tzinfo=timezone.utc)
     assert not notification_is_allowed(
         {"email_enabled": 0, "notify_phishing": 1, "notify_domain_shield": 1},
         now,
@@ -93,9 +93,9 @@ def test_quiet_hours_use_recipient_timezone_across_midnight() -> None:
         "timezone": "Europe/Paris",
     }
     assert not notification_is_allowed(
-        preference, datetime(2026, 7, 15, 21, 30, tzinfo=UTC)
+        preference, datetime(2026, 7, 15, 21, 30, tzinfo=timezone.utc)
     )
-    assert notification_is_allowed(preference, datetime(2026, 7, 15, 8, 0, tzinfo=UTC))
+    assert notification_is_allowed(preference, datetime(2026, 7, 15, 8, 0, tzinfo=timezone.utc))
 
 
 @pytest.mark.asyncio
