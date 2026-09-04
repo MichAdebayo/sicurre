@@ -95,3 +95,81 @@ def test_the_body_is_extracted_before_it_is_truncated() -> None:
     assert source.index("payload.text = extract_mime_body") < source.index(
         "anonymize_pii(payload.text)[:4000]"
     )
+
+
+# --- extract_mime_body: the branches a real mailbox actually produces ---
+
+def _mime(headers: str, body: str) -> str:
+    return f"Received: from mx.example.net\r\n{headers}\r\n\r\n{body}"
+
+
+def test_multipart_prefers_the_plain_text_part() -> None:
+    """Mail clients send plain and HTML together; the plain part is the message."""
+    from core.mime_headers import extract_mime_body
+
+    raw = (
+        "Received: from mx.example.net\r\n"
+        'Content-Type: multipart/alternative; boundary="B"\r\n\r\n'
+        "--B\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n"
+        "Confirmez vos identifiants.\r\n"
+        "--B\r\nContent-Type: text/html; charset=utf-8\r\n\r\n"
+        "<html><body><p>ignored</p></body></html>\r\n--B--\r\n"
+    )
+    assert extract_mime_body(raw) == "Confirmez vos identifiants."
+
+
+def test_html_only_mail_is_stripped_to_text() -> None:
+    """HTML-only phishing is common; tags must not reach the page or the model."""
+    from core.mime_headers import extract_mime_body
+
+    raw = _mime(
+        "Content-Type: text/html; charset=utf-8",
+        "<html><style>p{color:red}</style><body><p>Compte&nbsp;suspendu</p>"
+        "<script>alert(1)</script></body></html>",
+    )
+    body = extract_mime_body(raw)
+    assert "Compte" in body and "suspendu" in body
+    for leaked in ("<p>", "<script", "alert(1)", "color:red"):
+        assert leaked not in body
+
+
+def test_a_quoted_printable_body_is_decoded() -> None:
+    """Accented French is transfer-encoded; the raw form is unreadable."""
+    from core.mime_headers import extract_mime_body
+
+    raw = _mime(
+        "Content-Type: text/plain; charset=utf-8\r\n"
+        "Content-Transfer-Encoding: quoted-printable",
+        "Votre compte sera suspendu=2E",
+    )
+    assert extract_mime_body(raw) == "Votre compte sera suspendu."
+
+
+def test_an_unknown_charset_falls_back_rather_than_raising() -> None:
+    from core.mime_headers import extract_mime_body
+
+    raw = _mime("Content-Type: text/plain; charset=definitely-not-a-charset", "Bonjour")
+    assert "Bonjour" in extract_mime_body(raw)
+
+
+def test_a_message_with_no_text_part_does_not_return_headers() -> None:
+    """An attachment-only message must not surface its routing block as the body."""
+    from core.mime_headers import extract_mime_body
+
+    raw = _mime("Content-Type: application/pdf; name=x.pdf", "JVBERi0xLjQK")
+    body = extract_mime_body(raw)
+    assert "Received:" not in body
+
+
+def test_an_empty_plain_part_falls_through_to_html() -> None:
+    """A blank text/plain alternative must not win over real HTML content."""
+    from core.mime_headers import extract_mime_body
+
+    raw = (
+        "Received: from mx.example.net\r\n"
+        'Content-Type: multipart/alternative; boundary="B"\r\n\r\n'
+        "--B\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n   \r\n"
+        "--B\r\nContent-Type: text/html; charset=utf-8\r\n\r\n"
+        "<html><body>Contenu reel</body></html>\r\n--B--\r\n"
+    )
+    assert "Contenu reel" in extract_mime_body(raw)
