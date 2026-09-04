@@ -21,7 +21,7 @@
     "type": "git",
     "url": "git+https://github.com/MichAdebayo/sicurre.git"
   },
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "@hookform/resolvers": "3.10.0",
     "@tanstack/react-query": "5.80.7",
