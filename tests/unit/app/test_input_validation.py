@@ -184,6 +184,13 @@ async def test_scan_email_records_whitelist_stage_evidence(
         return []
 
     class SuccessResponse:
+        # The real httpx response always carries the identity headers the
+        # service returns; a stub without them is not a faithful stand-in.
+        headers = {
+            "X-Sicurre-Model-Version": "1.0.30",
+            "X-Sicurre-Model-Revision": "c6e4cbb79925",
+        }
+
         def raise_for_status(self) -> None:
             return None
 
@@ -227,7 +234,9 @@ async def test_scan_email_records_whitelist_stage_evidence(
     assert response.verdict == "safe"
     assert inference_payload["mail_context"]["recipient_expected"] is True
     insert = next(params for sql, params in writes if "INSERT INTO app_inference_event" in sql)
-    assert json.loads(insert[-2]) == {
+    # stage_breakdown_json sits four from the end: it is followed by
+    # expected_label, model_version and model_revision.
+    assert json.loads(insert[-4]) == {
         "custom_rule": {
             "active": True,
             "effect": "recipient_expected",
@@ -261,6 +270,13 @@ async def test_scan_email_persists_ml_stage_contract(
         return []
 
     class SuccessResponse:
+        # The real httpx response always carries the identity headers the
+        # service returns; a stub without them is not a faithful stand-in.
+        headers = {
+            "X-Sicurre-Model-Version": "1.0.30",
+            "X-Sicurre-Model-Revision": "c6e4cbb79925",
+        }
+
         def raise_for_status(self) -> None:
             return None
 

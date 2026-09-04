@@ -10,7 +10,19 @@ def test_application_migrations_form_one_resolvable_chain() -> None:
     """Reject missing predecessors and accidental multiple heads."""
     script = ScriptDirectory.from_config(Config("alembic.app.ini"))
 
-    assert script.get_current_head() == "20260830_app_0008"
+    # Assert the property, not the current head's name. Pinning the name made
+    # every legitimate migration fail this test, which trains people to edit the
+    # assertion rather than read it. Exactly one head is what "no accidental
+    # branch" actually means.
+    heads = script.get_heads()
+    assert len(heads) == 1, f"migration graph has branched: {heads}"
+
+    # And the chain must walk from that head back to base without a gap.
+    revisions = list(script.walk_revisions("base", heads[0]))
+    assert revisions, "no revisions resolved from base to head"
+    for revision in revisions:
+        assert revision.module is not None
+
     assert script.get_revision("20260724_app_0006") is not None
 
 
