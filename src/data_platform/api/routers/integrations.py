@@ -47,7 +47,7 @@ from core.config import get_settings
 from core.loops import send_loops_transactional
 from core.rate_limit import limiter
 from core.inference_client import get_inference_client
-from core.mime_headers import decode_mime_header
+from core.mime_headers import decode_mime_header, extract_mime_body
 from core.scan_metrics import observe_scan, observe_scan_failure, observe_stage
 from core.secret_cipher import decrypt_secret, encrypt_secret
 from data_platform.api.auth import AuthUser, ensure_runtime_tables, get_current_user
@@ -494,6 +494,12 @@ async def scan_email(
     # sees the subject a human would read rather than the wire format.
     payload.subject = decode_mime_header(payload.subject)
     payload.sender = decode_mime_header(payload.sender)
+    # The Worker forwards the whole message, so `text` arrives with every
+    # Received, ARC-Seal and DKIM-Signature line attached. Extract the body
+    # here, before the 4000-character truncation downstream: the headers alone
+    # exceed that, so truncating first discarded the body entirely and left the
+    # quarantine page showing routing metadata.
+    payload.text = extract_mime_body(payload.text)
 
     # ── Check Whitelist / Blocklist Rules ──────────────────────────────────
     matched_rule_type = None
