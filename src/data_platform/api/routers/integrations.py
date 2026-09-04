@@ -47,6 +47,7 @@ from core.config import get_settings
 from core.loops import send_loops_transactional
 from core.rate_limit import limiter
 from core.inference_client import get_inference_client
+from core.mime_headers import decode_mime_header
 from core.scan_metrics import observe_scan, observe_scan_failure, observe_stage
 from core.secret_cipher import decrypt_secret, encrypt_secret
 from data_platform.api.auth import AuthUser, ensure_runtime_tables, get_current_user
@@ -486,6 +487,13 @@ async def scan_email(
             explanation=str(event.get("explanation") or "Existing idempotent decision."),
             latency_ms=float(event.get("latency_ms") or 0.0) or None,
         )
+
+    # Mail clients encode non-ASCII headers as RFC 2047 encoded-words, so a
+    # French subject arrives as `=?UTF-8?Q?...?=`. Decoding here, before the
+    # rules, the classifier, the audit row and the alert, means every consumer
+    # sees the subject a human would read rather than the wire format.
+    payload.subject = decode_mime_header(payload.subject)
+    payload.sender = decode_mime_header(payload.sender)
 
     # ── Check Whitelist / Blocklist Rules ──────────────────────────────────
     matched_rule_type = None
