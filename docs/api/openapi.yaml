@@ -4385,16 +4385,8 @@ paths:
       - reported-email
   /v1/email/scan:
     post:
-      description: 'Validate the Worker shared secret, call the inference API, log the result,
-
-        and return a verdict.
-
-
-        This endpoint is intentionally public (no user session) — it is called by
-
-        Cloudflare Workers and authenticated exclusively through the per-integration
-
-        shared secret header.'
+      description: Validate the Worker shared secret, call the inference API, log the result, and return
+        a verdict
       operationId: scan_email_v1_email_scan_post
       parameters:
       - in: header
@@ -4555,9 +4547,8 @@ paths:
       - app-ui-flows
   /v1/integrations/cloudflare/setup:
     post:
-      description: "Full one-shot provisioning:\n  • Find zone → enable Email Routing → deploy Email Worker\
-        \ → create catch-all rule\nThe user only needs to click the verification email Cloudflare sends\
-        \ to\n``destination_email``."
+      description: 'Full one-shot provisioning: • Find zone → enable Email Routing → deploy Email Worker
+        → create c'
       operationId: setup_cloudflare_v1_integrations_cloudflare_setup_post
       requestBody:
         content:

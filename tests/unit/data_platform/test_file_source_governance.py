@@ -44,11 +44,7 @@ def test_published_corpora_are_not_personal_data(source: str) -> None:
 
 
 def test_enron_is_public_and_still_personal_data() -> None:
-    """Public and citable does not mean anonymous.
-
-    Enron is a published research corpus and it is real employee mail. Declaring
-    it as carrying personal data costs nothing and avoids an obvious question.
-    """
+    """Public and citable does not mean anonymous."""
     governance = file_source_governance("enron_spam")
 
     assert governance["legal_basis"] == "public_research_dataset"

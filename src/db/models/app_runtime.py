@@ -118,9 +118,7 @@ app_inference_event = sa.Table(
     _text_column("stage_labels_json", nullable=False, default="{}"),
     _text_column("stage_breakdown_json", nullable=False, default="{}"),
     _text_column("expected_label", nullable=True),
-    # Identity of the model that produced the verdict, taken from the
-    # inference response headers. Nullable: rows written before this was
-    # captured genuinely do not know, and a placeholder would claim they do.
+    # Identity of the model that produced the verdict, taken from the inference response headers.
     _text_column("model_version", nullable=True),
     _text_column("model_revision", nullable=True),
     _text_column("override_verdict", nullable=True),

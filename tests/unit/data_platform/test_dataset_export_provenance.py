@@ -35,24 +35,14 @@ def test_counts_are_grouped_by_source() -> None:
 
 
 def test_a_missing_source_is_counted_not_dropped() -> None:
-    """A row whose provenance is incomplete still belongs in the dataset.
-
-    The join is LEFT precisely so that a removed raw row cannot silently
-    shrink the export. Making it visible as `unattributed` is the honest
-    outcome; dropping it would misreport the split size.
-    """
+    """A row whose provenance is incomplete still belongs in the dataset."""
     provenance = _split_provenance(_frame())
     assert provenance["unattributed"] == 1
     assert sum(provenance["by_source"].values()) == 4
 
 
 def test_source_by_label_exposes_a_single_source_class() -> None:
-    """The cross-tab is the artifact that makes the confound visible.
-
-    A class arriving wholly from one source is the shape that let the earlier
-    model learn provenance instead of intent. The manifest has to show it, or
-    the report cannot argue about it.
-    """
+    """The cross-tab is the artifact that makes the confound visible."""
     provenance = _split_provenance(_frame())
     assert provenance["by_source_and_label"]["phishtank"] == {"phishing": 2}
     assert provenance["by_source_and_label"]["generated"] == {"legitimate": 1}
@@ -67,12 +57,7 @@ def test_counts_are_json_serialisable_integers() -> None:
 
 
 def test_the_sentinel_says_unavailable_rather_than_empty() -> None:
-    """"Could not look" must not read as "came from nowhere".
-
-    An absent provenance key, or an empty by_source map, would let a reader
-    conclude the split had no sources. The sentinel states the difference, so a
-    report quoting the manifest cannot accidentally claim the stronger thing.
-    """
+    """"Could not look" must not read as "came from nowhere"."""
     from data_platform.services.shared.dataset_export import _UNAVAILABLE_PROVENANCE
 
     assert _UNAVAILABLE_PROVENANCE["available"] is False
@@ -81,12 +66,7 @@ def test_the_sentinel_says_unavailable_rather_than_empty() -> None:
 
 
 def test_missing_lineage_tables_do_not_fail_the_export() -> None:
-    """The CSV is the deliverable; provenance is commentary on it.
-
-    A join on the export query would make a schema problem in the lineage
-    tables fail the export those tables have no part in producing. A dataset
-    with unknown provenance is still a dataset; no dataset is a broken release.
-    """
+    """The CSV is the deliverable; provenance is commentary on it."""
     import sqlalchemy as sa
 
     from data_platform.services.shared.dataset_export import DatasetExportService

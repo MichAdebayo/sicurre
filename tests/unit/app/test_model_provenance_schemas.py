@@ -36,12 +36,7 @@ def test_candidate_requires_immutable_code_and_artifact_revisions() -> None:
 
 
 def test_promotion_snapshot_applies_three_simple_gates() -> None:
-    """F1, phishing recall, and legitimate false positives determine passage.
-
-    Phishing recall carries a non-inferiority margin, so the failing case drops
-    well past it. A one-point drop would now pass, which is the intended
-    behaviour and is pinned separately below.
-    """
+    """F1, phishing recall, and legitimate false positives determine passage."""
     passing = PromotionMetricSnapshot(
         candidate_weighted_f1=0.92,
         production_weighted_f1=0.92,
@@ -56,13 +51,7 @@ def test_promotion_snapshot_applies_three_simple_gates() -> None:
 
 
 def test_recall_margin_matches_the_training_repository() -> None:
-    """The margin is duplicated across repositories and must not drift.
-
-    ``sicurre-ml`` decides the gate and this schema re-derives it as a
-    cross-check. When the two disagree every evaluation is rejected with HTTP
-    422 and no obvious cause, which is what happened on the first candidate ever
-    to pass. Pin the value so a change here is deliberate.
-    """
+    """The margin is duplicated across repositories and must not drift."""
     assert PHISHING_RECALL_REGRESSION_TOLERANCE == 0.099
 
     inside = PromotionMetricSnapshot(
@@ -193,16 +182,7 @@ def test_active_deployment_requires_revision_and_time() -> None:
 
 
 def test_evaluation_stage_transitions_are_not_sticky() -> None:
-    """A pass must undo a previous rejection, and neither arm may touch production.
-
-    The failure arm was once the only one written, so a rejection was sticky: a
-    candidate marked ``rejected`` stayed rejected after a later evaluation
-    passed, leaving MLflow reading ``candidate`` while the database read
-    ``rejected``. It surfaced on the first candidate ever to pass its gate.
-
-    ``production`` and ``retired`` belong to the promotion workflow. Re-running
-    an evaluation against the live model must not move it in either direction.
-    """
+    """A pass must undo a previous rejection, and neither arm may touch production."""
     from data_platform.services.model_provenance import _apply_evaluation_stage
 
     class _Version:

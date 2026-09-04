@@ -77,14 +77,7 @@ scan_failure_total = Counter(
 
 
 def observe_scan_failure(reason: str) -> None:
-    """Record a scan that produced no verdict.
-
-    ``observe_scan`` only fires once a verdict exists, so before this counter a
-    failed scan emitted nothing at all: the request vanished from
-    ``sicurre_scan_total`` instead of appearing in it as a failure. That is the
-    metric-level form of incident 06 — the outage was invisible because the
-    code path that would have reported it was never reached.
-    """
+    """Record a scan that produced no verdict."""
     scan_failure_total.labels(
         reason=reason if reason in _FAILURE_REASONS else "unknown"
     ).inc()

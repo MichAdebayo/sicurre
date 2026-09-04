@@ -1,15 +1,4 @@
-"""The documented palette must keep meeting WCAG 2.1 AA.
-
-`docs/brand/DESIGN.md` directs clickable text to #2E6BB5 rather than the
-primary #4A90D9. That reads like a style preference and is not one: the primary
-blue measures 3.34:1 on white, which is below the 4.5:1 that criterion 1.4.3
-requires for body text, while #2E6BB5 measures 5.40:1.
-
-A future palette edit that "simplifies" the two blues into one would drop link
-text below AA silently, because nothing about the rendered page looks wrong.
-This recomputes the ratios from the hex values so the constraint fails loudly
-instead.
-"""
+"""The documented palette meets WCAG 2.1 AA."""
 
 from __future__ import annotations
 
@@ -70,12 +59,7 @@ def test_operational_panel_token_pairs_pass_aa_in_both_themes() -> None:
 
 
 def test_primary_blue_is_below_aa_on_white() -> None:
-    """The reason the design system has two blues at all.
-
-    If this ever passes, the palette changed and the DESIGN.md instruction
-    directing clickable text to #2E6BB5 may no longer be necessary — but it
-    must then be revisited deliberately rather than left as folklore.
-    """
+    """The reason the design system has two blues at all."""
     ratio = _contrast(_PRIMARY_BLUE, _WHITE)
     assert _AA_LARGE <= ratio < _AA_BODY
 
@@ -112,17 +96,7 @@ def test_verdict_colours_pass_aa_where_they_are_actually_used() -> None:
 
 
 def test_danger_text_passes_aa_on_both_danger_surfaces() -> None:
-    """The Domain Shield badge failure is fixed by a dedicated text token.
-
-    Danger text used the #ef4444 accent directly, which measured 3.44:1 on the
-    pale danger surface and 4.37:1 on the dark one - both below the 4.5:1 body
-    threshold, at 11px. #b91c1c and #f87171 are the text token now, while
-    #ef4444 stays the fill/border accent (which pairs with white or dark
-    on-danger foregrounds, not with the tinted background).
-
-    If either side ever drops below AA again, the token regressed - restore it
-    rather than relaxing this test.
-    """
+    """The Domain Shield badge failure is fixed by a dedicated text token."""
     light = _contrast(*_DANGER_TEXT_LIGHT)
     dark = _contrast(*_DANGER_TEXT_DARK)
 

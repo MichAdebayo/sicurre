@@ -467,12 +467,7 @@ async def ingest_csv_bytes(
     trigger_mode: str = "manual",
     trace: SemanticTraceLogger | None = None,
 ) -> CsvIngestionResult:
-    """Ingest a CSV file supplied as raw bytes (R2-downloaded).
-
-    Mirrors :func:`ingest_csv_file` but derives file size and content hash
-    from *data* directly instead of reading the filesystem.  *external_ref*
-    and *storage_uri* are caller-provided (typically ``r2://bucket/key``).
-    """
+    """Ingest a CSV file supplied as raw bytes (R2-downloaded)."""
     # Treat the bytes as a virtual Path for helper functions that only use
     # ``.name`` for logging or schema-detection — no filesystem access occurs.
     virtual_path = Path(filename)

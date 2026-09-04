@@ -142,11 +142,7 @@ class WebCleaner:
 
 
 def _is_dropzone_txt_source(source_name: str) -> bool:
-    """True for dropzone TXT sources such as ``spam_1`` or ``legitimate_3``.
-
-    Matched by shape rather than enumerated so the label arm and the policy
-    block cannot drift apart as indices are added.
-    """
+    """True for dropzone TXT sources such as ``spam_1`` or ``legitimate_3``."""
     prefix, _, index = source_name.partition("_")
     return prefix in ("spam", "phishing", "legitimate") and index.isdigit()
 
@@ -162,20 +158,7 @@ class NormalizationPipeline:
             lane=NormalizationLane.DIRECT_MESSAGE,
             normalize_messages=True,
         ),
-        # Operator-exported spam from a real French mailbox, ingested by
-        # base_ingest/file/parsers/txt_email_ingestion.py, which hardcodes
-        # label="spam" and writes the body under "text". They need no label
-        # mapping and no extractor branch - the default case already reads them.
-        #
-        # Without an entry here get_source_policy returns None, the source is
-        # left out of normalizable_source_ids, and the records are never selected
-        # at all. 281 real messages sat invisible that way: not rejected, never
-        # examined. normalize_text calls every one of them usable.
-        # Dropzone TXT sources (spam_1, legitimate_3, ...) are resolved
-        # dynamically in get_source_policy rather than enumerated here. Any
-        # fixed range has an edge: legitimate_21 would match the label arm,
-        # find no policy, and be ignored without a word - the same silence that
-        # hid 281 messages for months.
+            # Operator-exported spam from a real French mailbox, via the TXT file parser.
         "kaggle_multilingual_spam": SourceNormalizationPolicy(
             lane=NormalizationLane.DIRECT_MESSAGE,
             normalize_messages=True,
@@ -260,10 +243,7 @@ class NormalizationPipeline:
         policy = cls.SOURCE_POLICIES.get(canonical)
         if policy is not None:
             return policy
-        # Dropzone TXT files become one source each, named from the filename,
-        # so the set is open-ended by construction. Resolving them by shape
-        # means dropping legitimate_37.txt works without a code change, and
-        # there is no index that silently has no policy.
+            # Dropzone TXT files become one source each, named from the filename.
         if _is_dropzone_txt_source(canonical):
             return SourceNormalizationPolicy(
                 lane=NormalizationLane.DIRECT_MESSAGE,
@@ -737,24 +717,9 @@ class NormalizationPipeline:
                     case _:
                         label = None
             case _ if _is_dropzone_txt_source(resolved_source_name):
-                # Mailbox exports carry label="spam" on every record, written by
-                # txt_email_ingestion. Without an arm here the default is
-                # `label = None`, and the write path rejects on a null label -
-                # so these would be selected, extract cleanly, and then be
-                # dropped for want of a label that was present all along.
-                # The parser writes the label from the filename prefix; this
-                # reads it back rather than assuming. An unrecognised value
-                # yields None and the write path rejects it, which is the
-                # correct outcome - guessing would put mislabelled rows into
-                # the corpus.
+                # Mailbox exports carry label="spam" on every record, written by txt_email_ingestion.
                 raw_label = str(raw_content.get("label", "")).lower()
                 # The label must agree with the filename the record came from.
-                # The parser derives one from the other, so a disagreement means
-                # the record was not produced by that path - hand-edited, or a
-                # file renamed after ingestion - and the safe answer is to
-                # refuse it. A null label is rejected downstream, which is the
-                # outcome we want: trusting either side over the other would
-                # put a mislabelled row into the corpus silently.
                 expected = resolved_source_name.split("_", 1)[0]
                 label = (
                     {

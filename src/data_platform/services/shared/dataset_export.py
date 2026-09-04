@@ -22,18 +22,7 @@ _UNAVAILABLE_PROVENANCE = {
 
 
 def _split_provenance(split_df: "pd.DataFrame") -> dict:
-    """Per-source counts for one split, for the sidecar manifest.
-
-    Provenance travels beside the CSV rather than inside it. The training
-    contract is `text,label`: adding a third column would change what every
-    consumer parses, and a source name sitting next to the text is a feature
-    the model can learn from. The confound is not hypothetical here - the
-    deployed classifier was previously found to have learned provenance rather
-    than intent, because each class arrived from its own corpus.
-
-    So the export answers "where did this split come from" as a separate
-    artifact, which a report can cite and a training run never reads.
-    """
+    """Per-source counts for one split, for the sidecar manifest."""
     frame = split_df.assign(source_name=split_df["source_name"].fillna("unattributed"))
     counts = frame["source_name"].value_counts()
     by_source = {str(name): int(count) for name, count in counts.items()}
@@ -65,32 +54,15 @@ class DatasetExportService:
         self.engine = create_engine(self.settings.sync_data_platform_database_url)
 
     def _read_provenance(self, conn, version_tag: str, *, sqlite: bool) -> dict[str, dict]:
-        """Per-split source counts, read separately from the dataset itself.
-
-        This is a second query rather than a join on the export query on
-        purpose. The CSV is the deliverable; provenance is commentary on it. A
-        join would make a schema problem in the lineage tables fail the export
-        that those tables have no part in producing, which is the wrong
-        failure: a dataset with unknown provenance is still a dataset, while no
-        dataset at all is a broken release.
-
-        The joins are LEFT for the same reason at row level - a record whose
-        raw row was since removed still belongs in the split, and is counted as
-        `unattributed` rather than dropped.
-        """
+        """Per-split source counts, read separately from the dataset itself."""
         message_join = (
             "di.normalized_message_id = replace(nm.id, '-', '')"
             if sqlite
             else "di.normalized_message_id = nm.id"
         )
         # Both sides of this one are stored the same way, so it joins directly.
-        # Wrapping either side in replace() would cost the index and turn a
-        # 32k-row join into a full scan - measured as a multi-minute hang on the
-        # local database before this was written as plain equality.
         raw_join = "nm.raw_record_id = rr.id"
-        # This one genuinely differs: data_source_system stores its id without
-        # dashes under SQLite. The normalisation is cheap because the table it
-        # scans has single-digit row counts.
+        # This one genuinely differs: data_source_system stores its id without dashes under SQLite.
         source_join = (
             "replace(rr.source_system_id, '-', '') = ss.id"
             if sqlite

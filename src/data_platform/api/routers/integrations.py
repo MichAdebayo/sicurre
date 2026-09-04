@@ -47,6 +47,7 @@ from core.config import get_settings
 from core.loops import send_loops_transactional
 from core.rate_limit import limiter
 from core.inference_client import get_inference_client
+from core.mime_headers import decode_mime_header, extract_mime_body
 from core.scan_metrics import observe_scan, observe_scan_failure, observe_stage
 from core.secret_cipher import decrypt_secret, encrypt_secret
 from data_platform.api.auth import AuthUser, ensure_runtime_tables, get_current_user
@@ -267,9 +268,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["integrations"])
 
-# ---------------------------------------------------------------------------
-# Database helpers (same pattern as app_routes.py — direct SQLite)
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- Database helpers
 
 
 def _db_path() -> str:
@@ -293,13 +292,7 @@ async def _async_query(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
 
 
 async def _timed_query(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
-    """Same as _async_query, but attributed to the "database" scan stage.
-
-    Production Postgres is Neon (serverless, eu-central-1) reached over TLS from
-    the application host, and it autosuspends when idle. At current volume the
-    compute is cold for most scans, so round-trip cost here is a prime suspect
-    for the gap between inference time and total decision time.
-    """
+    """Same as _async_query, but attributed to the "database" scan stage."""
     # Delegates through _async_query rather than calling the engine directly so
     # the existing module-level test seam keeps working.
     with observe_stage("database"):
@@ -320,9 +313,7 @@ def _encrypt_provider_token(token: str) -> str:
     )
 
 
-# ---------------------------------------------------------------------------
-# Pydantic schemas
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- Pydantic schemas
 
 
 class EmailScanRequest(BaseModel):
@@ -377,9 +368,7 @@ class TeardownRequest(BaseModel):
     )
 
 
-# ---------------------------------------------------------------------------
-# ── 1. Email Scan endpoint (called by Cloudflare Worker) ─────────────────
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- ── 1.
 
 
 @router.post("/v1/email/scan", response_model=EmailScanResponse)
@@ -389,14 +378,7 @@ async def scan_email(
     payload: EmailScanRequest,
     x_sicurre_secret: str | None = Header(default=None, alias="X-Sicurre-Secret"),
 ) -> EmailScanResponse:
-    """
-    Validate the Worker shared secret, call the inference API, log the result,
-    and return a verdict.
-
-    This endpoint is intentionally public (no user session) — it is called by
-    Cloudflare Workers and authenticated exclusively through the per-integration
-    shared secret header.
-    """
+    """Validate the Worker shared secret, call the inference API, log the result, and return a verdict"""
     request_started_at = perf_counter()
     _ = request
     _ensure_tables()
@@ -436,14 +418,7 @@ async def scan_email(
     legacy_event_id = (
         str(uuid5(NAMESPACE_URL, f"{workspace_id}:{message_id}")) if message_id else event_id
     )
-    # These three reads depend only on the integration row resolved above, not on
-    # each other, and all are side-effect-free SELECTs. Run them concurrently:
-    # serially they were four round-trips to Neon at ~115 ms each, which measured
-    # 458 ms — 23% of a 2.0 s scan against a 2.0 s objective.
-    #
-    # The dedup guards below still short-circuit in their original order. The only
-    # difference is that a replayed message now also fetches rules it will not use,
-    # which costs nothing in wall-clock because the fetch already overlapped.
+    # Run concurrently: independent SELECTs costing 458 ms of the 2 s budget when serial.
     zone_name = integration.get("zone_name") or ""
     with observe_stage("database"):
         existing_quarantine, existing_event, rules = await asyncio.gather(
@@ -487,6 +462,12 @@ async def scan_email(
             latency_ms=float(event.get("latency_ms") or 0.0) or None,
         )
 
+    # Decode RFC 2047 headers first so rules, classifier, audit and alert see readable text.
+    payload.subject = decode_mime_header(payload.subject)
+    payload.sender = decode_mime_header(payload.sender)
+    # The Worker forwards the raw message, so strip the MIME envelope down to the body.
+    payload.text = extract_mime_body(payload.text)
+
     # ── Check Whitelist / Blocklist Rules ──────────────────────────────────
     matched_rule_type = None
     sender_lower = payload.sender.lower()
@@ -515,9 +496,7 @@ async def scan_email(
     stage_scores: dict[str, Any] = {}
     stage_labels: dict[str, Any] = {}
     stage_breakdown: dict[str, Any] = {}
-    # Stays None when no model was consulted - a blocklist rule short-circuits
-    # before inference, and recording a model identity there would attribute a
-    # verdict to a model that never saw the message.
+    # Stays None when a blocklist rule short-circuits before any model is consulted.
     model_version: str | None = None
     model_revision: str | None = None
 
@@ -561,11 +540,7 @@ async def scan_email(
             resp.raise_for_status()
             result = resp.json()
 
-            # The inference service reports which model answered on every
-            # response. Capturing it here is what lets a verdict in the threat
-            # journal be attributed to the model that produced it - the first
-            # question when a classification is disputed, and one that a later
-            # retrain makes unanswerable if it was never recorded.
+            # The inference service reports which model answered on every response.
             model_version = (resp.headers.get("X-Sicurre-Model-Version") or "").strip() or None
             model_revision = (resp.headers.get("X-Sicurre-Model-Revision") or "").strip() or None
 
@@ -681,11 +656,7 @@ async def scan_email(
                     data_variables={
                         "firstName": first_name,
                         "domainName": integration.get("zone_name") or "votre domaine",
-                        # The Loops "threat-quarantined" template declares this
-                        # variable as `sender`; sending `senderEmail` produced a
-                        # 400 "Missing required data variable(s): sender." and no
-                        # alert reached the customer. Confirmed against the
-                        # template definition via the Loops API.
+                        # Loops declares this variable as `sender`; `senderEmail` returned 400.
                         "sender": payload.sender,
                         "emailSubject": payload.subject,
                         "riskScore": int(score * 100),
@@ -838,9 +809,7 @@ async def upload_quarantine_content(
     return {"status": "stored", "idempotent": False}
 
 
-# ---------------------------------------------------------------------------
-# ── 2. Provision Cloudflare integration ──────────────────────────────────
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- ── 2.
 
 
 @router.post(
@@ -856,12 +825,7 @@ async def setup_cloudflare(
     request: Request,
     current_user: AuthUser = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """
-    Full one-shot provisioning:
-      • Find zone → enable Email Routing → deploy Email Worker → create catch-all rule
-    The user only needs to click the verification email Cloudflare sends to
-    ``destination_email``.
-    """
+    """Full one-shot provisioning: • Find zone → enable Email Routing → deploy Email Worker → create c"""
     _ensure_tables()
     settings = get_settings()
     public_api_url = (
@@ -1125,9 +1089,7 @@ async def setup_cloudflare(
             )
 
             try:
-                # Domain Shield DNS health writes are useful, but they are not the
-                # same as gateway provisioning. If they fail, keep the integration
-                # active/pending and surface the DNS issue separately.
+                # DNS health is not gateway provisioning: keep the integration, surface DNS apart.
                 dns_records = await provisioner.get_dns_records(result.zone_id)
                 existing_spf_content = ""
                 existing_dkim_content = ""
@@ -1285,9 +1247,7 @@ async def setup_cloudflare(
     }
 
 
-# ---------------------------------------------------------------------------
-# ── 3. Status ──────────────────────────────────────────────────────────────
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- ── 3.
 
 
 @router.get(
@@ -1322,9 +1282,7 @@ async def cloudflare_status(
     }
 
 
-# ---------------------------------------------------------------------------
-# ── 4. Teardown ───────────────────────────────────────────────────────────
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- ── 4.
 
 
 @router.delete(
@@ -1422,9 +1380,7 @@ async def teardown_cloudflare(
     return {"status": "removed", "zone_name": row["zone_name"]}
 
 
-# ---------------------------------------------------------------------------
-# ── 5. Validate token only (used by the UI wizard step) ───────────────────
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- ── 5.
 
 
 class TokenVerifyRequest(BaseModel):
@@ -1456,9 +1412,7 @@ async def verify_cloudflare_token(
         return {"valid": False, "error": str(exc)}
 
 
-# ---------------------------------------------------------------------------
-# ── 6. Global Workspace Token Management ──────────────────────────────────
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- ── 6.
 
 
 class CloudflareTokenSaveRequest(BaseModel):
