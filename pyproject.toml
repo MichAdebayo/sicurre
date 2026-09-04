@@ -1,8 +1,9 @@
 [project]
 name = "sicurre"
 version = "0.1.0"
-description = "Documentation and architecture workspace for Sicurre"
+description = "Phishing interception for French auto-entrepreneurs: data platform, API and application"
 readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.11"
 dependencies = [
     "aiosqlite>=0.22.1",
