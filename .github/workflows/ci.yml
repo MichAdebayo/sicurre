@@ -79,8 +79,18 @@ jobs:
         run: |
           set -uo pipefail
           for attempt in 1 2 3; do
-            output="$(npm audit --omit=dev --audit-level=high 2>&1)" && exit 0
+            # Bounded: npm audit blocks rather than erroring when the registry
+            # is unreachable, so an unbounded call hangs the job until the
+            # runner's own limit. Exit 124 is the timeout, treated as
+            # unreachable rather than as a finding.
+            output="$(timeout 120 npm audit --omit=dev --audit-level=high 2>&1)" && exit 0
+            status=$?
             printf '%s\n' "$output"
+            if [ "$status" -eq 124 ]; then
+              echo "::warning::npm audit timed out after 120s (attempt ${attempt}/3); retrying"
+              sleep $((attempt * 20))
+              continue
+            fi
             if printf '%s' "$output" | grep -qiE 'Service Unavailable|audit endpoint returned an error|ENOTFOUND|ETIMEDOUT|ECONNRESET'; then
               echo "::warning::npm advisories endpoint unreachable (attempt ${attempt}/3); retrying"
               sleep $((attempt * 20))
