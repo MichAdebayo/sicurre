@@ -63,7 +63,7 @@ async def _add_raw_record(session: AsyncSession, record_id: str, payload: dict) 
     now = datetime.now(timezone.utc).isoformat()
     await session.execute(
         text(
-            # detected_language must be 'fr': run_batch isolates the French lane in its selection query, s
+    # detected_language must be 'fr': run_batch isolates the French lane in its query.
             "INSERT INTO data_raw_record (id, raw_object_id, source_system_id,"
             " record_key, raw_content, is_usable, detected_language,"
             " extracted_at, created_at)"

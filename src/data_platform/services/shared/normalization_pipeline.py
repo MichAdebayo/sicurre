@@ -158,7 +158,7 @@ class NormalizationPipeline:
             lane=NormalizationLane.DIRECT_MESSAGE,
             normalize_messages=True,
         ),
-        # Operator-exported spam from a real French mailbox, ingested by base_ingest/file/parsers/txt_
+            # Operator-exported spam from a real French mailbox, via the TXT file parser.
         "kaggle_multilingual_spam": SourceNormalizationPolicy(
             lane=NormalizationLane.DIRECT_MESSAGE,
             normalize_messages=True,
@@ -243,7 +243,7 @@ class NormalizationPipeline:
         policy = cls.SOURCE_POLICIES.get(canonical)
         if policy is not None:
             return policy
-        # Dropzone TXT files become one source each, named from the filename, so the set is open-ended
+            # Dropzone TXT files become one source each, named from the filename.
         if _is_dropzone_txt_source(canonical):
             return SourceNormalizationPolicy(
                 lane=NormalizationLane.DIRECT_MESSAGE,

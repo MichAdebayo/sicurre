@@ -2177,7 +2177,7 @@ def _classify_blocklist_response(provider: str, addresses: list[str]) -> tuple[b
 
     if provider == "Spamhaus DBL":
         if any(str(address).startswith("127.255.255.") for address in parsed):
-            # 127.255.255.254 = open resolver block 127.255.255.252 = typo in DNSBL name (DQS misconfigura
+                # 127.255.255.252/.254 are DQS misconfiguration codes, not a real listing.
             return False, "Spamhaus indisponible depuis le résolveur du serveur"
         return any(address in ipaddress.ip_network("127.0.0.0/16") for address in parsed), None
 

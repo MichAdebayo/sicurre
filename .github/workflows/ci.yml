@@ -75,7 +75,8 @@ jobs:
         # advisories endpoint, and those mean opposite things: one is a finding,
         # the other is npm having an outage and telling us nothing. A real
         # finding still fails the build on the first attempt, because the output
-        # is inspected rather than the exit code alone.
+        # is inspected rather than the exit code alone. A sustained outage warns
+        # rather than blocks: npm's uptime is not evidence about our dependencies.
         run: |
           set -uo pipefail
           for attempt in 1 2 3; do
@@ -99,8 +100,7 @@ jobs:
             echo "::error::npm audit reported a high or critical vulnerability in production dependencies"
             exit 1
           done
-          echo "::error::npm advisories endpoint stayed unreachable after 3 attempts - dependencies were NOT audited"
-          exit 1
+          echo "::warning::npm advisories endpoint stayed unreachable after 3 attempts - dependencies were NOT audited"
 
       - name: Build frontend
         run: npm run build

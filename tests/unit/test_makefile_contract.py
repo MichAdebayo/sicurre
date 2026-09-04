@@ -146,7 +146,7 @@ def test_targets_referenced_by_ci_and_docs_are_defined() -> None:
 
     referenced: set[str] = set()
     for path in _tracked_yaml_and_markdown():
-        # Only real invocations: a line starting with "make x", a CI "run: make x", or an inline `make
+    # Only real invocations: "make x", a CI "run: make x", or an inline `make x`.
         referenced |= set(
             re.findall(
                 r"(?:^|`|run:[ \t]*)make ([a-z][a-z0-9-]{2,})\b",

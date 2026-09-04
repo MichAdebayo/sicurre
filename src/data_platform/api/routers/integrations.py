@@ -418,7 +418,7 @@ async def scan_email(
     legacy_event_id = (
         str(uuid5(NAMESPACE_URL, f"{workspace_id}:{message_id}")) if message_id else event_id
     )
-    # These three reads depend only on the integration row resolved above, not on each other, and 
+    # Run concurrently: independent SELECTs costing 458 ms of the 2 s budget when serial.
     zone_name = integration.get("zone_name") or ""
     with observe_stage("database"):
         existing_quarantine, existing_event, rules = await asyncio.gather(
@@ -462,10 +462,10 @@ async def scan_email(
             latency_ms=float(event.get("latency_ms") or 0.0) or None,
         )
 
-    # Mail clients encode non-ASCII headers as RFC 2047 encoded-words, so a French subject arrives
+    # Decode RFC 2047 headers first so rules, classifier, audit and alert see readable text.
     payload.subject = decode_mime_header(payload.subject)
     payload.sender = decode_mime_header(payload.sender)
-    # The Worker forwards the whole message, so `text` arrives with every Received, ARC-Seal and D
+    # The Worker forwards the raw message, so strip the MIME envelope down to the body.
     payload.text = extract_mime_body(payload.text)
 
     # ── Check Whitelist / Blocklist Rules ──────────────────────────────────
@@ -496,7 +496,7 @@ async def scan_email(
     stage_scores: dict[str, Any] = {}
     stage_labels: dict[str, Any] = {}
     stage_breakdown: dict[str, Any] = {}
-    # Stays None when no model was consulted - a blocklist rule short-circuits before inference, a
+    # Stays None when a blocklist rule short-circuits before any model is consulted.
     model_version: str | None = None
     model_revision: str | None = None
 
@@ -656,7 +656,7 @@ async def scan_email(
                     data_variables={
                         "firstName": first_name,
                         "domainName": integration.get("zone_name") or "votre domaine",
-                        # The Loops "threat-quarantined" template declares this variable as `sender`; sending `senderE
+                        # Loops declares this variable as `sender`; `senderEmail` returned 400.
                         "sender": payload.sender,
                         "emailSubject": payload.subject,
                         "riskScore": int(score * 100),
@@ -1089,7 +1089,7 @@ async def setup_cloudflare(
             )
 
             try:
-                # Domain Shield DNS health writes are useful, but they are not the same as gateway provisionin
+                # DNS health is not gateway provisioning: keep the integration, surface DNS apart.
                 dns_records = await provisioner.get_dns_records(result.zone_id)
                 existing_spf_content = ""
                 existing_dkim_content = ""
