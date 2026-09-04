@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -125,7 +125,7 @@ def test_legacy_db_ingestion_preserves_multiclass_verdicts() -> None:
         object_type=ObjectType.SQL_EXPORT.value,
         content_hash="test-hash",
         source_metadata={},
-        collected_at=datetime.now(UTC),
+        collected_at=datetime.now(timezone.utc),
     )
     spam_source_name = "database/faker/synthetic_spam_medium"
     phishing_source_name = "database/faker/synthetic_phishing_medium"

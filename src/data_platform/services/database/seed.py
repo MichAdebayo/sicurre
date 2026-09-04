@@ -5,7 +5,7 @@ import logging
 import random
 import re
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 from faker import Faker
@@ -69,7 +69,7 @@ class ExternalUser(Base):
     email = Column(String, nullable=False, unique=True)
     display_name = Column(String)
     plan = Column(String, nullable=False, default="free")
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class ExternalThreatLog(Base):
@@ -91,7 +91,7 @@ class ExternalThreatLog(Base):
     model_version = Column(String, nullable=False)
     action_taken = Column(String)
     action_at = Column(DateTime)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class ExternalFeedback(Base):
@@ -104,7 +104,7 @@ class ExternalFeedback(Base):
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
     feedback_label = Column(String, nullable=False)
     comment = Column(Text)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class ExternalModelVersion(Base):
@@ -117,7 +117,7 @@ class ExternalModelVersion(Base):
     recall_score = Column(Float)
     eval_samples = Column(Integer)
     promoted_at = Column(DateTime)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 #: Upper bound on a stored body, in characters.
@@ -278,7 +278,7 @@ def seed_external_database(seed: int = SEED) -> None:
     Base.metadata.create_all(engine)
     session_local = sessionmaker(bind=engine)
 
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     plans = ["free"] * 4 + ["pro"] * 4 + ["business"] * 2
     phishing_signals = [
         ["DMARC fail", "Suspicious URL"],
@@ -490,7 +490,7 @@ def append_to_database(
         svc = SyntheticGenerationService(seed=effective_seed)
         df = svc.generate_class("phishing", n)
 
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         inserted = 0
         for _, row in df.iterrows():
             text_content = str(row.get("text", ""))

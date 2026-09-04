@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from hashlib import sha256
 from typing import Any
 
@@ -13,7 +13,7 @@ from data_platform.services.shared.review_persistence import ReviewPersistenceSe
 
 
 def _resolved_run_timestamp(run_timestamp: str | None) -> str:
-    return run_timestamp or datetime.now(UTC).isoformat()
+    return run_timestamp or datetime.now(timezone.utc).isoformat()
 
 
 def _coerce_source_parent(values: list[str]) -> str | None:

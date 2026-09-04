@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Any
 
@@ -15,7 +15,7 @@ JSON_VARIANT = sa.JSON().with_variant(JSONB(), "postgresql")
 
 
 def utc_now() -> datetime:
-    return datetime.now(UTC)
+    return datetime.now(timezone.utc)
 
 
 def enum_values(enum_cls: type[StrEnum]) -> tuple[str, ...]:

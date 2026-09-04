@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -141,7 +141,7 @@ async def test_sap_labs_trace_happy_path_schema(
         result = await service.run(
             session,
             trigger_mode="manual",
-            started_at=datetime(2025, 1, 1, tzinfo=UTC),
+            started_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
         )
 
     traces = parse_traces(capsys.readouterr().out)

@@ -4,7 +4,7 @@ import json
 import random
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from typing import Any
 
@@ -137,7 +137,7 @@ def append_cron_generation_batch(
         model_tags = _ensure_model_versions(session)
 
         generator = SyntheticGenerationService(seed=effective_seed)
-        generated_at = datetime.now(UTC)
+        generated_at = datetime.now(timezone.utc)
         inserted_by_class: dict[str, int] = {}
         inserted_by_scenario: dict[str, int] = {}
         seen_text_hashes: set[str] = set()

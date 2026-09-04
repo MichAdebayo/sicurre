@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -83,7 +83,7 @@ async def frozen_dataset_id(
             version_tag="v1.0.0",
             target_usage="training",
             status=DatasetStatus.FROZEN.value,
-            frozen_at=datetime.now(UTC),
+            frozen_at=datetime.now(timezone.utc),
             item_count=0,
         )
         sess.add(dataset)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from data_platform.services.database.source_naming import canonical_database_source
@@ -52,7 +52,7 @@ class StageTwoRewriteJobService:
 
         return {
             "mode": "stage_two_rewrite_jobs",
-            "generated_at": datetime.now(UTC).isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "job_count": len(jobs),
             "jobs": jobs,
         }

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
 
@@ -105,7 +105,7 @@ def test_recovery_snapshot_builder_materializes_local_merged_parquet(
                     {"text": "beta", "content_hash": "h2"},
                 ]
             ),
-            datetime(2026, 4, 1, 12, 0, tzinfo=UTC),
+            datetime(2026, 4, 1, 12, 0, tzinfo=timezone.utc),
         ),
         newer_key: (
             _parquet_bytes(
@@ -114,7 +114,7 @@ def test_recovery_snapshot_builder_materializes_local_merged_parquet(
                     {"text": "gamma", "content_hash": "h3"},
                 ]
             ),
-            datetime(2026, 4, 2, 12, 0, tzinfo=UTC),
+            datetime(2026, 4, 2, 12, 0, tzinfo=timezone.utc),
         ),
     }
 

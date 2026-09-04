@@ -3,9 +3,16 @@ line-length = 100
 
 [lint]
 select = ["E4", "E7", "E9", "F", "I", "B", "UP"]
-# B008 flags calls in argument defaults. That is exactly how FastAPI declares
-# dependencies (`Depends`, `Query`, `Header`), so every hit is a false positive.
-ignore = ["B008"]
+ignore = [
+  # B008 flags calls in argument defaults. That is exactly how FastAPI declares
+  # dependencies (`Depends`, `Query`, `Header`), so every hit is a false positive.
+  "B008",
+  # UP017 rewrites `timezone.utc` to `UTC`. Deferred, not accepted: the rewrite
+  # has no behaviour change but touches 129 lines, most of them inside code with
+  # no test coverage, which spends the changed-line coverage budget on churn.
+  # Worth doing alongside tests for those paths, not before them.
+  "UP017",
+]
 
 [lint.per-file-ignores]
 # CLI entrypoints and cron schedulers are run as scripts. They insert `src` into

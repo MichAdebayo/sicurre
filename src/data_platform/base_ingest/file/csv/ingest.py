@@ -30,7 +30,7 @@ import json
 import logging
 import sys
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -173,7 +173,7 @@ def _build_and_save_manifest(entries: list[_R2FileEntry]) -> None:
         for e in entries
     ]
     manifest = {
-        "generated_at": datetime.now(UTC).isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "description": (
             "R2-only File source base snapshots (CSV + JSONL + TXT). "
             "Replay with 'make file-ingest-base' on an empty DB to reproduce "
@@ -269,7 +269,7 @@ async def _persist_parsed_records_from_bytes(
             session, source_repo, source_machine_name
         )
 
-        started_at = datetime.now(UTC)
+        started_at = datetime.now(timezone.utc)
         ingestion_run = await run_repo.create(
             session,
             payload=IngestionRunCreate(
@@ -298,7 +298,7 @@ async def _persist_parsed_records_from_bytes(
         session.add(raw_object)
         await session.flush()
 
-        extracted_at = datetime.now(UTC)
+        extracted_at = datetime.now(timezone.utc)
         records_to_add: list[DataRawRecord] = []
         raw_keys_seen: set[str] = set()
 
@@ -341,7 +341,7 @@ async def _persist_parsed_records_from_bytes(
         for i in range(0, len(records_to_add), chunk_size):
             session.add_all(records_to_add[i : i + chunk_size])
 
-        ingestion_run.finished_at = datetime.now(UTC)
+        ingestion_run.finished_at = datetime.now(timezone.utc)
         ingestion_run.status = "completed"
         ingestion_run.raw_record_count = len(records_to_add)
 

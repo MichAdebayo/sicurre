@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 
@@ -22,7 +22,7 @@ class GenerationStagingService:
         monitor_artifact_uri: str | None = None,
         status: str = "completed",
     ) -> dict[str, Any]:
-        resolved_generated_at = generated_at or datetime.now(UTC).isoformat()
+        resolved_generated_at = generated_at or datetime.now(timezone.utc).isoformat()
         review_summary = Counter(
             str(sample.get("review_state") or "unknown") for sample in samples
         )

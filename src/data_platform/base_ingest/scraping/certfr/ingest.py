@@ -29,7 +29,7 @@ import logging
 import re
 import sys
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -169,7 +169,7 @@ def _save_manifest(entries: list[_SnapshotEntry]) -> None:
         for e in entries
     ]
     manifest = {
-        "generated_at": datetime.now(UTC).isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "description": (
             "R2-only CERT-FR TXT snapshots used for base ingestion. "
             "Replay with 'make certfr-ingest-base' on a DB that has already "
@@ -239,7 +239,7 @@ async def _ingest_snapshot(
             }
 
         source_sys = await _get_or_create_source_system(session, source_repo)
-        started_at = datetime.now(UTC)
+        started_at = datetime.now(timezone.utc)
 
         ingestion_run = await run_repo.create(
             session,
@@ -300,7 +300,7 @@ async def _ingest_snapshot(
         )
         session.add(raw_record)
 
-        ingestion_run.finished_at = datetime.now(UTC)
+        ingestion_run.finished_at = datetime.now(timezone.utc)
         ingestion_run.status = IngestionStatus.COMPLETED
         ingestion_run.raw_record_count = 1
         ingestion_run.raw_object_count = 1

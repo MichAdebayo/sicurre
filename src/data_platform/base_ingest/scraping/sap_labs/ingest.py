@@ -22,7 +22,7 @@ import hashlib
 import json
 import logging
 import sys
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -108,7 +108,7 @@ def _save_manifest(
 ) -> None:
     MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
     manifest = {
-        "generated_at": datetime.now(UTC).isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "description": (
             "SAP Labs base ingestion — 18 French phishing/legitimate emails "
             "read from R2. Replay with 'make sap-ingest-base'."
