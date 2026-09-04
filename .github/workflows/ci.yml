@@ -70,7 +70,27 @@ jobs:
           if-no-files-found: error
 
       - name: Audit production Node dependencies
-        run: npm audit --omit=dev --audit-level=high
+        # Retry only the registry being unreachable. `npm audit` exits non-zero
+        # both when it finds a vulnerability and when it cannot reach the
+        # advisories endpoint, and those mean opposite things: one is a finding,
+        # the other is npm having an outage and telling us nothing. A real
+        # finding still fails the build on the first attempt, because the output
+        # is inspected rather than the exit code alone.
+        run: |
+          set -uo pipefail
+          for attempt in 1 2 3; do
+            output="$(npm audit --omit=dev --audit-level=high 2>&1)" && exit 0
+            printf '%s\n' "$output"
+            if printf '%s' "$output" | grep -qiE 'Service Unavailable|audit endpoint returned an error|ENOTFOUND|ETIMEDOUT|ECONNRESET'; then
+              echo "::warning::npm advisories endpoint unreachable (attempt ${attempt}/3); retrying"
+              sleep $((attempt * 20))
+              continue
+            fi
+            echo "::error::npm audit reported a high or critical vulnerability in production dependencies"
+            exit 1
+          done
+          echo "::error::npm advisories endpoint stayed unreachable after 3 attempts - dependencies were NOT audited"
+          exit 1
 
       - name: Build frontend
         run: npm run build
