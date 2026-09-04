@@ -108,3 +108,53 @@ def test_domain_context_migration_executes_both_directions(monkeypatch) -> None:
     assert migration.op.execute.call_count == 7
     assert migration.op.create_table.call_count == 2
     assert len(batches) == 6
+
+
+def test_model_identity_migration_executes_both_directions(monkeypatch) -> None:
+    """Exercise the model-identity migration in both directions.
+
+    The columns are added and dropped through helpers that first inspect the
+    table, so a rerun is a no-op rather than a duplicate-column error. Both the
+    already-present and not-present branches are exercised here, because a
+    migration that only works on a clean database is a migration that fails the
+    first time a deploy is retried.
+    """
+    script = ScriptDirectory.from_config(Config("alembic.app.ini"))
+    migration = script.get_revision("20260904_app_0009").module
+
+    existing: set[str] = set()
+
+    class Inspector:
+        def get_columns(self, table: str):
+            assert table == "app_inference_event"
+            return [{"name": name} for name in sorted(existing)]
+
+    monkeypatch.setattr(migration.op, "get_bind", lambda: object())
+    monkeypatch.setattr(migration.sa, "inspect", lambda _bind: Inspector())
+
+    added: list[str] = []
+    dropped: list[str] = []
+    monkeypatch.setattr(
+        migration.op, "add_column", lambda table, column: added.append(column.name)
+    )
+    monkeypatch.setattr(migration.op, "drop_column", lambda table, name: dropped.append(name))
+
+    # Fresh table: both columns are added.
+    migration.upgrade()
+    assert added == ["model_version", "model_revision"]
+
+    # Rerun against a table that already has them: nothing is added twice.
+    existing.update(added)
+    added.clear()
+    migration.upgrade()
+    assert added == [], "re-running the migration must be a no-op"
+
+    # Downgrade removes exactly what it added.
+    migration.downgrade()
+    assert dropped == ["model_version", "model_revision"]
+
+    # And a downgrade on a table without them does nothing.
+    existing.clear()
+    dropped.clear()
+    migration.downgrade()
+    assert dropped == [], "downgrade on a clean table must be a no-op"
