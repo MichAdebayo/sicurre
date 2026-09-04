@@ -7,20 +7,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_async_session
 from core.rate_limit import limiter, touch_rate_limit_request
-from db.models import NormalizedLabel, SplitName
-from db.queries import (
-    DuplicateNormalizedMessageError,
-    NormalizedMessageDependencyError,
-    NormalizedMessageNotFoundError,
-)
 from data_platform.api.schemas import (
     NormalizedMessageCreate,
     NormalizedMessageListResponse,
     NormalizedMessageRead,
     NormalizedMessageUpdate,
 )
+from db.models import NormalizedLabel, SplitName
+from db.queries import (
+    DuplicateNormalizedMessageError,
+    NormalizedMessageDependencyError,
+    NormalizedMessageNotFoundError,
+)
 from db.services import NormalizedMessageService
-
 
 router = APIRouter(tags=["data-messages"])
 service = NormalizedMessageService()

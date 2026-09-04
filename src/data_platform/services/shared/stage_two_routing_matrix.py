@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from data_platform.services.database.source_naming import canonical_database_source
@@ -244,7 +244,7 @@ class StageTwoRoutingMatrixService:
 
         return {
             "mode": "stage_two_routing_matrix",
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
             "sources": sources,
         }
 

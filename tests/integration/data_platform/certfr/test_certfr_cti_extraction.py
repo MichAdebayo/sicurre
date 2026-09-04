@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 import pytest
@@ -18,18 +18,17 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.pool import StaticPool
 
 from core.database import Base
-from db.models import (
-    DataIngestionRun,
-    DataRawObject,
-    DataRawRecord,
-)
 from data_platform.extractors.certfr_cti import (
     CertFRCtiExtractor,
-    ExtractedContent,
 )
 from data_platform.services.shared.snapshot_storage import (
     LocalSnapshotStore,
     SnapshotWriteResult,
+)
+from db.models import (
+    DataIngestionRun,
+    DataRawObject,
+    DataRawRecord,
 )
 
 
@@ -327,7 +326,7 @@ async def test_extraction_with_pdf_creates_lineage(
             result = await extractor.run(
                 session,
                 trigger_mode="scheduled",
-                started_at=datetime(2026, 3, 26, 8, 0, tzinfo=timezone.utc),
+                started_at=datetime(2026, 3, 26, 8, 0, tzinfo=UTC),
             )
 
             ingestion_run = await session.scalar(select(DataIngestionRun))

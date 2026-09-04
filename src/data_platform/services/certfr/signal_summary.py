@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -65,7 +65,7 @@ class CertFRSignalSummaryService:
 
         return {
             "mode": "certfr_signal_summary",
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
             "threat_intel_total_count": int(
                 threat_intel_rule.get("current_count", 0) if threat_intel_rule else 0
             ),

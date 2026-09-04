@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 import pytest_asyncio
@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 from core.database import Base, get_async_session
+from data_platform.api.main import create_app
 from db.models import (
     DataAnnotation,
     DataDataset,
@@ -23,14 +24,12 @@ from db.models import (
 )
 from db.queries import DuplicateDatasetError
 from db.services import DatasetService
-from data_platform.api.main import create_app
-
 
 AUTH_HEADERS = {"Authorization": "Bearer dev-token"}
 
 
 def utc_timestamp() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 @pytest_asyncio.fixture

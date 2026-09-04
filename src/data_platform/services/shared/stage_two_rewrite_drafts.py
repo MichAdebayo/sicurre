@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import re
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from difflib import SequenceMatcher
 from typing import Any
 
@@ -322,7 +322,7 @@ class StageTwoRewriteDraftService:
 
         return {
             "mode": "stage_two_rewrite_drafts",
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
             "draft_count": len(drafts),
             "review_summary": dict(review_summary),
             "target_label_summary": dict(target_label_summary),
@@ -527,7 +527,6 @@ class StageTwoRewriteDraftService:
 
     @classmethod
     def _build_payment_notification(cls, source_preview: str) -> tuple[str, str]:
-        lowered = source_preview.lower()
         focus = cls._extract_legitimate_topic(
             source_preview,
             fallback=cls._infer_legitimate_focus(source_preview),

@@ -26,7 +26,7 @@ import json
 import logging
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -46,10 +46,10 @@ from data_platform.extractors.legacy_db import (  # noqa: E402
     LegacyDbIngestionService,
 )
 from data_platform.services.database.seed import seed_external_database  # noqa: E402
+from data_platform.services.shared.r2_read_client import R2ReadClient  # noqa: E402
 from data_platform.services.shared.snapshot_storage import (  # noqa: E402
     SnapshotWriteResult,
 )
-from data_platform.services.shared.r2_read_client import R2ReadClient  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -97,7 +97,7 @@ class NoOpSnapshotStore:
 def _save_manifest(result: LegacyDbIngestionResult, feeder_db_sha256: str) -> None:
     MANIFEST_DIR.mkdir(parents=True, exist_ok=True)
     manifest: dict[str, Any] = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "description": (
             "External DB base ingestion — adapted EN→FR phishing + synthetic "
             "phishing/spam/legitimate from R2 canonical external_threats.db (seed=42), "

@@ -1,22 +1,20 @@
 from fastapi import APIRouter, Depends
 
 from core.security import require_authenticated_principal
-
-from data_platform.api.routers.ingestion_runs import (
-    router as ingestion_runs_router,
-)
-from data_platform.api.routers.source_systems import (
-    router as source_systems_router,
-)
 from data_platform.api.routers.annotations import (
     router as annotations_router,
 )
 from data_platform.api.routers.datasets import router as datasets_router
+from data_platform.api.routers.ingestion_runs import (
+    router as ingestion_runs_router,
+)
 from data_platform.api.routers.messages import router as messages_router
 from data_platform.api.routers.raw_records import (
     router as raw_records_router,
 )
-
+from data_platform.api.routers.source_systems import (
+    router as source_systems_router,
+)
 
 router = APIRouter(
     prefix="/v1/data",

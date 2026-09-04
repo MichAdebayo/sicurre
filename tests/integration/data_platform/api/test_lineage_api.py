@@ -11,7 +11,6 @@ from sqlalchemy.pool import StaticPool
 from core.database import Base, get_async_session
 from data_platform.api.main import create_app
 
-
 AUTH_HEADERS = {"Authorization": "Bearer dev-token"}
 
 

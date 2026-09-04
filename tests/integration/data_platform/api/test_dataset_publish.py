@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -23,7 +23,6 @@ from data_platform.services.dataset_publish import (
     DatasetNotFrozenError,
     DatasetPublishConfigError,
     DatasetPublishResult,
-    DatasetPublishService,
     GitHubDispatchPublishError,
     KagglePushPublishError,
 )
@@ -84,7 +83,7 @@ async def frozen_dataset_id(
             version_tag="v1.0.0",
             target_usage="training",
             status=DatasetStatus.FROZEN.value,
-            frozen_at=datetime.now(timezone.utc),
+            frozen_at=datetime.now(UTC),
             item_count=0,
         )
         sess.add(dataset)

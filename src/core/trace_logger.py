@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 
@@ -59,7 +59,7 @@ class SemanticTraceLogger:
             "stage": stage,
             "status": status,
             "message": message,
-            "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "timestamp": datetime.now(UTC).isoformat(timespec="seconds"),
         }
 
         if entity_type:
@@ -71,7 +71,7 @@ class SemanticTraceLogger:
 
         # ── Tier 1: Human-readable line (raw terminal / judge demo) ──────────
         _STATUS_ICON = {"start": "▶", "success": "✓", "failed": "✗", "skipped": "○"}
-        ts = datetime.now(timezone.utc).strftime("%H:%M:%S")
+        ts = datetime.now(UTC).strftime("%H:%M:%S")
         icon = _STATUS_ICON.get(status, "·")
         human_line = f"[{ts}] {icon} [{stage.upper()}] {message}"
         if metrics:

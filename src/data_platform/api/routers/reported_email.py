@@ -22,9 +22,9 @@ from data_platform.api.routers.app_routes import (
 )
 from data_platform.api.schemas.app_responses import DmarcImportResponse
 from data_platform.api.schemas.integration_responses import (
-    ReportedEmailListResponse,
     ReportAddressResponse,
     ReportedEmailIngestResponse,
+    ReportedEmailListResponse,
 )
 from data_platform.services.reported_email import (
     InvalidReportAlias,

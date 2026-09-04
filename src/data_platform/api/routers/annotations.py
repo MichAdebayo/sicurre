@@ -5,12 +5,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_async_session
 from core.rate_limit import limiter, touch_rate_limit_request
+from data_platform.api.schemas import AnnotationCreate, AnnotationRead
 from db.queries import (
     NormalizedMessageNotFoundError,
 )
-from data_platform.api.schemas import AnnotationCreate, AnnotationRead
 from db.services import AnnotationService
-
 
 router = APIRouter(tags=["data-annotations"])
 service = AnnotationService()

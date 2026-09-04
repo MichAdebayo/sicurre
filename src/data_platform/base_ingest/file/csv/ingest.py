@@ -30,7 +30,7 @@ import json
 import logging
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -46,8 +46,6 @@ if str(SRC_ROOT) not in sys.path:
 from core.config import get_settings, redact_database_url  # noqa: E402
 from core.database import Base  # noqa: E402
 from core.trace_logger import SemanticTraceLogger  # noqa: E402
-from db.models import DataRawObject, DataRawRecord  # noqa: E402
-from db.queries import IngestionRunQueries, SourceSystemQueries  # noqa: E402
 from data_platform.api.schemas import IngestionRunCreate  # noqa: E402
 from data_platform.base_ingest.file.parsers.csv_ingestion import (  # noqa: E402
     get_or_create_source_system,
@@ -60,6 +58,8 @@ from data_platform.base_ingest.file.parsers.txt_email_ingestion import (  # noqa
     parse_txt_emails_from_bytes,
 )
 from data_platform.services.shared.r2_read_client import R2ReadClient  # noqa: E402
+from db.models import DataRawObject, DataRawRecord  # noqa: E402
+from db.queries import IngestionRunQueries, SourceSystemQueries  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -173,7 +173,7 @@ def _build_and_save_manifest(entries: list[_R2FileEntry]) -> None:
         for e in entries
     ]
     manifest = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "description": (
             "R2-only File source base snapshots (CSV + JSONL + TXT). "
             "Replay with 'make file-ingest-base' on an empty DB to reproduce "
@@ -269,7 +269,7 @@ async def _persist_parsed_records_from_bytes(
             session, source_repo, source_machine_name
         )
 
-        started_at = datetime.now(timezone.utc)
+        started_at = datetime.now(UTC)
         ingestion_run = await run_repo.create(
             session,
             payload=IngestionRunCreate(
@@ -298,7 +298,7 @@ async def _persist_parsed_records_from_bytes(
         session.add(raw_object)
         await session.flush()
 
-        extracted_at = datetime.now(timezone.utc)
+        extracted_at = datetime.now(UTC)
         records_to_add: list[DataRawRecord] = []
         raw_keys_seen: set[str] = set()
 
@@ -341,7 +341,7 @@ async def _persist_parsed_records_from_bytes(
         for i in range(0, len(records_to_add), chunk_size):
             session.add_all(records_to_add[i : i + chunk_size])
 
-        ingestion_run.finished_at = datetime.now(timezone.utc)
+        ingestion_run.finished_at = datetime.now(UTC)
         ingestion_run.status = "completed"
         ingestion_run.raw_record_count = len(records_to_add)
 

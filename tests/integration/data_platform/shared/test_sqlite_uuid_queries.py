@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 import pytest
@@ -35,7 +35,7 @@ async def session() -> AsyncIterator[AsyncSession]:
 async def test_dataset_export_join_matches_hyphenated_and_hex_uuid_storage(
     session: AsyncSession,
 ) -> None:
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     source_id = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     run_id = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     raw_object_id = "cccccccccccccccccccccccccccccccc"

@@ -23,7 +23,7 @@ import json
 import logging
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -212,7 +212,7 @@ def _save_manifest(entries: list[_SnapshotEntry]) -> None:
         for e in entries
     ]
     manifest = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "description": (
             "R2-only PhishTank base snapshots used for base ingestion. "
             "Replay with 'make phishtank-ingest-base' on an empty DB to reproduce "

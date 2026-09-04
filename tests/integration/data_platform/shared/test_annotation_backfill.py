@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 import pytest_asyncio
@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 from core.database import Base
+from data_platform.services.shared.annotation_backfill import AnnotationBackfillService
 from db.models import (
     AnnotationLabelSource,
     DataAnnotation,
@@ -20,11 +21,10 @@ from db.models import (
     DataRawRecord,
     DataSourceSystem,
 )
-from data_platform.services.shared.annotation_backfill import AnnotationBackfillService
 
 
 def utc_timestamp() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 @pytest_asyncio.fixture

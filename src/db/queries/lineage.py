@@ -6,11 +6,11 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import DataIngestionRun, DataSourceSystem
 from data_platform.api.schemas import (
     DataSourceCreate,
     IngestionRunCreate,
 )
+from db.models import DataIngestionRun, DataSourceSystem
 
 
 class DuplicateDataSourceError(Exception):

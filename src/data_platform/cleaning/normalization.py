@@ -6,7 +6,6 @@ import re
 import unicodedata
 from dataclasses import dataclass
 
-
 MIN_TEXT_LEN = 30
 MAX_TEXT_LEN = 10_000
 DEDUP_HASH_LEN = 300

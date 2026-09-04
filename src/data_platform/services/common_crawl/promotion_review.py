@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections import Counter, defaultdict
 import re
+from collections import Counter, defaultdict
 from statistics import mean
 from typing import Any
 

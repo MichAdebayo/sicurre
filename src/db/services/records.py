@@ -4,12 +4,6 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.queries import (
-    AnnotationQueries,
-    DatasetQueries,
-    NormalizedMessageQueries,
-    RawRecordQueries,
-)
 from data_platform.api.schemas import (
     AnnotationCreate,
     DatasetCreate,
@@ -18,6 +12,12 @@ from data_platform.api.schemas import (
 )
 from data_platform.cleaning.normalization import (
     TextNormalizationService,
+)
+from db.queries import (
+    AnnotationQueries,
+    DatasetQueries,
+    NormalizedMessageQueries,
+    RawRecordQueries,
 )
 
 
