@@ -33,7 +33,13 @@ COMPOSE="docker compose -f /home/sicurre-prod/sicurre/docker-compose.prod.yml"
 # exit is the signal that the failure has not come back.
 #
 # RESTORE to `30 6 3 * *` after the defence.
-30 6 * * * cd /home/sicurre-prod/sicurre && $COMPOSE --profile release run --rm --no-deps sicurre-data-release >> /home/sicurre-prod/sicurre/cron-dataset-release.log 2>&1
+# Dataset release. Ran daily from 1 September; each run also invokes the
+# adapted-phishing generator, which adds 1,620 new synthetic phishing
+# records every time. Narrowed to the 13th and 14th on 4 September: the
+# corpus is already 73% synthetic with 16 of 21 sources single-class, so
+# a daily run deepened the provenance confound for no benefit, while the
+# storage it consumed was minor next to the historical corpus.
+30 6 13,14 * * cd /home/sicurre-prod/sicurre && $COMPOSE --profile release run --rm --no-deps sicurre-data-release >> /home/sicurre-prod/sicurre/cron-dataset-release.log 2>&1
 
 # The 2 September one-off end-to-end check has run and is removed. It fired at
 # 11:30 and produced base-20260902-113227 (frozen 11:32), which confirmed the
