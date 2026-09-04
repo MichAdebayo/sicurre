@@ -100,6 +100,29 @@ export function ThreatRow({ threat, onUpdateStatus }: ThreatRowProps) {
             <div className="p-4 text-body-sm text-on-surface-variant/90 leading-relaxed max-w-3xl whitespace-pre-wrap">
               {threat.body_preview || "Aucun aperçu du contenu de l'e-mail disponible."}
             </div>
+            {/* Which model produced this verdict. Absent when a blocklist rule
+                decided without consulting the model, and for events recorded
+                before the identity was captured - shown as such rather than
+                blank, so the distinction stays legible. */}
+            <div className="px-4 pb-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-mono-data text-xs text-on-surface-variant/70">
+              <span>
+                Modèle&nbsp;:{" "}
+                {threat.model_version ? (
+                  <span className="text-on-surface">{threat.model_version}</span>
+                ) : (
+                  <span className="italic">non enregistré</span>
+                )}
+              </span>
+              {threat.model_revision ? (
+                <span title={threat.model_revision}>
+                  Révision&nbsp;:{" "}
+                  <span className="text-on-surface">
+                    {threat.model_revision.slice(0, 12)}
+                  </span>
+                </span>
+              ) : null}
+              {threat.latency_ms ? <span>Latence&nbsp;: {Math.round(threat.latency_ms)}&nbsp;ms</span> : null}
+            </div>
           </MotionDiv>
         )}
       </AnimatePresence>

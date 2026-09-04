@@ -515,6 +515,11 @@ async def scan_email(
     stage_scores: dict[str, Any] = {}
     stage_labels: dict[str, Any] = {}
     stage_breakdown: dict[str, Any] = {}
+    # Stays None when no model was consulted - a blocklist rule short-circuits
+    # before inference, and recording a model identity there would attribute a
+    # verdict to a model that never saw the message.
+    model_version: str | None = None
+    model_revision: str | None = None
 
     if matched_rule_type == "blocklist":
         verdict_safety = "phishing"
@@ -555,6 +560,14 @@ async def scan_email(
                 )
             resp.raise_for_status()
             result = resp.json()
+
+            # The inference service reports which model answered on every
+            # response. Capturing it here is what lets a verdict in the threat
+            # journal be attributed to the model that produced it - the first
+            # question when a classification is disputed, and one that a later
+            # retrain makes unanswerable if it was never recorded.
+            model_version = (resp.headers.get("X-Sicurre-Model-Version") or "").strip() or None
+            model_revision = (resp.headers.get("X-Sicurre-Model-Revision") or "").strip() or None
 
             is_phishing: bool = bool(result.get("is_phishing", False))
             verdict_safety = "phishing" if is_phishing else "safe"
@@ -700,8 +713,9 @@ async def scan_email(
                 safety_verdict, label_verdict, composite_score, is_phishing,
                 delivered_in_smail, llm_provider, explanation, latency_ms,
                 used_llm, used_virustotal, inference_source,
-                stage_scores_json, stage_labels_json, stage_breakdown_json, expected_label
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                stage_scores_json, stage_labels_json, stage_breakdown_json, expected_label,
+                model_version, model_revision
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 event_id,
@@ -729,6 +743,8 @@ async def scan_email(
                 json.dumps(stage_labels, sort_keys=True, separators=(",", ":")),
                 json.dumps(stage_breakdown, sort_keys=True, separators=(",", ":")),
                 None,
+                model_version,
+                model_revision,
             ),
         )
         # Mark integration active on first successful scan
