@@ -10,10 +10,7 @@ def test_application_migrations_form_one_resolvable_chain() -> None:
     """Reject missing predecessors and accidental multiple heads."""
     script = ScriptDirectory.from_config(Config("alembic.app.ini"))
 
-    # Assert the property, not the current head's name. Pinning the name made
-    # every legitimate migration fail this test, which trains people to edit the
-    # assertion rather than read it. Exactly one head is what "no accidental
-    # branch" actually means.
+    # Assert the property, not the current head's name.
     heads = script.get_heads()
     assert len(heads) == 1, f"migration graph has branched: {heads}"
 
@@ -111,14 +108,7 @@ def test_domain_context_migration_executes_both_directions(monkeypatch) -> None:
 
 
 def test_model_identity_migration_executes_both_directions(monkeypatch) -> None:
-    """Exercise the model-identity migration in both directions.
-
-    The columns are added and dropped through helpers that first inspect the
-    table, so a rerun is a no-op rather than a duplicate-column error. Both the
-    already-present and not-present branches are exercised here, because a
-    migration that only works on a clean database is a migration that fails the
-    first time a deploy is retried.
-    """
+    """Exercise the model-identity migration in both directions."""
     script = ScriptDirectory.from_config(Config("alembic.app.ini"))
     migration = script.get_revision("20260904_app_0009").module
 

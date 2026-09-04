@@ -529,13 +529,7 @@ def test_quarantine_storage_runtime_status(
 
 @pytest.mark.asyncio
 async def test_contract_probe_catches_the_incident_06_condition() -> None:
-    """Health and readiness green, classification refused — the actual outage.
-
-    On 17 July 2026 the classifier was healthy and the API sent it an empty
-    bearer token, so every unauthenticated check passed while no message was
-    ever classified. This is the shape of that failure, and the probe has to
-    report it as down rather than inheriting the green from its neighbours.
-    """
+    """Health and readiness green, classification refused — the actual outage."""
 
     def handler(request: httpx.Request) -> httpx.Response:
         if request.method == "POST":
@@ -590,13 +584,7 @@ async def test_contract_probe_rejects_a_verdictless_success() -> None:
 
 @pytest.mark.asyncio
 async def test_contract_probe_never_sends_client_content_or_leaks_the_key() -> None:
-    """The probe payload is synthetic and the key stays out of the report.
-
-    Incident 06 asked for an authenticated call *without client content*: an
-    admin refreshing the health page must not cause a real message to be
-    reprocessed, and the component report is rendered in a browser, so the
-    bearer token must never appear in it.
-    """
+    """The probe payload is synthetic and the key stays out of the report."""
     seen: dict = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -618,12 +606,7 @@ async def test_contract_probe_never_sends_client_content_or_leaks_the_key() -> N
 
 @pytest.mark.asyncio
 async def test_contract_probe_degrades_on_an_unexpected_status() -> None:
-    """A 500 is not a credential problem, so it is not reported as one.
-
-    Down means "the classifier refuses us" and calls for a key rotation;
-    degraded means "something else is wrong" and calls for reading its logs.
-    Collapsing the two would send an operator to the wrong runbook.
-    """
+    """A 500 is not a credential problem, so it is not reported as one."""
 
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(500)
@@ -639,12 +622,7 @@ async def test_contract_probe_degrades_on_an_unexpected_status() -> None:
 
 @pytest.mark.asyncio
 async def test_contract_probe_survives_a_non_json_success() -> None:
-    """A 200 whose body will not parse must not raise inside the health page.
-
-    The probe runs while rendering an admin view. An exception here would take
-    out the whole runtime-health response, so the one component that failed
-    would hide the status of every component that did not.
-    """
+    """A 200 whose body will not parse must not raise inside the health page."""
 
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, content=b"<html>not json</html>")

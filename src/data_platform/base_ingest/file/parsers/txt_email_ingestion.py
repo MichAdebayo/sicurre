@@ -73,32 +73,13 @@ TXT_SOURCE_LABELS: dict[str, str] = {
 
 
 def label_for_source(source: str) -> str:
-    """Corpus label for a dropzone source name, from its prefix.
-
-    Unknown prefixes fall back to "spam" so the five existing ``spam_*`` exports
-    keep behaving exactly as before; the fallback is deliberate rather than a
-    guess, and any new prefix should be registered above rather than relying on
-    it.
-    """
+    """Corpus label for a dropzone source name, from its prefix."""
     prefix = source.split("_", 1)[0].strip().lower()
     return TXT_SOURCE_LABELS.get(prefix, "spam")
 
 
 def _detect_language(text: str) -> str | None:
-    """Return the ISO code for *text*, or None when it cannot be determined.
-
-    The parser previously hardcoded ``language=None``, which propagated through
-    file_dropzone into ``detected_language`` on every raw record. The
-    normalization query selects on ``detected_language == "fr"``, so a null
-    meant the record was never selected - not rejected, never examined. 281
-    messages sat that way.
-
-    Detection matters more than filling the column in: these exports are
-    93.6% English. Writing "fr" blindly would have pushed 263 English messages
-    into a French-only corpus. Detected English simply is not selected for
-    normalization and remains available as adaptation source material, which is
-    how the other English corpora are already handled.
-    """
+    """Return the ISO code for *text*, or None when it cannot be determined."""
     sample = text.strip()[:1500]
     if len(sample) < 20:
         return None

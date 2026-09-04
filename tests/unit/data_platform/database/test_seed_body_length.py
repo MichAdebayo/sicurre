@@ -95,14 +95,7 @@ def test_empty_input_does_not_raise(value: str | None) -> None:
 
 
 def test_appended_rows_carry_full_length_bodies(tmp_path) -> None:
-    """The call site must actually use the rule, not just have it available.
-
-    Extracting split_subject_and_body made the rule testable but left both call
-    sites uncovered, because they sit inside functions that need a database.
-    This exercises one of them end to end against a temporary SQLite file, so a
-    future edit that stops calling the helper - and reintroduces a local
-    truncation - fails here rather than silently shortening the corpus again.
-    """
+    """The call site must actually use the rule, not just have it available."""
     from sqlalchemy import create_engine, select
     from sqlalchemy.orm import sessionmaker
 

@@ -1,13 +1,4 @@
-"""The POC's hand-rolled schema must not drift from the application's.
-
-The POC does not run Alembic. It creates `app_inference_event` itself and
-evolves it with idempotent ALTERs, so every column added by a migration has to
-be added here twice - once in the CREATE for a fresh database, once as an ALTER
-so an existing one heals instead of needing to be deleted.
-
-Miss either and the failure appears at demo time: a fresh POC lacks the column,
-or an existing POC raises on the first insert. These tests pin both halves.
-"""
+"""The POC's hand-rolled schema tracks the application's."""
 
 from __future__ import annotations
 
@@ -25,12 +16,7 @@ _REQUIRED = ("model_version", "model_revision")
 
 @pytest.fixture(autouse=True)
 def _poc_seed_credentials(monkeypatch):
-    """`ensure_local_auth_db` refuses to run without the POC seed passwords.
-
-    That guard is correct - it stops a POC starting with blank credentials - so
-    it is satisfied here rather than relaxed. CI has no .env, which is why these
-    passed locally and failed there.
-    """
+    """`ensure_local_auth_db` refuses to run without the POC seed passwords."""
     monkeypatch.setattr(local_runtime, "DEFAULT_ADMIN_PASSWORD", "test-admin-password")
     monkeypatch.setattr(local_runtime, "DEFAULT_VIEWER_PASSWORD", "test-viewer-password")
 

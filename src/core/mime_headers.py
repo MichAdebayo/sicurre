@@ -1,16 +1,4 @@
-"""Decode RFC 2047 encoded-word headers into readable text.
-
-Mail clients encode any non-ASCII header as an encoded-word, so a French
-subject arrives as
-`=?UTF-8?Q?SICURRE=2DE2E_=E2=80=94_Votre_compte?=` rather than as text. The
-scan path stored that raw, so the threat journal, the quarantine page and the
-Loops alert all showed the wire format instead of the subject, and the
-classifier scored the encoding rather than the words.
-
-`email.header` handles the parsing. What it does not do is fail safely: a
-malformed header raises, and a header is attacker-controlled, so every failure
-mode here returns the original string rather than propagating.
-"""
+"""Decode RFC 2047 headers and extract MIME bodies."""
 
 from __future__ import annotations
 
@@ -23,12 +11,7 @@ from html import unescape
 
 
 def decode_mime_header(value: str | None) -> str:
-    """Return the readable form of a possibly encoded-word header.
-
-    Plain ASCII passes through untouched. Anything that cannot be decoded is
-    returned as it arrived: a mail header is attacker-controlled input, and a
-    scan must not fail because a sender sent a malformed one.
-    """
+    """Return the readable form of a possibly encoded-word header."""
     if not value:
         return ""
     if "=?" not in value:
@@ -51,18 +34,7 @@ def decode_mime_header(value: str | None) -> str:
 
 
 def extract_mime_body(value: str | None) -> str:
-    """Return the human-readable body of a raw MIME message.
-
-    The Cloudflare Worker forwards the whole message, so `text` arrives with
-    every `Received`, `ARC-Seal` and `DKIM-Signature` line attached. Stored and
-    classified as-is, that meant the quarantine page displayed routing headers
-    instead of the mail, and the classifier scored base64 signature blocks
-    rather than what the sender wrote.
-
-    Prefers `text/plain`; falls back to `text/html` when that is all the message
-    carries. Input that is not MIME is returned unchanged, so a plain-text
-    payload from the POC or a test still passes straight through.
-    """
+    """Return the human-readable body of a raw MIME message."""
     if not value:
         return ""
     # A body without headers has no colon-terminated header block to strip.

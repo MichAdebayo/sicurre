@@ -202,17 +202,7 @@ def redact_pii(text: str) -> str:
 
 
 def split_subject_and_body(text: str) -> tuple[str, str]:
-    """Split a generated email into (subject, body), bounded and PII-redacted.
-
-    Extracted because this was written out twice, and the 200-character
-    truncation bug therefore existed twice: fixing one site would have left
-    every phishing record still stored as its opening paragraph. Two copies of a
-    rule are two places for it to drift, and the sites had already drifted -
-    only one of them handled the "Objet : " prefix.
-
-    Returns the body bounded by MAX_BODY_CHARS rather than a preview. The column
-    is still called body_preview for schema compatibility; it is no longer one.
-    """
+    """Split a generated email into (subject, body), bounded and PII-redacted."""
     text = str(text or "")
     subject = ""
     body = text[:MAX_BODY_CHARS]
@@ -447,26 +437,7 @@ def append_to_database(
     db_url: str | None = None,
     seed: int | None = None,
 ) -> int:
-    """Append *n* new synthetic phishing entries to an existing external DB.
-
-    Unlike :func:`seed_external_database`, this function does **not** delete
-    existing rows.  It reads the existing users and model version tags from the
-    target DB, then generates *n* new :class:`ExternalThreatLog` rows using
-    :class:`~data_platform.services.shared.synthetic_generation.SyntheticGenerationService`.
-
-    Designed for incremental cron validation: run ``append_to_database(100)``
-    between two ingestion runs to confirm exactly 100 new rows are picked up.
-
-    Args:
-        n: Number of new threat log entries to insert (must be > 0).
-        db_url: SQLAlchemy sync URL for the target DB.  Defaults to the
-            module-level ``DB_URL`` (``data/raw/db/external_threats.db``).
-        seed: Random seed for reproducibility.  Defaults to a fresh random
-            value so successive calls produce distinct rows.
-
-    Returns:
-        Number of rows inserted.
-    """
+    """Append *n* new synthetic phishing entries to an existing external DB."""
     if n <= 0:
         raise ValueError(f"n must be positive, got {n}")
 

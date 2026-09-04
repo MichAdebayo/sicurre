@@ -1,40 +1,15 @@
-# Install as the sicurre-prod Linux user after the first successful deploy.
-# Logs stay under the dedicated application's home directory.
 SHELL=/bin/sh
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 COMPOSE="docker compose -f /home/sicurre-prod/sicurre/docker-compose.prod.yml"
 
-# Daily privacy retention enforcement, independent of workspace activity.
 45 1 * * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/app/run_quarantine_purge.py >> /home/sicurre-prod/sicurre/cron-quarantine-purge.log 2>&1
-
-# Domain monitoring remains active even when its domain is not selected in the UI.
 17 */6 * * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/app/run_domain_shield_monitor.py >> /home/sicurre-prod/sicurre/cron-domain-shield.log 2>&1
-
-# Daily API and file deltas, staggered to avoid competing DB/R2 work.
 15 2 * * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/api/run_phishtank_ingestion.py >> /home/sicurre-prod/sicurre/cron-phishtank.log 2>&1
 35 2 * * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/file/run_csv_ingestion.py >> /home/sicurre-prod/sicurre/cron-file.log 2>&1
-
-# Weekly scraping source deltas.
 20 3 * * 1 cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/scraping/run_sekoia_ioc.py >> /home/sicurre-prod/sicurre/cron-sekoia.log 2>&1
 45 3 * * 2 cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/scraping/run_certfr_cti.py >> /home/sicurre-prod/sicurre/cron-certfr.log 2>&1
-
-# Monthly controlled source and resumable Common Crawl work.
 10 4 1 * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/database/run_sql_ingestion.py >> /home/sicurre-prod/sicurre/cron-database.log 2>&1
 10 5 2 * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py >> /home/sicurre-prod/sicurre/cron-common-crawl.log 2>&1
 
-# Release schedule. Normally monthly: `30 6 3 * *`, after the monthly DB and
-# Common Crawl jobs. TEMPORARILY DAILY until the defence, deliberately.
-#
-# Daily is cheap here rather than noisy, because the preflight gates it. With
-# no new eligible records it runs normalize, generate-data and annotate, then
-# exits 3 without building - no dataset version, no Kaggle publish, no GPU
-# dispatch. What it does exercise every day is generate-data, which is where
-# the 1 September release died on a unique-index collision. A daily clean
-# exit is the signal that the failure has not come back.
-#
-# RESTORE to `30 6 3 * *` after the defence.
-30 6 * * * cd /home/sicurre-prod/sicurre && $COMPOSE --profile release run --rm --no-deps sicurre-data-release >> /home/sicurre-prod/sicurre/cron-dataset-release.log 2>&1
-
-# The 2 September one-off end-to-end check has run and is removed. It fired at
-# 11:30 and produced base-20260902-113227 (frozen 11:32), which confirmed the
-# release path end to end after the 1 September unique-index failure.
+# Release publishes a dataset and dispatches training. Normally `30 6 3 * *`.
+30 6 13 * * cd /home/sicurre-prod/sicurre && $COMPOSE --profile release run --rm --no-deps sicurre-data-release >> /home/sicurre-prod/sicurre/cron-dataset-release.log 2>&1

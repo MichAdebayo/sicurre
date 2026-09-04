@@ -55,16 +55,7 @@ def test_every_declared_source_has_a_label() -> None:
 
 
 def test_scheduled_ingestion_actually_dispatches_for_every_source() -> None:
-    """A scheduled ingestion that succeeds without ingesting is the worst case.
-
-    Naming these targets in .PHONY gives each an explicit recipe-less rule that
-    wins over the pattern rule; make then prints "Nothing to be done" and exits
-    0. Cron sees success, and nothing is ingested.
-
-    This asserts the behaviour rather than the text, because the bug's natural
-    form is ``$(foreach s,$(SOURCES),$(s)-cron)`` - which never appears in the
-    file as the literal target name a textual check would look for.
-    """
+    """A scheduled ingestion that succeeds without ingesting is the worst case."""
     for source in _variable("SOURCES").split():
         result = subprocess.run(
             ["make", "--no-print-directory", "-n", f"{source}-cron"],
@@ -97,14 +88,7 @@ def test_an_unknown_source_fails_loudly() -> None:
 
 
 def test_process_runs_generation_between_normalize_and_annotate() -> None:
-    """Order is load-bearing, not cosmetic.
-
-    Generation emits normalized messages, so annotate must follow it; the
-    release preflight counts eligible records, so generation must precede that
-    too. Generation placed last makes preflight return "no new eligible
-    records" and the release becomes a silent no-op - which is exactly what the
-    3 August log reported.
-    """
+    """Order is load-bearing, not cosmetic."""
     assert _prerequisites("process") == ["normalize", "generate-data", "annotate"]
 
 
@@ -130,14 +114,7 @@ def test_legacy_scheduler_aliases_still_resolve() -> None:
 
 
 def _tracked_yaml_and_markdown() -> list[Path]:
-    """Workflow and doc files that are actually part of the repository.
-
-    Scanning the working tree instead would pick up untracked scratch files,
-    and those routinely *propose* targets that do not exist yet - a note
-    reading "Fix: a `make purge-expired` target" is a suggestion, not a caller.
-    This test is about callers: a reference that breaks when a target is
-    renamed. Something git does not track cannot break.
-    """
+    """Workflow and doc files that are actually part of the repository."""
     try:
         listing = subprocess.run(
             ["git", "ls-files", "-z", "--", ".github/workflows", "docs"],
@@ -169,9 +146,7 @@ def test_targets_referenced_by_ci_and_docs_are_defined() -> None:
 
     referenced: set[str] = set()
     for path in _tracked_yaml_and_markdown():
-        # Only real invocations: a line starting with "make x", a CI
-        # "run: make x", or an inline `make x`. A bare \bmake\b also
-        # matches English prose ("make collection repeatable").
+    # Only real invocations: "make x", a CI "run: make x", or an inline `make x`.
         referenced |= set(
             re.findall(
                 r"(?:^|`|run:[ \t]*)make ([a-z][a-z0-9-]{2,})\b",
@@ -190,19 +165,7 @@ def test_targets_referenced_by_ci_and_docs_are_defined() -> None:
 
 
 def test_every_release_path_step_runs_without_resyncing() -> None:
-    """A bare `uv run` in the release image destroys the environment it runs in.
-
-    The release container is built with
-    `uv sync --frozen --no-default-groups --group runtime --group release`, so it
-    holds exactly two dependency groups. `uv run` without --no-sync re-syncs to
-    the DEFAULT groups: it removes the release group - kaggle, which
-    publish-latest needs - and installs dev dependencies the image was
-    deliberately built without.
-
-    This is not hypothetical. On 1 September the scheduled release normalized 933
-    records and then stopped dead before generation, and `generate-data` was the
-    only step in the release path invoking `uv run` without --no-sync.
-    """
+    """A bare `uv run` in the release image destroys the environment it runs in."""
     text = _text()
     recipes = re.findall(r"^\t(?:@)?(uv run[^\n]*)", text, re.MULTILINE)
 

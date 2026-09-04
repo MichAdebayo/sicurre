@@ -68,13 +68,7 @@ def test_a_reference_match_does_not_swallow_the_prose_after_it() -> None:
 
 
 def test_a_label_does_not_consume_a_following_url() -> None:
-    """The label survives and the link collapses to its host, not to ``[REF]``.
-
-    ``Suivi :`` is a reference label, so the risk is ``_REFERENCE`` matching
-    across the colon and swallowing the link behind a ``[REF]``. It must not:
-    the link is handled by ``_TRACKING_URL`` first, which keeps the sending
-    host (real signal) and drops the path (per-recipient identifiers).
-    """
+    """The label survives and the link collapses to its host, not to ``[REF]``."""
     out = redact("Suivi : https://exemple.fr/suivi?uid=abc123", owner_names=OWNER)
     assert out.startswith("Suivi : "), "the label itself must survive"
     assert "[LIEN:exemple.fr]" in out, "the host is kept as signal"
@@ -107,12 +101,7 @@ def test_allowlisted_senders_resolve_to_a_register(sender: str, expected: str) -
     ],
 )
 def test_personal_and_self_generated_senders_are_excluded(sender: str) -> None:
-    """Excluded by construction, not by filtering.
-
-    GitHub notifications dominate category:updates and would put private
-    repository names into a published corpus; gmail.com senders are personal
-    correspondence from people who did not consent.
-    """
+    """Excluded by construction, not by filtering."""
     assert group_for(sender) is None
 
 
@@ -137,15 +126,7 @@ def test_the_emitted_block_parses_back_as_legitimate_french() -> None:
 
 
 def test_the_denylist_wins_over_the_allowlist() -> None:
-    """Precedence is the denylist's whole purpose, and it needs its own test.
-
-    Excluding gmail.com senders passes trivially today because no allow group
-    matches them either - so a test using such a sender verifies the allowlist
-    and says nothing about the denylist. This constructs the case that actually
-    distinguishes them: a sender matching an allowed domain that is also denied.
-    A future allowlist entry could easily overlap a denied domain, and then
-    ordering is the only thing preventing personal mail entering the corpus.
-    """
+    """Precedence is the denylist's whole purpose, and it needs its own test."""
     import make_legitimate_dropzone as mod
 
     original = mod.SENDER_GROUPS
@@ -159,14 +140,7 @@ def test_the_denylist_wins_over_the_allowlist() -> None:
 
 
 def test_the_extractor_module_is_actually_committed() -> None:
-    """A test that imports an ignored file passes locally and fails in CI.
-
-    .gitignore carries a broad ``build*.py`` rule. The first version of the
-    extractor was named build_legitimate_dropzone.py, was silently skipped by
-    ``git add -A``, and reached CI as a ModuleNotFoundError - after the pull
-    request had already been merged, because the failing check was not read
-    before merging.
-    """
+    """A test that imports an ignored file passes locally and fails in CI."""
     import subprocess
 
     root = Path(__file__).resolve().parents[4]

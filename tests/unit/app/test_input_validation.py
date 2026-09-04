@@ -538,13 +538,7 @@ async def test_duplicate_feedback_returns_409(monkeypatch: pytest.MonkeyPatch) -
 async def test_scan_email_runs_independent_lookups_concurrently(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The dedup and rules reads must overlap, not run one after another.
-
-    Serially these were four round-trips to a remote Postgres and measured
-    458 ms, 23% of a scan against a 2.0 s objective. Concurrency is the whole
-    point of the change, so assert the overlap rather than the wall clock,
-    which would make the test timing-dependent.
-    """
+    """The dedup and rules reads must overlap, not run one after another."""
     import asyncio as _asyncio
 
     import httpx

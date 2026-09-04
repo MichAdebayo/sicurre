@@ -1,15 +1,4 @@
-"""A verdict must record which model produced it.
-
-The inference service returns its identity on every classification -
-X-Sicurre-Model-Version and X-Sicurre-Model-Revision - and the application
-discarded both. A verdict in the threat journal could not be attributed to the
-model that produced it, which is the first question asked about a disputed
-classification and one a later retrain makes permanently unanswerable.
-
-Null is meaningful here rather than missing: a blocklist rule short-circuits
-before inference, so no model saw the message, and claiming one did would be
-worse than recording nothing.
-"""
+"""A verdict records which model produced it."""
 
 from __future__ import annotations
 
@@ -39,11 +28,7 @@ def test_the_identity_is_persisted_with_the_event() -> None:
 
 
 def test_the_insert_placeholders_match_its_columns() -> None:
-    """A miscounted placeholder is a runtime failure on every scan.
-
-    This is the failure mode that adding columns to a positional INSERT invites,
-    and it would only surface when a real email arrived.
-    """
+    """A miscounted placeholder is a runtime failure on every scan."""
     source = _scan_source()
     start = source.index("INSERT INTO app_inference_event")
     block = source[start : source.index(")\n", source.index(") VALUES", start))]
@@ -56,11 +41,7 @@ def test_the_insert_placeholders_match_its_columns() -> None:
 
 
 def test_identity_defaults_to_none_so_the_blocklist_path_cannot_crash() -> None:
-    """A blocklist verdict never calls the model, so the names must still exist.
-
-    Without the default the short-circuit path raises NameError at the INSERT,
-    which would fail exactly the messages a blocklist rule was meant to stop.
-    """
+    """A blocklist verdict never calls the model, so the names must still exist."""
     source = _scan_source()
     assert "model_version: str | None = None" in source
     assert "model_revision: str | None = None" in source

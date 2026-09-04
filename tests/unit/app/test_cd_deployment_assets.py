@@ -22,14 +22,7 @@ def test_cd_copies_every_declared_deployment_asset() -> None:
 
 
 def test_cd_transfers_every_module_the_provisioning_script_imports() -> None:
-    """Close the converse gap: declared assets exist, but are they sufficient?
-
-    The existing check proves every declared asset is present in the
-    repository. It cannot catch the opposite failure, where a script gains a
-    local import that the explicit SCP bundle never transfers. That deploys
-    cleanly and then dies with ERR_MODULE_NOT_FOUND on the host, which is the
-    same class of defect as the omitted Grafana alert bundle.
-    """
+    """Close the converse gap: declared assets exist, but are they sufficient?"""
     workflow = CD_WORKFLOW.read_text(encoding="utf-8")
     match = re.search(r'^\s+source: "([^"]+)"$', workflow, flags=re.MULTILINE)
     assert match is not None

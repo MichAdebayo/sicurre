@@ -42,12 +42,7 @@ def test_every_drop_point_records_a_reason() -> None:
 
 
 def test_no_silent_skip_remains() -> None:
-    """No `skipped_count += 1` may occur without a reason being set first.
-
-    This is the property that actually matters: adding a new drop condition
-    without recording its reason recreates the original defect, and would
-    otherwise pass every test in the suite.
-    """
+    """No `skipped_count += 1` may occur without a reason being set first."""
     source = _normalize_source()
     lines = source.splitlines()
 
