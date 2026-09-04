@@ -681,7 +681,12 @@ async def scan_email(
                     data_variables={
                         "firstName": first_name,
                         "domainName": integration.get("zone_name") or "votre domaine",
-                        "senderEmail": payload.sender,
+                        # The Loops "threat-quarantined" template declares this
+                        # variable as `sender`; sending `senderEmail` produced a
+                        # 400 "Missing required data variable(s): sender." and no
+                        # alert reached the customer. Confirmed against the
+                        # template definition via the Loops API.
+                        "sender": payload.sender,
                         "emailSubject": payload.subject,
                         "riskScore": int(score * 100),
                         "interceptedAt": notification_time.strftime("%d/%m/%Y %H:%M UTC"),
