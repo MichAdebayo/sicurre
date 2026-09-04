@@ -32,25 +32,14 @@ def test_a_failure_is_recorded_under_its_reason() -> None:
 
 
 def test_an_unrecognised_reason_collapses_to_unknown() -> None:
-    """The label set stays closed.
-
-    The reason is derived near an exception, and an exception string can carry
-    a URL, a header, or a fragment of the message being scanned. An open label
-    set would put that in a metric, which outlives and travels further than a
-    log line.
-    """
+    """The label set stays closed."""
     before = _failure_count("unknown")
     scan_metrics.observe_scan_failure("https://ml.internal/v1/classify failed for bob@corp.fr")
     assert _failure_count("unknown") == before + 1
 
 
 def test_the_alert_can_fire_at_demo_volume() -> None:
-    """The rule must not inherit the 5xx rule's minimum-volume guard.
-
-    `Sicurre elevated 5xx rate` requires >=20 requests in 15 minutes before it
-    evaluates. Mail arriving a few messages an hour never reaches that, so a
-    total classification outage would stay silent on that rule alone.
-    """
+    """The rule must not inherit the 5xx rule's minimum-volume guard."""
     rules = {r["uid"]: r for r in json.loads(ALERTS.read_text())["rules"]}
     rule = rules["sicurre-scan-failing"]
 

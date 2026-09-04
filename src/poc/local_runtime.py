@@ -158,11 +158,7 @@ def ensure_local_auth_db() -> None:
             conn.execute("ALTER TABLE app_inference_event ADD COLUMN override_by TEXT NULL")
         if "overridden_at" not in event_columns:
             conn.execute("ALTER TABLE app_inference_event ADD COLUMN overridden_at TEXT NULL")
-        # Identity of the model that produced the verdict. Nullable because a
-        # blocklist rule decides without consulting the model, and because rows
-        # written before this existed genuinely do not know. Added here as well
-        # as in the CREATE so an existing POC database self-heals on next start
-        # rather than needing to be deleted.
+        # Identity of the model that produced the verdict.
         if "model_version" not in event_columns:
             conn.execute("ALTER TABLE app_inference_event ADD COLUMN model_version TEXT NULL")
         if "model_revision" not in event_columns:

@@ -227,13 +227,7 @@ async def test_an_unreadable_file_returns_read_error_rather_than_raising(
     session_factory: async_sessionmaker[AsyncSession],
     tmp_path: Path,
 ) -> None:
-    """One corrupt file must not abort the batch.
-
-    The dropzone is processed in a loop, so an exception escaping here would
-    stop every file after the bad one from being ingested at all. Returning a
-    status keeps the loop going and leaves the failure attributable to the file
-    that caused it.
-    """
+    """One corrupt file must not abort the batch."""
     file_path = tmp_path / "corrupt.csv"
     # A lone surrogate cannot be decoded as UTF-8.
     file_path.write_bytes(b"text,label\n\xed\xa0\x80broken,spam\n")
@@ -254,13 +248,7 @@ async def test_the_same_file_twice_is_ingested_once(
     session_factory: async_sessionmaker[AsyncSession],
     tmp_path: Path,
 ) -> None:
-    """Content-hash dedup is what makes the daily cron idempotent.
-
-    The dropzone job re-reads the whole directory every night. Without this the
-    corpus would grow by a full copy of every unchanged file each run, and the
-    duplicate filter downstream would be doing work the ingest should never
-    have created.
-    """
+    """Content-hash dedup is what makes the daily cron idempotent."""
     file_path = tmp_path / "spam_1.csv"
     file_path.write_text(
         "text,label\nBonjour ceci est un message de test,spam\n", encoding="utf-8"
@@ -290,14 +278,7 @@ async def test_a_dropzone_file_registers_its_governance(
     session_factory: async_sessionmaker[AsyncSession],
     tmp_path: Path,
 ) -> None:
-    """A source created by ingestion must not arrive without a legal basis.
-
-    Eleven file sources carried NULL legal basis and contains_personal_data
-    False, including mailbox exports that hold real sender addresses. The flag
-    defaulting to False was wrong for exactly the sources most likely to carry
-    personal data, so the governance is applied at creation rather than
-    backfilled later.
-    """
+    """A source created by ingestion must not arrive without a legal basis."""
     file_path = tmp_path / "spam_2.csv"
     file_path.write_text(
         "text,label\nMessage de test pour la gouvernance,spam\n", encoding="utf-8"
@@ -319,12 +300,7 @@ async def test_a_dropzone_file_registers_its_governance(
 async def test_empty_bytes_are_reported_as_empty_not_ingested(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    """The R2 lane downloads bytes, so a zero-row object must be named as such.
-
-    `empty` and `read_error` are different operational facts: the first means
-    the object arrived and had no rows, the second that it could not be parsed.
-    Collapsing them would hide a truncated download behind a benign status.
-    """
+    """The R2 lane downloads bytes, so a zero-row object must be named as such."""
     from data_platform.base_ingest.file.parsers.csv_ingestion import ingest_csv_bytes
 
     async with session_factory() as session:
@@ -348,12 +324,7 @@ async def test_empty_bytes_are_reported_as_empty_not_ingested(
 async def test_bytes_from_r2_are_ingested_with_their_governance(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    """The R2 lane must register governance the same way the file lane does.
-
-    Both lanes create source systems. If only one applied the legal basis and
-    personal-data flag, the same corpus would carry rows governed differently
-    depending on which path happened to ingest them.
-    """
+    """The R2 lane must register governance the same way the file lane does."""
     from data_platform.base_ingest.file.parsers.csv_ingestion import ingest_csv_bytes
 
     payload = "text,label\nBonjour ceci est un message de test R2,spam\n".encode()

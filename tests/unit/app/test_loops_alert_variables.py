@@ -1,18 +1,4 @@
-"""The Loops alert payloads must match what the templates declare.
-
-Loops rejects a send with HTTP 400 when a declared data variable is absent, and
-the send happens inside a `try/except` that only logs a warning - so a renamed
-variable does not fail a request, break a test, or raise an alert. It silently
-stops the customer being told their mail was quarantined.
-
-That is exactly what happened on 4 September: the `threat-quarantined` template
-declares `sender`, the code sent `senderEmail`, and every phishing notification
-had been failing with "Missing required data variable(s): sender."
-
-These pin the key sets, verified against the template definitions retrieved from
-the Loops API. If a template changes, this fails and names the difference rather
-than leaving it to a log nobody is watching.
-"""
+"""Loops alert payloads match the variables each template declares."""
 
 from __future__ import annotations
 

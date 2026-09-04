@@ -155,22 +155,7 @@ async def register_candidate(
 
 
 def _apply_evaluation_stage(candidate: MlModelVersion, outcome: str) -> None:
-    """Move the candidate's stage to match the evaluation that just landed.
-
-    The failure arm used to be the only one written, so a rejection was sticky:
-    a candidate marked ``rejected`` stayed rejected even after a later
-    evaluation passed, leaving MLflow reading ``candidate`` while the database
-    read ``rejected``. That is the same shape of defect as a failure path
-    writing state no success path undoes, and it is confusing precisely when it
-    matters - at the moment a candidate finally becomes promotable.
-
-    The rule is that an evaluation moves a model only between ``candidate`` and
-    ``rejected``. ``production`` and ``retired`` are owned by the promotion
-    workflow, so neither arm touches them: re-evaluating the live model must
-    not silently demote it in the database while it is still serving, and a
-    passing evaluation of a production model is not a demotion either. An
-    ``inconclusive`` outcome decides nothing and so changes nothing.
-    """
+    """Move the candidate's stage to match the evaluation that just landed."""
     decidable = (ModelStage.CANDIDATE.value, ModelStage.REJECTED.value)
     if candidate.stage not in decidable:
         return

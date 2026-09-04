@@ -1,12 +1,4 @@
-"""Mail headers must be stored and shown as text, not as wire format.
-
-Any non-ASCII header arrives RFC 2047 encoded, so a French subject reached the
-database as `=?UTF-8?Q?...?=`. Three consequences, all live: the threat journal
-and quarantine page displayed the encoding, the Loops alert quoted it back to
-the customer, and the classifier scored the encoding rather than the words.
-
-Headers are attacker-controlled, so decoding must never be able to fail a scan.
-"""
+"""Mail headers are stored and shown as text, not wire format."""
 
 from __future__ import annotations
 

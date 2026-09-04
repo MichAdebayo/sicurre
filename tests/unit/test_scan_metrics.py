@@ -46,11 +46,7 @@ def test_buckets_straddle_the_two_second_objective() -> None:
 
 
 def test_inference_client_is_reused_across_calls() -> None:
-    """One TLS handshake per process, not per email.
-
-    Opening a client per request cost ~275 ms of the scan on connection setup
-    alone, so reuse is the behaviour worth pinning.
-    """
+    """One TLS handshake per process, not per email."""
     from core import inference_client
     from core.inference_client import get_inference_client
 
@@ -227,11 +223,7 @@ def test_lifespan_starts_and_stops_the_keepalive() -> None:
 
 
 def test_api_responses_forbid_caching() -> None:
-    """Threat payloads carry third-party personal data and must not be stored.
-
-    An absent Cache-Control licenses heuristic freshness rather than forbidding
-    caching, so the header has to be explicit.
-    """
+    """Threat payloads carry third-party personal data and must not be stored."""
     from fastapi.testclient import TestClient
 
     from data_platform.api.main import create_app

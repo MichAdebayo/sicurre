@@ -97,6 +97,14 @@ export function ThreatRow({ threat, onUpdateStatus }: ThreatRowProps) {
             transition={{ duration: 0.2, ease: "easeOut" }}
             className="overflow-hidden bg-surface-low border-t border-border-subtle/50"
           >
+            {threat.explanation ? (
+              <div className="mx-4 mt-4 rounded-md border-l-2 border-primary/40 bg-primary-container/30 px-3 py-2">
+                <p className="text-body-sm font-semibold text-on-surface">Pourquoi ce verdict</p>
+                <p className="text-body-sm text-on-surface-variant/90 leading-relaxed">
+                  {threat.explanation}
+                </p>
+              </div>
+            ) : null}
             <div className="p-4 text-body-sm text-on-surface-variant/90 leading-relaxed max-w-3xl whitespace-pre-wrap">
               {threat.body_preview || "Aucun aperçu du contenu de l'e-mail disponible."}
             </div>

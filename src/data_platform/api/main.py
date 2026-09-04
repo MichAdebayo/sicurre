@@ -159,19 +159,7 @@ def create_app() -> FastAPI:
 
     @app.middleware("http")
     async def _no_store_on_api(request, call_next):
-        """Forbid caching of API responses.
-
-        An absent Cache-Control is not "do not cache" — it licenses heuristic
-        freshness, so a cache may store the response and pick its own lifetime.
-        /v1/threats and /v1/quarantine return sender addresses and subject
-        lines, which is third-party personal data; stored to disk it outlives
-        the session that was allowed to see it, and a back-navigation after
-        logout can render it without the server ever being consulted.
-
-        Applied as middleware rather than per route so an endpoint added later
-        cannot be shipped without it. The root document already sets no-store;
-        this closes the same gap on the API.
-        """
+        """Forbid caching of API responses."""
         response = await call_next(request)
         if request.url.path.startswith("/v1/"):
             response.headers["Cache-Control"] = "no-store"

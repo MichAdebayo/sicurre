@@ -1,14 +1,4 @@
-"""`run_batch` must write the drop reason to the row it drops.
-
-The companion unit tests assert this by reading the source, which proves the
-assignments exist but never executes them: a reason could be set on an object
-that is then discarded without being flushed, and every one of those tests
-would still pass.
-
-These drive the real method against a real database and read the reason back
-off the row afterwards, which is the only way to show the value survives to
-where a report can query it.
-"""
+"""run_batch writes the drop reason to the row it drops."""
 
 from __future__ import annotations
 
@@ -73,9 +63,7 @@ async def _add_raw_record(session: AsyncSession, record_id: str, payload: dict) 
     now = datetime.now(timezone.utc).isoformat()
     await session.execute(
         text(
-            # detected_language must be 'fr': run_batch isolates the French
-            # lane in its selection query, so a record without it is never
-            # fetched and the test would pass by not running the code.
+            # detected_language must be 'fr': run_batch isolates the French lane in its selection query, s
             "INSERT INTO data_raw_record (id, raw_object_id, source_system_id,"
             " record_key, raw_content, is_usable, detected_language,"
             " extracted_at, created_at)"
@@ -103,14 +91,7 @@ async def _reason(session: AsyncSession, record_id: str) -> str | None:
 
 @pytest.mark.asyncio
 async def test_a_routing_rejection_names_the_route_outcome(session: AsyncSession) -> None:
-    """Routing runs before the content checks, and says so in the reason.
-
-    An empty subject and body is refused at the routing stage rather than
-    reaching the empty-text check, so the stored reason is `route:rejected`.
-    Recording which stage refused a record is the difference between "we
-    dropped it" and "we can say why", and the two stages fail for different
-    reasons that need different fixes.
-    """
+    """Routing runs before the content checks, and says so in the reason."""
     await _seed_source(session, "sap-labs-blog")
     await _add_raw_record(session, "d" * 32, {"subject": "", "body": "", "label": "phishing"})
     await session.commit()
@@ -144,11 +125,7 @@ async def test_a_record_without_a_label_is_dropped_with_its_reason(
 async def test_a_duplicate_is_dropped_naming_the_hash_that_matched(
     session: AsyncSession,
 ) -> None:
-    """The second copy is dropped; the first is kept.
-
-    Two records with identical text must not both survive, and the one that is
-    dropped must say it was a duplicate rather than looking like a failure.
-    """
+    """The second copy is dropped; the first is kept."""
     await _seed_source(session, "sap-labs-blog")
     body = {
         "subject": "Confirmation de commande",
@@ -171,11 +148,7 @@ async def test_a_duplicate_is_dropped_naming_the_hash_that_matched(
 async def test_an_extraction_failure_records_the_class_and_not_the_message(
     session: AsyncSession,
 ) -> None:
-    """An exception string can carry a fragment of the mail that caused it.
-
-    Storing `extract_error:JSONDecodeError` keeps the diagnosis and drops the
-    payload, which is the whole point of recording the class instead of str(e).
-    """
+    """An exception string can carry a fragment of the mail that caused it."""
     await _seed_source(session, "sap-labs-blog")
     now = datetime.now(timezone.utc).isoformat()
     await session.execute(

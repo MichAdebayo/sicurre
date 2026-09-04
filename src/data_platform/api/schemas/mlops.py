@@ -81,13 +81,7 @@ class PromotionMetricSnapshot(BaseModel):
     production_legitimate_false_positives: int = Field(ge=0)
 
     def passes(self) -> bool:
-        """Apply the provisional three-part non-regression policy.
-
-        Weighted F1 and legitimate false positives admit no regression: they are
-        what a candidate is expected to improve. Phishing recall carries a
-        non-inferiority margin, because a zero margin rejects on differences
-        smaller than the evaluation set can resolve.
-        """
+        """Apply the provisional three-part non-regression policy."""
         return (
             self.candidate_weighted_f1 >= self.production_weighted_f1
             and self.candidate_phishing_recall

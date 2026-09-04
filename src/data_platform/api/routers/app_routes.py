@@ -779,9 +779,7 @@ _PROBE_PAYLOAD = {
     "subject": "SICURRE-RUNTIME-PROBE",
     "sender": "probe@sicurre.invalid",
     "text": "Synthetic runtime probe. Not a client message.",
-    # The probe establishes the auth contract and the model path. Enabling the
-    # LLM or VirusTotal would spend third-party quota every time an admin loads
-    # the page, and their failure is not what this component reports on.
+    # The probe establishes the auth contract and the model path.
     "use_llm": False,
     "use_virustotal": False,
 }
@@ -790,14 +788,7 @@ _PROBE_PAYLOAD = {
 async def _probe_inference_contract(
     client: httpx.AsyncClient, inference_url: str, api_key: str | None
 ) -> dict:
-    """Authenticated call to /v1/classify — the check incident 06 was missing.
-
-    /v1/health and /v1/ready answer without credentials, so they stayed green
-    through the whole of incident 06: the classifier was healthy and the key
-    the API sent it was empty. The admin page reported ok while every real
-    classification failed. Only a call carrying the Authorization header the
-    gateway actually uses can distinguish those two states.
-    """
+    """Authenticated call to /v1/classify — the check incident 06 was missing."""
     if not api_key:
         return _runtime_status(
             component="inference_contract",
@@ -2186,9 +2177,7 @@ def _classify_blocklist_response(provider: str, addresses: list[str]) -> tuple[b
 
     if provider == "Spamhaus DBL":
         if any(str(address).startswith("127.255.255.") for address in parsed):
-            # 127.255.255.254 = open resolver block
-            # 127.255.255.252 = typo in DNSBL name (DQS misconfiguration)
-            # 127.255.255.255 = excessive query volume
+            # 127.255.255.254 = open resolver block 127.255.255.252 = typo in DNSBL name (DQS misconfigura
             return False, "Spamhaus indisponible depuis le résolveur du serveur"
         return any(address in ipaddress.ip_network("127.0.0.0/16") for address in parsed), None
 
@@ -2205,12 +2194,7 @@ async def _check_domain_blacklists(
     *,
     dqs_key: str | None = None,
 ) -> tuple[list[str], list[str]]:
-    """Query Spamhaus DBL and SURBL for domain reputation listings.
-
-    When *dqs_key* is provided, Spamhaus queries use the authenticated
-    DQS endpoint (``dbl.dq.spamhaus.net``) which works through any DNS
-    resolver.  Without a key the free public mirror is attempted.
-    """
+    """Query Spamhaus DBL and SURBL for domain reputation listings."""
     import dns.resolver
 
     if dqs_key:
