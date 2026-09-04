@@ -23,6 +23,18 @@ from poc import local_runtime
 _REQUIRED = ("model_version", "model_revision")
 
 
+@pytest.fixture(autouse=True)
+def _poc_seed_credentials(monkeypatch):
+    """`ensure_local_auth_db` refuses to run without the POC seed passwords.
+
+    That guard is correct - it stops a POC starting with blank credentials - so
+    it is satisfied here rather than relaxed. CI has no .env, which is why these
+    passed locally and failed there.
+    """
+    monkeypatch.setattr(local_runtime, "DEFAULT_ADMIN_PASSWORD", "test-admin-password")
+    monkeypatch.setattr(local_runtime, "DEFAULT_VIEWER_PASSWORD", "test-viewer-password")
+
+
 def _bootstrap(path: Path) -> list[str]:
     local_runtime.POC_AUTH_DB_PATH = path
     local_runtime.ensure_local_auth_db()
