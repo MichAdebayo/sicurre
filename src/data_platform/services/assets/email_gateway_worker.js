@@ -30,9 +30,17 @@ function apiBase(env) {
   return env.SICURRE_SCAN_URL.replace(/\/v1\/email\/scan\/?$/, "").replace(/\/$/, "");
 }
 
-/** POST a raw message to an ingest endpoint. Returns true only on success. */
+/**
+ * POST a raw message to an ingest endpoint.
+ *
+ * Returns "stored" when the API took it, "not-a-report" when the API said the
+ * message carries no report, and "unavailable" for anything else. The caller
+ * needs the three apart: a message that is not a report is ordinary mail and
+ * must still be classified, while a real report we merely failed to store must
+ * not be, or a machine report gets quarantined as phishing.
+ */
 async function ingest(env, path, rawBytes) {
-  if (!env.SICURRE_REPORTED_EMAIL_INGEST_KEY) return false;
+  if (!env.SICURRE_REPORTED_EMAIL_INGEST_KEY) return "unavailable";
   try {
     const response = await fetch(`${apiBase(env)}${path}`, {
       method: "POST",
@@ -43,9 +51,14 @@ async function ingest(env, path, rawBytes) {
       body: rawBytes,
       signal: AbortSignal.timeout(15_000),
     });
-    return response.ok;
+    if (response.ok) return "stored";
+    // 400: no report in the message. 404: not an address we ingest for. Both
+    // mean ordinary mail, which must still be classified. Everything else is a
+    // real report we failed to store.
+    const notAReport = response.status === 400 || response.status === 404;
+    return notAReport ? "not-a-report" : "unavailable";
   } catch (_) {
-    return false;
+    return "unavailable";
   }
 }
 
@@ -69,21 +82,25 @@ export default {
         .slice(0, 5_500);
     } catch (_) { /* fail-open body read */ }
 
-    // -- Reporting addresses, never classified -------------------------------
-    // These carry machine reports, not mail a person sent. Classifying one on a
-    // failed ingest quarantined a Google DMARC report as phishing and alerted
-    // the customer, so a failed ingest now forwards the report untouched rather
-    // than handing it to the classifier.
-    if (recipient === 'dmarc@sicurre.com') {
-      if (rawBytes.byteLength && await ingest(env, '/v1/email/dmarc-reports', rawBytes)) return;
-      await message.forward(env.FORWARD_TO);
-      return;
-    }
+    // -- Reporting addresses ------------------------------------------------
+    // These carry machine reports. Classifying one on a failed ingest is what
+    // quarantined a Google DMARC report as phishing and alerted the customer.
+    // But anyone can send to a reporting address, so only a message the API
+    // recognises as a report skips classification.
     const reportMatch = REPORT_ADDRESS.exec(recipient);
-    if (reportMatch) {
-      if (rawBytes.byteLength && await ingest(env, `/v1/email/reports/${reportMatch[1]}`, rawBytes)) return;
-      await message.forward(env.FORWARD_TO);
-      return;
+    let ingestPath = '';
+    if (recipient === 'dmarc@sicurre.com') ingestPath = '/v1/email/dmarc-reports';
+    else if (reportMatch) ingestPath = `/v1/email/reports/${reportMatch[1]}`;
+
+    if (ingestPath && rawBytes.byteLength) {
+      const outcome = await ingest(env, ingestPath, rawBytes);
+      if (outcome === 'stored') return;
+      if (outcome === 'unavailable') {
+        // A real report we could not store. Deliver it rather than classify it.
+        await message.forward(env.FORWARD_TO);
+        return;
+      }
+      // "not-a-report" falls through to classification like ordinary mail.
     }
 
     const headerMessageId = message.headers.get('message-id') || message.headers.get('Message-ID') || '';
