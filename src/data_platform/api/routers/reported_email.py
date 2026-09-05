@@ -62,6 +62,18 @@ def _dmarc_attachment(raw_message: bytes) -> tuple[str, bytes]:
     raise HTTPException(status_code=400, detail="DMARC report attachment not found")
 
 
+def _zone_candidates(domain: str) -> list[str]:
+    """The reported domain, then each parent that could be its Cloudflare zone.
+
+    Aggregate reports name the sending domain, which is routinely a subdomain
+    (`mail.example.com`), while onboarding stores the zone (`example.com`). An
+    exact match therefore misses the report entirely. Most specific first, and
+    never down to a bare TLD.
+    """
+    labels = domain.strip().lower().strip(".").split(".")
+    return [".".join(labels[i:]) for i in range(len(labels) - 1)]
+
+
 def _codec(settings: Settings) -> ReportAliasCodec:
     secret = settings.reported_email_alias_secret
     if not secret:
@@ -233,13 +245,20 @@ async def ingest_dmarc_email(
     if len(raw_message) > settings.reported_email_max_message_bytes:
         raise HTTPException(status_code=413, detail="DMARC report email is too large")
     domain, xml_payload = _dmarc_attachment(raw_message)
+    candidates = _zone_candidates(domain)
+    placeholders = ",".join("?" for _ in candidates)
     integrations = await auth_query(
-        "SELECT workspace_id FROM cloudflare_integration "
-        "WHERE lower(zone_name) = ? AND status = 'active' LIMIT 1",
-        (domain,),
+        "SELECT workspace_id, zone_name FROM cloudflare_integration "
+        f"WHERE lower(zone_name) IN ({placeholders}) AND status = 'active' "
+        "ORDER BY length(zone_name) DESC, created_at LIMIT 1",
+        tuple(candidates),
     )
     if not integrations:
-        raise HTTPException(status_code=404, detail="DMARC report domain is not onboarded")
+        # Receivers report on every domain that carries our rua, including our
+        # own sending domains, which are not customers. That is not an error:
+        # 404 made the Worker treat the report as a failed ingest and hand it to
+        # the classifier, which quarantined a Google report as phishing.
+        return {"status": "ignored", "record_count": 0}
     return await persist_dmarc_report(
         str(integrations[0]["workspace_id"]),
         domain,

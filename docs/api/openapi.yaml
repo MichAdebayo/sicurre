@@ -1144,6 +1144,7 @@ components:
           enum:
           - imported
           - already_imported
+          - ignored
           title: Status
           type: string
       required:

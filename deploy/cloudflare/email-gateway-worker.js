@@ -15,8 +15,9 @@
  * token, so a routing rule cannot express it - the catch-all Worker has to.
  *
  * Ingestion is deliberately fail-open. If the ingest key is absent, or the API
- * rejects or is unreachable, the message falls through to normal delivery
- * instead of throwing. A failed ingestion should cost a report, never the mail.
+ * rejects or is unreachable, the report is forwarded instead of throwing. A
+ * failed ingestion should cost a report, never the mail - and never be handed
+ * to the classifier, which would turn a machine report into a false threat.
  *
  * Bindings: SICURRE_SCAN_URL, SICURRE_SHARED_SECRET, FORWARD_TO,
  *           SICURRE_REPORTED_EMAIL_INGEST_KEY (optional; enables ingestion).
@@ -68,15 +69,21 @@ export default {
         .slice(0, 5_500);
     } catch (_) { /* fail-open body read */ }
 
-    // -- Reporting addresses, before any classification ----------------------
-    if (recipient === 'dmarc@sicurre.com' && rawBytes.byteLength) {
-      if (await ingest(env, '/v1/email/dmarc-reports', rawBytes)) return;
-      // fall through to delivery so the report is not lost
+    // -- Reporting addresses, never classified -------------------------------
+    // These carry machine reports, not mail a person sent. Classifying one on a
+    // failed ingest quarantined a Google DMARC report as phishing and alerted
+    // the customer, so a failed ingest now forwards the report untouched rather
+    // than handing it to the classifier.
+    if (recipient === 'dmarc@sicurre.com') {
+      if (rawBytes.byteLength && await ingest(env, '/v1/email/dmarc-reports', rawBytes)) return;
+      await message.forward(env.FORWARD_TO);
+      return;
     }
     const reportMatch = REPORT_ADDRESS.exec(recipient);
-    if (reportMatch && rawBytes.byteLength) {
-      if (await ingest(env, `/v1/email/reports/${reportMatch[1]}`, rawBytes)) return;
-      // fall through to delivery so the forwarded report is not lost
+    if (reportMatch) {
+      if (rawBytes.byteLength && await ingest(env, `/v1/email/reports/${reportMatch[1]}`, rawBytes)) return;
+      await message.forward(env.FORWARD_TO);
+      return;
     }
 
     const headerMessageId = message.headers.get('message-id') || message.headers.get('Message-ID') || '';

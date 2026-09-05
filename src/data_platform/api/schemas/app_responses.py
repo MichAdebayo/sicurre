@@ -413,5 +413,5 @@ class DmarcSummaryResponse(ApiResponse):
 class DmarcImportResponse(ApiResponse):
     """Idempotent DMARC import result."""
 
-    status: Literal["imported", "already_imported"]
+    status: Literal["imported", "already_imported", "ignored"]
     record_count: int = Field(ge=0)
