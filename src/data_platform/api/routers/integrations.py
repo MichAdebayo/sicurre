@@ -316,10 +316,31 @@ def _encrypt_provider_token(token: str) -> str:
 # --------------------------------------------------------------------------- Pydantic schemas
 
 
+def _alert_domain(recipient: str | None, zone_name: str | None) -> str:
+    """Name the domain the message was addressed to, not the one that scanned it.
+
+    A single Worker can serve several zones behind one shared secret, so the
+    integration it resolves to is not necessarily the recipient's domain. A
+    DMARC report for mail.sicurre.com was announced to the customer as "votre
+    domaine vinse.app" because the alert used the integration. Older Workers do
+    not send a recipient, so the zone remains the fallback.
+    """
+    local, at, host = (recipient or "").rpartition("@")
+    # rpartition returns the whole string as the tail when there is no "@", so
+    # a malformed recipient would otherwise be shown to the customer as if it
+    # were a domain.
+    domain = host.strip().lower() if at and local else ""
+    return domain or str(zone_name or "").strip().lower() or "votre domaine"
+
+
 class EmailScanRequest(BaseModel):
     message_id: str | None = Field(default=None, max_length=500)
     subject: str = Field(default="", max_length=500)
     sender: str = Field(default="", max_length=200)
+    #: Envelope recipient. One Worker can serve several zones, so the
+    #: integration resolved from its shared secret does not identify the domain
+    #: the message was actually sent to. Optional: older Workers omit it.
+    recipient: str = Field(default="", max_length=200)
     text: str = Field(default="", max_length=10_000)
     use_llm: bool = True
     use_virustotal: bool = False
@@ -582,6 +603,8 @@ async def scan_email(
     )
 
     # ── Quarantine Handling ────────────────────────────────────────────────
+    alert_domain = _alert_domain(payload.recipient, integration.get("zone_name"))
+
     # If verdict is phishing, quarantine the email instead of bouncing
     quarantine_id: str | None = None
     classified_as_phishing = verdict_safety == "phishing"
@@ -655,7 +678,7 @@ async def scan_email(
                     transactional_id=settings.loops_threat_quarantined_transaction_id,
                     data_variables={
                         "firstName": first_name,
-                        "domainName": integration.get("zone_name") or "votre domaine",
+                        "domainName": alert_domain,
                         # Loops declares this variable as `sender`; `senderEmail` returned 400.
                         "sender": payload.sender,
                         "emailSubject": payload.subject,

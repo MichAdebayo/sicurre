@@ -643,6 +643,9 @@ async def test_dmarc_ingestion_matches_a_subdomain_to_its_zone(
     result = await router.ingest_dmarc_email(_request(message), "worker-secret")
 
     assert result["status"] == "imported"
-    # The zone is queried alongside the reported subdomain, most specific first.
+    # The zone is queried alongside the reported subdomain, most specific first,
+    # and only workspaces that still have a member are eligible.
     assert seen["params"] == ("mail.example.test", "example.test")
-    assert "length(zone_name) DESC" in seen["sql"]
+    assert "length(ci.zone_name) DESC" in seen["sql"]
+    assert "app_workspace_membership" in seen["sql"]
+    assert "ci.created_at DESC" in seen["sql"]
