@@ -610,3 +610,39 @@ async def test_reported_email_list_is_empty_before_any_report(
     result = await reported_email.list_reported_emails(current_user=user)  # type: ignore[arg-type]
 
     assert result == {"items": []}
+
+
+def test_zone_candidates_walks_up_to_the_zone_but_not_the_tld() -> None:
+    """A report names the sending domain; onboarding stores the zone."""
+    assert router._zone_candidates("mail.sicurre.com") == ["mail.sicurre.com", "sicurre.com"]
+    assert router._zone_candidates("vinse.app") == ["vinse.app"]
+    assert router._zone_candidates("MAIL.Sicurre.COM.") == ["mail.sicurre.com", "sicurre.com"]
+    assert "com" not in router._zone_candidates("mail.sicurre.com")
+
+
+@pytest.mark.asyncio
+async def test_dmarc_ingestion_matches_a_subdomain_to_its_zone(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """A report for mail.sicurre.com belongs to the sicurre.com integration."""
+    monkeypatch.setattr(router, "get_settings", lambda: _settings(tmp_path))
+    seen: dict[str, tuple] = {}
+
+    async def query(sql: str, params: tuple = ()) -> list[dict]:
+        seen["sql"], seen["params"] = sql, params
+        return [{"workspace_id": "ws-1", "zone_name": "sicurre.com"}]
+
+    async def persist(workspace_id: str, domain: str, payload: bytes) -> dict:
+        return {"status": "imported", "record_count": 1, "workspace_id": workspace_id}
+
+    monkeypatch.setattr(router, "auth_query", query)
+    monkeypatch.setattr(router, "persist_dmarc_report", persist)
+
+    message = _dmarc_message("mail.example.test")
+    result = await router.ingest_dmarc_email(_request(message), "worker-secret")
+
+    assert result["status"] == "imported"
+    # The zone is queried alongside the reported subdomain, most specific first.
+    assert seen["params"] == ("mail.example.test", "example.test")
+    assert "length(zone_name) DESC" in seen["sql"]
