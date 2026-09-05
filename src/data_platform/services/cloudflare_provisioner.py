@@ -20,9 +20,12 @@ import json
 import logging
 import secrets
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import httpx
+
+from core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -31,131 +34,13 @@ CF_BASE = "https://api.cloudflare.com/client/v4"
 # ---------------------------------------------------------------------------
 # Embedded Cloudflare Email Worker script
 # ---------------------------------------------------------------------------
-_WORKER_JS = """\
-/**
- * Sicurre Email Gateway Worker
- *
- * Flow:
- *   1. Extract sender, subject and body from the inbound email
- *   2. POST to Sicurre scan endpoint (SICURRE_SCAN_URL)
- *   3. If quarantined, upload the original MIME for controlled release
- *   4. If verdict == "phishing"  → reject the message
- *   5. Otherwise                 → forward to FORWARD_TO with X-Sicurre trace headers
- *
- * Environment bindings (set via Cloudflare Workers secrets):
- *   SICURRE_SCAN_URL      – e.g. https://api.yourdomain.com/v1/email/scan
- *   SICURRE_SHARED_SECRET – random secret shared between Worker and API
- *   FORWARD_TO            – verified destination address
- */
-export default {
-  async email(message, env, _ctx) {
-    const from    = message.from    || '';
-    const subject = message.headers.get('subject') || message.headers.get('Subject') || '';
-
-    // Read the original MIME once. Sicurre-ML owns deterministic MIME parsing;
-    // preserving headers and boundaries is required for correct decoding.
-    let rawBytes = new ArrayBuffer(0);
-    let bodyText = '';
-    try {
-      rawBytes = await new Response(message.raw).arrayBuffer();
-      const rawText = new TextDecoder('utf-8', { fatal: false }).decode(rawBytes);
-      bodyText = rawText.slice(0, 10_000);
-    } catch (_) { /* fail-open body read */ }
-
-    const headerMessageId = message.headers.get('message-id') || message.headers.get('Message-ID') || '';
-    let messageId = headerMessageId.trim();
-    if (!messageId && rawBytes.byteLength) {
-      const digest = await crypto.subtle.digest('SHA-256', rawBytes);
-      messageId = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
-    }
-
-    // ── Call Sicurre scan endpoint ──────────────────────────────────────────
-    let verdict = 'safe';
-    let scanStatus = 'unavailable';
-    let confidence = '';
-    let scanHttpStatus = '';
-    let label = '';
-    let quarantineId = '';
-    let eventId = '';
-    try {
-      const resp = await fetch(env.SICURRE_SCAN_URL, {
-        method : 'POST',
-        headers: {
-          'Content-Type'     : 'application/json',
-          'X-Sicurre-Secret' : env.SICURRE_SHARED_SECRET,
-        },
-        body  : JSON.stringify({
-          message_id     : messageId,
-          subject,
-          sender         : from,
-          text           : bodyText,
-          use_llm        : true,
-          use_virustotal : false,   // skip VT on the intercept path for speed
-        }),
-        signal: AbortSignal.timeout(10_000),
-      });
-      scanHttpStatus = String(resp.status);
-      if (resp.ok) {
-        const data = await resp.json();
-        verdict = (data.verdict || 'safe').toLowerCase();
-        scanStatus = 'scanned';
-        confidence = data.score === undefined ? '' : String(data.score);
-        label = data.label ? String(data.label).toLowerCase() : '';
-        quarantineId = data.quarantine_id ? String(data.quarantine_id) : '';
-        eventId = data.event_id ? String(data.event_id) : '';
-      } else {
-        scanStatus = 'api-error';
-      }
-    } catch (_) {
-      scanStatus = 'api-unreachable';
-      // Preserve mail availability, but never claim the message was scanned.
-    }
-
-    if (verdict === 'phishing') {
-      message.setReject('Phishing email blocked by Sicurre Anti-Phishing Gateway');
-      return;
-    }
-
-    if (verdict === 'quarantine') {
-      if (!quarantineId || !rawBytes.byteLength) {
-        message.setReject('Sicurre quarantine storage unavailable; message was not discarded');
-        return;
-      }
-      const uploadUrl = env.SICURRE_SCAN_URL.replace(/\\/v1\\/email\\/scan\\/?$/, `/v1/email/quarantine/${quarantineId}/content`);
-      try {
-        const upload = await fetch(uploadUrl, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'message/rfc822',
-            'X-Sicurre-Secret': env.SICURRE_SHARED_SECRET,
-          },
-          body: rawBytes,
-          signal: AbortSignal.timeout(15_000),
-        });
-        if (!upload.ok) {
-          message.setReject('Sicurre quarantine storage failed; message was not discarded');
-        }
-      } catch (_) {
-        message.setReject('Sicurre quarantine storage unreachable; message was not discarded');
-      }
-      return;
-    }
-
-    // Forward clean/spam mail to the verified destination inbox.
-    // X-* headers are intentionally added so fail-open delivery remains visible
-    // in the destination mailbox headers when the scan API is unavailable.
-    const traceHeaders = new Headers();
-    traceHeaders.set('X-Sicurre-Gateway', 'cloudflare-email-worker');
-    traceHeaders.set('X-Sicurre-Scan-Status', scanStatus);
-    traceHeaders.set('X-Sicurre-Verdict', verdict);
-    traceHeaders.set('X-Sicurre-Label', label);
-    traceHeaders.set('X-Sicurre-Scan-Http-Status', scanHttpStatus);
-    traceHeaders.set('X-Sicurre-Confidence', confidence);
-    traceHeaders.set('X-Sicurre-Event-ID', eventId);
-    await message.forward(env.FORWARD_TO, traceHeaders);
-  },
-};
-"""
+#: The Worker script deployed to Cloudflare, read from the single copy that
+#: ships inside the package. It used to be inlined here as well, and the two
+#: drifted: this copy never gained the DMARC and reported-email branches, so
+#: every re-provision silently reverted ingestion to plain classification.
+_WORKER_JS = (Path(__file__).parent / "assets" / "email_gateway_worker.js").read_text(
+    encoding="utf-8"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -341,25 +226,44 @@ class CloudflareProvisioner:
         scan_url: str,
         shared_secret: str,
         forward_to: str,
+        reported_email_ingest_key: str | None = None,
     ) -> None:
         """
         Deploy the Sicurre Email Worker script to Cloudflare Workers.
 
         The script handles the email event, calls the scan API, and either
         forwards clean mail or rejects phishing.
+
+        Cloudflare replaces the whole binding set on every PUT, so a binding
+        left out here is deleted from the running Worker. Omitting the ingest
+        key is what turns DMARC and reported-email ingestion back off: the
+        script keeps its branches, finds no key, and silently forwards instead.
         """
+        bindings: list[dict[str, str]] = [
+            {"type": "plain_text", "name": "SICURRE_SCAN_URL", "text": scan_url},
+            {
+                "type": "secret_text",
+                "name": "SICURRE_SHARED_SECRET",
+                "text": shared_secret,
+            },
+            {"type": "plain_text", "name": "FORWARD_TO", "text": forward_to},
+        ]
+        if reported_email_ingest_key is None:
+            # Default rather than require it: both call sites would otherwise
+            # have to remember, and forgetting deletes the binding silently.
+            reported_email_ingest_key = get_settings().reported_email_ingest_key
+        if reported_email_ingest_key:
+            bindings.append(
+                {
+                    "type": "secret_text",
+                    "name": "SICURRE_REPORTED_EMAIL_INGEST_KEY",
+                    "text": reported_email_ingest_key,
+                }
+            )
         metadata = {
             "main_module": "worker.js",
             "compatibility_date": "2024-12-01",
-            "bindings": [
-                {"type": "plain_text", "name": "SICURRE_SCAN_URL", "text": scan_url},
-                {
-                    "type": "secret_text",
-                    "name": "SICURRE_SHARED_SECRET",
-                    "text": shared_secret,
-                },
-                {"type": "plain_text", "name": "FORWARD_TO", "text": forward_to},
-            ],
+            "bindings": bindings,
         }
         files = {
             "worker.js": ("worker.js", _WORKER_JS, "application/javascript+module"),
