@@ -674,6 +674,10 @@ async def scan_email(
     db_sender = payload.sender[:200]
     db_snippet = payload.text[:240]
 
+    # event_id is a uuid5 of workspace:zone:message_id, so one message scanned
+    # twice - two rua addresses on one DMARC record, or a retry - lands on one
+    # row. A later, milder scan must not soften a verdict that already
+    # quarantined the message, or the journal contradicts the quarantine.
     # Anonymize legitimate and spam email contents to ensure user privacy compliance (GDPR)
     if verdict_safety not in ("phishing", "quarantine"):
         db_subject = "[Masqué par Sicurre]"
@@ -692,6 +696,16 @@ async def scan_email(
                 stage_scores_json, stage_labels_json, stage_breakdown_json, expected_label,
                 model_version, model_revision
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(id) DO UPDATE SET
+                safety_verdict=excluded.safety_verdict,
+                label_verdict=excluded.label_verdict,
+                composite_score=excluded.composite_score,
+                is_phishing=excluded.is_phishing,
+                subject=excluded.subject, sender=excluded.sender, snippet=excluded.snippet,
+                explanation=excluded.explanation, llm_provider=excluded.llm_provider,
+                latency_ms=excluded.latency_ms, model_version=excluded.model_version,
+                model_revision=excluded.model_revision
+            WHERE app_inference_event.safety_verdict NOT IN ('phishing', 'quarantine')
             """,
             (
                 event_id,
