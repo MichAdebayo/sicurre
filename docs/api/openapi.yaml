@@ -1320,6 +1320,11 @@ components:
             type: string
           - type: 'null'
           title: Message Id
+        recipient:
+          default: ''
+          maxLength: 200
+          title: Recipient
+          type: string
         sender:
           default: ''
           maxLength: 200

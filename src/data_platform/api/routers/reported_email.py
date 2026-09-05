@@ -247,10 +247,17 @@ async def ingest_dmarc_email(
     domain, xml_payload = _dmarc_attachment(raw_message)
     candidates = _zone_candidates(domain)
     placeholders = ",".join("?" for _ in candidates)
+    # A domain can carry more than one active integration: re-onboarding leaves
+    # the previous row behind, pointing at a workspace nobody belongs to any
+    # more. Ordering by age alone picks that dead one and files the report where
+    # no one can read it, so require a workspace that still has a member and
+    # prefer the most recent.
     integrations = await auth_query(
-        "SELECT workspace_id, zone_name FROM cloudflare_integration "
-        f"WHERE lower(zone_name) IN ({placeholders}) AND status = 'active' "
-        "ORDER BY length(zone_name) DESC, created_at LIMIT 1",
+        "SELECT ci.workspace_id, ci.zone_name FROM cloudflare_integration ci "
+        f"WHERE lower(ci.zone_name) IN ({placeholders}) AND ci.status = 'active' "
+        "AND EXISTS (SELECT 1 FROM app_workspace_membership m "
+        "            WHERE m.workspace_id = ci.workspace_id) "
+        "ORDER BY length(ci.zone_name) DESC, ci.created_at DESC LIMIT 1",
         tuple(candidates),
     )
     if not integrations:

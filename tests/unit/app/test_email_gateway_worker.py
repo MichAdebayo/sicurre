@@ -110,3 +110,12 @@ def test_deploy_sends_the_ingest_key_binding(monkeypatch) -> None:
     names = {b["name"] for b in captured["metadata"]["bindings"]}
     assert "SICURRE_REPORTED_EMAIL_INGEST_KEY" in names
     assert {"SICURRE_SCAN_URL", "SICURRE_SHARED_SECRET", "FORWARD_TO"} <= names
+
+
+def test_the_script_sends_the_recipient_for_alert_attribution() -> None:
+    """One Worker serves several zones behind a single shared secret.
+
+    Without the recipient the API can only name the integration's zone, which
+    announced a DMARC report for mail.sicurre.com as "votre domaine vinse.app".
+    """
+    assert "recipient," in provisioner._WORKER_JS
