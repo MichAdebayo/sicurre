@@ -76,3 +76,35 @@ def test_production_settings_require_valid_secret_key() -> None:
         secret_encryption_key=TEST_KEY,
     )
     assert settings.secret_encryption_key == TEST_KEY
+
+
+def test_encrypting_always_yields_a_marked_ciphertext() -> None:
+    """The prefix is what tells a stored value apart from plaintext.
+
+    decrypt_secret passes an unprefixed value through untouched so existing
+    rows keep working, which means a regression that stopped encrypting would
+    store plaintext and read back cleanly. The postcondition is the only place
+    that failure can be caught at the point it happens.
+    """
+    for secret in ("token", "", "a" * 4096, "clé-avec-accents"):
+        assert encrypt_secret(
+            secret, configured_key=TEST_KEY, environment="production"
+        ).startswith("enc:v1:")
+
+
+def test_reading_legacy_plaintext_is_reported(caplog: pytest.LogCaptureFixture) -> None:
+    """Accepting it silently is what would hide a stopped-encrypting regression."""
+    with caplog.at_level("WARNING"):
+        assert (
+            decrypt_secret("plain-token", configured_key=TEST_KEY, environment="production")
+            == "plain-token"
+        )
+    assert any("not encrypted" in r.message for r in caplog.records)
+
+
+def test_reading_a_real_ciphertext_stays_quiet(caplog: pytest.LogCaptureFixture) -> None:
+    """The warning must mark the exception, not every read."""
+    sealed = encrypt_secret("token", configured_key=TEST_KEY, environment="production")
+    with caplog.at_level("WARNING"):
+        assert decrypt_secret(sealed, configured_key=TEST_KEY, environment="production") == "token"
+    assert not [r for r in caplog.records if "not encrypted" in r.message]
