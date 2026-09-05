@@ -500,10 +500,17 @@ async def test_dmarc_ingestion_rejects_invalid_requests(
 
 
 @pytest.mark.asyncio
-async def test_dmarc_ingestion_rejects_unknown_domain(
+async def test_dmarc_ingestion_ignores_a_domain_that_is_not_onboarded(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
+    """A report for a domain we do not host is a no-op, not an error.
+
+    Receivers report on every domain carrying our rua, including our own sending
+    domains, which are not customers. Raising 404 made the Worker read the
+    report as a failed ingest and hand it to the classifier, which quarantined a
+    Google aggregate report as phishing and alerted the customer.
+    """
     monkeypatch.setattr(router, "get_settings", lambda: _settings(tmp_path))
 
     async def query(_sql: str, _params: tuple = ()) -> list[dict]:
@@ -511,10 +518,9 @@ async def test_dmarc_ingestion_rejects_unknown_domain(
 
     monkeypatch.setattr(router, "auth_query", query)
 
-    with pytest.raises(HTTPException) as exc_info:
-        await router.ingest_dmarc_email(_request(_dmarc_message()), "worker-secret")
+    result = await router.ingest_dmarc_email(_request(_dmarc_message()), "worker-secret")
 
-    assert exc_info.value.status_code == 404
+    assert result == {"status": "ignored", "record_count": 0}
 
 
 @pytest.mark.anyio

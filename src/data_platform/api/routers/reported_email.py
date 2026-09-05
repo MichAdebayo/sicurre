@@ -235,11 +235,16 @@ async def ingest_dmarc_email(
     domain, xml_payload = _dmarc_attachment(raw_message)
     integrations = await auth_query(
         "SELECT workspace_id FROM cloudflare_integration "
-        "WHERE lower(zone_name) = ? AND status = 'active' LIMIT 1",
+        "WHERE lower(zone_name) = ? AND status = 'active' "
+        "ORDER BY created_at LIMIT 1",
         (domain,),
     )
     if not integrations:
-        raise HTTPException(status_code=404, detail="DMARC report domain is not onboarded")
+        # Receivers report on every domain that carries our rua, including our
+        # own sending domains, which are not customers. That is not an error:
+        # 404 made the Worker treat the report as a failed ingest and hand it to
+        # the classifier, which quarantined a Google report as phishing.
+        return {"status": "ignored", "record_count": 0}
     return await persist_dmarc_report(
         str(integrations[0]["workspace_id"]),
         domain,
