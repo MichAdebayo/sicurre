@@ -128,6 +128,7 @@ export default {
           message_id     : messageId,
           subject,
           sender         : from,
+          recipient,
           text           : bodyText,
           use_llm        : true,
           use_virustotal : false,
