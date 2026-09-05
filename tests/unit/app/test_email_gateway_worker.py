@@ -43,14 +43,26 @@ def test_the_script_keeps_its_reporting_branches() -> None:
     assert "SICURRE_REPORTED_EMAIL_INGEST_KEY" in script
 
 
-def test_a_failed_ingest_forwards_instead_of_classifying() -> None:
-    """A DMARC report was quarantined as phishing because it fell through."""
+def test_ingest_separates_a_lost_report_from_ordinary_mail() -> None:
+    """The three outcomes are not interchangeable.
+
+    A report we failed to store must not be classified - that quarantined a
+    Google aggregate report as phishing. But anyone can send to a reporting
+    address, so a message the API does not recognise as a report has to stay on
+    the classification path; forwarding it unread would let mail reach the
+    inbox unscanned simply by addressing it to dmarc@.
+    """
     script = provisioner._WORKER_JS
-    dmarc_branch = script.split("dmarc@sicurre.com")[2]
-    up_to_scan = dmarc_branch.split("SICURRE_SCAN_URL")[0]
-    assert "message.forward" in up_to_scan, (
-        "the dmarc branch must forward and return; falling through reaches the "
-        "classifier, which is what quarantined a Google report as phishing"
+    for outcome in ("stored", "not-a-report", "unavailable"):
+        assert f'"{outcome}"' in script or f"'{outcome}'" in script, outcome
+    assert "response.status === 400" in script
+    assert "response.status === 404" in script
+    # The lost-report path forwards; the not-a-report path must not return early.
+    branch = script.split("const outcome = await ingest")[1].split("headerMessageId")[0]
+    assert "message.forward" in branch
+    assert branch.count("return;") == 2, (
+        "expected exactly two early returns: stored, and a lost report that is "
+        "forwarded. A third would mean not-a-report skips classification."
     )
 
 
