@@ -588,12 +588,7 @@
     "report_messages_hint": "Sent from your domain",
     "report_aligned_hint": "Genuinely sent by you",
     "report_failed_hint": "Possible spoofing",
-    "report_sources_title": "Top 5 sending sources",
-    "report_verdict_clean_one": "Over the last period, {{count}} message was sent in your name and it was authenticated. No spoofing detected.",
-    "report_verdict_clean_other": "Over the last period, {{count}} messages were sent in your name and all were authenticated. No spoofing detected.",
-    "report_verdict_failed_one": "{{count}} message sent in your name could not be authenticated. Someone may be spoofing your domain.",
-    "report_verdict_failed_other": "{{count}} messages sent in your name could not be authenticated. Someone may be spoofing your domain.",
-    "report_verdict_none": "No reports received yet. Mail providers send them about once a day."
+    "report_sources_title": "Top 5 sending sources"
   },
   "settings": {
     "title": "Sicurre Configuration",
