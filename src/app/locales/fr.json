@@ -588,12 +588,7 @@
     "report_messages_hint": "Envoyés depuis votre domaine",
     "report_aligned_hint": "Légitimes, bien envoyés par vous",
     "report_failed_hint": "Usurpation possible",
-    "report_sources_title": "5 principales sources d'envoi",
-    "report_verdict_clean_one": "Sur la dernière période, {{count}} message a été envoyé en votre nom et il a été authentifié. Aucune usurpation détectée.",
-    "report_verdict_clean_other": "Sur la dernière période, {{count}} messages ont été envoyés en votre nom et tous ont été authentifiés. Aucune usurpation détectée.",
-    "report_verdict_failed_one": "{{count}} message envoyé en votre nom n'a pas pu être authentifié. Quelqu'un usurpe peut-être votre domaine.",
-    "report_verdict_failed_other": "{{count}} messages envoyés en votre nom n'ont pas pu être authentifiés. Quelqu'un usurpe peut-être votre domaine.",
-    "report_verdict_none": "Aucun rapport reçu pour l'instant. Les fournisseurs de messagerie en envoient une fois par jour environ."
+    "report_sources_title": "5 principales sources d'envoi"
   },
   "settings": {
     "title": "Configuration de Sicurre",
