@@ -1151,29 +1151,53 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                     </button>
                   </div>
                 ) : (
-                  <><div className="mt-4 grid gap-3 sm:grid-cols-4">
+                  <>
+                    {/* The counts alone do not say whether two messages is good
+                        or bad. Lead with the reading; keep the numbers as the
+                        evidence behind it. */}
+                    <p className={`mt-4 rounded-lg border p-3 text-sm font-semibold ${!dmarcReports?.report_count
+                      ? "border-border-subtle bg-surface-low text-on-surface-variant"
+                      : (dmarcReports?.failed_messages ?? 0) > 0
+                        ? "border-danger/30 bg-danger/5 text-danger-text"
+                        : "border-safe/20 bg-safe/10 text-on-surface"}`}>
+                      {!dmarcReports?.report_count
+                        ? t("domain_shield.report_verdict_none")
+                        : (dmarcReports?.failed_messages ?? 0) > 0
+                          ? t("domain_shield.report_verdict_failed", { count: dmarcReports?.failed_messages ?? 0 })
+                          : t("domain_shield.report_verdict_clean", { count: dmarcReports?.total_messages ?? 0 })}
+                    </p>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-4">
                     {[
-                      { label: t("domain_shield.report_count"), value: dmarcReports?.report_count ?? 0 },
-                      { label: t("domain_shield.report_messages"), value: dmarcReports?.total_messages ?? 0 },
-                      { label: t("domain_shield.report_aligned"), value: dmarcReports?.aligned_messages ?? 0 },
-                      { label: t("domain_shield.report_failed"), value: dmarcReports?.failed_messages ?? 0 },
+                      { label: t("domain_shield.report_count"), hint: t("domain_shield.report_count_hint"), value: dmarcReports?.report_count ?? 0, alarm: false },
+                      { label: t("domain_shield.report_messages"), hint: t("domain_shield.report_messages_hint"), value: dmarcReports?.total_messages ?? 0, alarm: false },
+                      { label: t("domain_shield.report_aligned"), hint: t("domain_shield.report_aligned_hint"), value: dmarcReports?.aligned_messages ?? 0, alarm: false },
+                      // Only this one means "act now"; the other three are context.
+                      { label: t("domain_shield.report_failed"), hint: t("domain_shield.report_failed_hint"), value: dmarcReports?.failed_messages ?? 0, alarm: (dmarcReports?.failed_messages ?? 0) > 0 },
                     ].map((metric) => (
-                      <div key={metric.label} className="rounded-lg border border-border-subtle bg-surface-lowest p-3">
+                      <div key={metric.label} className={`rounded-lg border p-3 ${metric.alarm ? "border-danger/30 bg-danger/5" : "border-border-subtle bg-surface-lowest"}`}>
                         <p className="text-xs font-bold text-on-surface-variant">{metric.label}</p>
-                        <p className="mt-1 font-mono text-lg font-extrabold text-on-surface">{metric.value}</p>
+                        <p className={`mt-1 font-mono text-lg font-extrabold ${metric.alarm ? "text-danger-text" : "text-on-surface"}`}>{metric.value}</p>
+                        <p className="mt-0.5 text-[11px] font-medium text-on-surface-variant/85">{metric.hint}</p>
                       </div>
                     ))}
                   </div>
                     {dmarcReports?.top_sources?.length ? (
-                      <div className="mt-3 divide-y divide-border-subtle overflow-hidden rounded-lg border border-border-subtle bg-surface-lowest">
-                        {dmarcReports.top_sources.map((source) => (
-                          <div key={source.source_ip} className="grid grid-cols-[1fr_auto] gap-3 px-3 py-2 text-[11px]">
-                            <span className="font-mono text-on-surface">{source.source_ip}</span>
-                            <span className="font-semibold text-on-surface-variant">
-                              {source.message_count} · DKIM {source.dkim_result} · SPF {source.spf_result}
-                            </span>
-                          </div>
-                        ))}
+                      <div className="mt-3 overflow-hidden rounded-lg border border-border-subtle bg-surface-lowest">
+                        {/* Bounded to five by the API. Saying so stops a short
+                            list reading as truncated rather than deliberate. */}
+                        <p className="border-b border-border-subtle px-3 py-2 text-[11px] font-bold text-on-surface-variant">
+                          {t("domain_shield.report_sources_title")}
+                        </p>
+                        <div className="divide-y divide-border-subtle">
+                          {dmarcReports.top_sources.map((source) => (
+                            <div key={source.source_ip} className="grid grid-cols-[1fr_auto] gap-3 px-3 py-2 text-[11px]">
+                              <span className="font-mono text-on-surface">{source.source_ip}</span>
+                              <span className="font-semibold text-on-surface-variant">
+                                {source.message_count} · DKIM {source.dkim_result} · SPF {source.spf_result}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     ) : (
                       <p className="mt-3 text-[11px] font-semibold text-on-surface-variant">

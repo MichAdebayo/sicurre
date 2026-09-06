@@ -189,7 +189,13 @@
     "expires": "Expires {{date}}",
     "recent_support": "Recent support requests",
     "empty_support": "No requests.",
-    "views": { "overview": "Overview", "operations": "Operations", "incidents": "Incidents", "integrations": "Integrations", "reviews": "Review queues" },
+    "views": {
+      "overview": "Overview",
+      "operations": "Operations",
+      "incidents": "Incidents",
+      "integrations": "Integrations",
+      "reviews": "Review queues"
+    },
     "unknown": "Unknown",
     "status": "Status",
     "load_error": "Unable to load the admin console.",
@@ -208,18 +214,45 @@
         "unknown": "Unknown"
       },
       "technical_detail": "Technical detail",
-      "messages": { "ok": "Check passed.", "degraded": "Partial check; monitoring required.", "down": "Check failed; action required.", "unknown": "Status not determined." },
+      "messages": {
+        "ok": "Check passed.",
+        "degraded": "Partial check; monitoring required.",
+        "down": "Check failed; action required.",
+        "unknown": "Status not determined."
+      },
       "components": {
-        "inference_api": "Inference API", "public_app_api": "Sicurre API", "public_app_health": "Application health",
-        "email_scan_gateway": "Email scan gateway", "cloudflare_worker": "Cloudflare Worker", "cloudflare_worker_binding": "Worker binding",
-        "cloudflare_routing_rule": "Routing rule", "cloudflare_email_sending": "Cloudflare email sending", "quarantine_storage": "Quarantine storage"
+        "inference_api": "Inference API",
+        "public_app_api": "Sicurre API",
+        "public_app_health": "Application health",
+        "email_scan_gateway": "Email scan gateway",
+        "cloudflare_worker": "Cloudflare Worker",
+        "cloudflare_worker_binding": "Worker binding",
+        "cloudflare_routing_rule": "Routing rule",
+        "cloudflare_email_sending": "Cloudflare email sending",
+        "quarantine_storage": "Quarantine storage"
       }
     },
     "values": {
-      "legitimate": "legitimate", "spam": "spam", "phishing": "phishing", "quarantine": "quarantine",
-      "active": "active", "error": "error", "pending": "pending", "held": "held", "restored": "restored",
-      "false_negative": "false negative", "false_positive": "false positive", "true_positive": "true positive", "true_negative": "true negative",
-      "incident": "incident", "dns": "DNS", "billing": "billing", "feedback": "user feedback", "other": "other", "open": "open", "closed": "closed"
+      "legitimate": "legitimate",
+      "spam": "spam",
+      "phishing": "phishing",
+      "quarantine": "quarantine",
+      "active": "active",
+      "error": "error",
+      "pending": "pending",
+      "held": "held",
+      "restored": "restored",
+      "false_negative": "false negative",
+      "false_positive": "false positive",
+      "true_positive": "true positive",
+      "true_negative": "true negative",
+      "incident": "incident",
+      "dns": "DNS",
+      "billing": "billing",
+      "feedback": "user feedback",
+      "other": "other",
+      "open": "open",
+      "closed": "closed"
     }
   },
   "threats": {
@@ -476,12 +509,12 @@
     "report_enabled": "Reporting active",
     "report_enabled_desc": "Sicurre turns DMARC XML reports into readable signals.",
     "report_missing_desc": "Your DMARC policy protects the domain, but Sicurre is not receiving daily XML reports yet.",
-    "report_count": "Reports",
+    "report_count": "Reports received",
     "reports_received": "Reports received",
     "awaiting_report": "Waiting for first report",
-    "report_messages": "Messages",
-    "report_aligned": "Aligned",
-    "report_failed": "Failures",
+    "report_messages": "Messages in your name",
+    "report_aligned": "Authenticated",
+    "report_failed": "Not authenticated",
     "report_empty": "No DMARC reports received.",
     "import_report": "Import report",
     "report_imported": "Report imported: {{count}} record(s).",
@@ -550,7 +583,17 @@
     "no_report_data": "No data",
     "report_count_received": "{{count}} report(s) received",
     "no_reports_received": "No reports received",
-    "policy": "Policy"
+    "policy": "Policy",
+    "report_count_hint": "Coverage",
+    "report_messages_hint": "Sent from your domain",
+    "report_aligned_hint": "Genuinely sent by you",
+    "report_failed_hint": "Possible spoofing",
+    "report_sources_title": "Top 5 sending sources",
+    "report_verdict_clean_one": "Over the last period, {{count}} message was sent in your name and it was authenticated. No spoofing detected.",
+    "report_verdict_clean_other": "Over the last period, {{count}} messages were sent in your name and all were authenticated. No spoofing detected.",
+    "report_verdict_failed_one": "{{count}} message sent in your name could not be authenticated. Someone may be spoofing your domain.",
+    "report_verdict_failed_other": "{{count}} messages sent in your name could not be authenticated. Someone may be spoofing your domain.",
+    "report_verdict_none": "No reports received yet. Mail providers send them about once a day."
   },
   "settings": {
     "title": "Sicurre Configuration",

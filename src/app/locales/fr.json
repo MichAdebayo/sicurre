@@ -189,7 +189,13 @@
     "expires": "Expire le {{date}}",
     "recent_support": "Demandes de support récentes",
     "empty_support": "Aucune demande.",
-    "views": { "overview": "Vue d’ensemble", "operations": "Opérations", "incidents": "Incidents", "integrations": "Intégrations", "reviews": "À examiner" },
+    "views": {
+      "overview": "Vue d’ensemble",
+      "operations": "Opérations",
+      "incidents": "Incidents",
+      "integrations": "Intégrations",
+      "reviews": "À examiner"
+    },
     "unknown": "Inconnu",
     "status": "Statut",
     "load_error": "Impossible de charger la console d’administration.",
@@ -208,18 +214,45 @@
         "unknown": "Inconnu"
       },
       "technical_detail": "Détail technique",
-      "messages": { "ok": "Contrôle réussi.", "degraded": "Contrôle partiel, à surveiller.", "down": "Contrôle en échec, intervention requise.", "unknown": "État non déterminé." },
+      "messages": {
+        "ok": "Contrôle réussi.",
+        "degraded": "Contrôle partiel, à surveiller.",
+        "down": "Contrôle en échec, intervention requise.",
+        "unknown": "État non déterminé."
+      },
       "components": {
-        "inference_api": "API d’inférence", "public_app_api": "API Sicurre", "public_app_health": "Santé de l’application",
-        "email_scan_gateway": "Passerelle d’analyse", "cloudflare_worker": "Worker Cloudflare", "cloudflare_worker_binding": "Liaison du Worker",
-        "cloudflare_routing_rule": "Règle de routage", "cloudflare_email_sending": "Envoi d’e-mails Cloudflare", "quarantine_storage": "Stockage de quarantaine"
+        "inference_api": "API d’inférence",
+        "public_app_api": "API Sicurre",
+        "public_app_health": "Santé de l’application",
+        "email_scan_gateway": "Passerelle d’analyse",
+        "cloudflare_worker": "Worker Cloudflare",
+        "cloudflare_worker_binding": "Liaison du Worker",
+        "cloudflare_routing_rule": "Règle de routage",
+        "cloudflare_email_sending": "Envoi d’e-mails Cloudflare",
+        "quarantine_storage": "Stockage de quarantaine"
       }
     },
     "values": {
-      "legitimate": "légitime", "spam": "spam", "phishing": "phishing", "quarantine": "quarantaine",
-      "active": "actif", "error": "en erreur", "pending": "en attente", "held": "retenu", "restored": "restauré",
-      "false_negative": "faux négatif", "false_positive": "faux positif", "true_positive": "vrai positif", "true_negative": "vrai négatif",
-      "incident": "incident", "dns": "DNS", "billing": "facturation", "feedback": "retour utilisateur", "other": "autre", "open": "ouvert", "closed": "fermé"
+      "legitimate": "légitime",
+      "spam": "spam",
+      "phishing": "phishing",
+      "quarantine": "quarantaine",
+      "active": "actif",
+      "error": "en erreur",
+      "pending": "en attente",
+      "held": "retenu",
+      "restored": "restauré",
+      "false_negative": "faux négatif",
+      "false_positive": "faux positif",
+      "true_positive": "vrai positif",
+      "true_negative": "vrai négatif",
+      "incident": "incident",
+      "dns": "DNS",
+      "billing": "facturation",
+      "feedback": "retour utilisateur",
+      "other": "autre",
+      "open": "ouvert",
+      "closed": "fermé"
     }
   },
   "threats": {
@@ -476,12 +509,12 @@
     "report_enabled": "Reporting actif",
     "report_enabled_desc": "Sicurre transforme les rapports XML DMARC en signaux lisibles.",
     "report_missing_desc": "Votre politique DMARC protège le domaine, mais Sicurre ne reçoit pas encore les rapports XML quotidiens.",
-    "report_count": "Rapports",
+    "report_count": "Rapports reçus",
     "reports_received": "Rapports reçus",
     "awaiting_report": "En attente du premier rapport",
-    "report_messages": "Messages",
-    "report_aligned": "Alignés",
-    "report_failed": "Échecs",
+    "report_messages": "Messages en votre nom",
+    "report_aligned": "Authentifiés",
+    "report_failed": "Non authentifiés",
     "report_empty": "Aucun rapport DMARC reçu.",
     "import_report": "Importer un rapport",
     "report_imported": "Rapport importé : {{count}} enregistrement(s).",
@@ -550,7 +583,17 @@
     "no_report_data": "Aucune donnée",
     "report_count_received": "{{count}} rapport(s) reçu(s)",
     "no_reports_received": "Aucun rapport reçu",
-    "policy": "Politique"
+    "policy": "Politique",
+    "report_count_hint": "Couverture",
+    "report_messages_hint": "Envoyés depuis votre domaine",
+    "report_aligned_hint": "Légitimes, bien envoyés par vous",
+    "report_failed_hint": "Usurpation possible",
+    "report_sources_title": "5 principales sources d'envoi",
+    "report_verdict_clean_one": "Sur la dernière période, {{count}} message a été envoyé en votre nom et il a été authentifié. Aucune usurpation détectée.",
+    "report_verdict_clean_other": "Sur la dernière période, {{count}} messages ont été envoyés en votre nom et tous ont été authentifiés. Aucune usurpation détectée.",
+    "report_verdict_failed_one": "{{count}} message envoyé en votre nom n'a pas pu être authentifié. Quelqu'un usurpe peut-être votre domaine.",
+    "report_verdict_failed_other": "{{count}} messages envoyés en votre nom n'ont pas pu être authentifiés. Quelqu'un usurpe peut-être votre domaine.",
+    "report_verdict_none": "Aucun rapport reçu pour l'instant. Les fournisseurs de messagerie en envoient une fois par jour environ."
   },
   "settings": {
     "title": "Configuration de Sicurre",
