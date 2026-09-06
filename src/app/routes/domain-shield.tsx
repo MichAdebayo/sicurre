@@ -1152,21 +1152,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                   </div>
                 ) : (
                   <>
-                    {/* The counts alone do not say whether two messages is good
-                        or bad. Lead with the reading; keep the numbers as the
-                        evidence behind it. */}
-                    <p className={`mt-4 rounded-lg border p-3 text-sm font-semibold ${!dmarcReports?.report_count
-                      ? "border-border-subtle bg-surface-low text-on-surface-variant"
-                      : (dmarcReports?.failed_messages ?? 0) > 0
-                        ? "border-danger/30 bg-danger/5 text-danger-text"
-                        : "border-safe/20 bg-safe/10 text-on-surface"}`}>
-                      {!dmarcReports?.report_count
-                        ? t("domain_shield.report_verdict_none")
-                        : (dmarcReports?.failed_messages ?? 0) > 0
-                          ? t("domain_shield.report_verdict_failed", { count: dmarcReports?.failed_messages ?? 0 })
-                          : t("domain_shield.report_verdict_clean", { count: dmarcReports?.total_messages ?? 0 })}
-                    </p>
-                    <div className="mt-3 grid gap-3 sm:grid-cols-4">
+                    <div className="mt-4 grid gap-3 sm:grid-cols-4">
                     {[
                       { label: t("domain_shield.report_count"), hint: t("domain_shield.report_count_hint"), value: dmarcReports?.report_count ?? 0, alarm: false },
                       { label: t("domain_shield.report_messages"), hint: t("domain_shield.report_messages_hint"), value: dmarcReports?.total_messages ?? 0, alarm: false },
@@ -1175,9 +1161,19 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                       { label: t("domain_shield.report_failed"), hint: t("domain_shield.report_failed_hint"), value: dmarcReports?.failed_messages ?? 0, alarm: (dmarcReports?.failed_messages ?? 0) > 0 },
                     ].map((metric) => (
                       <div key={metric.label} className={`rounded-lg border p-3 ${metric.alarm ? "border-danger/30 bg-danger/5" : "border-border-subtle bg-surface-lowest"}`}>
-                        <p className="text-xs font-bold text-on-surface-variant">{metric.label}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-xs font-bold text-on-surface-variant">{metric.label}</p>
+                          {/* The explanation belongs on demand, not on the card:
+                              four permanent hint lines crowded the numbers. */}
+                          <div className="relative group">
+                            <HelpCircle className="h-3.5 w-3.5 cursor-help text-on-surface-variant/60" aria-hidden="true" />
+                            <span className="sr-only">{metric.hint}</span>
+                            <div role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 w-48 -translate-x-1/2 rounded-lg border border-border-subtle bg-surface-lowest p-2.5 text-[12px] font-semibold leading-5 text-on-surface-variant opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                              {metric.hint}
+                            </div>
+                          </div>
+                        </div>
                         <p className={`mt-1 font-mono text-lg font-extrabold ${metric.alarm ? "text-danger-text" : "text-on-surface"}`}>{metric.value}</p>
-                        <p className="mt-0.5 text-[11px] font-medium text-on-surface-variant/85">{metric.hint}</p>
                       </div>
                     ))}
                   </div>
