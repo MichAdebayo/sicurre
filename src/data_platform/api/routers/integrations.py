@@ -83,26 +83,45 @@ def _clean_str(val: str) -> str:
     return val
 
 
+#: The only include Email Routing needs. `spf.cloudflare.com` publishes no SPF
+#: record at all, and RFC 7208 makes a missing include target a permerror, which
+#: propagates to the whole record - so it was not merely useless. Every SPF
+#: mechanism also costs one of the ten DNS lookups a record is allowed, and
+#: `include:sicurre.com` spent one to reach the same Cloudflare ranges by a
+#: longer path while granting Sicurre permission to send as the customer, which
+#: it never does.
+_CLOUDFLARE_ROUTING_INCLUDE = "include:_spf.mx.cloudflare.net"
+
+#: Mechanisms Sicurre has published in the past and now withdraws. Only ever
+#: strings Sicurre itself injected - a customer's own includes are untouchable.
+_WITHDRAWN_SPF_INCLUDES = ("include:spf.cloudflare.com", "include:sicurre.com")
+
+#: A record created from nothing keeps softfail. Sicurre cannot see whose
+#: newsletter or invoicing tool also sends for this domain, and `-all` would
+#: have receivers reject that mail outright. Tightening to `-all` is the
+#: customer's call once they know their own senders; an existing `all` is
+#: always preserved, so a domain that already chose `-all` keeps it.
+_DEFAULT_ALL = "~all"
+
+
 def _merge_spf(current_spf: str) -> str:
     cleaned = _clean_str(current_spf)
-    if not cleaned:
-        return "v=spf1 include:spf.cloudflare.com include:sicurre.com ~all"
     parts = cleaned.split()
     if not parts or parts[0] != "v=spf1":
-        return "v=spf1 include:spf.cloudflare.com include:sicurre.com ~all"
+        return f"v=spf1 {_CLOUDFLARE_ROUTING_INCLUDE} {_DEFAULT_ALL}"
 
-    mechanisms = []
-    all_mechanism = "~all"
-    for p in parts[1:]:
-        if p in ("-all", "~all", "?all", "+all"):
-            all_mechanism = p
-        else:
-            if p not in mechanisms:
-                mechanisms.append(p)
+    mechanisms: list[str] = []
+    all_mechanism = _DEFAULT_ALL
+    for mechanism in parts[1:]:
+        if mechanism in ("-all", "~all", "?all", "+all"):
+            all_mechanism = mechanism
+        elif mechanism in _WITHDRAWN_SPF_INCLUDES:
+            continue
+        elif mechanism not in mechanisms:
+            mechanisms.append(mechanism)
 
-    for inc in ("include:spf.cloudflare.com", "include:sicurre.com"):
-        if inc not in mechanisms:
-            mechanisms.append(inc)
+    if _CLOUDFLARE_ROUTING_INCLUDE not in mechanisms:
+        mechanisms.append(_CLOUDFLARE_ROUTING_INCLUDE)
 
     return f"v=spf1 {' '.join(mechanisms)} {all_mechanism}"
 

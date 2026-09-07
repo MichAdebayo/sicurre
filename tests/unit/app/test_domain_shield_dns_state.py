@@ -139,3 +139,61 @@ def test_domain_shield_never_writes_a_dkim_record() -> None:
     assert "fix_dkim" not in source, "the DKIM fix flag should be gone"
     # The read path may still name the selector; that is observation, not authorship.
     assert "_domainkey." in source, "detection must still recognise DKIM selectors"
+
+
+# --------------------------------------------------------------------------- ──
+# SPF is a record on someone else's domain, with a ten DNS lookup budget and a
+# policy that decides whether their mail is rejected. Sicurre may add what
+# Email Routing needs and withdraw what it wrongly added before; everything
+# else in there belongs to the customer.
+# --------------------------------------------------------------------------- ──
+
+CF = "include:_spf.mx.cloudflare.net"
+
+
+def test_a_missing_record_gets_the_routing_include_and_softfail() -> None:
+    """`-all` on a record we invented would reject senders we cannot see."""
+    assert _merge_spf("") == f"v=spf1 {CF} ~all"
+
+
+def test_the_dead_include_is_withdrawn() -> None:
+    """spf.cloudflare.com publishes no SPF record; RFC 7208 calls that permerror."""
+    merged = _merge_spf("v=spf1 include:spf.cloudflare.com ~all")
+    assert "spf.cloudflare.com" not in merged
+    assert CF in merged
+
+
+def test_the_self_authorisation_is_withdrawn() -> None:
+    """Sicurre never sends as the customer, so it does not hold a permit to."""
+    merged = _merge_spf("v=spf1 include:sicurre.com ~all")
+    assert "include:sicurre.com" not in merged
+
+
+def test_the_customers_own_mechanisms_survive() -> None:
+    """Dropping one of these silently stops their real mail."""
+    merged = _merge_spf(
+        "v=spf1 include:_spf.google.com include:servers.mcsv.net ip4:198.51.100.7 "
+        "include:spf.cloudflare.com -all"
+    )
+    for kept in ("include:_spf.google.com", "include:servers.mcsv.net", "ip4:198.51.100.7"):
+        assert kept in merged, f"{kept} was dropped from the customer's record"
+    assert "spf.cloudflare.com" not in merged
+
+
+def test_an_existing_policy_is_never_loosened_or_tightened() -> None:
+    """The all mechanism is the customer's decision, not ours."""
+    assert _merge_spf("v=spf1 ip4:198.51.100.7 -all").endswith("-all")
+    assert _merge_spf("v=spf1 ip4:198.51.100.7 ~all").endswith("~all")
+    assert _merge_spf("v=spf1 ip4:198.51.100.7 ?all").endswith("?all")
+
+
+def test_the_routing_include_is_not_duplicated() -> None:
+    """Repeated syncs must not grow the record or its lookup count."""
+    once = _merge_spf(f"v=spf1 {CF} ~all")
+    assert once.count(CF) == 1
+    assert _merge_spf(once) == once, "merging is not idempotent"
+
+
+def test_a_non_spf_value_is_never_extended() -> None:
+    """A verification token reaching this function must not become an SPF record."""
+    assert _merge_spf("google-site-verification=Kx9wQ2mPl0") == f"v=spf1 {CF} ~all"
