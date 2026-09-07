@@ -162,3 +162,47 @@ def test_the_key_columns_cannot_be_null(legacy_db: sa.Engine) -> None:
     columns = {c["name"]: c for c in sa.inspect(legacy_db).get_columns(_TABLE)}
     assert columns["workspace_id"]["nullable"] is False
     assert columns["domain"]["nullable"] is False
+
+
+# --------------------------------------------------------------------------- PostgreSQL branch
+#
+# CI has no PostgreSQL service, so this branch cannot be executed against a real
+# server here. These two tests pin which DDL each dialect receives - the choice
+# is the thing that broke, and it is worth a guard. They do NOT establish that
+# the statements work: that was verified by running this migration against the
+# production schema inside a rolled-back transaction, where the key moved to
+# (workspace_id, domain), the workspace index survived, a second workspace could
+# then hold vinse.app, and the downgrade kept the most recently updated row.
+
+
+class _Bind:
+    """Just enough of a connection for `_rekey` to read its dialect."""
+
+    def __init__(self, name: str) -> None:
+        self.dialect = type("Dialect", (), {"name": name})()
+
+
+def test_postgresql_alters_the_constraint_in_place(monkeypatch: pytest.MonkeyPatch) -> None:
+    """PostgreSQL supports ALTER, so no table is rebuilt under it."""
+    dropped: list[tuple[str, str]] = []
+    created: list[list[str]] = []
+    rebuilt: list[str] = []
+
+    monkeypatch.setattr(
+        migration.op, "drop_constraint",
+        lambda name, table, type_: dropped.append((name, type_)),
+    )
+    monkeypatch.setattr(
+        migration.op, "create_primary_key",
+        lambda name, table, cols: created.append(list(cols)),
+    )
+    monkeypatch.setattr(
+        migration.op, "batch_alter_table",
+        lambda *a, **k: rebuilt.append("rebuild"),
+    )
+
+    migration._rekey(_Bind("postgresql"), ["workspace_id", "domain"])
+
+    assert dropped == [("pk_app_domain_shield_status", "primary")]
+    assert created == [["workspace_id", "domain"]]
+    assert not rebuilt, "PostgreSQL must not take the copy-and-move path"
