@@ -243,3 +243,23 @@ def test_the_status_table_is_created_with_the_composite_key() -> None:
     block = source[start : source.index('"""', start)]
     assert "PRIMARY KEY (workspace_id, domain)" in block
     assert "domain TEXT PRIMARY KEY" not in block
+
+
+def test_domain_shield_fixes_do_not_require_email_routing() -> None:
+    """A Google Workspace customer can still repair SPF and DMARC.
+
+    The MX guard refuses to enable Email Routing on a domain whose mail is
+    served elsewhere, because that would take inbound mail over. Domain Shield
+    is a separate promise - a health check on records the customer already
+    owns - and must stay available to exactly those customers.
+    """
+    import inspect
+
+    from data_platform.api.routers import integrations
+
+    source = inspect.getsource(integrations._sync_domain_shield_dns)
+    assert "enable_email_routing" not in source, (
+        "the DNS fix path must not enable Email Routing; that would couple a "
+        "record repair to taking over the customer's mail"
+    )
+    assert "provision(" not in source

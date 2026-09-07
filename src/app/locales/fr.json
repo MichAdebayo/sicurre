@@ -525,6 +525,7 @@
     "cloudflare_zone_settings_permission_error": "Cloudflare Email Routing n'est pas encore activé. Ajoutez la permission Zone Settings:Edit, puis réessayez.",
     "cloudflare_worker_permission_error": "Cloudflare a refusé le déploiement du Worker. Vérifiez la permission Workers Scripts:Edit sur le compte.",
     "cloudflare_routing_permission_error": "Cloudflare a refusé la règle de routage. Vérifiez la permission Email Routing Rules:Edit sur la zone.",
+    "cloudflare_mail_provider_conflict": "Ce domaine reçoit déjà ses e-mails via un autre fournisseur. Le connecter déplacerait le courrier entrant vers Cloudflare Email Routing. Migrez d'abord le domaine vers Cloudflare Email Routing, puis connectez-le ici.",
     "cloudflare_address_permission_error": "Cloudflare a refusé l'adresse de destination. Vérifiez la permission Email Routing Addresses:Edit sur le compte.",
     "cloudflare_scope_error": "Cloudflare a refusé cette opération. Vérifiez que le token couvre le compte et la zone sélectionnés.",
     "cloudflare_unknown_error": "Erreur Cloudflare inconnue.",

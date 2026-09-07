@@ -525,6 +525,7 @@
     "cloudflare_zone_settings_permission_error": "Cloudflare Email Routing is not enabled yet. Add Zone Settings:Edit, then try again.",
     "cloudflare_worker_permission_error": "Cloudflare rejected the Worker deployment. Check Workers Scripts:Edit on the account.",
     "cloudflare_routing_permission_error": "Cloudflare rejected the routing rule. Check Email Routing Rules:Edit on the zone.",
+    "cloudflare_mail_provider_conflict": "This domain already receives mail through another provider. Connecting it would move inbound mail to Cloudflare Email Routing. Move the domain to Cloudflare Email Routing first, then connect it here.",
     "cloudflare_address_permission_error": "Cloudflare rejected the destination address. Check Email Routing Addresses:Edit on the account.",
     "cloudflare_scope_error": "Cloudflare rejected this operation. Check that the token covers the selected account and zone.",
     "cloudflare_unknown_error": "Unknown Cloudflare error.",

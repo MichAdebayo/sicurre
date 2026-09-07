@@ -70,6 +70,18 @@ def _sha256(value: str) -> str:
 # ---------------------------------------------------------------------------
 # CloudflareProvisioner
 # ---------------------------------------------------------------------------
+_CLOUDFLARE_MX_SUFFIX = "mx.cloudflare.net"
+
+
+def _is_cloudflare_mx(host: str) -> bool:
+    """True only for Cloudflare's own routing hosts.
+
+    Matched on the label boundary: `route1.mx.cloudflare.net` is Cloudflare's,
+    a host merely ending in those characters is not.
+    """
+    return host == _CLOUDFLARE_MX_SUFFIX or host.endswith(f".{_CLOUDFLARE_MX_SUFFIX}")
+
+
 class CloudflareProvisioner:
     """
     Thin async wrapper around the Cloudflare REST API.
@@ -168,15 +180,33 @@ class CloudflareProvisioner:
         return zone_id, account_id
 
     async def enable_email_routing(self, zone_id: str) -> None:
-        """Enable Email Routing for a zone (idempotent)."""
+        """Enable Email Routing for a zone (idempotent).
+
+        Refuses a zone whose mail is served by someone else. Cloudflare
+        documents that Email Routing requires its own MX records, cannot be
+        used with an external mail server, and locks the records it adds
+        against deletion from the DNS panel - so enabling it on a domain
+        running Google Workspace or Microsoft 365 takes over that domain's
+        inbound mail. Sicurre's own promise to the customer is "no migration,
+        no mailbox changes", and this is the one place that could break it.
+        """
         dns_records = await self.get_dns_records(zone_id)
-        if any(
-            record.get("type") == "MX"
-            and str(record.get("content", "")).lower().rstrip(".").endswith("mx.cloudflare.net")
-            for record in dns_records
-        ):
+        mx_hosts = [
+            host
+            for host in (
+                str(record.get("content", "")).strip().strip('"').lower().rstrip(".")
+                for record in dns_records
+                if record.get("type") == "MX"
+            )
+            if host
+        ]
+        if any(_is_cloudflare_mx(host) for host in mx_hosts):
             logger.info("Email Routing DNS is already configured on zone %s", zone_id)
             return
+        if mx_hosts:
+            raise MailProviderConflictError(sorted(set(mx_hosts)))
+        # No MX at all: the domain receives mail nowhere yet, so there is
+        # nothing to take over.
         try:
             await self._post(f"/zones/{zone_id}/email/routing/dns")
             logger.info("Email Routing enabled on zone %s", zone_id)
@@ -580,3 +610,20 @@ class CloudflareAPIError(Exception):
     def __init__(self, message: str, status_code: int = 0) -> None:
         super().__init__(message)
         self.status_code = status_code
+
+
+class MailProviderConflictError(CloudflareAPIError):
+    """The zone already receives mail somewhere other than Cloudflare.
+
+    A subclass so the existing handlers still catch it, distinguishable so a
+    caller can tell "we refused" apart from "Cloudflare failed".
+    """
+
+    def __init__(self, mx_hosts: list[str]) -> None:
+        self.mx_hosts = mx_hosts
+        super().__init__(
+            "This domain already receives mail through another provider "
+            f"({', '.join(mx_hosts)}). Turning on Cloudflare Email Routing would "
+            "replace those MX records and take over inbound mail. Move the domain "
+            "to Cloudflare Email Routing first, then connect it to Sicurre."
+        )
