@@ -494,8 +494,17 @@ class CloudflareProvisioner:
         rec_type: str,
         name: str,
         content: str,
+        match_prefix: str | None = None,
     ) -> None:
-        """Create or update a DNS record for the zone."""
+        """Create or update a DNS record for the zone.
+
+        `match_prefix` narrows which existing record counts as the one being
+        replaced. A zone apex carries many TXT records - SPF beside Google and
+        Microsoft verification tokens - and matching on name alone takes
+        whichever the API happens to return first, so writing SPF could
+        overwrite a verification record and destroy it. Callers that own one
+        record among several at a name must pass the prefix that identifies it.
+        """
         # Clean record value: remove any raw python byte literal indicators (e.g. b'...')
         content_clean = content
         if content_clean.startswith("b'") or content_clean.startswith('b"'):
@@ -508,11 +517,17 @@ class CloudflareProvisioner:
         # Cloudflare zone names are fully qualified in responses. Normalize both side-by-side comparison
         target_name_normalized = name.lower().rstrip(".")
         for rec in records:
-            if rec.get("type") == rec_type:
-                rec_name_normalized = str(rec.get("name", "")).lower().rstrip(".")
-                if rec_name_normalized == target_name_normalized:
-                    existing_id = rec["id"]
-                    break
+            if rec.get("type") != rec_type:
+                continue
+            rec_name_normalized = str(rec.get("name", "")).lower().rstrip(".")
+            if rec_name_normalized != target_name_normalized:
+                continue
+            if match_prefix is not None:
+                rec_content = str(rec.get("content", "")).strip().strip('"')
+                if not rec_content.lower().startswith(match_prefix.lower()):
+                    continue
+            existing_id = rec["id"]
+            break
 
         body = {"type": rec_type, "name": name, "content": content_clean, "ttl": 3600}
 

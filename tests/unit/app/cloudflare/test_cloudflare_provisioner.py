@@ -512,3 +512,106 @@ async def test_teardown_flow() -> None:
     await provisioner.teardown("zone-123", "account-456", "my-worker", "rule-123")
     assert del_rule.called
     assert del_worker.called
+
+
+# --------------------------------------------------------------------------- ──
+# A zone apex carries many TXT records. Writing SPF must replace the SPF one and
+# nothing else: matching on name alone took whichever the API returned first,
+# so a customer's Google or Microsoft verification token could be overwritten
+# with an SPF string and lost.
+# --------------------------------------------------------------------------- ──
+
+_APEX_TXT = [
+    {"id": "rec-google", "type": "TXT", "name": "example.test",
+     "content": "google-site-verification=Kx9wQ2mPl0"},
+    {"id": "rec-ms", "type": "TXT", "name": "example.test",
+     "content": "MS=ms84720193"},
+    {"id": "rec-spf", "type": "TXT", "name": "example.test",
+     "content": "v=spf1 include:_spf.mx.cloudflare.net -all"},
+]
+
+
+def _zone_records(records: list[dict]) -> None:
+    respx.get(
+        "https://api.cloudflare.com/client/v4/zones/zone-1/dns_records",
+        params={"per_page": 100},
+    ).mock(return_value=httpx.Response(200, json={"success": True, "result": records}))
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_spf_write_replaces_the_spf_record_not_the_first_apex_txt() -> None:
+    """The verification tokens must be left untouched."""
+    _zone_records(_APEX_TXT)
+    put = respx.put(
+        "https://api.cloudflare.com/client/v4/zones/zone-1/dns_records/rec-spf"
+    ).mock(return_value=httpx.Response(200, json={"success": True, "result": {}}))
+
+    await CloudflareProvisioner(api_token="t").deploy_dns_record(
+        zone_id="zone-1",
+        rec_type="TXT",
+        name="example.test",
+        content="v=spf1 include:_spf.mx.cloudflare.net include:sicurre.com -all",
+        match_prefix="v=spf1",
+    )
+
+    assert put.called, "the SPF record must be the one updated"
+    assert put.calls.last.request.url.path.endswith("/rec-spf")
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_spf_write_creates_a_record_when_the_apex_has_no_spf() -> None:
+    """With only verification tokens present, none of them may be reused."""
+    _zone_records(_APEX_TXT[:2])  # google + microsoft, no SPF
+    post = respx.post(
+        "https://api.cloudflare.com/client/v4/zones/zone-1/dns_records"
+    ).mock(return_value=httpx.Response(200, json={"success": True, "result": {}}))
+
+    await CloudflareProvisioner(api_token="t").deploy_dns_record(
+        zone_id="zone-1",
+        rec_type="TXT",
+        name="example.test",
+        content="v=spf1 include:_spf.mx.cloudflare.net -all",
+        match_prefix="v=spf1",
+    )
+
+    assert post.called, "a missing SPF record is created, never grafted onto a token"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_without_a_prefix_the_first_named_record_is_still_taken() -> None:
+    """The narrowing is opt-in, so records with one value per name keep working."""
+    _zone_records(_APEX_TXT)
+    put = respx.put(
+        "https://api.cloudflare.com/client/v4/zones/zone-1/dns_records/rec-google"
+    ).mock(return_value=httpx.Response(200, json={"success": True, "result": {}}))
+
+    await CloudflareProvisioner(api_token="t").deploy_dns_record(
+        zone_id="zone-1", rec_type="TXT", name="example.test", content="anything",
+    )
+
+    assert put.called
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_quoted_record_content_still_matches_the_prefix() -> None:
+    """Cloudflare returns TXT values quoted; the prefix test must see through it."""
+    _zone_records([
+        {"id": "rec-google", "type": "TXT", "name": "example.test",
+         "content": "google-site-verification=Kx9wQ2mPl0"},
+        {"id": "rec-spf", "type": "TXT", "name": "example.test",
+         "content": '"v=spf1 -all"'},
+    ])
+    put = respx.put(
+        "https://api.cloudflare.com/client/v4/zones/zone-1/dns_records/rec-spf"
+    ).mock(return_value=httpx.Response(200, json={"success": True, "result": {}}))
+
+    await CloudflareProvisioner(api_token="t").deploy_dns_record(
+        zone_id="zone-1", rec_type="TXT", name="example.test",
+        content="v=spf1 include:_spf.mx.cloudflare.net -all", match_prefix="v=spf1",
+    )
+
+    assert put.called

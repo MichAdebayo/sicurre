@@ -106,6 +106,38 @@ def _merge_spf(current_spf: str) -> str:
     return f"v=spf1 {' '.join(mechanisms)} {all_mechanism}"
 
 
+def _read_dns_state(
+    dns_records: list[dict[str, Any]], zone_name: str
+) -> tuple[str, str, str]:
+    """Pick the SPF, DKIM and DMARC records out of a zone's TXT records.
+
+    Returns the raw content of each, or "" when absent.
+
+    An apex TXT is only SPF if it says so. Reading any apex record as SPF took
+    whichever the provider listed last - often a Google or Microsoft
+    verification token - and `_merge_spf` then saw no `v=spf1` prefix and
+    returned a fresh default, discarding the customer's real record.
+
+    This lives in one place because the setup route and the DNS sync both need
+    it, and two copies of a rule about someone else's DNS is how they drift.
+    """
+    spf = dkim = dmarc = ""
+    zone = zone_name.lower().rstrip(".")
+    for rec in dns_records:
+        if rec.get("type") != "TXT":
+            continue
+        name = _clean_str(rec.get("name", "")).lower().rstrip(".")
+        content = _clean_str(rec.get("content", "")).strip('"')
+        if name == zone and content.lower().startswith("v=spf1"):
+            spf = content
+        elif "._domainkey." in name or name.startswith("_domainkey."):
+            if "v=DKIM1" in content or "k=rsa" in content:
+                dkim = content
+        elif name == f"_dmarc.{zone}":
+            dmarc = content
+    return spf, dkim, dmarc
+
+
 def _merge_dmarc(current_dmarc: str) -> str:
     cleaned = _clean_str(current_dmarc)
     if not cleaned:
@@ -140,22 +172,9 @@ async def _sync_domain_shield_dns(
     """Apply selected Domain Shield DNS fixes and update the local status cache."""
     zone_id, _ = await provisioner.get_zone(zone_name)
     dns_records = await provisioner.get_dns_records(zone_id)
-    existing_spf_content = ""
-    existing_dkim_content = ""
-    existing_dmarc_content = ""
-
-    for rec in dns_records:
-        if rec.get("type") != "TXT":
-            continue
-        rec_name = _clean_str(rec.get("name", "")).lower().rstrip(".")
-        rec_content = _clean_str(rec.get("content", "")).strip('"')
-        if rec_name == zone_name.lower():
-            existing_spf_content = rec_content
-        elif "._domainkey." in rec_name or rec_name.startswith("_domainkey."):
-            if "v=DKIM1" in rec_content or "k=rsa" in rec_content:
-                existing_dkim_content = rec_content
-        elif rec_name == f"_dmarc.{zone_name}".lower():
-            existing_dmarc_content = rec_content
+    existing_spf_content, existing_dkim_content, existing_dmarc_content = _read_dns_state(
+        dns_records, zone_name
+    )
 
     spf_val = 1 if "v=spf1" in existing_spf_content else 0
     spf_rec = existing_spf_content or None
@@ -166,6 +185,7 @@ async def _sync_domain_shield_dns(
             rec_type="TXT",
             name=zone_name,
             content=spf_rec,
+            match_prefix="v=spf1",
         )
         spf_val = 1
 
@@ -190,6 +210,7 @@ async def _sync_domain_shield_dns(
             rec_type="TXT",
             name=f"_dmarc.{zone_name}",
             content=dmarc_rec,
+            match_prefix="v=DMARC1",
         )
         dmarc_val = 1
 
@@ -1128,21 +1149,11 @@ async def setup_cloudflare(
             try:
                 # DNS health is not gateway provisioning: keep the integration, surface DNS apart.
                 dns_records = await provisioner.get_dns_records(result.zone_id)
-                existing_spf_content = ""
-                existing_dkim_content = ""
-                existing_dmarc_content = ""
-
-                for rec in dns_records:
-                    if rec.get("type") == "TXT":
-                        rec_name = _clean_str(rec.get("name", "")).lower().rstrip(".")
-                        rec_content = _clean_str(rec.get("content", ""))
-                        if rec_name == payload.zone_name.lower():
-                            existing_spf_content = rec_content
-                        elif "._domainkey." in rec_name or rec_name.startswith("_domainkey."):
-                            if "v=DKIM1" in rec_content or "k=rsa" in rec_content:
-                                existing_dkim_content = rec_content
-                        elif rec_name == f"_dmarc.{payload.zone_name}".lower():
-                            existing_dmarc_content = rec_content
+                (
+                    existing_spf_content,
+                    existing_dkim_content,
+                    existing_dmarc_content,
+                ) = _read_dns_state(dns_records, payload.zone_name)
 
                 spf_val = 1 if "v=spf1" in existing_spf_content else 0
                 spf_rec = existing_spf_content or None
@@ -1153,6 +1164,7 @@ async def setup_cloudflare(
                         rec_type="TXT",
                         name=payload.zone_name,
                         content=spf_rec,
+                        match_prefix="v=spf1",
                     )
                     spf_val = 1
 
@@ -1177,6 +1189,7 @@ async def setup_cloudflare(
                         rec_type="TXT",
                         name=f"_dmarc.{payload.zone_name}",
                         content=dmarc_rec,
+                        match_prefix="v=DMARC1",
                     )
                     dmarc_val = 1
                 dmarc_policy = "none"
