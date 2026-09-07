@@ -271,7 +271,8 @@ app_domain_shield_status = _workspace_table(
     _text_column("score_grade", nullable=False),
     _text_column("updated_at", nullable=False),
     constraints=(
-        sa.PrimaryKeyConstraint("domain"),
+        # Two workspaces may protect the same domain; one row each.
+        sa.PrimaryKeyConstraint("workspace_id", "domain"),
         sa.Index("ix_app_domain_shield_status_workspace_id", "workspace_id"),
     ),
 )

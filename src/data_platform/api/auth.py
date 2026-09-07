@@ -263,7 +263,7 @@ def _ensure_legacy_sqlite_tables() -> None:
         )
         conn.execute("""
             CREATE TABLE IF NOT EXISTS app_domain_shield_status (
-                domain TEXT PRIMARY KEY,
+                domain TEXT NOT NULL,
                 workspace_id TEXT NOT NULL,
                 spf_valid INTEGER NOT NULL,
                 spf_record TEXT,
@@ -276,7 +276,9 @@ def _ensure_legacy_sqlite_tables() -> None:
                 ssl_days_remaining INTEGER NOT NULL,
                 reputation_score INTEGER NOT NULL,
                 score_grade TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                -- Two workspaces may protect the same domain; one row each.
+                PRIMARY KEY (workspace_id, domain)
             )
         """)
         conn.execute("""

@@ -227,7 +227,6 @@ export interface CloudflareSetupPayload {
   zone_name: string;
   destination_email: string;
   fix_spf?: boolean;
-  fix_dkim?: boolean;
   fix_dmarc?: boolean;
 }
 

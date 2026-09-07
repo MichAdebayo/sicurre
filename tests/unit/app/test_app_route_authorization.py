@@ -222,7 +222,7 @@ async def test_domain_shield_marks_uninspectable_certificate_unavailable(monkeyp
         return []
 
     async def to_thread(function: Any, *_args: Any) -> Any:
-        if function is app_routes._get_ssl_expiry_days:
+        if function is app_routes.get_ssl_expiry_days:
             return -1
         raise RuntimeError("DNS unavailable")
 

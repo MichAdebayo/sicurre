@@ -33,6 +33,11 @@ const MotionDiv = motion.div as any;
 function formatCloudflareError(t: TFunction, message?: string | null): string {
   if (!message) return t("domain_shield.cloudflare_unknown_error");
   const lower = message.toLowerCase();
+  // Sicurre refusing, not Cloudflare failing: the zone's mail is served
+  // elsewhere and enabling Email Routing would take inbound mail over.
+  if (lower.includes("already receives mail through another provider")) {
+    return t("domain_shield.cloudflare_mail_provider_conflict");
+  }
   if (lower.includes("zone settings:edit")) {
     return t("domain_shield.cloudflare_zone_settings_permission_error");
   }
