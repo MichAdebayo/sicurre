@@ -376,3 +376,50 @@ async def test_an_uninspectable_domain_is_written_as_uninspected(
     written = dict(zip(_column_names(captured["sql"]), captured["params"], strict=True))
     assert written["ssl_valid"] == 0
     assert written["ssl_days_remaining"] == 0
+
+
+@pytest.mark.asyncio
+async def test_a_cached_certificate_that_has_run_out_says_so(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Aged-out and never-inspected are different facts, and read differently.
+
+    The cache ages `days_remaining` down from the day it was measured. Reaching
+    zero means the certificate we did see has since expired - not that we could
+    not see one - so it must not borrow the uninspectable wording.
+    """
+    from data_platform.api.routers import app_routes
+
+    measured_at = datetime.now(timezone.utc) - timedelta(days=120)
+    row = {
+        "spf_valid": 1, "spf_record": "v=spf1 -all",
+        "dkim_valid": 1, "dkim_record": "v=DKIM1; p=abc",
+        "dmarc_valid": 1, "dmarc_record": "v=DMARC1; p=reject", "dmarc_policy": "reject",
+        "ssl_valid": 1, "ssl_days_remaining": 30,   # 30 days left, measured 120 days ago
+        "reputation_score": 100, "score_grade": "A",
+        "updated_at": measured_at.isoformat(),
+    }
+
+    async def allow(_domain: str, _workspace_id: str) -> None:
+        return None
+
+    async def blocklists(_domain: str, **_kwargs: object) -> tuple[list[str], list[str]]:
+        return [], []
+
+    async def query(_sql: str, _params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        return [row]
+
+    monkeypatch.setattr(app_routes, "_require_workspace_domain", allow)
+    monkeypatch.setattr(app_routes, "_check_domain_blacklists", blocklists)
+    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+
+    result = await app_routes.check_domain_shield_status(
+        "lapsed.test", refresh=False, current_user=_shield_user()
+    )
+
+    assert result["ssl"] == {
+        "valid": False,
+        "days_remaining": 0,
+        "auto_renew": False,
+        "error": "The measured certificate has expired",
+    }
