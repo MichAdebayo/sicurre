@@ -51,6 +51,7 @@ from core.mime_headers import decode_mime_header, extract_mime_body
 from core.rate_limit import limiter
 from core.scan_metrics import observe_scan, observe_scan_failure, observe_stage
 from core.secret_cipher import decrypt_secret, encrypt_secret
+from core.tls_certificate import get_ssl_expiry_days
 from data_platform.api.auth import AuthUser, ensure_runtime_tables, get_current_user
 from data_platform.api.schemas.app_responses import (
     CloudflareIntegrationResponse,
@@ -173,6 +174,19 @@ def _read_dns_state(
     return spf, dkim, dmarc
 
 
+async def _measure_ssl(domain: str) -> tuple[int, int]:
+    """Inspect the domain's public certificate for the shield status cache.
+
+    Returns ``(ssl_valid, days_remaining)``. A domain whose certificate cannot
+    be read is recorded as ``(0, 0)`` — the same thing the refresh path records
+    — rather than being credited with a lifetime nobody measured. The cached
+    read ages ``days_remaining`` down day by day, so a fabricated year here
+    would have been reported as fact for a year.
+    """
+    days_remaining = await asyncio.to_thread(get_ssl_expiry_days, domain)
+    return (1, days_remaining) if days_remaining >= 0 else (0, 0)
+
+
 def _merge_dmarc(current_dmarc: str) -> str:
     cleaned = _clean_str(current_dmarc)
     if not cleaned:
@@ -271,6 +285,8 @@ async def _sync_domain_shield_dns(
     else:
         grade = "F"
 
+    ssl_val, ssl_days = await _measure_ssl(zone_name)
+
     ts = datetime.now(timezone.utc).isoformat()
     await _async_query(
         """
@@ -278,7 +294,7 @@ async def _sync_domain_shield_dns(
             domain, workspace_id, spf_valid, spf_record, dkim_valid, dkim_record,
             dmarc_valid, dmarc_record, dmarc_policy, ssl_valid, ssl_days_remaining,
             reputation_score, score_grade, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 365, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(workspace_id, domain) DO UPDATE SET
             workspace_id=excluded.workspace_id, spf_valid=excluded.spf_valid,
             spf_record=excluded.spf_record, dkim_valid=excluded.dkim_valid,
@@ -298,6 +314,8 @@ async def _sync_domain_shield_dns(
             dmarc_val,
             dmarc_rec,
             dmarc_policy,
+            ssl_val,
+            ssl_days,
             rep_score,
             grade,
             ts,
@@ -1238,13 +1256,15 @@ async def setup_cloudflare(
                 else:
                     grade = "F"
 
+                ssl_val, ssl_days = await _measure_ssl(payload.zone_name)
+
                 await _async_query(
                     """
                     INSERT INTO app_domain_shield_status (
                         domain, workspace_id, spf_valid, spf_record, dkim_valid, dkim_record,
                         dmarc_valid, dmarc_record, dmarc_policy, ssl_valid, ssl_days_remaining,
                         reputation_score, score_grade, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 365, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(workspace_id, domain) DO UPDATE SET
                         workspace_id=excluded.workspace_id, spf_valid=excluded.spf_valid,
                         spf_record=excluded.spf_record, dkim_valid=excluded.dkim_valid,
@@ -1264,6 +1284,8 @@ async def setup_cloudflare(
                         dmarc_val,
                         dmarc_rec,
                         dmarc_policy,
+                        ssl_val,
+                        ssl_days,
                         rep_score,
                         grade,
                         ts,

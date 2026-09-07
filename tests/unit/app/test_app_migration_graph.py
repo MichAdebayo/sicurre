@@ -192,7 +192,9 @@ def test_shield_status_key_migration_executes_both_directions(monkeypatch) -> No
 
     # Re-running against the widened key must be a no-op, not a second attempt.
     pk_columns = ["workspace_id", "domain"]
-    created.clear(); dropped.clear(); statements.clear()
+    created.clear()
+    dropped.clear()
+    statements.clear()
     migration.upgrade()
     assert created == [] and dropped == [], "upgrade is not idempotent"
 
