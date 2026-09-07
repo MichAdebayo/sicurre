@@ -8,6 +8,10 @@ domain shared one row and overwrote each other's status. That is not
 hypothetical here: vinse.app carried two active integrations in two workspaces
 at once. Reads were already scoped by workspace, so the row a customer saw
 could be a status written for someone else's copy of the domain.
+
+The model now declares the composite key, so a database created from scratch
+arrives correct and this migration finds nothing to do. It runs for real only
+against a database that predates the change.
 """
 
 from __future__ import annotations
@@ -21,13 +25,43 @@ branch_labels = None
 depends_on = None
 
 _TABLE = "app_domain_shield_status"
-_OLD_PK = "pk_app_domain_shield_status"
+_PK = "pk_app_domain_shield_status"
 
 
 def _primary_key_columns(bind: sa.engine.Connection) -> list[str]:
-    inspector = sa.inspect(bind)
-    constraint = inspector.get_pk_constraint(_TABLE)
+    constraint = sa.inspect(bind).get_pk_constraint(_TABLE)
     return list(constraint.get("constrained_columns") or [])
+
+
+def _rekey(bind: sa.engine.Connection, pk_columns: list[str]) -> None:
+    """Move the primary key to `pk_columns`, whatever the dialect allows.
+
+    SQLite cannot ALTER a constraint at all, so the table is rebuilt by
+    copy-and-move. The rebuild is driven by the live table's own reflected
+    definition rather than a copy of the schema written out here, which would
+    silently drift; its indexes are carried across explicitly, because a
+    rebuilt table does not inherit the indexes of the one it replaces.
+    """
+    if bind.dialect.name == "sqlite":
+        live = sa.Table(_TABLE, sa.MetaData(), autoload_with=bind)
+        target = sa.Table(
+            _TABLE,
+            sa.MetaData(),
+            *[sa.Column(c.name, c.type, nullable=c.nullable) for c in live.columns],
+            sa.PrimaryKeyConstraint(*pk_columns, name=_PK),
+        )
+        for index in live.indexes:
+            sa.Index(
+                index.name,
+                *[target.c[column.name] for column in index.columns],
+                unique=index.unique,
+            )
+        with op.batch_alter_table(_TABLE, copy_from=target, recreate="always"):
+            pass
+        return
+
+    op.drop_constraint(_PK, _TABLE, type_="primary")
+    op.create_primary_key(_PK, _TABLE, pk_columns)
 
 
 def upgrade() -> None:
@@ -36,18 +70,19 @@ def upgrade() -> None:
     if sorted(_primary_key_columns(bind)) == ["domain", "workspace_id"]:
         return
 
-    # A row whose workspace is unknown cannot belong to anyone; keying it would
-    # only preserve a collision under a new name.
-    op.execute(sa.text(f"DELETE FROM {_TABLE} WHERE workspace_id IS NULL"))
-    op.drop_constraint(_OLD_PK, _TABLE, type_="primary")
-    op.create_primary_key(_OLD_PK, _TABLE, ["workspace_id", "domain"])
+    # No guard is needed for an unowned row: workspace_id is NOT NULL in every
+    # deployment, and joining the primary key makes that structural rather than
+    # incidental. A key column cannot be null.
+    _rekey(bind, ["workspace_id", "domain"])
 
 
 def downgrade() -> None:
     """Return to a domain-only key, keeping one row per domain.
 
     Narrowing the key cannot preserve two workspaces' rows for one domain, so
-    the most recently updated row wins and the rest are dropped.
+    the most recently updated row wins and the rest are dropped. The delete is
+    written as a correlated EXISTS rather than `DELETE ... USING`, which is
+    PostgreSQL-only syntax.
     """
     bind = op.get_bind()
     if _primary_key_columns(bind) == ["domain"]:
@@ -56,13 +91,17 @@ def downgrade() -> None:
     op.execute(
         sa.text(
             f"""
-            DELETE FROM {_TABLE} a
-            USING {_TABLE} b
-            WHERE a.domain = b.domain
-              AND a.workspace_id <> b.workspace_id
-              AND (a.updated_at, a.workspace_id) < (b.updated_at, b.workspace_id)
+            DELETE FROM {_TABLE}
+            WHERE EXISTS (
+                SELECT 1 FROM {_TABLE} AS newer
+                WHERE newer.domain = {_TABLE}.domain
+                  AND (
+                        newer.updated_at > {_TABLE}.updated_at
+                     OR (newer.updated_at = {_TABLE}.updated_at
+                         AND newer.workspace_id > {_TABLE}.workspace_id)
+                  )
+            )
             """
         )
     )
-    op.drop_constraint(_OLD_PK, _TABLE, type_="primary")
-    op.create_primary_key(_OLD_PK, _TABLE, ["domain"])
+    _rekey(bind, ["domain"])
