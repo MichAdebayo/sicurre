@@ -197,3 +197,49 @@ def test_the_routing_include_is_not_duplicated() -> None:
 def test_a_non_spf_value_is_never_extended() -> None:
     """A verification token reaching this function must not become an SPF record."""
     assert _merge_spf("google-site-verification=Kx9wQ2mPl0") == f"v=spf1 {CF} ~all"
+
+
+# --------------------------------------------------------------------------- ──
+# One customer's action must not reach another customer's rows. The status table
+# was keyed on domain alone, and the disconnect path deleted by domain across
+# every workspace holding it.
+# --------------------------------------------------------------------------- ──
+
+
+def test_shield_status_is_written_per_workspace() -> None:
+    """Upserts must conflict on the whole key, or one workspace overwrites another."""
+    import inspect
+
+    from data_platform.api.routers import app_routes, integrations
+
+    for module in (app_routes, integrations):
+        source = inspect.getsource(module)
+        assert "ON CONFLICT(domain) DO UPDATE" not in source, (
+            f"{module.__name__} still upserts on domain alone"
+        )
+        if "app_domain_shield_status" in source:
+            assert "ON CONFLICT(workspace_id, domain)" in source
+
+
+def test_disconnecting_a_domain_only_clears_this_workspace() -> None:
+    """`OR domain = ?` wiped the shield status of every workspace holding it."""
+    import inspect
+
+    from data_platform.api.routers import integrations
+
+    source = inspect.getsource(integrations)
+    assert "app_domain_shield_status WHERE workspace_id = ? OR domain" not in source
+
+
+def test_the_status_table_is_created_with_the_composite_key() -> None:
+    """A fresh install must not start with the key the migration exists to fix."""
+    import inspect
+
+    from data_platform.api import auth
+
+    source = inspect.getsource(auth)
+    start = source.index("CREATE TABLE IF NOT EXISTS app_domain_shield_status")
+    # To the end of this CREATE TABLE, not to the first bracket inside it.
+    block = source[start : source.index('"""', start)]
+    assert "PRIMARY KEY (workspace_id, domain)" in block
+    assert "domain TEXT PRIMARY KEY" not in block

@@ -148,3 +148,56 @@ def test_model_identity_migration_executes_both_directions(monkeypatch) -> None:
     dropped.clear()
     migration.downgrade()
     assert dropped == [], "downgrade on a clean table must be a no-op"
+
+
+def test_shield_status_key_migration_executes_both_directions(monkeypatch) -> None:
+    """Widening and narrowing the Domain Shield key must both be runnable.
+
+    The table was keyed on `domain` alone, so two workspaces protecting the same
+    domain shared one row. Narrowing back cannot keep both, so the downgrade
+    collapses to the most recently updated row rather than failing.
+    """
+    script = ScriptDirectory.from_config(Config("alembic.app.ini"))
+    migration = script.get_revision("20260907_app_0010").module
+
+    pk_columns: list[str] = ["domain"]
+
+    class Inspector:
+        def get_pk_constraint(self, table: str):
+            assert table == "app_domain_shield_status"
+            return {"constrained_columns": list(pk_columns)}
+
+    monkeypatch.setattr(migration.op, "get_bind", lambda: object())
+    monkeypatch.setattr(migration.sa, "inspect", lambda _bind: Inspector())
+
+    statements: list[str] = []
+    created: list[list[str]] = []
+    dropped: list[str] = []
+    monkeypatch.setattr(migration.op, "execute", lambda stmt: statements.append(str(stmt)))
+    monkeypatch.setattr(
+        migration.op, "drop_constraint",
+        lambda name, table, type_: dropped.append(name),
+    )
+    monkeypatch.setattr(
+        migration.op, "create_primary_key",
+        lambda name, table, cols: created.append(list(cols)),
+    )
+
+    migration.upgrade()
+    assert created == [["workspace_id", "domain"]]
+    assert dropped == ["pk_app_domain_shield_status"]
+    assert any("workspace_id IS NULL" in s for s in statements), (
+        "an ownerless row cannot be keyed and must be removed first"
+    )
+
+    # Re-running against the widened key must be a no-op, not a second attempt.
+    pk_columns = ["workspace_id", "domain"]
+    created.clear(); dropped.clear(); statements.clear()
+    migration.upgrade()
+    assert created == [] and dropped == [], "upgrade is not idempotent"
+
+    migration.downgrade()
+    assert created == [["domain"]]
+    assert any("updated_at" in s for s in statements), (
+        "the downgrade must keep the most recently updated row per domain"
+    )

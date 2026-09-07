@@ -2596,7 +2596,7 @@ async def check_domain_shield_status(
             dmarc_valid, dmarc_record, dmarc_policy, ssl_valid, ssl_days_remaining,
             reputation_score, score_grade, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(domain) DO UPDATE SET
+        ON CONFLICT(workspace_id, domain) DO UPDATE SET
             workspace_id=excluded.workspace_id, spf_valid=excluded.spf_valid,
             spf_record=excluded.spf_record, dkim_valid=excluded.dkim_valid,
             dkim_record=excluded.dkim_record, dmarc_valid=excluded.dmarc_valid,

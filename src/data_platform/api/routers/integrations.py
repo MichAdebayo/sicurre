@@ -279,7 +279,7 @@ async def _sync_domain_shield_dns(
             dmarc_valid, dmarc_record, dmarc_policy, ssl_valid, ssl_days_remaining,
             reputation_score, score_grade, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 365, ?, ?, ?)
-        ON CONFLICT(domain) DO UPDATE SET
+        ON CONFLICT(workspace_id, domain) DO UPDATE SET
             workspace_id=excluded.workspace_id, spf_valid=excluded.spf_valid,
             spf_record=excluded.spf_record, dkim_valid=excluded.dkim_valid,
             dkim_record=excluded.dkim_record, dmarc_valid=excluded.dmarc_valid,
@@ -1245,7 +1245,7 @@ async def setup_cloudflare(
                         dmarc_valid, dmarc_record, dmarc_policy, ssl_valid, ssl_days_remaining,
                         reputation_score, score_grade, updated_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 365, ?, ?, ?)
-                    ON CONFLICT(domain) DO UPDATE SET
+                    ON CONFLICT(workspace_id, domain) DO UPDATE SET
                         workspace_id=excluded.workspace_id, spf_valid=excluded.spf_valid,
                         spf_record=excluded.spf_record, dkim_valid=excluded.dkim_valid,
                         dkim_record=excluded.dkim_record, dmarc_valid=excluded.dmarc_valid,
@@ -1440,8 +1440,11 @@ async def teardown_cloudflare(
             (current_user.workspace_id,),
         )
         await _async_query(
-            "DELETE FROM app_domain_shield_status WHERE workspace_id = ? OR domain = ?",
-            (current_user.workspace_id, row["zone_name"]),
+            # Scoped to this workspace. `OR domain = ?` deleted the status for
+            # that domain in every workspace holding it, so one customer
+            # disconnecting wiped another customer's shield.
+            "DELETE FROM app_domain_shield_status WHERE workspace_id = ?",
+            (current_user.workspace_id,),
         )
 
     return {"status": "removed", "zone_name": row["zone_name"]}
