@@ -11,6 +11,8 @@ import respx
 from data_platform.services.cloudflare_provisioner import (
     CloudflareAPIError,
     CloudflareProvisioner,
+    MailProviderConflictError,
+    _is_cloudflare_mx,
 )
 
 
@@ -512,3 +514,227 @@ async def test_teardown_flow() -> None:
     await provisioner.teardown("zone-123", "account-456", "my-worker", "rule-123")
     assert del_rule.called
     assert del_worker.called
+
+
+# --------------------------------------------------------------------------- ──
+# A zone apex carries many TXT records. Writing SPF must replace the SPF one and
+# nothing else: matching on name alone took whichever the API returned first,
+# so a customer's Google or Microsoft verification token could be overwritten
+# with an SPF string and lost.
+# --------------------------------------------------------------------------- ──
+
+_APEX_TXT = [
+    {"id": "rec-google", "type": "TXT", "name": "example.test",
+     "content": "google-site-verification=Kx9wQ2mPl0"},
+    {"id": "rec-ms", "type": "TXT", "name": "example.test",
+     "content": "MS=ms84720193"},
+    {"id": "rec-spf", "type": "TXT", "name": "example.test",
+     "content": "v=spf1 include:_spf.mx.cloudflare.net -all"},
+]
+
+
+def _zone_records(records: list[dict]) -> None:
+    respx.get(
+        "https://api.cloudflare.com/client/v4/zones/zone-1/dns_records",
+        params={"per_page": 100},
+    ).mock(return_value=httpx.Response(200, json={"success": True, "result": records}))
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_spf_write_replaces_the_spf_record_not_the_first_apex_txt() -> None:
+    """The verification tokens must be left untouched."""
+    _zone_records(_APEX_TXT)
+    put = respx.put(
+        "https://api.cloudflare.com/client/v4/zones/zone-1/dns_records/rec-spf"
+    ).mock(return_value=httpx.Response(200, json={"success": True, "result": {}}))
+
+    await CloudflareProvisioner(api_token="t").deploy_dns_record(
+        zone_id="zone-1",
+        rec_type="TXT",
+        name="example.test",
+        content="v=spf1 include:_spf.mx.cloudflare.net include:sicurre.com -all",
+        match_prefix="v=spf1",
+    )
+
+    assert put.called, "the SPF record must be the one updated"
+    assert put.calls.last.request.url.path.endswith("/rec-spf")
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_spf_write_creates_a_record_when_the_apex_has_no_spf() -> None:
+    """With only verification tokens present, none of them may be reused."""
+    _zone_records(_APEX_TXT[:2])  # google + microsoft, no SPF
+    post = respx.post(
+        "https://api.cloudflare.com/client/v4/zones/zone-1/dns_records"
+    ).mock(return_value=httpx.Response(200, json={"success": True, "result": {}}))
+
+    await CloudflareProvisioner(api_token="t").deploy_dns_record(
+        zone_id="zone-1",
+        rec_type="TXT",
+        name="example.test",
+        content="v=spf1 include:_spf.mx.cloudflare.net -all",
+        match_prefix="v=spf1",
+    )
+
+    assert post.called, "a missing SPF record is created, never grafted onto a token"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_without_a_prefix_the_first_named_record_is_still_taken() -> None:
+    """The narrowing is opt-in, so records with one value per name keep working."""
+    _zone_records(_APEX_TXT)
+    put = respx.put(
+        "https://api.cloudflare.com/client/v4/zones/zone-1/dns_records/rec-google"
+    ).mock(return_value=httpx.Response(200, json={"success": True, "result": {}}))
+
+    await CloudflareProvisioner(api_token="t").deploy_dns_record(
+        zone_id="zone-1", rec_type="TXT", name="example.test", content="anything",
+    )
+
+    assert put.called
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_quoted_record_content_still_matches_the_prefix() -> None:
+    """Cloudflare returns TXT values quoted; the prefix test must see through it."""
+    _zone_records([
+        {"id": "rec-google", "type": "TXT", "name": "example.test",
+         "content": "google-site-verification=Kx9wQ2mPl0"},
+        {"id": "rec-spf", "type": "TXT", "name": "example.test",
+         "content": '"v=spf1 -all"'},
+    ])
+    put = respx.put(
+        "https://api.cloudflare.com/client/v4/zones/zone-1/dns_records/rec-spf"
+    ).mock(return_value=httpx.Response(200, json={"success": True, "result": {}}))
+
+    await CloudflareProvisioner(api_token="t").deploy_dns_record(
+        zone_id="zone-1", rec_type="TXT", name="example.test",
+        content="v=spf1 include:_spf.mx.cloudflare.net -all", match_prefix="v=spf1",
+    )
+
+    assert put.called
+
+
+# --------------------------------------------------------------------------- MX guard
+#
+# Cloudflare documents that Email Routing requires its own MX records and
+# "cannot be used with external mail servers", and that the records it adds are
+# locked against deletion from the DNS panel. Enabling it on a domain running
+# Google Workspace therefore takes that domain's inbound mail over - the one
+# thing onboarding promises it will not do.
+
+
+def _dns_records(*mx_hosts: str) -> httpx.Response:
+    """A zone answer carrying the given MX hosts."""
+    return httpx.Response(
+        200,
+        json={
+            "success": True,
+            "result": [
+                {"type": "MX", "content": host, "name": "example.com"} for host in mx_hosts
+            ],
+        },
+    )
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_a_google_workspace_domain_is_refused() -> None:
+    """The refusal happens before any privileged call, not after."""
+    provisioner = CloudflareProvisioner(api_token="token")
+    respx.get("https://api.cloudflare.com/client/v4/zones/zone-123/dns_records").mock(
+        return_value=_dns_records("aspmx.l.google.com", "alt1.aspmx.l.google.com")
+    )
+    enable = respx.post(
+        "https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/dns"
+    ).mock(return_value=httpx.Response(200, json={"success": True}))
+
+    with pytest.raises(MailProviderConflictError) as exc_info:
+        await provisioner.enable_email_routing("zone-123")
+
+    assert not enable.called, "the zone was modified despite the conflict"
+    assert exc_info.value.mx_hosts == ["alt1.aspmx.l.google.com", "aspmx.l.google.com"]
+    assert "aspmx.l.google.com" in str(exc_info.value), "the message must name the provider"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_a_microsoft_365_domain_is_refused() -> None:
+    """Not special-cased to Google; any foreign MX counts."""
+    provisioner = CloudflareProvisioner(api_token="token")
+    respx.get("https://api.cloudflare.com/client/v4/zones/zone-123/dns_records").mock(
+        return_value=_dns_records("example-com.mail.protection.outlook.com")
+    )
+    enable = respx.post(
+        "https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/dns"
+    ).mock(return_value=httpx.Response(200, json={"success": True}))
+
+    with pytest.raises(MailProviderConflictError):
+        await provisioner.enable_email_routing("zone-123")
+    assert not enable.called
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_a_domain_receiving_no_mail_is_still_onboarded() -> None:
+    """A zone with no MX has nothing to take over, so the guard must not fire."""
+    provisioner = CloudflareProvisioner(api_token="token")
+    respx.get("https://api.cloudflare.com/client/v4/zones/zone-123/dns_records").mock(
+        return_value=_dns_records()
+    )
+    enable = respx.post(
+        "https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/dns"
+    ).mock(return_value=httpx.Response(200, json={"success": True}))
+
+    await provisioner.enable_email_routing("zone-123")
+    assert enable.called
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_a_zone_already_on_cloudflare_is_left_alone() -> None:
+    """Mixed MX during a migration still reads as already on Cloudflare."""
+    provisioner = CloudflareProvisioner(api_token="token")
+    respx.get("https://api.cloudflare.com/client/v4/zones/zone-123/dns_records").mock(
+        return_value=_dns_records("route2.mx.cloudflare.net", "aspmx.l.google.com")
+    )
+    enable = respx.post(
+        "https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/dns"
+    ).mock(return_value=httpx.Response(200, json={"success": True}))
+
+    await provisioner.enable_email_routing("zone-123")
+    assert not enable.called
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_quoted_and_trailing_dot_mx_forms_are_recognised() -> None:
+    """Cloudflare returns fully qualified names; the guard must not be fooled."""
+    provisioner = CloudflareProvisioner(api_token="token")
+    respx.get("https://api.cloudflare.com/client/v4/zones/zone-123/dns_records").mock(
+        return_value=_dns_records("ROUTE1.MX.CLOUDFLARE.NET.")
+    )
+    enable = respx.post(
+        "https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/dns"
+    ).mock(return_value=httpx.Response(200, json={"success": True}))
+
+    await provisioner.enable_email_routing("zone-123")
+    assert not enable.called
+
+
+def test_only_cloudflares_own_hosts_count_as_cloudflare() -> None:
+    """Matched on the label boundary, so a lookalike host does not slip past."""
+    assert _is_cloudflare_mx("route1.mx.cloudflare.net")
+    assert _is_cloudflare_mx("mx.cloudflare.net")
+    assert not _is_cloudflare_mx("notmx.cloudflare.net")
+    assert not _is_cloudflare_mx("mx.cloudflare.net.attacker.example")
+    assert not _is_cloudflare_mx("aspmx.l.google.com")
+
+
+def test_the_refusal_is_catchable_as_a_cloudflare_error() -> None:
+    """Existing handlers wrap provisioning in `except CloudflareAPIError`."""
+    assert issubclass(MailProviderConflictError, CloudflareAPIError)

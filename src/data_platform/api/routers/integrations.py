@@ -24,6 +24,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import re
 import secrets
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -50,6 +51,7 @@ from core.mime_headers import decode_mime_header, extract_mime_body
 from core.rate_limit import limiter
 from core.scan_metrics import observe_scan, observe_scan_failure, observe_stage
 from core.secret_cipher import decrypt_secret, encrypt_secret
+from core.tls_certificate import get_ssl_expiry_days
 from data_platform.api.auth import AuthUser, ensure_runtime_tables, get_current_user
 from data_platform.api.schemas.app_responses import (
     CloudflareIntegrationResponse,
@@ -82,28 +84,107 @@ def _clean_str(val: str) -> str:
     return val
 
 
+#: The only include Email Routing needs. `spf.cloudflare.com` publishes no SPF
+#: record at all, and RFC 7208 makes a missing include target a permerror, which
+#: propagates to the whole record - so it was not merely useless. Every SPF
+#: mechanism also costs one of the ten DNS lookups a record is allowed, and
+#: `include:sicurre.com` spent one to reach the same Cloudflare ranges by a
+#: longer path while granting Sicurre permission to send as the customer, which
+#: it never does.
+_CLOUDFLARE_ROUTING_INCLUDE = "include:_spf.mx.cloudflare.net"
+
+#: Mechanisms Sicurre has published in the past and now withdraws. Only ever
+#: strings Sicurre itself injected - a customer's own includes are untouchable.
+_WITHDRAWN_SPF_INCLUDES = ("include:spf.cloudflare.com", "include:sicurre.com")
+
+#: A record created from nothing keeps softfail. Sicurre cannot see whose
+#: newsletter or invoicing tool also sends for this domain, and `-all` would
+#: have receivers reject that mail outright. Tightening to `-all` is the
+#: customer's call once they know their own senders; an existing `all` is
+#: always preserved, so a domain that already chose `-all` keeps it.
+_DEFAULT_ALL = "~all"
+
+
 def _merge_spf(current_spf: str) -> str:
     cleaned = _clean_str(current_spf)
-    if not cleaned:
-        return "v=spf1 include:spf.cloudflare.com include:sicurre.com ~all"
     parts = cleaned.split()
     if not parts or parts[0] != "v=spf1":
-        return "v=spf1 include:spf.cloudflare.com include:sicurre.com ~all"
+        return f"v=spf1 {_CLOUDFLARE_ROUTING_INCLUDE} {_DEFAULT_ALL}"
 
-    mechanisms = []
-    all_mechanism = "~all"
-    for p in parts[1:]:
-        if p in ("-all", "~all", "?all", "+all"):
-            all_mechanism = p
-        else:
-            if p not in mechanisms:
-                mechanisms.append(p)
+    mechanisms: list[str] = []
+    all_mechanism = _DEFAULT_ALL
+    for mechanism in parts[1:]:
+        if mechanism in ("-all", "~all", "?all", "+all"):
+            all_mechanism = mechanism
+        elif mechanism in _WITHDRAWN_SPF_INCLUDES:
+            continue
+        elif mechanism not in mechanisms:
+            mechanisms.append(mechanism)
 
-    for inc in ("include:spf.cloudflare.com", "include:sicurre.com"):
-        if inc not in mechanisms:
-            mechanisms.append(inc)
+    if _CLOUDFLARE_ROUTING_INCLUDE not in mechanisms:
+        mechanisms.append(_CLOUDFLARE_ROUTING_INCLUDE)
 
     return f"v=spf1 {' '.join(mechanisms)} {all_mechanism}"
+
+
+def _has_usable_dkim(content: str) -> bool:
+    """True when a DKIM record carries a real public key.
+
+    Sicurre used to publish `v=DKIM1; k=rsa; p=MII...` - a 44-character stub
+    ending in an ellipsis - and then accept any record containing `v=DKIM1` as
+    proof DKIM was configured, so the check passed on its own placeholder. A
+    genuine RSA public key is a few hundred base64 characters; an empty `p=`
+    means the key was revoked. Both are rejected here.
+    """
+    if "v=dkim1" not in content.lower():
+        return False
+    match = re.search(r"p=([A-Za-z0-9+/=]*)", content)
+    return bool(match) and len(match.group(1)) >= 100
+
+
+def _read_dns_state(
+    dns_records: list[dict[str, Any]], zone_name: str
+) -> tuple[str, str, str]:
+    """Pick the SPF, DKIM and DMARC records out of a zone's TXT records.
+
+    Returns the raw content of each, or "" when absent.
+
+    An apex TXT is only SPF if it says so. Reading any apex record as SPF took
+    whichever the provider listed last - often a Google or Microsoft
+    verification token - and `_merge_spf` then saw no `v=spf1` prefix and
+    returned a fresh default, discarding the customer's real record.
+
+    This lives in one place because the setup route and the DNS sync both need
+    it, and two copies of a rule about someone else's DNS is how they drift.
+    """
+    spf = dkim = dmarc = ""
+    zone = zone_name.lower().rstrip(".")
+    for rec in dns_records:
+        if rec.get("type") != "TXT":
+            continue
+        name = _clean_str(rec.get("name", "")).lower().rstrip(".")
+        content = _clean_str(rec.get("content", "")).strip('"')
+        if name == zone and content.lower().startswith("v=spf1"):
+            spf = content
+        elif "._domainkey." in name or name.startswith("_domainkey."):
+            if _has_usable_dkim(content):
+                dkim = content
+        elif name == f"_dmarc.{zone}":
+            dmarc = content
+    return spf, dkim, dmarc
+
+
+async def _measure_ssl(domain: str) -> tuple[int, int]:
+    """Inspect the domain's public certificate for the shield status cache.
+
+    Returns ``(ssl_valid, days_remaining)``. A domain whose certificate cannot
+    be read is recorded as ``(0, 0)`` — the same thing the refresh path records
+    — rather than being credited with a lifetime nobody measured. The cached
+    read ages ``days_remaining`` down day by day, so a fabricated year here
+    would have been reported as fact for a year.
+    """
+    days_remaining = await asyncio.to_thread(get_ssl_expiry_days, domain)
+    return (1, days_remaining) if days_remaining >= 0 else (0, 0)
 
 
 def _merge_dmarc(current_dmarc: str) -> str:
@@ -114,8 +195,6 @@ def _merge_dmarc(current_dmarc: str) -> str:
     policy = "quarantine"
     if "p=reject" in cleaned:
         policy = "reject"
-
-    import re
 
     rec = re.sub(r"p=[^;]+", f"p={policy}", cleaned)
 
@@ -134,28 +213,14 @@ async def _sync_domain_shield_dns(
     workspace_id: str,
     zone_name: str,
     fix_spf: bool,
-    fix_dkim: bool,
     fix_dmarc: bool,
 ) -> dict[str, Any]:
     """Apply selected Domain Shield DNS fixes and update the local status cache."""
     zone_id, _ = await provisioner.get_zone(zone_name)
     dns_records = await provisioner.get_dns_records(zone_id)
-    existing_spf_content = ""
-    existing_dkim_content = ""
-    existing_dmarc_content = ""
-
-    for rec in dns_records:
-        if rec.get("type") != "TXT":
-            continue
-        rec_name = _clean_str(rec.get("name", "")).lower().rstrip(".")
-        rec_content = _clean_str(rec.get("content", "")).strip('"')
-        if rec_name == zone_name.lower():
-            existing_spf_content = rec_content
-        elif "._domainkey." in rec_name or rec_name.startswith("_domainkey."):
-            if "v=DKIM1" in rec_content or "k=rsa" in rec_content:
-                existing_dkim_content = rec_content
-        elif rec_name == f"_dmarc.{zone_name}".lower():
-            existing_dmarc_content = rec_content
+    existing_spf_content, existing_dkim_content, existing_dmarc_content = _read_dns_state(
+        dns_records, zone_name
+    )
 
     spf_val = 1 if "v=spf1" in existing_spf_content else 0
     spf_rec = existing_spf_content or None
@@ -166,20 +231,17 @@ async def _sync_domain_shield_dns(
             rec_type="TXT",
             name=zone_name,
             content=spf_rec,
+            match_prefix="v=spf1",
         )
         spf_val = 1
 
+    # DKIM is never written here. The signing key belongs to whoever sends the
+    # mail: Cloudflare mints its own for Email Routing at cf2024-1._domainkey,
+    # and a customer sending through Google or Microsoft gets one from them.
+    # Sicurre publishing a key it does not hold produced a record no verifier
+    # could use, at a selector nothing reads, reported as valid.
     dkim_val = 1 if existing_dkim_content else 0
     dkim_rec = existing_dkim_content or None
-    if fix_dkim:
-        dkim_rec = "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA..."
-        await provisioner.deploy_dns_record(
-            zone_id=zone_id,
-            rec_type="TXT",
-            name=f"cloudflare._domainkey.{zone_name}",
-            content=dkim_rec,
-        )
-        dkim_val = 1
 
     dmarc_val = 1 if "v=DMARC1" in existing_dmarc_content else 0
     dmarc_rec = existing_dmarc_content or None
@@ -190,6 +252,7 @@ async def _sync_domain_shield_dns(
             rec_type="TXT",
             name=f"_dmarc.{zone_name}",
             content=dmarc_rec,
+            match_prefix="v=DMARC1",
         )
         dmarc_val = 1
 
@@ -222,6 +285,8 @@ async def _sync_domain_shield_dns(
     else:
         grade = "F"
 
+    ssl_val, ssl_days = await _measure_ssl(zone_name)
+
     ts = datetime.now(timezone.utc).isoformat()
     await _async_query(
         """
@@ -229,8 +294,8 @@ async def _sync_domain_shield_dns(
             domain, workspace_id, spf_valid, spf_record, dkim_valid, dkim_record,
             dmarc_valid, dmarc_record, dmarc_policy, ssl_valid, ssl_days_remaining,
             reputation_score, score_grade, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 365, ?, ?, ?)
-        ON CONFLICT(domain) DO UPDATE SET
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(workspace_id, domain) DO UPDATE SET
             workspace_id=excluded.workspace_id, spf_valid=excluded.spf_valid,
             spf_record=excluded.spf_record, dkim_valid=excluded.dkim_valid,
             dkim_record=excluded.dkim_record, dmarc_valid=excluded.dmarc_valid,
@@ -249,6 +314,8 @@ async def _sync_domain_shield_dns(
             dmarc_val,
             dmarc_rec,
             dmarc_policy,
+            ssl_val,
+            ssl_days,
             rep_score,
             grade,
             ts,
@@ -364,7 +431,6 @@ class CloudflareSetupRequest(BaseModel):
     zone_name: str = Field(..., description="Domain to protect, e.g. vinse.app")
     destination_email: str = Field(..., description="Where clean mail is forwarded after scanning")
     fix_spf: bool = True
-    fix_dkim: bool = True
     fix_dmarc: bool = True
 
 
@@ -922,7 +988,6 @@ async def setup_cloudflare(
                 workspace_id=current_user.workspace_id,
                 zone_name=payload.zone_name,
                 fix_spf=payload.fix_spf,
-                fix_dkim=payload.fix_dkim,
                 fix_dmarc=payload.fix_dmarc,
             )
         except CloudflareAPIError as exc:
@@ -1081,7 +1146,6 @@ async def setup_cloudflare(
             workspace_id=current_user.workspace_id,
             zone_name=payload.zone_name,
             fix_spf=payload.fix_spf,
-            fix_dkim=payload.fix_dkim,
             fix_dmarc=payload.fix_dmarc,
         )
     except CloudflareAPIError as exc:
@@ -1128,21 +1192,11 @@ async def setup_cloudflare(
             try:
                 # DNS health is not gateway provisioning: keep the integration, surface DNS apart.
                 dns_records = await provisioner.get_dns_records(result.zone_id)
-                existing_spf_content = ""
-                existing_dkim_content = ""
-                existing_dmarc_content = ""
-
-                for rec in dns_records:
-                    if rec.get("type") == "TXT":
-                        rec_name = _clean_str(rec.get("name", "")).lower().rstrip(".")
-                        rec_content = _clean_str(rec.get("content", ""))
-                        if rec_name == payload.zone_name.lower():
-                            existing_spf_content = rec_content
-                        elif "._domainkey." in rec_name or rec_name.startswith("_domainkey."):
-                            if "v=DKIM1" in rec_content or "k=rsa" in rec_content:
-                                existing_dkim_content = rec_content
-                        elif rec_name == f"_dmarc.{payload.zone_name}".lower():
-                            existing_dmarc_content = rec_content
+                (
+                    existing_spf_content,
+                    existing_dkim_content,
+                    existing_dmarc_content,
+                ) = _read_dns_state(dns_records, payload.zone_name)
 
                 spf_val = 1 if "v=spf1" in existing_spf_content else 0
                 spf_rec = existing_spf_content or None
@@ -1153,20 +1207,13 @@ async def setup_cloudflare(
                         rec_type="TXT",
                         name=payload.zone_name,
                         content=spf_rec,
+                        match_prefix="v=spf1",
                     )
                     spf_val = 1
 
+                # See _sync_domain_shield_dns: DKIM is observed, never authored.
                 dkim_val = 1 if existing_dkim_content else 0
                 dkim_rec = existing_dkim_content or None
-                if payload.fix_dkim:
-                    dkim_rec = "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA..."
-                    await provisioner.deploy_dns_record(
-                        zone_id=result.zone_id,
-                        rec_type="TXT",
-                        name=f"cloudflare._domainkey.{payload.zone_name}",
-                        content=dkim_rec,
-                    )
-                    dkim_val = 1
 
                 dmarc_val = 1 if "v=DMARC1" in existing_dmarc_content else 0
                 dmarc_rec = existing_dmarc_content or None
@@ -1177,6 +1224,7 @@ async def setup_cloudflare(
                         rec_type="TXT",
                         name=f"_dmarc.{payload.zone_name}",
                         content=dmarc_rec,
+                        match_prefix="v=DMARC1",
                     )
                     dmarc_val = 1
                 dmarc_policy = "none"
@@ -1208,14 +1256,16 @@ async def setup_cloudflare(
                 else:
                     grade = "F"
 
+                ssl_val, ssl_days = await _measure_ssl(payload.zone_name)
+
                 await _async_query(
                     """
                     INSERT INTO app_domain_shield_status (
                         domain, workspace_id, spf_valid, spf_record, dkim_valid, dkim_record,
                         dmarc_valid, dmarc_record, dmarc_policy, ssl_valid, ssl_days_remaining,
                         reputation_score, score_grade, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 365, ?, ?, ?)
-                    ON CONFLICT(domain) DO UPDATE SET
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(workspace_id, domain) DO UPDATE SET
                         workspace_id=excluded.workspace_id, spf_valid=excluded.spf_valid,
                         spf_record=excluded.spf_record, dkim_valid=excluded.dkim_valid,
                         dkim_record=excluded.dkim_record, dmarc_valid=excluded.dmarc_valid,
@@ -1234,6 +1284,8 @@ async def setup_cloudflare(
                         dmarc_val,
                         dmarc_rec,
                         dmarc_policy,
+                        ssl_val,
+                        ssl_days,
                         rep_score,
                         grade,
                         ts,
@@ -1410,8 +1462,11 @@ async def teardown_cloudflare(
             (current_user.workspace_id,),
         )
         await _async_query(
-            "DELETE FROM app_domain_shield_status WHERE workspace_id = ? OR domain = ?",
-            (current_user.workspace_id, row["zone_name"]),
+            # Scoped to this workspace. `OR domain = ?` deleted the status for
+            # that domain in every workspace holding it, so one customer
+            # disconnecting wiped another customer's shield.
+            "DELETE FROM app_domain_shield_status WHERE workspace_id = ?",
+            (current_user.workspace_id,),
         )
 
     return {"status": "removed", "zone_name": row["zone_name"]}

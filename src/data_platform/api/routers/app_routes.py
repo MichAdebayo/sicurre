@@ -31,6 +31,7 @@ from core.operational_exercises import (
 )
 from core.rate_limit import limiter
 from core.secret_cipher import decrypt_secret
+from core.tls_certificate import get_ssl_expiry_days
 from data_platform.api.auth import AuthUser, get_current_user
 from data_platform.api.auth import async_query as auth_query
 from data_platform.api.schemas.app_responses import (
@@ -2134,40 +2135,6 @@ async def list_cloudflare_integrations(current_user: AuthUser = Depends(get_curr
     ]
 
 
-def _get_ssl_expiry_days(domain: str) -> int:
-    import socket
-    import ssl
-    from datetime import datetime
-
-    try:
-        context = ssl.create_default_context()
-        context.check_hostname = False
-        context.verify_mode = ssl.CERT_NONE
-        with socket.create_connection((domain, 443), timeout=2.0) as sock:
-            with context.wrap_socket(sock, server_hostname=domain) as ssock:
-                cert = ssock.getpeercert(binary_form=True)
-                if cert:
-                    import ssl
-
-                    # Alternate PEER CERT parse to avoid binary cert parse complexity
-                    # We wrap socket without verify_mode=ssl.CERT_NONE to get text dict if verified
-                    pass
-        # Standard verified peer cert retrieval
-        context_ver = ssl.create_default_context()
-        with socket.create_connection((domain, 443), timeout=2.0) as sock:
-            with context_ver.wrap_socket(sock, server_hostname=domain) as ssock:
-                cert_dict = ssock.getpeercert()
-                expiry_str = cert_dict.get("notAfter")
-                if expiry_str:
-                    # e.g., "May 10 12:00:00 2026 GMT"
-                    expiry_date = datetime.strptime(expiry_str, "%b %d %H:%M:%S %Y %Z")
-                    delta = expiry_date - datetime.utcnow()
-                    return max(0, delta.days)
-    except Exception:
-        pass
-    return -1
-
-
 def _classify_blocklist_response(provider: str, addresses: list[str]) -> tuple[bool, str | None]:
     """Distinguish a real listing from a DNSBL access/error response."""
     parsed = []
@@ -2252,6 +2219,19 @@ async def check_domain_shield_status(
                     updated_at = updated_at.replace(tzinfo=timezone.utc)
                 elapsed_days = max(0, (datetime.now(timezone.utc) - updated_at).days)
                 cached_ssl_days = max(0, cached_ssl_days - elapsed_days)
+            # The two reads of this row must agree. Refresh names why a
+            # certificate is not valid; the cache used to return `error: None`
+            # regardless, so a domain we could not inspect came back as invalid
+            # with no reason given.
+            ssl_measured = bool(row["ssl_valid"])
+            ssl_is_valid = ssl_measured and cached_ssl_days > 0
+            if ssl_is_valid:
+                ssl_error = None
+            elif ssl_measured:
+                ssl_error = "The measured certificate has expired"
+            else:
+                ssl_error = "Unable to inspect the public certificate"
+
             if blacklists_listed:
                 score = max(30, score - 30 * len(blacklists_listed))
 
@@ -2286,10 +2266,10 @@ async def check_domain_shield_status(
                     "error": None if row["dmarc_valid"] else "Not configured",
                 },
                 "ssl": {
-                    "valid": bool(row["ssl_valid"]) and cached_ssl_days > 0,
+                    "valid": ssl_is_valid,
                     "days_remaining": cached_ssl_days,
-                    "auto_renew": True,
-                    "error": None,
+                    "auto_renew": ssl_is_valid,
+                    "error": ssl_error,
                 },
                 "reputation_score": score,
                 "score_grade": grade,
@@ -2449,7 +2429,7 @@ async def check_domain_shield_status(
         status["reputation_score"] -= 25
 
     # 4. Check SSL Certificate
-    expiry_days = await asyncio.to_thread(_get_ssl_expiry_days, domain)
+    expiry_days = await asyncio.to_thread(get_ssl_expiry_days, domain)
     if expiry_days >= 0:
         status["ssl"]["valid"] = True
         status["ssl"]["days_remaining"] = expiry_days
@@ -2596,7 +2576,7 @@ async def check_domain_shield_status(
             dmarc_valid, dmarc_record, dmarc_policy, ssl_valid, ssl_days_remaining,
             reputation_score, score_grade, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(domain) DO UPDATE SET
+        ON CONFLICT(workspace_id, domain) DO UPDATE SET
             workspace_id=excluded.workspace_id, spf_valid=excluded.spf_valid,
             spf_record=excluded.spf_record, dkim_valid=excluded.dkim_valid,
             dkim_record=excluded.dkim_record, dmarc_valid=excluded.dmarc_valid,

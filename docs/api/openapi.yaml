@@ -696,10 +696,6 @@ components:
           description: Where clean mail is forwarded after scanning
           title: Destination Email
           type: string
-        fix_dkim:
-          default: true
-          title: Fix Dkim
-          type: boolean
         fix_dmarc:
           default: true
           title: Fix Dmarc
