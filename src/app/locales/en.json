@@ -588,7 +588,9 @@
     "report_messages_hint": "Sent from your domain",
     "report_aligned_hint": "Genuinely sent by you",
     "report_failed_hint": "Possible spoofing",
-    "report_sources_title": "Top 5 sending sources"
+    "report_sources_title": "Top 5 sending sources",
+    "dkim_label": "DKIM (signature from your mail provider)",
+    "dkim_provider_managed": "Managed by your provider"
   },
   "settings": {
     "title": "Sicurre Configuration",

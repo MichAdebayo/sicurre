@@ -186,7 +186,6 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
   const [autoFixProgress, setAutoFixProgress] = useState<"idle" | "verify" | "dns" | "routing" | "success" | "error">("idle");
   const [autoFixErrorMsg, setAutoFixErrorMsg] = useState("");
   const [fixSpf, setFixSpf] = useState(true);
-  const [fixDkim, setFixDkim] = useState(true);
   const [fixDmarc, setFixDmarc] = useState(true);
   const setupMutation = useSetupCloudflare();
 
@@ -256,7 +255,6 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
         zone_name: selectedDomain,
         destination_email: session?.email || "owner@sicurre.com",
         fix_spf: fixSpf,
-        fix_dkim: fixDkim,
         fix_dmarc: fixDmarc
       };
 
@@ -674,20 +672,18 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                           </div>
                         )}
 
-                        {/* DKIM Record */}
+                        {/* DKIM is listed, never offered as a fix. The signing key
+                            belongs to whoever sends the mail - Cloudflare mints one for
+                            routed mail at cf2024-1._domainkey, Google or Microsoft for a
+                            customer's own sending - so there is nothing here for Sicurre
+                            to write. It used to publish a placeholder and call it valid. */}
                         {!shieldStatus.dkim.valid && (
                           <div className="flex items-center justify-between font-semibold border-b border-border-subtle/50 pb-2 last:border-b-0">
                             <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={fixDkim}
-                                onChange={(e) => setFixDkim(e.target.checked)}
-                                className="w-4 h-4 text-primary bg-surface-lowest border-border-subtle rounded cursor-pointer focus:ring-0"
-                              />
-                              <span className="text-on-surface">DKIM (TXT cloudflare._domainkey)</span>
+                              <span className="ml-6 text-on-surface">{t("domain_shield.dkim_label")}</span>
                             </div>
-                            <span className="text-error text-[11px] font-bold bg-error/[0.04] px-2 py-0.5 rounded border border-error/20">
-                              {t("domain_shield.status_missing_incorrect")}
+                            <span className="text-on-surface-variant text-[11px] font-bold bg-surface-low px-2 py-0.5 rounded border border-border-subtle">
+                              {t("domain_shield.dkim_provider_managed")}
                             </span>
                           </div>
                         )}

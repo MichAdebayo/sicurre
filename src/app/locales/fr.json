@@ -588,7 +588,9 @@
     "report_messages_hint": "Envoyés depuis votre domaine",
     "report_aligned_hint": "Légitimes, bien envoyés par vous",
     "report_failed_hint": "Usurpation possible",
-    "report_sources_title": "5 principales sources d'envoi"
+    "report_sources_title": "5 principales sources d'envoi",
+    "dkim_label": "DKIM (signature de votre fournisseur d'e-mail)",
+    "dkim_provider_managed": "Géré par votre fournisseur"
   },
   "settings": {
     "title": "Configuration de Sicurre",

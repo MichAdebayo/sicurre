@@ -24,6 +24,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import re
 import secrets
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -106,6 +107,21 @@ def _merge_spf(current_spf: str) -> str:
     return f"v=spf1 {' '.join(mechanisms)} {all_mechanism}"
 
 
+def _has_usable_dkim(content: str) -> bool:
+    """True when a DKIM record carries a real public key.
+
+    Sicurre used to publish `v=DKIM1; k=rsa; p=MII...` - a 44-character stub
+    ending in an ellipsis - and then accept any record containing `v=DKIM1` as
+    proof DKIM was configured, so the check passed on its own placeholder. A
+    genuine RSA public key is a few hundred base64 characters; an empty `p=`
+    means the key was revoked. Both are rejected here.
+    """
+    if "v=dkim1" not in content.lower():
+        return False
+    match = re.search(r"p=([A-Za-z0-9+/=]*)", content)
+    return bool(match) and len(match.group(1)) >= 100
+
+
 def _read_dns_state(
     dns_records: list[dict[str, Any]], zone_name: str
 ) -> tuple[str, str, str]:
@@ -131,7 +147,7 @@ def _read_dns_state(
         if name == zone and content.lower().startswith("v=spf1"):
             spf = content
         elif "._domainkey." in name or name.startswith("_domainkey."):
-            if "v=DKIM1" in content or "k=rsa" in content:
+            if _has_usable_dkim(content):
                 dkim = content
         elif name == f"_dmarc.{zone}":
             dmarc = content
@@ -146,8 +162,6 @@ def _merge_dmarc(current_dmarc: str) -> str:
     policy = "quarantine"
     if "p=reject" in cleaned:
         policy = "reject"
-
-    import re
 
     rec = re.sub(r"p=[^;]+", f"p={policy}", cleaned)
 
@@ -166,7 +180,6 @@ async def _sync_domain_shield_dns(
     workspace_id: str,
     zone_name: str,
     fix_spf: bool,
-    fix_dkim: bool,
     fix_dmarc: bool,
 ) -> dict[str, Any]:
     """Apply selected Domain Shield DNS fixes and update the local status cache."""
@@ -189,17 +202,13 @@ async def _sync_domain_shield_dns(
         )
         spf_val = 1
 
+    # DKIM is never written here. The signing key belongs to whoever sends the
+    # mail: Cloudflare mints its own for Email Routing at cf2024-1._domainkey,
+    # and a customer sending through Google or Microsoft gets one from them.
+    # Sicurre publishing a key it does not hold produced a record no verifier
+    # could use, at a selector nothing reads, reported as valid.
     dkim_val = 1 if existing_dkim_content else 0
     dkim_rec = existing_dkim_content or None
-    if fix_dkim:
-        dkim_rec = "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA..."
-        await provisioner.deploy_dns_record(
-            zone_id=zone_id,
-            rec_type="TXT",
-            name=f"cloudflare._domainkey.{zone_name}",
-            content=dkim_rec,
-        )
-        dkim_val = 1
 
     dmarc_val = 1 if "v=DMARC1" in existing_dmarc_content else 0
     dmarc_rec = existing_dmarc_content or None
@@ -385,7 +394,6 @@ class CloudflareSetupRequest(BaseModel):
     zone_name: str = Field(..., description="Domain to protect, e.g. vinse.app")
     destination_email: str = Field(..., description="Where clean mail is forwarded after scanning")
     fix_spf: bool = True
-    fix_dkim: bool = True
     fix_dmarc: bool = True
 
 
@@ -943,7 +951,6 @@ async def setup_cloudflare(
                 workspace_id=current_user.workspace_id,
                 zone_name=payload.zone_name,
                 fix_spf=payload.fix_spf,
-                fix_dkim=payload.fix_dkim,
                 fix_dmarc=payload.fix_dmarc,
             )
         except CloudflareAPIError as exc:
@@ -1102,7 +1109,6 @@ async def setup_cloudflare(
             workspace_id=current_user.workspace_id,
             zone_name=payload.zone_name,
             fix_spf=payload.fix_spf,
-            fix_dkim=payload.fix_dkim,
             fix_dmarc=payload.fix_dmarc,
         )
     except CloudflareAPIError as exc:
@@ -1168,17 +1174,9 @@ async def setup_cloudflare(
                     )
                     spf_val = 1
 
+                # See _sync_domain_shield_dns: DKIM is observed, never authored.
                 dkim_val = 1 if existing_dkim_content else 0
                 dkim_rec = existing_dkim_content or None
-                if payload.fix_dkim:
-                    dkim_rec = "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA..."
-                    await provisioner.deploy_dns_record(
-                        zone_id=result.zone_id,
-                        rec_type="TXT",
-                        name=f"cloudflare._domainkey.{payload.zone_name}",
-                        content=dkim_rec,
-                    )
-                    dkim_val = 1
 
                 dmarc_val = 1 if "v=DMARC1" in existing_dmarc_content else 0
                 dmarc_rec = existing_dmarc_content or None
