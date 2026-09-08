@@ -70,6 +70,11 @@ def _sha256(value: str) -> str:
 # ---------------------------------------------------------------------------
 # CloudflareProvisioner
 # ---------------------------------------------------------------------------
+_DNS_PAGE_SIZE = 100
+# A guard against an API that never stops paging, not a real zone size limit:
+# 50 pages is 5,000 records, far past any zone Sicurre would be pointed at.
+_DNS_PAGE_LIMIT = 50
+
 _CLOUDFLARE_MX_SUFFIX = "mx.cloudflare.net"
 
 
@@ -378,16 +383,49 @@ class CloudflareProvisioner:
         return res if isinstance(res, dict) else {}
 
     async def get_dns_records(self, zone_id: str) -> list[dict[str, Any]]:
-        """Fetch all DNS records for a given zone."""
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            r = await client.get(
-                f"{CF_BASE}/zones/{zone_id}/dns_records",
-                headers=self._headers,
-                params={"per_page": 100},
-            )
-        data = self._unwrap(r, context=f"GET /zones/{zone_id}/dns_records")
-        res = data.get("result", [])
-        return res if isinstance(res, list) else []
+        """Fetch every DNS record for a zone, following pagination.
+
+        Truncating this list is not a cosmetic loss. Callers decide whether a
+        record already exists from what they find here, so a customer whose SPF
+        record sits past the first page looked to Sicurre like a zone with no
+        SPF at all - and the fix would then *create a second one*. Two v=spf1
+        records at an apex is a permanent error under RFC 7208 and takes SPF
+        down for the whole domain.
+        """
+        records: list[dict[str, Any]] = []
+        page = 1
+        while True:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                r = await client.get(
+                    f"{CF_BASE}/zones/{zone_id}/dns_records",
+                    headers=self._headers,
+                    params={"per_page": _DNS_PAGE_SIZE, "page": page},
+                )
+            data = self._unwrap(r, context=f"GET /zones/{zone_id}/dns_records")
+            batch = data.get("result") or []
+            if not isinstance(batch, list):
+                break
+            records.extend(batch)
+
+            info = data.get("result_info") or {}
+            total_pages = info.get("total_pages")
+            if isinstance(total_pages, int) and total_pages > 0:
+                if page >= total_pages:
+                    break
+            elif len(batch) < _DNS_PAGE_SIZE:
+                # No result_info to steer by: a short page is the last page.
+                break
+
+            page += 1
+            if page > _DNS_PAGE_LIMIT:
+                logger.warning(
+                    "Stopped reading DNS records for zone %s after %d pages; "
+                    "the zone may be larger than expected",
+                    zone_id,
+                    _DNS_PAGE_LIMIT,
+                )
+                break
+        return records
 
     # ── full provisioning flow ──────────────────────────────────────────────
 

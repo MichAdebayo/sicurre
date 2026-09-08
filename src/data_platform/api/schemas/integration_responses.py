@@ -52,6 +52,9 @@ class CloudflareTeardownResponse(ApiResponse):
 
     status: Literal["removed"]
     zone_name: str
+    # False only when Sicurre's DMARC reporting address could not be removed
+    # from the zone, which an operator then has to finish by hand.
+    dmarc_reporting_withdrawn: bool = True
 
 
 class CloudflareTokenVerificationResponse(ApiResponse):

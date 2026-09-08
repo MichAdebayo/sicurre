@@ -380,12 +380,28 @@ async def test_teardown_uses_requested_integration_and_stored_token(monkeypatch)
             ]
         return []
 
+    deployed: list[dict[str, Any]] = []
+
     class Provisioner:
         def __init__(self, api_token: str) -> None:
             assert api_token == "stored-secret"
 
         async def teardown(self, **kwargs: Any) -> None:
             assert kwargs["zone_id"] == "zone-2"
+
+        async def get_dns_records(self, zone_id: str) -> list[dict[str, str]]:
+            assert zone_id == "zone-2"
+            return [
+                {
+                    "type": "TXT",
+                    "name": "_dmarc.two.example",
+                    "content": "v=DMARC1; p=reject; "
+                    "rua=mailto:owner@two.example,mailto:dmarc@sicurre.com",
+                }
+            ]
+
+        async def deploy_dns_record(self, **kwargs: Any) -> None:
+            deployed.append(kwargs)
 
     monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
     monkeypatch.setattr(integrations, "_async_query", query)
@@ -394,9 +410,19 @@ async def test_teardown_uses_requested_integration_and_stored_token(monkeypatch)
 
     response = await teardown_cloudflare(TeardownRequest(integration_id="integration-2"), _user())
 
-    assert response == {"status": "removed", "zone_name": "two.example"}
+    assert response == {
+        "status": "removed",
+        "zone_name": "two.example",
+        "dmarc_reporting_withdrawn": True,
+    }
     assert statements[0][1] == ("integration-2", "workspace-1")
     assert any("DELETE FROM cloudflare_integration" in sql for sql, _ in statements)
+
+    # The domain stops reporting to Sicurre, and keeps its own reporting.
+    assert len(deployed) == 1, "the DMARC record was not rewritten on teardown"
+    assert deployed[0]["name"] == "_dmarc.two.example"
+    assert deployed[0]["match_prefix"] == "v=DMARC1"
+    assert deployed[0]["content"] == "v=DMARC1; p=reject; rua=mailto:owner@two.example"
 
 
 @pytest.mark.asyncio
@@ -475,7 +501,11 @@ async def test_teardown_discards_failed_local_attempt_without_provider_token(mon
         TeardownRequest(integration_id="integration-failed"), _user()
     )
 
-    assert response == {"status": "removed", "zone_name": "failed.example"}
+    assert response == {
+        "status": "removed",
+        "zone_name": "failed.example",
+        "dmarc_reporting_withdrawn": True,
+    }
     assert any(sql.startswith("DELETE FROM cloudflare_integration") for sql in statements)
     assert not any(sql.startswith("DELETE FROM app_cloudflare_config") for sql in statements)
 
