@@ -1355,18 +1355,10 @@ async def setup_cloudflare(
                 ),
             )
 
+            # No DNS work is needed on Sicurre's side to start receiving this
+            # domain's DMARC reports: the wildcard consent record on
+            # sicurre.com covers every client. See docs/ops/runbooks.md.
             logger.info("Cloudflare provisioning complete for zone %s", payload.zone_name)
-            # One manual step remains, on Sicurre's own zone rather than the
-            # client's. Without it, receivers that enforce RFC 7489 7.1 decline
-            # to send us this domain's aggregate reports and nothing says so.
-            # See docs/ops/runbooks.md.
-            logger.info(
-                "ACTION REQUIRED on sicurre.com: publish TXT "
-                '%s._report._dmarc.sicurre.com = "v=DMARC1" '
-                "to authorise DMARC aggregate reporting for %s",
-                payload.zone_name.lower(),
-                payload.zone_name,
-            )
         except (CloudflareAPIError, Exception) as exc:
             logger.exception("Cloudflare provisioning failed: %s", exc)
             ts = datetime.now(timezone.utc).isoformat()
