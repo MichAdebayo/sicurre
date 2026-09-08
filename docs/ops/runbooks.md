@@ -26,49 +26,49 @@ Fix:
 - Ensure workspace-scoped event fingerprints are enforced.
 - Treat repeated Worker calls as at-least-once delivery and make scan writes idempotent.
 
-## Runbook: authorise DMARC reporting for a newly onboarded domain
+## Runbook: DMARC aggregate reports are not arriving
 
-**Do this once per client domain, on `sicurre.com`, right after onboarding.**
+Domain Shield adds `rua=mailto:dmarc@sicurre.com` to a client's DMARC record,
+asking receivers to send us their aggregate reports. Because that mailbox sits
+on a different domain from the record, RFC 7489 7.1 makes the receiving domain
+publish its consent, or a receiver that checks - Google and Microsoft both do -
+silently declines to send. Nothing in the report or the dashboard says a report
+was withheld; it simply never arrives.
 
-Domain Shield adds `rua=mailto:dmarc@sicurre.com` to the client's DMARC record,
-which asks receivers to send their aggregate reports to us. That is only half of
-what the standard requires. Because the mailbox sits on a different domain from
-the record, RFC 7489 §7.1 makes `sicurre.com` publish its consent — otherwise a
-receiver that checks is entitled to refuse, and simply will not send the report.
-
-Google and Microsoft both check. Without this record, Sicurre receives reports
-only from the receivers that skip the check, so the DMARC page shows a partial
-picture of the client's mail and nothing indicates that anything is missing.
-
-Publish on the **sicurre.com** zone, once per onboarded domain:
+**This is already handled, once, for every client present and future**, by a
+wildcard on the sicurre.com zone:
 
 ```
-<client-domain>._report._dmarc.sicurre.com   TXT   "v=DMARC1"
+*._report._dmarc.sicurre.com   TXT   "v=DMARC1;"
 ```
 
-For a client on `example.com` that is
-`example.com._report._dmarc.sicurre.com`. Add a second record for any subdomain
-that carries its own DMARC record pointing at us, for example
-`mail.example.com._report._dmarc.sicurre.com`.
+Onboarding a client therefore needs no DNS work on our side at all. This is the
+same mechanism Cloudflare uses for its own DMARC reporting product - a random
+label under `_report._dmarc.dmarc-reports.cloudflare.net` answers `v=DMARC1;`,
+which is only possible with a wildcard.
 
-Verify:
+Verify the consent chain for a client that is not receiving reports. All three
+must answer:
 
 ```bash
-dig +short TXT <client-domain>._report._dmarc.sicurre.com
+dig +short TXT _dmarc.<client-domain>                          # names dmarc@sicurre.com
+dig +short TXT <client-domain>._report._dmarc.sicurre.com      # our consent
+dig +short MX  sicurre.com                                     # routes to the worker
 ```
 
-An empty answer means the authorisation is missing and reports are being
-declined. Aggregate reports arrive daily, so allow ~24-48h before judging
-whether the change worked.
+If the middle one is empty the wildcard has been deleted or the zone is not
+resolving; restore it before looking anywhere else. Aggregate reports are
+generated about once a day per domain, so allow 24-48h before concluding a
+change did or did not work.
 
-**Why this is not automated.** The record belongs to the Sicurre zone, not the
-client's. Auto-configuration only ever holds a token for the client's zone and
-deliberately writes nothing outside it. Automating this would mean giving the
-API a second, Sicurre-owned Cloudflare credential with write access to our own
-DNS — a meaningful increase in blast radius for a record that changes once per
-client. It stays a manual step until that trade is worth making.
+**Why not a record per client.** Per-domain records are more precise and give an
+audit trail, but each one publicly names a client of Sicurre in DNS, and each is
+a manual step that has to happen before reports flow. The wildcard names nobody
+and cannot be forgotten. Its cost is that any domain on the internet may direct
+reports at `dmarc@sicurre.com`; the ingest endpoint requires the Worker's shared
+secret, caps message size, and returns `ignored` for a domain with no active
+integration, so an unrecognised report is discarded rather than stored.
 
 **On teardown.** Disconnecting a client withdraws `dmarc@sicurre.com` from their
-DMARC record automatically, so they stop reporting to us. The
-`_report._dmarc` record on our side is then inert and can be removed at leisure;
-leaving it grants no access to anything.
+DMARC record automatically, so they stop reporting to us. Nothing needs removing
+on our side - the wildcard is not client-specific.
