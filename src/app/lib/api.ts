@@ -720,7 +720,7 @@ export function useTeardownCloudflare() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: CloudflareTeardownPayload) =>
-      fetchJson<{ status: string }>(
+      fetchJson<{ status: string; dmarc_reporting_withdrawn?: boolean }>(
         `${CF_BASE}`,
         { method: "DELETE", body: JSON.stringify(payload) },
       ),

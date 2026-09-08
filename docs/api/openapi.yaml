@@ -752,6 +752,10 @@ components:
       additionalProperties: false
       description: Removed Cloudflare integration.
       properties:
+        dmarc_reporting_withdrawn:
+          default: true
+          title: Dmarc Reporting Withdrawn
+          type: boolean
         status:
           const: removed
           title: Status

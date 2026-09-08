@@ -711,6 +711,7 @@
     "confirm_disable": "Désactiver",
     "verify_email": "Validez l’adresse de destination",
     "verify_email_desc": "Cloudflare a envoyé un lien de confirmation à",
+    "dmarc_withdrawal_failed": "D\u00e9connect\u00e9, mais l\u2019adresse de rapport de Sicurre n\u2019a pas pu \u00eatre retir\u00e9e de votre enregistrement DMARC. Retirez mailto:dmarc@sicurre.com de la liste rua= sur _dmarc de votre domaine pour cesser de nous envoyer des rapports.",
     "zone": "Zone :",
     "refresh_status": "Actualiser le statut",
     "cancel_and_delete": "Annuler et supprimer",
