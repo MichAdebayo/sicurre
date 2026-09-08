@@ -738,3 +738,100 @@ def test_only_cloudflares_own_hosts_count_as_cloudflare() -> None:
 def test_the_refusal_is_catchable_as_a_cloudflare_error() -> None:
     """Existing handlers wrap provisioning in `except CloudflareAPIError`."""
     assert issubclass(MailProviderConflictError, CloudflareAPIError)
+
+
+# --------------------------------------------------------------------------- DNS pagination
+#
+# The read requested one page of 100 and ignored result_info. Callers decide
+# whether a record already exists from what this returns, so a zone whose SPF
+# record sat past the cutoff read as a zone with no SPF - and the fix would
+# then create a second one. Two v=spf1 records at an apex is an RFC 7208
+# permerror: SPF fails for the entire domain.
+
+
+def _page(records: list[dict[str, str]], page: int, total_pages: int) -> httpx.Response:
+    return httpx.Response(
+        200,
+        json={
+            "success": True,
+            "result": records,
+            "result_info": {"page": page, "per_page": 100, "total_pages": total_pages},
+        },
+    )
+
+
+def _filler(count: int, start: int = 0) -> list[dict[str, str]]:
+    return [
+        {"type": "TXT", "name": f"host{i}.example.com", "content": f"filler-{i}"}
+        for i in range(start, start + count)
+    ]
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_a_zone_larger_than_one_page_is_read_whole() -> None:
+    """The SPF record on page two must still be found."""
+    spf = {"type": "TXT", "name": "example.com", "content": "v=spf1 include:_spf.google.com ~all"}
+    route = respx.get("https://api.cloudflare.com/client/v4/zones/zone-123/dns_records")
+    route.side_effect = [
+        _page(_filler(100), page=1, total_pages=2),
+        _page(_filler(40, start=100) + [spf], page=2, total_pages=2),
+    ]
+
+    records = await CloudflareProvisioner(api_token="token").get_dns_records("zone-123")
+
+    assert len(records) == 141
+    assert spf in records, "the customer's SPF record was invisible past page one"
+    assert route.call_count == 2
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_a_single_page_zone_makes_one_request() -> None:
+    """Pagination must not cost an extra round trip on a small zone."""
+    route = respx.get("https://api.cloudflare.com/client/v4/zones/zone-123/dns_records")
+    route.side_effect = [_page(_filler(7), page=1, total_pages=1)]
+
+    records = await CloudflareProvisioner(api_token="token").get_dns_records("zone-123")
+
+    assert len(records) == 7
+    assert route.call_count == 1
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_a_short_page_ends_the_read_without_result_info() -> None:
+    """Some responses carry no result_info; a short page is then the last one."""
+    route = respx.get("https://api.cloudflare.com/client/v4/zones/zone-123/dns_records")
+    route.side_effect = [
+        httpx.Response(200, json={"success": True, "result": _filler(3)}),
+    ]
+
+    records = await CloudflareProvisioner(api_token="token").get_dns_records("zone-123")
+
+    assert len(records) == 3
+    assert route.call_count == 1, "a short page must not trigger another request"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_an_empty_zone_is_not_an_error() -> None:
+    """A zone with no records reads as none, not as a failure."""
+    route = respx.get("https://api.cloudflare.com/client/v4/zones/zone-123/dns_records")
+    route.side_effect = [_page([], page=1, total_pages=1)]
+
+    assert await CloudflareProvisioner(api_token="token").get_dns_records("zone-123") == []
+    assert route.call_count == 1
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_the_reader_cannot_page_forever() -> None:
+    """An API that always claims another page must not hang provisioning."""
+    route = respx.get("https://api.cloudflare.com/client/v4/zones/zone-123/dns_records")
+    route.side_effect = lambda _request: _page(_filler(100), page=1, total_pages=9999)
+
+    records = await CloudflareProvisioner(api_token="token").get_dns_records("zone-123")
+
+    assert route.call_count == 50, "the page guard did not stop the read"
+    assert len(records) == 5000

@@ -120,6 +120,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
   const verifyMutation = useVerifyCloudflareToken();
   const setupMutation  = useSetupCloudflare();
   const teardownMutation = useTeardownCloudflare();
+  const [dmarcStillReporting, setDmarcStillReporting] = useState(false);
 
   // Controlled form state
   const [cfToken, setCfToken]           = useState("");
@@ -230,7 +231,11 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
   const handleTeardown = async () => {
     if (!cfStatus?.id) return;
     try {
-      await teardownMutation.mutateAsync({ integration_id: cfStatus.id });
+      const result = await teardownMutation.mutateAsync({ integration_id: cfStatus.id });
+      // Disconnecting also removes Sicurre's reporting address from the
+      // domain's DMARC record. If that one write failed the domain would keep
+      // sending us its reports, so say so rather than let it pass silently.
+      setDmarcStillReporting(result?.dmarc_reporting_withdrawn === false);
       setShowTeardown(false);
       refetch();
     } catch {
@@ -401,6 +406,9 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
             </p>
             {teardownMutation.isError && (
               <p className="text-xs text-error">{(teardownMutation.error as Error)?.message}</p>
+            )}
+            {dmarcStillReporting && (
+              <p className="text-xs text-amber-700">{t("cloudflare.dmarc_withdrawal_failed")}</p>
             )}
             <div className="flex gap-2">
               <Button

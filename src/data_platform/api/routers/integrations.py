@@ -207,6 +207,46 @@ def _merge_dmarc(current_dmarc: str) -> str:
     return rec
 
 
+_SICURRE_DMARC_MAILBOX = "dmarc@sicurre.com"
+
+
+def _withdraw_dmarc_reporting(current_dmarc: str) -> str | None:
+    """Take Sicurre's reporting address back out of a customer's DMARC record.
+
+    Returns the rewritten record, or None when there is nothing of ours in it.
+
+    Two things are deliberately left alone. The policy is never touched: we
+    cannot know what it was before we merged, and lowering it would weaken a
+    domain we no longer protect. And the record is never deleted, even one we
+    created outright - a departing customer keeps whatever DMARC protection
+    they have, minus our mailbox. What we withdraw is only the instruction to
+    keep sending us their aggregate reports.
+    """
+    cleaned = _clean_str(current_dmarc)
+    if not cleaned or _SICURRE_DMARC_MAILBOX not in cleaned.lower():
+        return None
+
+    rebuilt: list[str] = []
+    for tag in cleaned.split(";"):
+        tag = tag.strip()
+        if not tag:
+            continue
+        name, separator, value = tag.partition("=")
+        if not separator or name.strip().lower() not in ("rua", "ruf"):
+            rebuilt.append(tag)
+            continue
+        kept = [
+            uri.strip()
+            for uri in value.split(",")
+            if uri.strip() and _SICURRE_DMARC_MAILBOX not in uri.strip().lower()
+        ]
+        # A reporting tag with no addresses left is dropped, not left empty.
+        if kept:
+            rebuilt.append(f"{name.strip()}={','.join(kept)}")
+
+    return "; ".join(rebuilt)
+
+
 async def _sync_domain_shield_dns(
     *,
     provisioner: CloudflareProvisioner,
@@ -1316,6 +1356,17 @@ async def setup_cloudflare(
             )
 
             logger.info("Cloudflare provisioning complete for zone %s", payload.zone_name)
+            # One manual step remains, on Sicurre's own zone rather than the
+            # client's. Without it, receivers that enforce RFC 7489 7.1 decline
+            # to send us this domain's aggregate reports and nothing says so.
+            # See docs/ops/runbooks.md.
+            logger.info(
+                "ACTION REQUIRED on sicurre.com: publish TXT "
+                '%s._report._dmarc.sicurre.com = "v=DMARC1" '
+                "to authorise DMARC aggregate reporting for %s",
+                payload.zone_name.lower(),
+                payload.zone_name,
+            )
         except (CloudflareAPIError, Exception) as exc:
             logger.exception("Cloudflare provisioning failed: %s", exc)
             ts = datetime.now(timezone.utc).isoformat()
@@ -1406,6 +1457,9 @@ async def teardown_cloudflare(
 
     has_remote_resources = all(row.get(field) for field in ("zone_id", "account_id", "worker_name"))
     local_failed_attempt = row["status"] == "error" and not has_remote_resources
+    # False only when we tried to withdraw our reporting address and could not,
+    # which is the one case an operator has to finish by hand.
+    dmarc_reporting_withdrawn = True
     if has_remote_resources:
         settings = get_settings()
         encrypted_token = payload.cf_api_token or row.get("api_token")
@@ -1445,6 +1499,37 @@ async def teardown_cloudflare(
                 detail=f"Cloudflare could not remove the routing resources: {exc}",
             ) from exc
 
+        # Stop the domain reporting to us before we forget it exists. Without
+        # this a former customer keeps mailing Sicurre their DMARC aggregates
+        # indefinitely, with no relationship and no way to know. The Worker and
+        # rule are already gone by now, so a DNS failure here is reported
+        # rather than raised - undoing a completed teardown would be worse.
+        try:
+            _, _, existing_dmarc = _read_dns_state(
+                await provisioner.get_dns_records(row["zone_id"]), row["zone_name"]
+            )
+            withdrawn = _withdraw_dmarc_reporting(existing_dmarc)
+            if withdrawn is not None:
+                await provisioner.deploy_dns_record(
+                    zone_id=row["zone_id"],
+                    rec_type="TXT",
+                    name=f"_dmarc.{row['zone_name']}",
+                    content=withdrawn,
+                    match_prefix="v=DMARC1",
+                )
+                logger.info("Withdrew Sicurre DMARC reporting from %s", row["zone_name"])
+        except Exception as exc:
+            # Deliberately broad: the destructive half of the teardown has
+            # already succeeded, so nothing here may raise past this point.
+            dmarc_reporting_withdrawn = False
+            logger.warning(
+                "Could not withdraw Sicurre DMARC reporting from %s; "
+                "the domain will keep sending aggregate reports until it is "
+                "removed by hand: %s",
+                row["zone_name"],
+                exc,
+            )
+
     await _async_query(
         "DELETE FROM cloudflare_integration WHERE id = ?",
         (row["id"],),
@@ -1469,7 +1554,11 @@ async def teardown_cloudflare(
             (current_user.workspace_id,),
         )
 
-    return {"status": "removed", "zone_name": row["zone_name"]}
+    return {
+        "status": "removed",
+        "zone_name": row["zone_name"],
+        "dmarc_reporting_withdrawn": dmarc_reporting_withdrawn,
+    }
 
 
 # --------------------------------------------------------------------------- ── 5.
