@@ -1,6 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { authBaseURL, authClient } from "./auth-client";
 import { isReusableDomainShieldStatus } from "./domain-shield-cache";
+import { discardSessionCache } from "./session-cache";
+
+export { discardSessionCache };
+
+/** Bind the cache reset to this tree's QueryClient. */
+export function useDiscardSessionCache(): () => void {
+  const queryClient = useQueryClient();
+  return () => discardSessionCache(queryClient);
+}
 
 const API_BASE_URL = "/v1";
 const USER_NAME_KEY = "sicurre_user_name";
@@ -433,7 +442,7 @@ export function useLogout() {
     },
     onSettled: () => {
       clearStoredSession();
-      queryClient.removeQueries({ queryKey: ["auth-session"] });
+      discardSessionCache(queryClient);
     },
   });
 }

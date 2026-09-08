@@ -20,6 +20,7 @@ const state = vi.hoisted(() => ({
     refetch: vi.fn(),
   },
   publicRender: vi.fn(),
+  discardCache: vi.fn(),
 }));
 
 vi.mock("react-i18next", () => ({
@@ -29,6 +30,7 @@ vi.mock("../../../src/app/lib/api", () => ({
   useCurrentSession: () => state.session,
   useCloudflareList: () => state.domains,
   useLogout: () => ({ mutateAsync: vi.fn() }),
+  useDiscardSessionCache: () => state.discardCache,
   clearStoredSession: vi.fn(),
   seedStoredSession: vi.fn(),
 }));
@@ -83,6 +85,7 @@ beforeEach(() => {
   state.session = { data: undefined, isLoading: true, isError: false };
   state.domains = { data: undefined, isLoading: true, isError: false, refetch: vi.fn() };
   state.publicRender.mockClear();
+  state.discardCache.mockClear();
   window.history.replaceState({}, "", "/app/domain-shield");
 });
 
@@ -262,5 +265,44 @@ describe("authenticated refresh loading", () => {
     render(<App />);
     expect(await screen.findByText("Protected: vinse.app")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+});
+
+
+describe("ending a session discards the workspace's cached data", () => {
+  /**
+   * Every cached query holds the signed-in workspace's data. A session that
+   * expires ends it just as surely as pressing Se déconnecter, so the cache has
+   * to go the same way - otherwise the next account to sign in on this tab is
+   * shown the previous one's data until each query refetches. That was the
+   * "vinse.app connecté" flash on the connected-domains panel.
+   */
+  it("discards the cache when a signed-in session is later rejected", async () => {
+    finishSession();
+    state.domains = { data: [], isLoading: false, isError: false, refetch: vi.fn() };
+    const { rerender } = render(<App />);
+    await screen.findByRole("main");
+    expect(state.discardCache).not.toHaveBeenCalled();
+
+    // The same tab, the same mounted app: the session is now rejected.
+    await act(async () => {
+      state.session = { data: undefined, isLoading: false, isError: true };
+      rerender(<App />);
+    });
+
+    await waitFor(() => expect(state.discardCache).toHaveBeenCalled());
+  });
+
+  it("does not discard when nobody was signed in", async () => {
+    // Signup and e-mail verification legitimately run with a failing session
+    // query: nobody is signed in yet, so there is nothing to discard. Clearing
+    // the cache here interrupted those flows.
+    window.history.replaceState({}, "", "/");
+    state.session = { data: undefined, isLoading: false, isError: true };
+
+    render(<App />);
+    await screen.findByText("Public page");
+
+    expect(state.discardCache).not.toHaveBeenCalled();
   });
 });

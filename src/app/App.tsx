@@ -5,6 +5,7 @@ import {
   clearStoredSession,
   seedStoredSession,
   useCurrentSession,
+  useDiscardSessionCache,
   useLogout,
 } from "./lib/api";
 import {
@@ -169,6 +170,7 @@ function AppContent() {
   const isVerificationEntry = viewState === "verify-email";
   const sessionQuery = useCurrentSession(sessionLookupEnabled && !isVerificationEntry);
   const logoutMutation = useLogout();
+  const discardCache = useDiscardSessionCache();
   const session = isVerificationEntry || !sessionLookupEnabled ? undefined : sessionQuery.data;
   const administration = isAdminPage(activePage) && Boolean(session?.is_platform_admin);
 
@@ -207,6 +209,12 @@ function AppContent() {
     if (sessionQuery.isError) {
       clearStoredSession();
       if (hasStoredSession) {
+        // An expired or rejected session ends a session just as surely as
+        // pressing Se déconnecter, so the previous workspace's cached data
+        // goes the same way. Guarded by hasStoredSession because signup and
+        // e-mail verification legitimately run with a failing session query -
+        // nobody is signed in yet, and there is nothing to discard.
+        discardCache();
         setHasStoredSession(false);
         setViewState("login");
       }
