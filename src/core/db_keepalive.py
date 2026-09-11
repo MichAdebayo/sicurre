@@ -59,6 +59,15 @@ async def run_db_keepalive(interval_seconds: float | None = None) -> None:
 
 
 def keepalive_enabled() -> bool:
-    """Only warm a real remote database; local SQLite has nothing to keep warm."""
-    url = get_settings().database_url or ""
-    return url.startswith("postgresql")
+    """Warm a real remote database, unless the operator has turned it off.
+
+    Two conditions. Local SQLite has nothing to keep warm and no compute to
+    wake. And the ping is what stops Neon suspending compute at all, so on a
+    metered plan it is the difference between minutes of compute a day and
+    twenty-four hours of it - which is a decision an operator has to be able to
+    make without editing code.
+    """
+    settings = get_settings()
+    if not settings.db_keepalive_enabled:
+        return False
+    return (settings.database_url or "").startswith("postgresql")
