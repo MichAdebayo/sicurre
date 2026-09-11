@@ -14,6 +14,9 @@ from __future__ import annotations
 
 import inspect
 
+import pytest
+
+from data_platform.api.auth import AuthUser
 from data_platform.api.routers import integrations
 from data_platform.api.routers.integrations import (
     CloudflareSetupRequest,
@@ -21,6 +24,18 @@ from data_platform.api.routers.integrations import (
     _merge_spf,
     _planned_change,
 )
+
+
+def _user() -> AuthUser:
+    return AuthUser(
+        id="user-1",
+        email="owner@sicurre.com",
+        display_name="Owner",
+        role="owner",
+        workspace_id="workspace-1",
+        workspace_name="Workspace",
+        is_platform_admin=False,
+    )
 
 
 def test_connecting_writes_nothing_unless_asked() -> None:
@@ -78,3 +93,72 @@ def test_verifying_a_token_writes_nothing() -> None:
     """The preview reads the zone. It must never deploy while doing so."""
     source = inspect.getsource(integrations.verify_cloudflare_token)
     assert "deploy_dns_record" not in source, "the preview wrote to the zone"
+
+
+@pytest.mark.asyncio
+async def test_the_preview_reports_the_real_zone(monkeypatch) -> None:
+    """Drive the endpoint: the plan must come from the customer's own records.
+
+    A zone already carrying Google's SPF and a reject DMARC without our
+    reporting address should be told SPF will be modified, DMARC modified, and
+    DKIM is present — not a generic "we will change things".
+    """
+    dkim = "v=DKIM1; k=rsa; p=" + "MIIBIjANBgkqhkiG9w0BAQEF" * 17
+
+    class Provisioner:
+        def __init__(self, api_token: str) -> None:
+            assert api_token == "token-abc"
+
+        async def verify_token(self) -> bool:
+            return True
+
+        async def get_zone(self, zone_name: str) -> tuple[str, str]:
+            assert zone_name == "sicurre.com"
+            return "zone-1", "account-1"
+
+        async def get_dns_records(self, zone_id: str) -> list[dict[str, str]]:
+            assert zone_id == "zone-1"
+            return [
+                {"type": "TXT", "name": "sicurre.com",
+                 "content": "v=spf1 include:_spf.google.com ~all"},
+                {"type": "TXT", "name": "cf2024-1._domainkey.sicurre.com", "content": dkim},
+                {"type": "TXT", "name": "_dmarc.sicurre.com",
+                 "content": "v=DMARC1; p=reject"},
+            ]
+
+    monkeypatch.setattr(integrations, "CloudflareProvisioner", Provisioner)
+
+    result = await integrations.verify_cloudflare_token(
+        integrations.TokenVerifyRequest(cf_api_token="token-abc", zone_name="sicurre.com"),
+        _user(),
+    )
+
+    assert result["valid"] is True
+    assert result["plan"] == {"spf": "modify", "dmarc": "modify", "dkim_present": True}
+
+
+@pytest.mark.asyncio
+async def test_an_empty_zone_is_reported_as_additions(monkeypatch) -> None:
+    """Nothing published yet means both records are added, not modified."""
+
+    class Provisioner:
+        def __init__(self, api_token: str) -> None:
+            pass
+
+        async def verify_token(self) -> bool:
+            return True
+
+        async def get_zone(self, _zone_name: str) -> tuple[str, str]:
+            return "zone-1", "account-1"
+
+        async def get_dns_records(self, _zone_id: str) -> list[dict[str, str]]:
+            return []
+
+    monkeypatch.setattr(integrations, "CloudflareProvisioner", Provisioner)
+
+    result = await integrations.verify_cloudflare_token(
+        integrations.TokenVerifyRequest(cf_api_token="t", zone_name="sicurre.com"),
+        _user(),
+    )
+
+    assert result["plan"] == {"spf": "add", "dmarc": "add", "dkim_present": False}
