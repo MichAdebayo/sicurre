@@ -110,7 +110,6 @@ Still open:
 
 - The "managed records" help icon in the Domain Shield auto-fix panel is
   hover-only; that panel is being reverted and the icon goes with it.
-- No automated audit (axe) has been run yet; see below.
 
 ## Resolved: danger text
 
@@ -131,13 +130,42 @@ background — so verdict badges keep their identity while their text becomes
 legible. `test_palette_contrast.py` asserts both surfaces now pass AA; if either
 regresses, restore the token rather than relaxing the test.
 
-## What has not been done
+## Automated audit
 
-No automated audit (axe, Lighthouse) and no screen-reader pass has been run.
-The criteria above are stated so that interface work can be reviewed against
-them; they are not evidence that every existing screen already satisfies them.
-Stating that limit is more useful than a conformance claim the project cannot
-support.
+axe-core 4.13 (`@axe-core/cli`, headless Chrome, rule tags `wcag2a`,
+`wcag2aa`, `wcag21a`, `wcag21aa`, `best-practice`, 5 s render delay so the
+React routes are mounted) was run on 12 September 2026 against the eight
+public routes: `/`, `/login`, `/signup`, `/verify-email`, `/cgu`,
+`/mentions-legales`, `/confidentialite`, `/contact`.
+
+| Build | Result |
+|---|---|
+| Production before the fixes | 7 of 8 pages without a `main` landmark; content outside landmarks on those pages; the password show/hide button unnamed on login and signup; `aria-label` on the Turnstile container, which is a plain `div`; on contact an unlabelled select, a 1.8:1 button text in dark mode (white text on the dark-mode primary token), and no `h1` |
+| Local production build after the fixes | 0 violations on all 8 pages |
+
+What changed: `header`, `main` and `footer` landmarks on the landing, login,
+legal and contact pages; a name and pressed state on the password toggle;
+`role="group"` on the Turnstile container; an explicit label on the contact
+subject select; the contact button text uses the `on-primary` token so it
+pairs with the primary background in both themes; contact headings run
+h1, h2.
+
+Limits of the result: axe finds the subset of WCAG failures that can be
+detected from the DOM, roughly a third of real defects. It says nothing about
+keyboard operation, focus order, or how a screen reader reads a flow; those
+are covered by the criteria above and by `tests/unit/app/dialog.test.tsx`.
+The signed-in routes (dashboard, threats, quarantine, Domain Shield, alerts,
+settings) were not scanned by the command line tool because it has no
+session; they follow the same primitives. No screen-reader pass has been
+run.
+
+To repeat the scan on a local build:
+
+```bash
+npm run build && npx vite preview --port 4173 &
+npx @axe-core/cli http://localhost:4173/ http://localhost:4173/login \
+  --load-delay 5000 --tags wcag2a,wcag2aa,wcag21a,wcag21aa,best-practice
+```
 
 ## Documents
 

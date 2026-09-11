@@ -93,8 +93,9 @@ export function Turnstile({
   return (
     <div
       id={containerId}
-      className="min-h-[65px] w-full overflow-hidden rounded-lg bg-slate-950/60"
+      role="group"
       aria-label="Vérification anti-robot"
+      className="min-h-[65px] w-full overflow-hidden rounded-lg bg-slate-950/60"
     />
   );
 }

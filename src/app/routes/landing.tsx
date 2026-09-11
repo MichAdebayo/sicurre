@@ -316,6 +316,7 @@ export default function LandingRoute({
       {/* ═══════════════════════════════════════════════════════════════════════
           HERO — Full viewport heading, trust badges & bottom marquee banner
           ═══════════════════════════════════════════════════════════════════════ */}
+      <main>
       <section className="relative w-full min-h-screen flex flex-col justify-between overflow-hidden pt-24 pb-0">
         <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0) 55%, rgba(15,18,30,0.6) 70%, rgba(20,24,40,0.8) 85%, rgba(10,12,20,0.95) 100%)" }} />
         <div className="absolute pointer-events-none" style={{ top: "-15%", left: "50%", transform: "translateX(-50%)", width: "140%", height: "110%", background: "conic-gradient(from 180deg at 50% 0%, transparent 35%, rgba(200,210,230,0.04) 42%, rgba(180,195,225,0.07) 47%, rgba(200,210,240,0.09) 50%, rgba(180,195,225,0.07) 53%, rgba(200,210,230,0.04) 58%, transparent 65%)", maskImage: "linear-gradient(to bottom, black 0%, black 60%, transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black 0%, black 60%, transparent 100%)" }} />
@@ -521,6 +522,8 @@ export default function LandingRoute({
           </FadeInSection>
         </div>
       </section>
+
+      </main>
 
       {/* ═══════════════════════════════════════════════════════════════════════
           FOOTER — Compact sleek dark glassmorphism footer

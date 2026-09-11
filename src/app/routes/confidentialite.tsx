@@ -18,8 +18,7 @@ export default function ConfidentialiteRoute({ onBack }: ConfidentialiteProps) {
 
       <div className="max-w-3xl mx-auto space-y-8 relative z-10">
 
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/10 pb-6">
+        <header className="flex items-center justify-between border-b border-white/10 pb-6">
           <div className="flex items-center gap-3">
             <img src={sicurreLogo} alt="Sicurre Logo" className="w-9 h-9" />
             <span className="font-display font-bold text-xl text-white tracking-tight">Sicurre</span>
@@ -29,11 +28,11 @@ export default function ConfidentialiteRoute({ onBack }: ConfidentialiteProps) {
             aria-label="Retour à l'accueil"
             className="p-2.5 text-white/90 bg-white/[0.06] hover:bg-primary hover:border-primary border border-white/15 rounded-xl cursor-pointer transition-all shadow-sm flex items-center justify-center"
           >
-            <Home className="w-4.5 h-4.5" />
+            <Home className="w-4.5 h-4.5" aria-hidden="true" />
           </button>
-        </div>
+        </header>
 
-        {/* Content Card */}
+        <main>
         <MotionDiv
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -119,11 +118,11 @@ export default function ConfidentialiteRoute({ onBack }: ConfidentialiteProps) {
             </p>
           </section>
         </MotionDiv>
+        </main>
 
-        {/* Footer */}
-        <div className="text-center text-xs text-slate-500">
+        <footer className="text-center text-xs text-slate-500">
           © 2026 Sicurre. Tous droits réservés.
-        </div>
+        </footer>
       </div>
     </div>
   );

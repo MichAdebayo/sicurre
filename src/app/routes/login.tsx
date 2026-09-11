@@ -235,13 +235,15 @@ export default function LoginRoute({
 
       {/* ── Home Back Button (Top Left) ── */}
       {onNavigateToLanding && (
+        <nav aria-label="Retour">
         <button
           onClick={onNavigateToLanding}
           aria-label="Retour à l'accueil"
           className="absolute top-6 left-6 p-2.5 text-white/90 bg-white/[0.06] hover:bg-primary hover:border-primary border border-white/15 rounded-xl cursor-pointer transition-all shadow-sm z-20 flex items-center justify-center"
         >
-          <Home className="w-4.5 h-4.5" />
+          <Home className="w-4.5 h-4.5" aria-hidden="true" />
         </button>
+        </nav>
       )}
 
       {/* ── Unified Brand Background Spotlight & Space Grid ── */}
@@ -253,6 +255,7 @@ export default function LoginRoute({
       />
       <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.008)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.008)_1px,transparent_1px)] bg-[size:5rem_5rem] pointer-events-none" />
 
+      <main className="w-full flex flex-col items-center relative z-10">
       {/* ── Main Form Layout ── */}
       <MotionDiv
         initial={{ opacity: 0, scale: 0.99, y: 8 }}
@@ -390,9 +393,11 @@ export default function LoginRoute({
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="text-white/40 hover:text-white transition-colors cursor-pointer mr-0.5"
+                    aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                    aria-pressed={showPassword}
+                    className="rounded text-white/40 hover:text-white transition-colors cursor-pointer mr-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showPassword ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                   </button>
                 }
                 required
@@ -470,6 +475,7 @@ export default function LoginRoute({
           </button>.
         </p>
       </MotionDiv>
+      </main>
 
       {/* ── In-Place Legal Modal Overlay ── */}
       <AnimatePresence>
