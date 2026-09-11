@@ -76,7 +76,10 @@
       "threshold": 0,
       "for": "1m",
       "noDataState": "OK",
-      "labels": { "exercise": "synthetic", "exercise_type": "api_unavailable" },
+      "labels": {
+        "exercise": "synthetic",
+        "exercise_type": "api_unavailable"
+      },
       "summary": "Synthetic API-unavailability alert test. The API and customer emails are unaffected.",
       "runbook": "Stop the synthetic signal in the Sicurre admin console or wait for its automatic expiry, then verify Grafana recovery."
     },
@@ -88,7 +91,10 @@
       "threshold": 0,
       "for": "1m",
       "noDataState": "OK",
-      "labels": { "exercise": "synthetic", "exercise_type": "high_latency" },
+      "labels": {
+        "exercise": "synthetic",
+        "exercise_type": "high_latency"
+      },
       "summary": "Synthetic latency alert test. No request delay is injected.",
       "runbook": "Stop the synthetic signal in the Sicurre admin console or wait for its automatic expiry, then verify Grafana recovery."
     },
@@ -100,7 +106,10 @@
       "threshold": 0,
       "for": "1m",
       "noDataState": "OK",
-      "labels": { "exercise": "synthetic", "exercise_type": "elevated_5xx" },
+      "labels": {
+        "exercise": "synthetic",
+        "exercise_type": "elevated_5xx"
+      },
       "summary": "Synthetic server-error alert test. No customer request is made to fail.",
       "runbook": "Stop the synthetic signal in the Sicurre admin console or wait for its automatic expiry, then verify Grafana recovery."
     },
@@ -125,6 +134,17 @@
       "noDataState": "OK",
       "summary": "The shared Sicurre telemetry footprint exceeds 85% of the 10,000-series free-tier allocation.",
       "runbook": "Freeze new telemetry labels and reduce the highest-cardinality scrape before the tenant limit is reached."
+    },
+    {
+      "uid": "sicurre-database-unreachable",
+      "title": "Sicurre database unreachable",
+      "expression": "min(sicurre_database_up{stack=\"sicurre\"})",
+      "operator": "lt",
+      "threshold": 1,
+      "for": "3m",
+      "noDataState": "OK",
+      "summary": "The database has refused every round trip for three minutes. Requests that touch it are failing, while /health keeps returning ok by design.",
+      "runbook": "Check the Neon console for compute quota and endpoint state first - a suspended or quota-exhausted compute looks exactly like this. Then /health/ready, which names the reason. Restarting sicurre-api will not help and is not the fix."
     }
   ]
 }
