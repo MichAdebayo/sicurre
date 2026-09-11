@@ -130,3 +130,40 @@ async def test_an_unresolvable_domain_is_reported_not_raised(monkeypatch) -> Non
         integrations.DomainPreviewRequest(zone_name="nope.invalid"), request=None, current_user=_user()
     )
     assert result == {"zone_name": "nope.invalid", "resolvable": False, "on_cloudflare": False, "mail_provider": "none"}
+
+
+@pytest.mark.asyncio
+async def test_a_value_that_is_not_a_hostname_is_refused_with_422() -> None:
+    from fastapi import HTTPException
+
+    with pytest.raises(HTTPException) as excinfo:
+        await _handler()(
+            integrations.DomainPreviewRequest(zone_name="not a domain"), request=None, current_user=_user()
+        )
+    assert excinfo.value.status_code == 422
+
+
+def test_the_default_resolver_reads_txt_mx_and_ns_answers(monkeypatch) -> None:
+    """The dnspython adapter joins TXT chunks, keeps MX exchanges, strips trailing dots."""
+    import sys
+    import types
+
+    from core import domain_preview
+
+    class Txt:
+        strings = (b"v=spf1 ", b"include:_spf.google.com ~all")
+
+    class Mx:
+        exchange = "aspmx.l.google.com."
+
+    class Ns:
+        def __str__(self) -> str:
+            return "ada.ns.cloudflare.com."
+
+    answers = {"TXT": [Txt()], "MX": [Mx()], "NS": [Ns()]}
+    fake = types.SimpleNamespace(resolve=lambda name, rrtype: answers[rrtype])
+    monkeypatch.setitem(sys.modules, "dns.resolver", fake)
+
+    assert domain_preview._default_resolver("example.test", "TXT") == ["v=spf1 include:_spf.google.com ~all"]
+    assert domain_preview._default_resolver("example.test", "MX") == ["aspmx.l.google.com"]
+    assert domain_preview._default_resolver("example.test", "NS") == ["ada.ns.cloudflare.com"]
