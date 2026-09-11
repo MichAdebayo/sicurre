@@ -763,7 +763,9 @@
     "plan_add": "Added",
     "plan_modify": "Modified",
     "plan_keep": "Unchanged",
-    "plan_footnote": "No record is deleted, and nothing outside these is touched. Untick to leave a record as it is."
+    "plan_footnote": "No record is deleted, and nothing outside these is touched. Untick to leave a record as it is.",
+    "check_domain": "Check this domain",
+    "checking": "Checking…"
   },
   "landing": {
     "nav_login": "Sign in",

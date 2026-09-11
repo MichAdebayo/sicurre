@@ -128,6 +128,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
   // written. Held so the customer sees it and can decline a record without
   // declining the integration.
   const [dnsPlan, setDnsPlan] = useState<CloudflareDnsPlan | null>(null);
+  const [verifyError, setVerifyError] = useState("");
   const [applySpf, setApplySpf] = useState(true);
   const [applyDmarc, setApplyDmarc] = useState(true);
   const setupMutation  = useSetupCloudflare();
@@ -185,28 +186,41 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
 
   // ── Integration Orchestration ─────────────────────────────────────────────
 
-  const handleIntegrate = async () => {
+  /**
+   * Step one: read the zone and stop.
+   *
+   * Nothing is provisioned here. Showing the plan and then provisioning in the
+   * same handler would render the preview at the moment the write began, which
+   * is the failure this whole change exists to remove - the customer must be
+   * able to decline a record before it is written, not while it is.
+   */
+  const handleVerify = async () => {
     if (!cfToken.trim() || !zoneName.trim()) return;
-
-    setIsIntegrating(true);
-    setStages(integrationStages(t, ["loading", "idle", "idle", "idle"]));
-
+    setVerifyError("");
     try {
-      // Step 1: Verify token
       const result = await verifyMutation.mutateAsync({
         cf_api_token: cfToken,
         zone_name: zoneName,
       });
-
-      if (result.plan) setDnsPlan(result.plan);
-
       if (!result.valid) {
-        setStages(prev => prev.map(s => s.id === "verify" ? { ...s, status: "error", errorMsg: formatCloudflareError(t, result.error || t("cloudflare.invalid_token_or_domain")) } : s));
+        setVerifyError(formatCloudflareError(t, result.error || t("cloudflare.invalid_token_or_domain")));
         return;
       }
+      setDnsPlan(result.plan ?? null);
+    } catch (err: any) {
+      setVerifyError(formatCloudflareError(t, err?.message));
+    }
+  };
 
+  /** Step two: provision, carrying whatever the customer left ticked. */
+  const handleIntegrate = async () => {
+    if (!cfToken.trim() || !zoneName.trim()) return;
+
+    setIsIntegrating(true);
+    setStages(integrationStages(t, ["success", "loading", "idle", "idle"]));
+
+    try {
       setStages(prev => prev.map(s =>
-        s.id === "verify" ? { ...s, status: "success" } :
         s.id === "dns" ? { ...s, status: "loading" } : s
       ));
 
@@ -585,7 +599,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
               label={t("cloudflare.api_token")}
               type={showToken ? "text" : "password"}
               value={cfToken}
-              onChange={e => setCfToken(e.target.value)}
+              onChange={e => { setCfToken(e.target.value); setDnsPlan(null); setVerifyError(""); }}
               placeholder={t("cloudflare.api_token_placeholder")}
               suffix={
                 <button type="button" onClick={() => setShowToken(v => !v)} className="text-on-surface-variant/60 hover:text-on-surface transition-colors cursor-pointer">
@@ -600,7 +614,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
               label={t("cloudflare.domain")}
               type="text"
               value={zoneName}
-              onChange={e => setZoneName(e.target.value.trim().toLowerCase())}
+              onChange={e => { setZoneName(e.target.value.trim().toLowerCase()); setDnsPlan(null); setVerifyError(""); }}
               placeholder={t("cloudflare.domain_placeholder")}
             />
           </div>
@@ -645,15 +659,23 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
         </div>
       )}
 
+      {verifyError && (
+        <p className="text-xs font-semibold text-error">{verifyError}</p>
+      )}
+
       <div className="flex justify-end pt-1">
         <Button
-          onClick={handleIntegrate}
+          onClick={dnsPlan ? handleIntegrate : handleVerify}
           disabled={!isFormValid || verifyMutation.isPending || setupMutation.isPending}
           className="w-full sm:w-auto text-xs font-bold cursor-pointer"
         >
-          {verifyMutation.isPending || setupMutation.isPending
-            ? t("cloudflare.integrating")
-            : t("cloudflare.integrate")}
+          {verifyMutation.isPending
+            ? t("cloudflare.checking")
+            : setupMutation.isPending
+              ? t("cloudflare.integrating")
+              : dnsPlan
+                ? t("cloudflare.integrate")
+                : t("cloudflare.check_domain")}
         </Button>
       </div>
     </MotionDiv>
