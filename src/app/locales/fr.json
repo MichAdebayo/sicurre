@@ -755,7 +755,15 @@
     "errors": {
       "zone_not_found": "Ce domaine est introuvable dans les zones accessibles par ce token.",
       "invalid_token": "Cloudflare a refusé le token API."
-    }
+    },
+    "plan_title": "Ce que la connexion va changer sur votre domaine",
+    "plan_gateway": "Passerelle anti-hameçonnage et routage du courrier",
+    "plan_spf": "Autoriser nos serveurs à recevoir votre courrier",
+    "plan_dmarc": "Publier votre politique anti-usurpation",
+    "plan_add": "Ajouté",
+    "plan_modify": "Modifié",
+    "plan_keep": "Inchangé",
+    "plan_footnote": "Aucun enregistrement n'est supprimé et rien d'autre n'est touché. Décochez pour laisser un enregistrement tel quel."
   },
   "landing": {
     "nav_login": "Connexion",

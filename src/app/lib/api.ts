@@ -231,6 +231,12 @@ export interface CloudflareStatus {
   updated_at?: string;
 }
 
+export interface CloudflareDnsPlan {
+  spf: "add" | "modify" | "keep";
+  dmarc: "add" | "modify" | "keep";
+  dkim_present: boolean;
+}
+
 export interface CloudflareSetupPayload {
   cf_api_token?: string;
   zone_name: string;
@@ -700,7 +706,12 @@ export function useCloudflareStatus() {
 export function useVerifyCloudflareToken() {
   return useMutation({
     mutationFn: (payload: CfTokenVerifyPayload) =>
-      fetchJson<{ valid: boolean; zone_id?: string; error?: string }>(
+      fetchJson<{
+        valid: boolean;
+        zone_id?: string;
+        error?: string;
+        plan?: CloudflareDnsPlan;
+      }>(
         `${CF_BASE}/verify-token`,
         { method: "POST", body: JSON.stringify(payload) },
       ),

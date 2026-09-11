@@ -755,7 +755,15 @@
     "errors": {
       "zone_not_found": "This domain was not found among the zones accessible to this token.",
       "invalid_token": "Cloudflare rejected the API token."
-    }
+    },
+    "plan_title": "What connecting will change on your domain",
+    "plan_gateway": "Anti-phishing gateway and mail routing",
+    "plan_spf": "Allow our servers to receive your mail",
+    "plan_dmarc": "Publish your anti-spoofing policy",
+    "plan_add": "Added",
+    "plan_modify": "Modified",
+    "plan_keep": "Unchanged",
+    "plan_footnote": "No record is deleted, and nothing outside these is touched. Untick to leave a record as it is."
   },
   "landing": {
     "nav_login": "Sign in",

@@ -57,12 +57,25 @@ class CloudflareTeardownResponse(ApiResponse):
     dmarc_reporting_withdrawn: bool = True
 
 
+class CloudflareDnsPlan(ApiResponse):
+    """What connecting would change on the customer's zone.
+
+    Derived from the same merge the write path uses, so what is shown before
+    the button is what gets applied after it.
+    """
+
+    spf: Literal["add", "modify", "keep"]
+    dmarc: Literal["add", "modify", "keep"]
+    dkim_present: bool
+
+
 class CloudflareTokenVerificationResponse(ApiResponse):
     """Cloudflare token and zone-access validation result."""
 
     valid: bool
     zone_id: str | None = None
     error: str | None = None
+    plan: CloudflareDnsPlan | None = None
 
 
 class CloudflareTokenStatusResponse(ApiResponse):
