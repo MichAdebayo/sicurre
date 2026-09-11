@@ -1,7 +1,7 @@
 # Accessibility
 
 The target is WCAG 2.1 level AA. This document records what was verified, how,
-and what is not yet met — measured on 11 September 2026 against the design
+and what is not yet met — measured on 12 September 2026 against the design
 system's palette and the components in `src/app/`.
 
 The palette values are reproduced here from `docs/brand/DESIGN.md` so the
@@ -62,39 +62,55 @@ Applied to interface work. Each is checkable by a reviewer without tooling.
 
 ## Current state
 
-Measured across the 59 TypeScript files in `src/app/` on 11 September 2026:
+Measured across the 59 TypeScript files in `src/app/` on 12 September 2026:
 
 | Signal | Files |
 |---|---|
-| `aria-label` | 21 |
-| `aria-hidden` | 15 |
-| `role=` | 14 |
+| `aria-label` | 23 |
+| `aria-hidden` | 19 |
+| `focus-visible` | 19 |
+| `role=` | 18 |
 | `alt=` | 9 |
-| `focus-visible` | 6 |
-| `aria-labelledby` | 5 |
-| `aria-describedby` | 2 |
+| `aria-labelledby` | 6 |
+| `aria-describedby` | 4 |
+| `aria-expanded` | 2 |
 | `aria-current` | 2 |
-| `aria-live` | 1 (plus `role="status"` or `role="alert"` in 10 more files) |
+| `aria-live` | 1 (plus `role="status"` or `role="alert"` in 11 more files) |
 
-Accessibility work is present and deliberate rather than incidental — the
-`aria-hidden` count shows decorative elements being hidden on purpose, and
-every `Input` associates its label by a generated id. It is also uneven. The
-known gaps, in the order they will be addressed:
+Every `Input` associates its label by a generated id, verdict and Domain
+Shield status badges carry their state as visible text beside the icon, and
+decorative icons are hidden from assistive technology.
 
-1. No dialog carries `role="dialog"`, `aria-modal`, a focus trap or an Escape
-   handler (`components/ui/dialog.tsx` and the two overlays in
-   `routes/quarantine.tsx`).
-2. The Cloudflare connection form reports its error in a plain paragraph
-   rather than a live region; the login form already uses `role="alert"`.
-3. Status badges rely on colour plus icon; the screen-reader text that names
-   the state is present on three elements only.
-4. 25 elements remove the outline with `outline-none` without a
-   `focus-visible` ring, including the input and toggle primitives.
-5. Six routes have no `h1` (the four admin routes, logs, contact).
-6. The notification popover and the two Domain Shield tooltips are
-   mouse-only.
-7. Two selects have no associated label (`routes/threats.tsx`,
-   `routes/settings.tsx` domain picker).
+Closed on 12 September 2026:
+
+1. **Dialogs.** `components/ui/dialog.tsx` is a modal dialog: `role="dialog"`
+   (or `alertdialog`), `aria-modal`, labelled by its title and described by
+   its subtitle, focus moved inside on open and returned on close, Tab kept
+   within the panel, Escape and the backdrop close it, named close control.
+   The quarantine preview and the delete confirmation use it.
+   `tests/unit/app/dialog.test.tsx` pins the contract.
+2. **Form errors.** The Cloudflare connection error is a `role="alert"`
+   region that receives focus when it appears, as the login form already did.
+3. **Keyboard focus.** The button, input and toggle primitives and every
+   native control that removed the outline show a 2 px primary ring on
+   keyboard focus (`focus-visible`), never on mouse click.
+4. **Headings.** Every route has one `h1`; the contact page was the last
+   without one (the admin routes already get theirs from `AdminPage`).
+5. **Notifications.** Items are buttons in a labelled region, the bell
+   reports `aria-expanded`, Escape closes the popover, and unread state
+   carries the text "Non lu" for screen readers as well as the dot.
+6. **Tooltip.** The SSL help on Domain Shield is a button with
+   `aria-describedby`; the tooltip shows on focus as well as hover.
+7. **Labels.** The threats period filter and the settings domain picker are
+   labelled.
+8. **Placeholders.** Loading and unavailable values on the dashboard are
+   words, not an em dash.
+
+Still open:
+
+- The "managed records" help icon in the Domain Shield auto-fix panel is
+  hover-only; that panel is being reverted and the icon goes with it.
+- No automated audit (axe) has been run yet; see below.
 
 ## Resolved: danger text
 
