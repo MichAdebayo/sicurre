@@ -247,6 +247,17 @@ def _withdraw_dmarc_reporting(current_dmarc: str) -> str | None:
     return "; ".join(rebuilt)
 
 
+def _planned_change(current: str, proposed: str) -> str:
+    """What connecting would do to one record: add it, change it, or nothing.
+
+    Computed from the same merge the write path uses, so the preview cannot
+    promise something different from what is applied.
+    """
+    if not _clean_str(current):
+        return "add"
+    return "modify" if _clean_str(current) != _clean_str(proposed) else "keep"
+
+
 async def _sync_domain_shield_dns(
     *,
     provisioner: CloudflareProvisioner,
@@ -470,8 +481,13 @@ class CloudflareSetupRequest(BaseModel):
     )
     zone_name: str = Field(..., description="Domain to protect, e.g. vinse.app")
     destination_email: str = Field(..., description="Where clean mail is forwarded after scanning")
-    fix_spf: bool = True
-    fix_dmarc: bool = True
+    # Default off. Connecting used to rewrite a customer's SPF and DMARC before
+    # they had seen either record, because the interface sent neither flag and
+    # both defaulted on. Mail interception is what they asked for; editing
+    # records they already depend on is a separate consent, and the caller now
+    # has to say so.
+    fix_spf: bool = False
+    fix_dmarc: bool = False
 
 
 class CloudflareStatusResponse(BaseModel):
@@ -1580,7 +1596,21 @@ async def verify_cloudflare_token(
         if not token_ok:
             return {"valid": False, "error": "Token verification failed"}
         zone_id, _ = await provisioner.get_zone(payload.zone_name)
-        return {"valid": True, "zone_id": zone_id}
+        # Read the zone and work out what connecting would actually change, so
+        # the customer can be shown it before they press the button rather than
+        # after. This is the same read provisioning does; nothing is written.
+        spf, dkim, dmarc = _read_dns_state(
+            await provisioner.get_dns_records(zone_id), payload.zone_name
+        )
+        return {
+            "valid": True,
+            "zone_id": zone_id,
+            "plan": {
+                "spf": _planned_change(spf, _merge_spf(spf)),
+                "dmarc": _planned_change(dmarc, _merge_dmarc(dmarc)),
+                "dkim_present": bool(dkim),
+            },
+        }
     except CloudflareAPIError as exc:
         return {"valid": False, "error": str(exc)}
 

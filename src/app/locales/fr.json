@@ -591,7 +591,23 @@
     "report_failed_hint": "Usurpation possible",
     "report_sources_title": "5 principales sources d'envoi",
     "dkim_label": "DKIM (signature de votre fournisseur d'e-mail)",
-    "dkim_provider_managed": "Géré par votre fournisseur"
+    "dkim_provider_managed": "Géré par votre fournisseur",
+    "dkim_provider_absent": "Introuvable",
+    "managed_records": "Ce que Sicurre gère sur votre domaine",
+    "group_writes": "Sicurre modifiera — décochez pour laisser tel quel",
+    "group_reads": "Sicurre lit seulement — rien à modifier ici",
+    "row_spf": "Autoriser nos serveurs à recevoir votre courrier",
+    "row_dmarc": "Publier votre politique anti-usurpation",
+    "row_dmarc_policy": "Rejeter les messages usurpés, pas seulement les observer",
+    "row_dmarc_reporting": "Nous envoyer vos rapports d'usurpation",
+    "row_certificate": "Certificat public de votre domaine",
+    "row_in_place": "En place",
+    "row_enforced": "Appliquée",
+    "row_monitor_only": "Surveille seulement",
+    "row_enabled": "Activé",
+    "row_not_inspected": "Non inspecté",
+    "dmarc_open_items_one": "1 point à régler",
+    "dmarc_open_items_other": "{{count}} points à régler"
   },
   "settings": {
     "title": "Configuration de Sicurre",
@@ -739,7 +755,15 @@
     "errors": {
       "zone_not_found": "Ce domaine est introuvable dans les zones accessibles par ce token.",
       "invalid_token": "Cloudflare a refusé le token API."
-    }
+    },
+    "plan_title": "Ce que la connexion va changer sur votre domaine",
+    "plan_gateway": "Passerelle anti-hameçonnage et routage du courrier",
+    "plan_spf": "Autoriser nos serveurs à recevoir votre courrier",
+    "plan_dmarc": "Publier votre politique anti-usurpation",
+    "plan_add": "Ajouté",
+    "plan_modify": "Modifié",
+    "plan_keep": "Inchangé",
+    "plan_footnote": "Aucun enregistrement n'est supprimé et rien d'autre n'est touché. Décochez pour laisser un enregistrement tel quel."
   },
   "landing": {
     "nav_login": "Connexion",

@@ -591,7 +591,23 @@
     "report_failed_hint": "Possible spoofing",
     "report_sources_title": "Top 5 sending sources",
     "dkim_label": "DKIM (signature from your mail provider)",
-    "dkim_provider_managed": "Managed by your provider"
+    "dkim_provider_managed": "Managed by your provider",
+    "dkim_provider_absent": "Not found",
+    "managed_records": "What Sicurre manages on your domain",
+    "group_writes": "Sicurre will modify — untick to leave as is",
+    "group_reads": "Sicurre only reads — nothing to change here",
+    "row_spf": "Allow our servers to receive your mail",
+    "row_dmarc": "Publish your anti-spoofing policy",
+    "row_dmarc_policy": "Reject spoofed messages, not just watch them",
+    "row_dmarc_reporting": "Send us your spoofing reports",
+    "row_certificate": "Public certificate for your domain",
+    "row_in_place": "In place",
+    "row_enforced": "Enforced",
+    "row_monitor_only": "Monitor only",
+    "row_enabled": "Enabled",
+    "row_not_inspected": "Not inspected",
+    "dmarc_open_items_one": "1 item to resolve",
+    "dmarc_open_items_other": "{{count}} items to resolve"
   },
   "settings": {
     "title": "Sicurre Configuration",
@@ -739,7 +755,15 @@
     "errors": {
       "zone_not_found": "This domain was not found among the zones accessible to this token.",
       "invalid_token": "Cloudflare rejected the API token."
-    }
+    },
+    "plan_title": "What connecting will change on your domain",
+    "plan_gateway": "Anti-phishing gateway and mail routing",
+    "plan_spf": "Allow our servers to receive your mail",
+    "plan_dmarc": "Publish your anti-spoofing policy",
+    "plan_add": "Added",
+    "plan_modify": "Modified",
+    "plan_keep": "Unchanged",
+    "plan_footnote": "No record is deleted, and nothing outside these is touched. Untick to leave a record as it is."
   },
   "landing": {
     "nav_login": "Sign in",

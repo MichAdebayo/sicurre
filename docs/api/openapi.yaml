@@ -594,6 +594,38 @@ components:
       - matched
       title: BlacklistStatusResponse
       type: object
+    CloudflareDnsPlan:
+      additionalProperties: false
+      description: 'What connecting would change on the customer''s zone.
+
+
+        Derived from the same merge the write path uses, so what is shown before
+
+        the button is what gets applied after it.'
+      properties:
+        dkim_present:
+          title: Dkim Present
+          type: boolean
+        dmarc:
+          enum:
+          - add
+          - modify
+          - keep
+          title: Dmarc
+          type: string
+        spf:
+          enum:
+          - add
+          - modify
+          - keep
+          title: Spf
+          type: string
+      required:
+      - spf
+      - dmarc
+      - dkim_present
+      title: CloudflareDnsPlan
+      type: object
     CloudflareDnsSyncResponse:
       additionalProperties: false
       description: Domain Shield values recomputed during provisioning.
@@ -697,11 +729,11 @@ components:
           title: Destination Email
           type: string
         fix_dmarc:
-          default: true
+          default: false
           title: Fix Dmarc
           type: boolean
         fix_spf:
-          default: true
+          default: false
           title: Fix Spf
           type: boolean
         zone_name:
@@ -798,6 +830,10 @@ components:
           - type: string
           - type: 'null'
           title: Error
+        plan:
+          anyOf:
+          - $ref: '#/components/schemas/CloudflareDnsPlan'
+          - type: 'null'
         valid:
           title: Valid
           type: boolean
