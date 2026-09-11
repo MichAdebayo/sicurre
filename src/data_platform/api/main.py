@@ -3,7 +3,7 @@ import logging
 import subprocess
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Response, status
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
@@ -17,8 +17,13 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy.exc import SQLAlchemyError
 
+from core import db_health
 from core.config import get_settings
-from core.db_keepalive import keepalive_enabled, run_db_keepalive
+from core.db_keepalive import (
+    check_database_now,
+    keepalive_enabled,
+    run_db_keepalive,
+)
 from core.inference_client import close_inference_client
 from core.provider_credentials import encrypt_legacy_provider_credentials
 from core.rate_limit import limiter
@@ -28,7 +33,10 @@ from data_platform.api.routers.app_routes import synchronize_operational_exercis
 from data_platform.api.routers.integrations import router as integrations_router
 from data_platform.api.routers.internal import router as internal_router
 from data_platform.api.routers.reported_email import router as reported_email_router
-from data_platform.api.schemas.integration_responses import HealthResponse
+from data_platform.api.schemas.integration_responses import (
+    HealthResponse,
+    ReadinessResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -177,6 +185,42 @@ def create_app() -> FastAPI:
     @limiter.exempt
     async def healthcheck() -> dict[str, str]:
         return {"status": "ok", "environment": settings.environment}
+
+    @app.get("/health/ready", tags=["system"], response_model=ReadinessResponse)
+    @limiter.exempt
+    async def readiness(response: Response) -> dict[str, object]:
+        """Report whether the database is reachable, without forcing a restart.
+
+        Kept apart from `/health` on purpose: Docker restarts this container on
+        a failing health check, and a restart cannot mend a database that is
+        down — it only loops and buries the cause. This one is for alerting.
+
+        The answer comes from the keepalive's last ping where that is recent
+        enough, so scraping it does not add load or hold a serverless compute
+        awake. Only a stale record triggers a probe of its own.
+        """
+        if db_health.is_stale():
+            try:
+                await check_database_now()
+            except Exception as exc:  # noqa: BLE001 - the outcome is the answer
+                db_health.record_failure(f"{type(exc).__name__}: {exc}")
+        ok, detail, age = db_health.last_observation()
+        if not ok:
+            response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+            return {
+                "status": "degraded",
+                "environment": settings.environment,
+                "database": "unreachable",
+                "detail": detail or "no successful database round trip recorded",
+                "observed_seconds_ago": round(age, 1) if age is not None else None,
+            }
+        return {
+            "status": "ready",
+            "environment": settings.environment,
+            "database": "reachable",
+            "detail": None,
+            "observed_seconds_ago": round(age, 1) if age is not None else None,
+        }
 
     @app.get("/metrics", include_in_schema=False)
     @limiter.exempt

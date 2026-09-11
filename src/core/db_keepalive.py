@@ -27,6 +27,7 @@ import logging
 from sqlalchemy import text
 
 from core.config import get_settings
+from core.db_health import record_failure, record_success
 from db.runtime import get_app_engine
 
 logger = logging.getLogger(__name__)
@@ -42,15 +43,30 @@ async def _ping_once() -> None:
         await connection.execute(text("SELECT 1"))
 
 
+async def check_database_now() -> None:
+    """Probe the database once and record the result.
+
+    Used by the readiness endpoint when no recent observation exists, which is
+    the case whenever the keepalive is turned off. It raises on failure so the
+    caller can record the reason.
+    """
+    await _ping_once()
+    record_success()
+
+
 async def run_db_keepalive(interval_seconds: float | None = None) -> None:
     """Ping the database on an interval until cancelled."""
     interval = interval_seconds or DEFAULT_INTERVAL_SECONDS
     while True:
         try:
             await _ping_once()
+            # The ping already proves the database answered. Recording that is
+            # free, and it is the only regular observation this service makes.
+            record_success()
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001 - warmth is best-effort by design
+            record_failure(f"{type(exc).__name__}: {exc}")
             logger.warning("Database keepalive ping failed: %s", exc)
         try:
             await asyncio.sleep(interval)
