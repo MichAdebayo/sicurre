@@ -75,6 +75,12 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
   const hasSicurreDmarcReporting = !!shieldStatus?.dmarc?.reporting_enabled || !!(shieldStatus?.dmarc?.record || "").includes("dmarc@sicurre.com");
   const isDmarcValid = !!(shieldStatus?.dmarc?.valid && hasRestrictiveDmarcPolicy);
   const isDmarcComplete = isDmarcValid && hasSicurreDmarcReporting;
+  // How many of the three DMARC facts still need work. The card used to show a
+  // colour and nothing else, so a grade could drop with no way to tell why.
+  const dmarcOpenItems = shieldStatus
+    ? [!shieldStatus.dmarc.valid, !hasRestrictiveDmarcPolicy, !hasSicurreDmarcReporting]
+        .filter(Boolean).length
+    : 0;
   const needsDnsSetup = !!(shieldStatus && (!shieldStatus.spf.valid || !shieldStatus.dkim.valid || !isDmarcValid || !hasSicurreDmarcReporting));
   const isShieldLoading = shieldLoading || refreshShieldMutation.isPending;
 
@@ -526,8 +532,12 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
 
                   const severity = (() => {
                     if (step.id === "dmarc") {
+                      // Three separately scored facts live behind this one card:
+                      // the record, its policy strength, and whether it reports
+                      // to Sicurre. The severity was already right; what was
+                      // missing is saying which of them is open, which the
+                      // count below the label now does.
                       if (!shieldStatus?.dmarc?.valid) return "error";
-                      if (shieldStatus?.dmarc?.policy === "none") return "warning";
                       if (!hasRestrictiveDmarcPolicy) return "warning";
                       if (!hasSicurreDmarcReporting) return "warning";
                       return "success";
@@ -596,7 +606,9 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                           </span>
                         </div>
                         <p className="text-[10.5px] text-on-surface-variant font-semibold leading-snug">
-                          {t(step.descriptionKey)}
+                          {step.id === "dmarc" && isStepCompleted && dmarcOpenItems > 0
+                            ? t("domain_shield.dmarc_open_items", { count: dmarcOpenItems })
+                            : t(step.descriptionKey)}
                         </p>
                       </div>
 
@@ -635,89 +647,143 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                       </div>
                     </div>
                   )}
+                  {/* What Sicurre manages on this domain.
+                      Shown whether or not anything is wrong: gating it on
+                      needsDnsSetup meant a healthy customer could never see
+                      what had been changed on their own DNS.
 
-                  {/* Target configuration breakdown list */}
-                  {needsDnsSetup && (
-                    <div className="bg-surface-low border border-border-subtle rounded-xl p-3.5 space-y-2.5 text-xs">
-                      <div className="mb-1 flex items-center justify-between text-xs font-bold text-on-surface-variant">
-                        <div className="flex items-center gap-1.5">
-                          <span>{t("domain_shield.dns_records")}</span>
-
-                          {/* Tooltip safety info */}
-                          <div className="relative group">
-                            <Info className="w-3.5 h-3.5 text-primary cursor-help hover:text-primary-hover transition-colors" />
-                            <div className="absolute bottom-full right-0 mb-1.5 w-64 max-w-[calc(100vw-3rem)] rounded-lg border border-border-subtle bg-surface-lowest p-2.5 text-center font-sans text-[10px] font-bold normal-case leading-normal text-on-surface opacity-0 shadow-xl transition-opacity duration-200 pointer-events-none group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50">
-                              {t("domain_shield.dns_records_help")}
-                            </div>
+                      Grouped by ownership, because a checkbox here is consent
+                      to write a record into someone else's zone - not a to-do.
+                      A box means "we will write this, and you may decline it";
+                      no box means the record is not ours to touch. */}
+                  <div className="bg-surface-low border border-border-subtle rounded-xl p-3.5 space-y-2.5 text-xs">
+                    <div className="mb-1 flex items-center justify-between text-xs font-bold text-on-surface-variant">
+                      <div className="flex items-center gap-1.5">
+                        <span>{t("domain_shield.managed_records")}</span>
+                        <div className="relative group">
+                          <Info className="w-3.5 h-3.5 text-primary cursor-help hover:text-primary-hover transition-colors" />
+                          <div className="absolute bottom-full right-0 mb-1.5 w-64 max-w-[calc(100vw-3rem)] rounded-lg border border-border-subtle bg-surface-lowest p-2.5 text-center font-sans text-[10px] font-bold normal-case leading-normal text-on-surface opacity-0 shadow-xl transition-opacity duration-200 pointer-events-none group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50">
+                            {t("domain_shield.dns_records_help")}
                           </div>
                         </div>
-                        <span className="text-[9.5px] font-mono lowercase text-on-surface-variant/60 font-semibold">@{selectedDomain}</span>
                       </div>
-                      <div className="space-y-2.5 pt-0.5">
-                        {/* SPF Record */}
-                        {!shieldStatus.spf.valid && (
-                          <div className="flex items-center justify-between font-semibold border-b border-border-subtle/50 pb-2 last:border-b-0">
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={fixSpf}
-                                onChange={(e) => setFixSpf(e.target.checked)}
-                                className="w-4 h-4 text-primary bg-surface-lowest border-border-subtle rounded cursor-pointer focus:ring-0"
-                              />
-                              <span className="text-on-surface">SPF (TXT @)</span>
-                            </div>
-                            <span className="text-error text-[11px] font-bold bg-error/[0.04] px-2 py-0.5 rounded border border-error/20">
-                              {t("domain_shield.status_missing_incorrect")}
-                            </span>
-                          </div>
-                        )}
+                      <span className="text-[9.5px] font-mono lowercase text-on-surface-variant/60 font-semibold">@{selectedDomain}</span>
+                    </div>
 
-                        {/* DKIM is listed, never offered as a fix. The signing key
-                            belongs to whoever sends the mail - Cloudflare mints one for
-                            routed mail at cf2024-1._domainkey, Google or Microsoft for a
-                            customer's own sending - so there is nothing here for Sicurre
-                            to write. It used to publish a placeholder and call it valid. */}
-                        {!shieldStatus.dkim.valid && (
-                          <div className="flex items-center justify-between font-semibold border-b border-border-subtle/50 pb-2 last:border-b-0">
-                            <div className="flex items-center gap-2">
-                              <span className="ml-6 text-on-surface">{t("domain_shield.dkim_label")}</span>
-                            </div>
-                            <span className="text-on-surface-variant text-[11px] font-bold bg-surface-low px-2 py-0.5 rounded border border-border-subtle">
-                              {t("domain_shield.dkim_provider_managed")}
-                            </span>
-                          </div>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant/70">
+                      {t("domain_shield.group_writes")}
+                    </p>
+                    <div className="space-y-2.5 pt-0.5">
+                      {/* SPF */}
+                      <div className="flex items-center justify-between gap-2 font-semibold border-b border-border-subtle/50 pb-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={fixSpf}
+                            onChange={(e) => setFixSpf(e.target.checked)}
+                            disabled={shieldStatus.spf.valid}
+                            className="w-4 h-4 text-primary bg-surface-lowest border-border-subtle rounded cursor-pointer focus:ring-0 disabled:cursor-default disabled:opacity-40"
+                          />
+                          <span className="text-on-surface">{t("domain_shield.row_spf")}</span>
+                        </div>
+                        {shieldStatus.spf.valid ? (
+                          <span className="shrink-0 rounded border border-safe/25 bg-safe-bg px-2 py-0.5 text-[11px] font-bold text-safe">
+                            {t("domain_shield.row_in_place")}
+                          </span>
+                        ) : (
+                          <span className="shrink-0 text-error text-[11px] font-bold bg-error/[0.04] px-2 py-0.5 rounded border border-error/20">
+                            {t("domain_shield.status_missing_incorrect")}
+                          </span>
                         )}
+                      </div>
 
-                        {/* DMARC Record */}
-                        {(!isDmarcValid || !hasSicurreDmarcReporting) && (
-                          <div className="flex items-center justify-between font-semibold last:border-b-0">
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={fixDmarc}
-                                onChange={(e) => setFixDmarc(e.target.checked)}
-                                className="w-4 h-4 text-primary bg-surface-lowest border-border-subtle rounded cursor-pointer focus:ring-0"
-                              />
-                              <span className="text-on-surface">DMARC (TXT _dmarc)</span>
-                            </div>
-                            {!shieldStatus.dmarc.valid ? (
-                              <span className="text-error text-[11px] font-bold bg-error/[0.04] px-2 py-0.5 rounded border border-error/20">
-                                {t("domain_shield.status_missing_incorrect")}
-                              </span>
-                            ) : isDmarcValid && !hasSicurreDmarcReporting ? (
-                              <span className="rounded border border-warning/25 bg-warning-bg px-2 py-0.5 text-[11px] font-bold text-warning">
-                                {t("domain_shield.reporting_missing")}
-                              </span>
-                            ) : (
-                              <span className="rounded border border-warning/25 bg-warning-bg px-2 py-0.5 text-[11px] font-bold text-warning">
-                                {t("domain_shield.status_partial")}
-                              </span>
-                            )}
-                          </div>
+                      {/* DMARC, and the two facts inside the same record.
+                          Policy strength and reporting are each scored
+                          separately but were collapsed into one badge, so a
+                          customer could see a grade drop with no way to tell
+                          which of the two caused it. They indent under the
+                          parent and carry no checkbox of their own, because
+                          one write fixes both. */}
+                      <div className="flex items-center justify-between gap-2 font-semibold">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={fixDmarc}
+                            onChange={(e) => setFixDmarc(e.target.checked)}
+                            disabled={isDmarcComplete}
+                            className="w-4 h-4 text-primary bg-surface-lowest border-border-subtle rounded cursor-pointer focus:ring-0 disabled:cursor-default disabled:opacity-40"
+                          />
+                          <span className="text-on-surface">{t("domain_shield.row_dmarc")}</span>
+                        </div>
+                        {shieldStatus.dmarc.valid ? (
+                          <span className="shrink-0 rounded border border-safe/25 bg-safe-bg px-2 py-0.5 text-[11px] font-bold text-safe">
+                            {t("domain_shield.row_in_place")}
+                          </span>
+                        ) : (
+                          <span className="shrink-0 text-error text-[11px] font-bold bg-error/[0.04] px-2 py-0.5 rounded border border-error/20">
+                            {t("domain_shield.status_missing_incorrect")}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 pl-6 font-semibold">
+                        <span className="min-w-0 text-on-surface-variant">{t("domain_shield.row_dmarc_policy")}</span>
+                        {hasRestrictiveDmarcPolicy ? (
+                          <span className="shrink-0 rounded border border-safe/25 bg-safe-bg px-2 py-0.5 text-[11px] font-bold text-safe">
+                            {t("domain_shield.row_enforced")}
+                          </span>
+                        ) : (
+                          <span className="shrink-0 rounded border border-warning/25 bg-warning-bg px-2 py-0.5 text-[11px] font-bold text-warning">
+                            {t("domain_shield.row_monitor_only")}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 pl-6 font-semibold">
+                        <span className="min-w-0 text-on-surface-variant">{t("domain_shield.row_dmarc_reporting")}</span>
+                        {hasSicurreDmarcReporting ? (
+                          <span className="shrink-0 rounded border border-safe/25 bg-safe-bg px-2 py-0.5 text-[11px] font-bold text-safe">
+                            {t("domain_shield.row_enabled")}
+                          </span>
+                        ) : (
+                          <span className="shrink-0 rounded border border-warning/25 bg-warning-bg px-2 py-0.5 text-[11px] font-bold text-warning">
+                            {t("domain_shield.reporting_missing")}
+                          </span>
                         )}
                       </div>
                     </div>
-                  )}
+
+                    <p className="pt-1 text-[10px] font-bold uppercase tracking-wide text-on-surface-variant/70">
+                      {t("domain_shield.group_reads")}
+                    </p>
+                    <div className="space-y-2.5 pt-0.5">
+                      {/* DKIM is listed, never offered as a fix. The signing key
+                          belongs to whoever sends the mail - Cloudflare mints one for
+                          routed mail at cf2024-1._domainkey, Google or Microsoft for a
+                          customer's own sending - so there is nothing here for Sicurre
+                          to write. It used to publish a placeholder and call it valid. */}
+                      <div className="flex items-center justify-between gap-2 font-semibold border-b border-border-subtle/50 pb-2">
+                        <span className="min-w-0 text-on-surface">{t("domain_shield.dkim_label")}</span>
+                        <span className="shrink-0 text-on-surface-variant text-[11px] font-bold bg-surface-low px-2 py-0.5 rounded border border-border-subtle">
+                          {shieldStatus.dkim.valid
+                            ? t("domain_shield.dkim_provider_managed")
+                            : t("domain_shield.dkim_provider_absent")}
+                        </span>
+                      </div>
+
+                      {/* The certificate is read from the wire, not configured
+                          here, and contributes nothing to the grade. Labelled so
+                          it stops reading as something the customer must act on. */}
+                      <div className="flex items-center justify-between gap-2 font-semibold">
+                        <span className="min-w-0 text-on-surface">{t("domain_shield.row_certificate")}</span>
+                        <span className="shrink-0 text-on-surface-variant text-[11px] font-bold bg-surface-low px-2 py-0.5 rounded border border-border-subtle">
+                          {shieldStatus.ssl.valid
+                            ? t("domain_shield.ssl_countdown", { days: shieldStatus.ssl.days_remaining })
+                            : t("domain_shield.row_not_inspected")}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
 
                   {/* Cloudflare token warning alert shown inline only when token is missing */}
                   {!wsTokenData?.configured && (
