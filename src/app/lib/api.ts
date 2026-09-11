@@ -292,16 +292,10 @@ const DEVICE_PREFERENCE_KEYS = new Set([
 /**
  * Remove everything the signed-in session put in browser storage.
  *
- * This sweeps by prefix rather than naming keys. Several are named after the
- * data they hold — `sicurre:active-domain:<workspaceId>`,
- * `sicurre:kpis:<workspaceId>:<domain>`, `sicurre_domain_shield_status:<domain>`
- * — so they cannot be listed ahead of time, and the previous version removed
- * four fixed keys and left the rest behind. After logout a shared browser still
- * held the domain the previous user managed, that domain's SPF/DKIM/DMARC
- * posture, their threat counts and their workspace id.
- *
- * Sweeping also means a tenant-scoped key added later is cleared without anyone
- * remembering to update this function, which is the failure the fixed list had.
+ * Sweeps by the `sicurre` prefix rather than by name: several keys embed the
+ * workspace or domain they belong to and cannot be listed ahead of time, and
+ * a tenant-scoped key added later is cleared without this function changing.
+ * Device preferences (theme, language, rail state) are kept.
  */
 export function clearStoredSession(): void {
   for (const store of [localStorage, sessionStorage]) {

@@ -8,14 +8,10 @@
  *   - `auth.ts` passes it to Better Auth, which also uses it for its CSRF
  *     origin check, deciding who may submit state-changing requests.
  *
- * It previously existed as two identical literals, one per file. Correcting
- * only the CORS copy would have changed the response headers and left CSRF
- * still trusting the same origins — a fix that looks like it worked.
- *
- * The development origins are gated on the environment. Shipped ungated, a
- * production deployment trusts a Vite dev server that only exists on a
- * developer's machine: any page the victim loads on their own localhost:5173
- * could read authenticated responses from the live service.
+ * The development origins are gated on the environment: a production
+ * deployment must not trust a Vite dev server, or any page loaded on a
+ * developer's localhost could read authenticated responses from the live
+ * service.
  */
 
 const DEV_ORIGINS = ["http://127.0.0.1:5173", "http://localhost:5173"] as const;

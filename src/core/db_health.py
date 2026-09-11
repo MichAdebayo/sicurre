@@ -1,15 +1,9 @@
-"""Whether the database is reachable, and how long ago we last knew.
+"""Last known database reachability, for the readiness endpoint and a gauge.
 
-`/health` cannot answer this. It is what Docker restarts the container on, and
-restarting the API does not fix an unreachable database — it produces a restart
-loop that hides the outage instead of reporting it. So liveness stays cheap and
-readiness lives here.
-
-The observation is recorded rather than probed. The keepalive already opens a
-connection every thirty seconds; making it report what it saw costs nothing,
-where a second periodic probe would be one more thing holding a serverless
-compute awake. When no keepalive is running the record goes stale, and the
-readiness endpoint probes once rather than reporting an answer it does not have.
+Liveness (``/health``) never depends on the database: Docker restarts the
+container on it, and a restart cannot fix an unreachable database. Readiness
+reads the observation the keepalive ping records here; when no observation
+is recent (``STALE_AFTER_SECONDS``) the readiness endpoint probes once.
 """
 
 from __future__ import annotations

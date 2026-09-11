@@ -10,8 +10,7 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, icon, suffix, className, id, ...props }, ref) => {
-    // Callers rarely pass an id, which previously left both htmlFor and the
-    // input id undefined — the label was announced as unassociated text.
+    // Generate an id when the caller passes none, so the label stays associated.
     const generatedId = useId();
     const inputId = id ?? generatedId;
     const errorId = `${inputId}-error`;

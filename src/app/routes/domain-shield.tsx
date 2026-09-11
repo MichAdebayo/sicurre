@@ -75,8 +75,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
   const hasSicurreDmarcReporting = !!shieldStatus?.dmarc?.reporting_enabled || !!(shieldStatus?.dmarc?.record || "").includes("dmarc@sicurre.com");
   const isDmarcValid = !!(shieldStatus?.dmarc?.valid && hasRestrictiveDmarcPolicy);
   const isDmarcComplete = isDmarcValid && hasSicurreDmarcReporting;
-  // How many of the three DMARC facts still need work. The card used to show a
-  // colour and nothing else, so a grade could drop with no way to tell why.
+  // How many of the three DMARC facts still need work; the card names them.
   const dmarcOpenItems = shieldStatus
     ? [!shieldStatus.dmarc.valid, !hasRestrictiveDmarcPolicy, !hasSicurreDmarcReporting]
         .filter(Boolean).length

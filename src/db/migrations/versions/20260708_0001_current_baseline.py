@@ -4,9 +4,8 @@ Revision ID: 20260708_0001
 Revises:
 Create Date: 2026-07-08 00:00:00.000000
 
-This repository is still pre-production for the data-platform database.
-The earlier exploratory migration chain has been retired so a fresh local or
-Neon database can be created with the current ORM schema in one pass.
+Creates the current ORM schema in one pass for a fresh local or Neon
+database; the earlier exploratory migration chain was retired.
 """
 
 from __future__ import annotations

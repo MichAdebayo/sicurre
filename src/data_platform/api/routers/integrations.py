@@ -1,21 +1,18 @@
-"""
-Integrations router — two responsibilities:
+"""Email scan and Cloudflare integration router.
 
-1. POST /v1/email/scan
-   Public endpoint called by the Cloudflare Email Worker.
-   Validates the shared-secret header, forwards the payload to the inference
-   engine, logs the decision to sicurre.db, and returns a verdict JSON.
-
-2. POST /v1/integrations/cloudflare/setup
-   Authenticated endpoint that provisions an entire Cloudflare email intercept
-   pipeline (Email Routing + Email Worker + DNS catch-all rule) for a domain
-   in a single API call.
-
-3. GET  /v1/integrations/cloudflare/status
-   Returns the current integration record for the calling user.
-
-4. DELETE /v1/integrations/cloudflare
-   Tears down the Cloudflare pipeline and removes the DB record.
+- ``POST /v1/email/scan``: called by the Email Worker with the shared secret;
+  runs rules, blocklists and the inference service, records the event and
+  returns the verdict.
+- ``PUT /v1/email/quarantine/{item_id}/content``: the Worker deposits a held
+  message's MIME.
+- ``POST /v1/integrations/cloudflare/verify-token``: read the zone and return
+  the DNS plan without writing anything.
+- ``POST /v1/integrations/cloudflare/setup``: provision Email Routing, the
+  Worker, the catch-all rule and the consented DNS records.
+- ``GET /v1/integrations/cloudflare/status``, ``DELETE
+  /v1/integrations/cloudflare``: report or tear down the integration.
+- ``GET``/``POST``/``DELETE /v1/integrations/cloudflare/token``: the
+  workspace's encrypted Cloudflare token.
 """
 
 from __future__ import annotations
@@ -84,13 +81,9 @@ def _clean_str(val: str) -> str:
     return val
 
 
-#: The only include Email Routing needs. `spf.cloudflare.com` publishes no SPF
-#: record at all, and RFC 7208 makes a missing include target a permerror, which
-#: propagates to the whole record - so it was not merely useless. Every SPF
-#: mechanism also costs one of the ten DNS lookups a record is allowed, and
-#: `include:sicurre.com` spent one to reach the same Cloudflare ranges by a
-#: longer path while granting Sicurre permission to send as the customer, which
-#: it never does.
+#: The only include Email Routing needs. ``spf.cloudflare.com`` publishes no
+#: SPF record and a missing include target is a permerror under RFC 7208;
+#: each include also costs one of the ten DNS lookups a record is allowed.
 _CLOUDFLARE_ROUTING_INCLUDE = "include:_spf.mx.cloudflare.net"
 
 #: Mechanisms Sicurre has published in the past and now withdraws. Only ever
@@ -130,11 +123,8 @@ def _merge_spf(current_spf: str) -> str:
 def _has_usable_dkim(content: str) -> bool:
     """True when a DKIM record carries a real public key.
 
-    Sicurre used to publish `v=DKIM1; k=rsa; p=MII...` - a 44-character stub
-    ending in an ellipsis - and then accept any record containing `v=DKIM1` as
-    proof DKIM was configured, so the check passed on its own placeholder. A
-    genuine RSA public key is a few hundred base64 characters; an empty `p=`
-    means the key was revoked. Both are rejected here.
+    A genuine RSA public key is a few hundred base64 characters; a short
+    placeholder or an empty ``p=`` (a revoked key) is rejected.
     """
     if "v=dkim1" not in content.lower():
         return False
@@ -147,15 +137,10 @@ def _read_dns_state(
 ) -> tuple[str, str, str]:
     """Pick the SPF, DKIM and DMARC records out of a zone's TXT records.
 
-    Returns the raw content of each, or "" when absent.
-
-    An apex TXT is only SPF if it says so. Reading any apex record as SPF took
-    whichever the provider listed last - often a Google or Microsoft
-    verification token - and `_merge_spf` then saw no `v=spf1` prefix and
-    returned a fresh default, discarding the customer's real record.
-
-    This lives in one place because the setup route and the DNS sync both need
-    it, and two copies of a rule about someone else's DNS is how they drift.
+    Returns the raw content of each, or "" when absent. An apex TXT record
+    counts as SPF only when it starts with ``v=spf1``; other apex records
+    (provider verification tokens) are ignored. Shared by the setup route and
+    the DNS sync.
     """
     spf = dkim = dmarc = ""
     zone = zone_name.lower().rstrip(".")
@@ -177,11 +162,8 @@ def _read_dns_state(
 async def _measure_ssl(domain: str) -> tuple[int, int]:
     """Inspect the domain's public certificate for the shield status cache.
 
-    Returns ``(ssl_valid, days_remaining)``. A domain whose certificate cannot
-    be read is recorded as ``(0, 0)`` — the same thing the refresh path records
-    — rather than being credited with a lifetime nobody measured. The cached
-    read ages ``days_remaining`` down day by day, so a fabricated year here
-    would have been reported as fact for a year.
+    Returns ``(ssl_valid, days_remaining)``, or ``(0, 0)`` when the
+    certificate cannot be read, matching what the refresh path records.
     """
     days_remaining = await asyncio.to_thread(get_ssl_expiry_days, domain)
     return (1, days_remaining) if days_remaining >= 0 else (0, 0)
@@ -211,16 +193,11 @@ _SICURRE_DMARC_MAILBOX = "dmarc@sicurre.com"
 
 
 def _withdraw_dmarc_reporting(current_dmarc: str) -> str | None:
-    """Take Sicurre's reporting address back out of a customer's DMARC record.
+    """Take Sicurre's reporting address out of a customer's DMARC record.
 
-    Returns the rewritten record, or None when there is nothing of ours in it.
-
-    Two things are deliberately left alone. The policy is never touched: we
-    cannot know what it was before we merged, and lowering it would weaken a
-    domain we no longer protect. And the record is never deleted, even one we
-    created outright - a departing customer keeps whatever DMARC protection
-    they have, minus our mailbox. What we withdraw is only the instruction to
-    keep sending us their aggregate reports.
+    Returns the rewritten record, or None when it contains nothing of ours.
+    The policy tag is never changed and the record is never deleted; only
+    Sicurre's mailbox is removed from ``rua`` and ``ruf``.
     """
     cleaned = _clean_str(current_dmarc)
     if not cleaned or _SICURRE_DMARC_MAILBOX not in cleaned.lower():
@@ -286,11 +263,9 @@ async def _sync_domain_shield_dns(
         )
         spf_val = 1
 
-    # DKIM is never written here. The signing key belongs to whoever sends the
-    # mail: Cloudflare mints its own for Email Routing at cf2024-1._domainkey,
-    # and a customer sending through Google or Microsoft gets one from them.
-    # Sicurre publishing a key it does not hold produced a record no verifier
-    # could use, at a selector nothing reads, reported as valid.
+    # DKIM is never written: the signing key belongs to whoever sends the mail
+    # (Cloudflare's own selector for Email Routing, the customer's provider for
+    # their own sending).
     dkim_val = 1 if existing_dkim_content else 0
     dkim_rec = existing_dkim_content or None
 
@@ -481,11 +456,8 @@ class CloudflareSetupRequest(BaseModel):
     )
     zone_name: str = Field(..., description="Domain to protect, e.g. vinse.app")
     destination_email: str = Field(..., description="Where clean mail is forwarded after scanning")
-    # Default off. Connecting used to rewrite a customer's SPF and DMARC before
-    # they had seen either record, because the interface sent neither flag and
-    # both defaulted on. Mail interception is what they asked for; editing
-    # records they already depend on is a separate consent, and the caller now
-    # has to say so.
+    # Default off: rewriting SPF or DMARC is a separate consent from mail
+    # interception, so the caller must opt in to each.
     fix_spf: bool = False
     fix_dmarc: bool = False
 
@@ -1507,11 +1479,8 @@ async def teardown_cloudflare(
                 detail=f"Cloudflare could not remove the routing resources: {exc}",
             ) from exc
 
-        # Stop the domain reporting to us before we forget it exists. Without
-        # this a former customer keeps mailing Sicurre their DMARC aggregates
-        # indefinitely, with no relationship and no way to know. The Worker and
-        # rule are already gone by now, so a DNS failure here is reported
-        # rather than raised - undoing a completed teardown would be worse.
+        # Withdraw Sicurre's DMARC reporting address. The Worker and rule are
+        # already gone, so a DNS failure here is reported rather than raised.
         try:
             _, _, existing_dmarc = _read_dns_state(
                 await provisioner.get_dns_records(row["zone_id"]), row["zone_name"]

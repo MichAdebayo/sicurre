@@ -187,12 +187,8 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
   // ── Integration Orchestration ─────────────────────────────────────────────
 
   /**
-   * Step one: read the zone and stop.
-   *
-   * Nothing is provisioned here. Showing the plan and then provisioning in the
-   * same handler would render the preview at the moment the write began, which
-   * is the failure this whole change exists to remove - the customer must be
-   * able to decline a record before it is written, not while it is.
+   * Step one: read the zone and stop. Nothing is written here; the plan is
+   * shown so the customer can decline a record before provisioning starts.
    */
   const handleVerify = async () => {
     if (!cfToken.trim() || !zoneName.trim()) return;

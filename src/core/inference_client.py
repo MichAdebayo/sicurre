@@ -1,18 +1,9 @@
 """One long-lived HTTP client for the inference service.
 
-The scan handler previously opened `httpx.AsyncClient` per request. Each open
-built a fresh connection pool and paid a TLS handshake to the inference host
-before a single byte of the classification request went out. Measurement put
-the data platform's `inference` stage at ~1852 ms against the inference
-service's own reported total of ~1577 ms — roughly 275 ms of the scan spent
-establishing a connection that the previous scan had already established and
-then discarded.
-
-Keeping one client alive lets keep-alive do its job: the TCP and TLS setup is
-paid once per process rather than once per email.
-
-The client is closed from the application lifespan so the pool does not outlive
-the event loop it was created on.
+A single ``httpx.AsyncClient`` per process keeps the connection pool and TLS
+session across scans, so connection setup is paid once rather than per email.
+The client is closed from the application lifespan so the pool does not
+outlive the event loop it was created on.
 """
 
 from __future__ import annotations
