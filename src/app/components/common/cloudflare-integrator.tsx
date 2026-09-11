@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
 
+import type { CloudflareDnsPlan } from "../../lib/api";
 import {
   SICURRE_TOKEN_PERMISSIONS,
   cloudflareTokenTemplateUrl,
@@ -123,6 +124,12 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
   const { t } = useTranslation();
   const { data: cfStatus, isLoading: statusLoading, refetch } = useCloudflareStatus();
   const verifyMutation = useVerifyCloudflareToken();
+  // What connecting would change on their zone, read before anything is
+  // written. Held so the customer sees it and can decline a record without
+  // declining the integration.
+  const [dnsPlan, setDnsPlan] = useState<CloudflareDnsPlan | null>(null);
+  const [applySpf, setApplySpf] = useState(true);
+  const [applyDmarc, setApplyDmarc] = useState(true);
   const setupMutation  = useSetupCloudflare();
   const teardownMutation = useTeardownCloudflare();
   const [dmarcStillReporting, setDmarcStillReporting] = useState(false);
@@ -191,6 +198,8 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
         zone_name: zoneName,
       });
 
+      if (result.plan) setDnsPlan(result.plan);
+
       if (!result.valid) {
         setStages(prev => prev.map(s => s.id === "verify" ? { ...s, status: "error", errorMsg: formatCloudflareError(t, result.error || t("cloudflare.invalid_token_or_domain")) } : s));
         return;
@@ -212,6 +221,8 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
         cf_api_token: cfToken,
         zone_name: zoneName,
         destination_email: userEmail,
+        fix_spf: applySpf,
+        fix_dmarc: applyDmarc,
       });
 
       setStages(prev => prev.map(s =>
@@ -595,6 +606,44 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
           </div>
         </div>
       </div>
+
+      {/* What connecting will change on their zone, shown before the button
+          rather than discovered after it. The two records Sicurre writes can
+          each be declined without declining the integration; the interception
+          itself - Email Routing, the Worker, the routing rule - is what they
+          came for and is not presented as optional. */}
+      {dnsPlan && (
+        <div className="rounded-xl border border-border-subtle bg-surface-low p-3.5 space-y-2.5 text-xs">
+          <p className="text-xs font-bold text-on-surface-variant">{t("cloudflare.plan_title")}</p>
+          <div className="flex items-center justify-between gap-2 font-semibold border-b border-border-subtle/50 pb-2">
+            <span className="min-w-0 text-on-surface">{t("cloudflare.plan_gateway")}</span>
+            <span className="shrink-0 rounded border border-primary/25 bg-primary/[0.06] px-2 py-0.5 text-[11px] font-bold text-primary">
+              {t("cloudflare.plan_add")}
+            </span>
+          </div>
+          {(["spf", "dmarc"] as const).map((record) => (
+            <div key={record} className="flex items-center justify-between gap-2 font-semibold">
+              <label className="flex min-w-0 items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={record === "spf" ? applySpf : applyDmarc}
+                  onChange={(e) =>
+                    record === "spf" ? setApplySpf(e.target.checked) : setApplyDmarc(e.target.checked)
+                  }
+                  className="w-4 h-4 text-primary bg-surface-lowest border-border-subtle rounded cursor-pointer focus:ring-0"
+                />
+                <span className="text-on-surface">{t(`cloudflare.plan_${record}`)}</span>
+              </label>
+              <span className="shrink-0 rounded border border-border-subtle bg-surface-lowest px-2 py-0.5 text-[11px] font-bold text-on-surface-variant">
+                {t(`cloudflare.plan_${dnsPlan[record]}`)}
+              </span>
+            </div>
+          ))}
+          <p className="text-[10.5px] font-semibold text-on-surface-variant/80 leading-snug">
+            {t("cloudflare.plan_footnote")}
+          </p>
+        </div>
+      )}
 
       <div className="flex justify-end pt-1">
         <Button
