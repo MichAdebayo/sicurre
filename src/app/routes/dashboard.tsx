@@ -195,7 +195,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
 
   const securityScoreGrade = () => {
     if (shieldStatus) return shieldStatus.score_grade;
-    return "—";
+    return t("dashboard.grade_unavailable");
   };
 
   const grade = securityScoreGrade();
@@ -294,10 +294,10 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
 
         {/* General KPI blocks */}
         <div className="md:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <KPIBlock label={t("dashboard.kpi_raw")} value={kpisLoading ? "—" : totalScans.toLocaleString()} variant="primary" />
-          <KPIBlock label={t("threats.badge_phishing")} value={kpisLoading ? "—" : phishingCount.toLocaleString()} variant="phishing" />
-          <KPIBlock label={t("threats.badge_spam")} value={kpisLoading ? "—" : spamCount.toLocaleString()} variant="spam" />
-          <KPIBlock label={t("threats.badge_legitimate")} value={kpisLoading ? "—" : legitimateCount.toLocaleString()} variant="legitimate" />
+          <KPIBlock label={t("dashboard.kpi_raw")} value={kpisLoading ? t("common.loading") : totalScans.toLocaleString()} variant="primary" />
+          <KPIBlock label={t("threats.badge_phishing")} value={kpisLoading ? t("common.loading") : phishingCount.toLocaleString()} variant="phishing" />
+          <KPIBlock label={t("threats.badge_spam")} value={kpisLoading ? t("common.loading") : spamCount.toLocaleString()} variant="spam" />
+          <KPIBlock label={t("threats.badge_legitimate")} value={kpisLoading ? t("common.loading") : legitimateCount.toLocaleString()} variant="legitimate" />
         </div>
       </div>
 

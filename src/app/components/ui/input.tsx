@@ -34,10 +34,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? errorId : undefined}
             className={clsx(
-              "w-full px-4 py-2.5 bg-surface-lowest border border-border-subtle rounded-lg text-body-md text-on-surface placeholder:text-on-surface-variant/40 transition-all duration-200 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:bg-surface-low",
+              "w-full px-4 py-2.5 bg-surface-lowest border border-border-subtle rounded-lg text-body-md text-on-surface placeholder:text-on-surface-variant/40 transition-all duration-200 focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 disabled:bg-surface-low",
               icon && "pl-11",
               suffix && "pr-11",
-              error && "border-error focus:border-error focus:ring-error/20",
+              error && "border-error focus:border-error focus-visible:ring-error",
               className,
             )}
             {...props}

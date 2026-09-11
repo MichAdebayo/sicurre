@@ -87,7 +87,7 @@ function LanguageSwitcher({ scrolled }: { scrolled: boolean }) {
         <div className="absolute right-0 mt-2 w-36 rounded-xl border border-white/15 bg-[#101424]/95 backdrop-blur-2xl text-white shadow-2xl shadow-black/80 py-1 text-[13px] font-medium text-left z-50 overflow-hidden">
           <button
             onClick={() => changeLanguage("fr")}
-            className={`w-full px-3.5 py-2.5 transition-all flex items-center gap-2.5 cursor-pointer border-0 outline-none hover:bg-primary/20 hover:text-white ${
+            className={`w-full px-3.5 py-2.5 transition-all flex items-center gap-2.5 cursor-pointer border-0 outline-none focus-visible:ring-2 focus-visible:ring-primary hover:bg-primary/20 hover:text-white ${
               currentLang === "fr" ? "text-primary font-bold bg-primary/10" : "text-white/80"
             }`}
           >
@@ -96,7 +96,7 @@ function LanguageSwitcher({ scrolled }: { scrolled: boolean }) {
           </button>
           <button
             onClick={() => changeLanguage("en")}
-            className={`w-full px-3.5 py-2.5 transition-all flex items-center gap-2.5 cursor-pointer border-0 outline-none hover:bg-primary/20 hover:text-white ${
+            className={`w-full px-3.5 py-2.5 transition-all flex items-center gap-2.5 cursor-pointer border-0 outline-none focus-visible:ring-2 focus-visible:ring-primary hover:bg-primary/20 hover:text-white ${
               currentLang === "en" ? "text-primary font-bold bg-primary/10" : "text-white/80"
             }`}
           >
@@ -534,19 +534,19 @@ export default function LandingRoute({
           <div className="flex flex-wrap items-center gap-6 text-[13px] font-medium">
             <button
               onClick={onNavigateToMentionsLegales}
-              className="text-slate-300 hover:text-white transition-colors cursor-pointer border-none bg-transparent p-0 font-medium outline-none"
+              className="text-slate-300 hover:text-white transition-colors cursor-pointer border-none bg-transparent p-0 font-medium outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               {t("landing.footer_mentions")}
             </button>
             <button
               onClick={onNavigateToConfidentialite}
-              className="text-slate-300 hover:text-white transition-colors cursor-pointer border-none bg-transparent p-0 font-medium outline-none"
+              className="text-slate-300 hover:text-white transition-colors cursor-pointer border-none bg-transparent p-0 font-medium outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               {t("landing.footer_privacy")}
             </button>
             <button
               onClick={onNavigateToContact}
-              className="text-slate-300 hover:text-white transition-colors cursor-pointer border-none bg-transparent p-0 font-medium outline-none"
+              className="text-slate-300 hover:text-white transition-colors cursor-pointer border-none bg-transparent p-0 font-medium outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               {t("landing.footer_contact")}
             </button>
