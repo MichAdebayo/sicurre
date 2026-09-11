@@ -660,6 +660,72 @@ components:
       - updated_at
       title: CloudflareDnsSyncResponse
       type: object
+    CloudflareDomainPreviewResponse:
+      additionalProperties: false
+      description: 'What public DNS says about a domain, before any token exists.
+
+
+        ``plan`` is derived from the same merge the write path uses, read from the
+
+        public records rather than the zone API, so it is indicative: the token
+
+        verification that follows reads the zone itself.'
+      properties:
+        dmarc_policy:
+          anyOf:
+          - enum:
+            - reject
+            - quarantine
+            - none
+            type: string
+          - type: 'null'
+          title: Dmarc Policy
+        dmarc_reporting:
+          default: false
+          title: Dmarc Reporting
+          type: boolean
+        mail_provider:
+          enum:
+          - cloudflare
+          - other
+          - none
+          title: Mail Provider
+          type: string
+        mx_hosts:
+          items:
+            type: string
+          title: Mx Hosts
+          type: array
+        nameservers:
+          items:
+            type: string
+          title: Nameservers
+          type: array
+        on_cloudflare:
+          title: On Cloudflare
+          type: boolean
+        plan:
+          anyOf:
+          - $ref: '#/components/schemas/CloudflareDnsPlan'
+          - type: 'null'
+        resolvable:
+          title: Resolvable
+          type: boolean
+        source:
+          const: public_dns
+          default: public_dns
+          title: Source
+          type: string
+        zone_name:
+          title: Zone Name
+          type: string
+      required:
+      - zone_name
+      - resolvable
+      - on_cloudflare
+      - mail_provider
+      title: CloudflareDomainPreviewResponse
+      type: object
     CloudflareIntegrationResponse:
       additionalProperties: false
       description: Sanitized Cloudflare integration state; credentials are never returned.
@@ -1310,6 +1376,17 @@ components:
       required:
       - valid
       title: DnsRecordStatusResponse
+      type: object
+    DomainPreviewRequest:
+      properties:
+        zone_name:
+          maxLength: 253
+          minLength: 3
+          title: Zone Name
+          type: string
+      required:
+      - zone_name
+      title: DomainPreviewRequest
       type: object
     DomainShieldResponse:
       additionalProperties: false
@@ -4639,6 +4716,39 @@ paths:
       summary: List Cloudflare Integrations
       tags:
       - app-ui-flows
+  /v1/integrations/cloudflare/preview:
+    post:
+      description: 'Describe a domain from public DNS, before the customer creates a token.
+
+
+        Reports whether the zone is on Cloudflare, who receives its mail, and
+
+        what connecting would add or modify. Reads only; needs no credentials.'
+      operationId: preview_cloudflare_domain_v1_integrations_cloudflare_preview_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DomainPreviewRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CloudflareDomainPreviewResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Preview Cloudflare Domain
+      tags:
+      - integrations
   /v1/integrations/cloudflare/setup:
     post:
       description: 'Full one-shot provisioning: • Find zone → enable Email Routing → deploy Email Worker

@@ -42,6 +42,7 @@ from fastapi import (
 from pydantic import BaseModel, Field
 
 from core.config import get_settings
+from core.domain_preview import normalize_zone, read_public_dns
 from core.inference_client import get_inference_client
 from core.loops import send_loops_transactional
 from core.mime_headers import decode_mime_header, extract_mime_body
@@ -55,6 +56,7 @@ from data_platform.api.schemas.app_responses import (
     StatusResponse,
 )
 from data_platform.api.schemas.integration_responses import (
+    CloudflareDomainPreviewResponse,
     CloudflareSetupResponse,
     CloudflareTeardownResponse,
     CloudflareTokenStatusResponse,
@@ -1582,6 +1584,56 @@ async def verify_cloudflare_token(
         }
     except CloudflareAPIError as exc:
         return {"valid": False, "error": str(exc)}
+
+
+class DomainPreviewRequest(BaseModel):
+    zone_name: str = Field(..., min_length=3, max_length=253)
+
+
+@router.post(
+    "/v1/integrations/cloudflare/preview",
+    response_model=CloudflareDomainPreviewResponse,
+    response_model_exclude_unset=True,
+)
+@limiter.limit("30/minute")
+async def preview_cloudflare_domain(
+    payload: DomainPreviewRequest,
+    request: Request,
+    current_user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Describe a domain from public DNS, before the customer creates a token.
+
+    Reports whether the zone is on Cloudflare, who receives its mail, and
+    what connecting would add or modify. Reads only; needs no credentials.
+    """
+    zone = normalize_zone(payload.zone_name)
+    if zone is None:
+        raise HTTPException(status_code=422, detail="zone_name must be a hostname")
+    snapshot = await read_public_dns(zone)
+    if not snapshot.resolvable:
+        return {
+            "zone_name": zone,
+            "resolvable": False,
+            "on_cloudflare": False,
+            "mail_provider": "none",
+        }
+    dmarc = _clean_str(snapshot.dmarc)
+    policy = "reject" if "p=reject" in dmarc else "quarantine" if "p=quarantine" in dmarc else "none"
+    return {
+        "zone_name": zone,
+        "resolvable": True,
+        "on_cloudflare": snapshot.on_cloudflare,
+        "nameservers": snapshot.nameservers,
+        "mail_provider": snapshot.mail_provider,
+        "mx_hosts": snapshot.mx_hosts,
+        "plan": {
+            "spf": _planned_change(snapshot.spf, _merge_spf(snapshot.spf)),
+            "dmarc": _planned_change(snapshot.dmarc, _merge_dmarc(snapshot.dmarc)),
+            "dkim_present": snapshot.dkim_present,
+        },
+        "dmarc_policy": policy if dmarc else None,
+        "dmarc_reporting": _SICURRE_DMARC_MAILBOX in dmarc.lower(),
+    }
 
 
 # --------------------------------------------------------------------------- ── 6.
