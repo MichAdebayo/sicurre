@@ -763,7 +763,9 @@
     "plan_add": "Ajouté",
     "plan_modify": "Modifié",
     "plan_keep": "Inchangé",
-    "plan_footnote": "Aucun enregistrement n'est supprimé et rien d'autre n'est touché. Décochez pour laisser un enregistrement tel quel."
+    "plan_footnote": "Aucun enregistrement n'est supprimé et rien d'autre n'est touché. Décochez pour laisser un enregistrement tel quel.",
+    "check_domain": "Vérifier ce domaine",
+    "checking": "Vérification…"
   },
   "landing": {
     "nav_login": "Connexion",
