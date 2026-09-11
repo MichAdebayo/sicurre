@@ -132,9 +132,6 @@ docs/simplon/
 docs/model/
 docs/deployment/
 docs/email-intercept.md
-deploy/hetzner/*.md
-deploy/nginx/ssl/*.md
-deploy/README.md
 tasks/
 scratch/
 
@@ -174,12 +171,7 @@ src/app/walkthrough.md
 env.api
 env.auth
 env.alloy
-deploy/README.md
-deploy/alloy/*.md
-deploy/grafana/*.md
-deploy/nginx/*.md
 
-DEPLOYMENT_BLOCKERS.md
 cert-readiness-audit.md
 # Golden evaluation sets are canonical in the dedicated R2 bucket, addressed by
 # immutable version tag and checksum. Local copies are working artifacts only,
@@ -191,7 +183,6 @@ scripts/README.md
 docs/architecture/issue-artifact.md
 scripts/certification/
 
-deploy/cloudflare/README.md
 
 build*.py
 
