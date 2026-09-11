@@ -1558,7 +1558,12 @@ components:
       type: object
     HealthResponse:
       additionalProperties: false
-      description: Process liveness and deployment environment.
+      description: 'Process liveness and deployment environment.
+
+
+        Deliberately says nothing about dependencies. Docker restarts the container
+
+        when this fails, and restarting cannot reach an unreachable database.'
       properties:
         environment:
           title: Environment
@@ -2434,6 +2439,41 @@ components:
       - created_at
       title: RawRecordRead
       type: object
+    ReadinessResponse:
+      additionalProperties: false
+      description: Whether the service can actually serve, dependencies included.
+      properties:
+        database:
+          enum:
+          - reachable
+          - unreachable
+          title: Database
+          type: string
+        detail:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Detail
+        environment:
+          title: Environment
+          type: string
+        observed_seconds_ago:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Observed Seconds Ago
+        status:
+          enum:
+          - ready
+          - degraded
+          title: Status
+          type: string
+      required:
+      - status
+      - environment
+      - database
+      title: ReadinessResponse
+      type: object
     RedactionStatus:
       enum:
       - not_required
@@ -2975,6 +3015,34 @@ paths:
                 $ref: '#/components/schemas/HealthResponse'
           description: Successful Response
       summary: Healthcheck
+      tags:
+      - system
+  /health/ready:
+    get:
+      description: 'Report whether the database is reachable, without forcing a restart.
+
+
+        Kept apart from `/health` on purpose: Docker restarts this container on
+
+        a failing health check, and a restart cannot mend a database that is
+
+        down — it only loops and buries the cause. This one is for alerting.
+
+
+        The answer comes from the keepalive''s last ping where that is recent
+
+        enough, so scraping it does not add load or hold a serverless compute
+
+        awake. Only a stale record triggers a probe of its own.'
+      operationId: readiness_health_ready_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+          description: Successful Response
+      summary: Readiness
       tags:
       - system
   /internal/ml/candidates:

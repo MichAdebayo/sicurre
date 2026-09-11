@@ -115,7 +115,23 @@ class PhishtankSnapshotResponse(ApiResponse):
 
 
 class HealthResponse(ApiResponse):
-    """Process liveness and deployment environment."""
+    """Process liveness and deployment environment.
+
+    Deliberately says nothing about dependencies. Docker restarts the container
+    when this fails, and restarting cannot reach an unreachable database.
+    """
 
     status: Literal["ok"]
     environment: str
+
+
+class ReadinessResponse(ApiResponse):
+    """Whether the service can actually serve, dependencies included."""
+
+    status: Literal["ready", "degraded"]
+    environment: str
+    database: Literal["reachable", "unreachable"]
+    detail: str | None = None
+    # How old the observation is. The keepalive refreshes it every 30s; when no
+    # keepalive runs, the endpoint probes and this is near zero.
+    observed_seconds_ago: float | None = None
