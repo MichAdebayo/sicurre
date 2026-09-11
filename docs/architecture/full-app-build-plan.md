@@ -27,11 +27,10 @@ Do not port POC UI patterns directly into the production app. Use the POC for ev
 
 Read these before writing any full-app UI or integration code:
 
-1. [docs/brand/brand-identity.md](docs/brand/brand-identity.md)
-2. [docs/architecture/component-design.md](docs/architecture/component-design.md)
-3. [docs/api/openapi.yaml](docs/api/openapi.yaml)
-4. [.vscode/skills/frontend-agent/SKILL.md](.vscode/skills/frontend-agent/SKILL.md)
-5. [.github/copilot-instructions.md](.github/copilot-instructions.md)
+1. [docs/brand/brand-identity.md](../brand/brand-identity.md) and [docs/brand/DESIGN.md](../brand/DESIGN.md)
+2. [docs/architecture/component-design.md](component-design.md)
+3. [docs/api/openapi.yaml](../api/openapi.yaml)
+4. [AGENTS.md](../../AGENTS.md)
 
 ## Product target
 
@@ -194,7 +193,7 @@ Exit criteria:
 - no direct database access from the frontend
 - no Cloudflare or classifier calls directly from the frontend
 - all Cloudflare operations go through the app API
-- all contracts must follow [docs/api/openapi.yaml](docs/api/openapi.yaml)
+- all contracts must follow [docs/api/openapi.yaml](../api/openapi.yaml)
 
 ## UX rules for the full app
 

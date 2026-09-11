@@ -76,7 +76,7 @@ export function AppToast({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md p-1 text-current/85 transition-colors hover:bg-current/15 hover:text-current focus:outline-none focus:ring-2 focus:ring-current/55"
+              className="rounded-md p-1 text-current/85 transition-colors hover:bg-current/15 hover:text-current focus:outline-none focus-visible:ring-2 focus-visible:ring-current"
               aria-label="Fermer la notification"
             >
               <X className="h-5 w-5" />

@@ -50,12 +50,19 @@ export function TopBar({
     return new Date(dateStr).toLocaleDateString(i18n.language === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short" });
   };
 
-  // Auto-close popover on click-away
+  // Close on click-away and on Escape
   useEffect(() => {
     if (!isOpen) return;
     const handleClose = () => setIsOpen(false);
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsOpen(false);
+    };
     window.addEventListener("click", handleClose);
-    return () => window.removeEventListener("click", handleClose);
+    window.addEventListener("keydown", handleKey);
+    return () => {
+      window.removeEventListener("click", handleClose);
+      window.removeEventListener("keydown", handleKey);
+    };
   }, [isOpen]);
 
   // Construct dynamic actionable list
@@ -134,8 +141,10 @@ export function TopBar({
           }}
           className="relative rounded-lg border border-border-subtle bg-surface-lowest/80 p-2 text-on-surface-variant transition-[background-color,border-color,transform] duration-200 hover:border-primary/35 hover:bg-primary-fixed hover:text-primary active:scale-[0.98] dark:bg-surface-low dark:hover:bg-primary-container dark:hover:text-on-primary-container"
           aria-label={t("topbar.open_notifications")}
+          aria-expanded={isOpen}
+          aria-controls="topbar-notifications"
         >
-          <Bell className="w-[22px] h-[22px] stroke-[1.5]" />
+          <Bell className="w-[22px] h-[22px] stroke-[1.5]" aria-hidden="true" />
           {unreadCount > 0 && (
             <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-error rounded-full ring-2 ring-surface-lowest dark:ring-surface-low" />
           )}
@@ -144,6 +153,9 @@ export function TopBar({
         {/* Notifications Floating Dropdown Overlay */}
         {!administration && isOpen && (
           <div
+            id="topbar-notifications"
+            role="region"
+            aria-label={t("topbar.notifications")}
             onClick={(e) => e.stopPropagation()}
             className="absolute right-0 top-11 z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg border border-border-subtle bg-surface-lowest p-4 text-on-surface shadow-xl shadow-primary/10 animate-in fade-in slide-in-from-top-1 duration-150 font-sans dark:bg-surface-low"
           >
@@ -166,7 +178,7 @@ export function TopBar({
             </div>
 
             {/* Notification items list */}
-            <div className="space-y-1.5 max-h-[340px] overflow-y-auto pt-3 select-none pr-1">
+            <div className="space-y-1.5 max-h-[340px] overflow-y-auto pt-3 pr-1">
               {cappedNotifs.length === 0 ? (
                 <div className="py-8 text-center">
                   <CheckCircle2 className="mx-auto mb-2 h-7 w-7 text-safe/60" />
@@ -181,7 +193,8 @@ export function TopBar({
                 cappedNotifs.map((notif) => {
                   const isUnread = notif.unread;
                   return (
-                    <div
+                    <button
+                      type="button"
                       key={notif.id}
                       onClick={() => {
                         if (notif.id.startsWith("alert_history_")) {
@@ -192,7 +205,7 @@ export function TopBar({
                         }
                         setIsOpen(false);
                       }}
-                      className={`flex items-start gap-3 p-2.5 rounded-lg border border-transparent transition-colors ${notif.page ? "cursor-pointer hover:border-border-subtle hover:bg-surface-low" : "cursor-default"}`}
+                      className={`flex w-full items-start gap-3 p-2.5 rounded-lg border border-transparent text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${notif.page ? "cursor-pointer hover:border-border-subtle hover:bg-surface-low" : "cursor-default"}`}
                     >
                       {/* Icon */}
                       {getCategoryIconContainer(notif.category)}
@@ -210,9 +223,13 @@ export function TopBar({
                         <p className="text-[13px] text-on-surface-variant leading-5 line-clamp-2">
                           {notif.desc}
                         </p>
-                        {isUnread && <span className="mt-1 block h-1.5 w-1.5 rounded-full bg-primary" />}
+                        {isUnread && (
+                          <span className="mt-1 block h-1.5 w-1.5 rounded-full bg-primary">
+                            <span className="sr-only">{t("topbar.unread_item")}</span>
+                          </span>
+                        )}
                       </div>
-                    </div>
+                    </button>
                   );
                 })
               )}

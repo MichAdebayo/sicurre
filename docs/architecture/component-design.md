@@ -121,7 +121,7 @@ flowchart LR
 
 ## Bloc 1 components
 
-The related issue note for the Bloc 1 source perimeter is documented in [issue-artifact.md](issue-artifact.md).
+The Bloc 1 source perimeter is tracked in the GitHub issues of the `data-platform` milestone.
 
 ### 1. Source connectors
 
@@ -232,7 +232,7 @@ The related issue note for the Bloc 1 source perimeter is documented in [issue-a
 - Primary repository evidence:
 	- `docs/research/tech-stack-survey.md`
 	- public architecture and planning docs
-	- concise validation notes in `docs/architecture/issue-artifact.md`
+	- concise validation notes on the GitHub issue
 
 ### 7. Training and evaluation pipeline
 
@@ -277,7 +277,7 @@ The related issue note for the Bloc 1 source perimeter is documented in [issue-a
 - Evidence form:
 	- concise success criteria
 	- measured validation notes
-	- recorded conclusion in `docs/architecture/issue-artifact.md`
+	- recorded conclusion on the GitHub issue
 
 ### 11. Sicurre API, application domain
 

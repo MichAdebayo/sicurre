@@ -287,7 +287,7 @@ export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
                         value={quietStart}
                         onChange={(e) => setQuietStart(e.target.value)}
                         disabled={!emailEnabled}
-                        className="w-full px-3 py-2 bg-surface-lowest border border-border-subtle rounded-lg text-sm outline-none focus:border-primary"
+                        className="w-full px-3 py-2 bg-surface-lowest border border-border-subtle rounded-lg text-sm outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary"
                       />
                     </div>
                     <div>
@@ -299,7 +299,7 @@ export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
                         value={quietEnd}
                         onChange={(e) => setQuietEnd(e.target.value)}
                         disabled={!emailEnabled}
-                        className="w-full px-3 py-2 bg-surface-lowest border border-border-subtle rounded-lg text-sm outline-none focus:border-primary"
+                        className="w-full px-3 py-2 bg-surface-lowest border border-border-subtle rounded-lg text-sm outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary"
                       />
                     </div>
                   </div>
@@ -333,7 +333,7 @@ export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
                 <select
                   value={ruleType}
                   onChange={(e) => setRuleType(e.target.value as any)}
-                  className="w-full rounded-lg border border-border-subtle bg-surface-lowest px-3 py-2 text-sm text-on-surface focus:border-primary focus:outline-none cursor-pointer dark:bg-surface-low"
+                  className="w-full rounded-lg border border-border-subtle bg-surface-lowest px-3 py-2 text-sm text-on-surface focus:border-primary focus:outline-none cursor-pointer dark:bg-surface-low focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <option value="whitelist">{t("alerts.whitelist")}</option>
                   <option value="blocklist">{t("alerts.blocklist")}</option>

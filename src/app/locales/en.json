@@ -50,7 +50,9 @@
     "previous": "Previous",
     "next": "Next",
     "open_navigation": "Open navigation",
-    "close_navigation": "Close navigation"
+    "close_navigation": "Close navigation",
+    "close": "Close",
+    "help": "Help"
   },
   "page_titles": {
     "login": "Sign in",
@@ -158,7 +160,8 @@
     "checklist_dkim_missing": "DKIM record is missing or invalid for domain",
     "checklist_dmarc_missing": "DMARC policy is missing or set to 'none'",
     "checklist_threats_active": "Unresolved threat alerts in threat log",
-    "all_clear": "All configurations are optimal! Shield is green."
+    "all_clear": "All configurations are optimal! Shield is green.",
+    "grade_unavailable": "Grade unavailable"
   },
   "admin": {
     "title": "Admin console",
@@ -330,7 +333,8 @@
     "no_subject": "(No subject)",
     "explain_phishing": "Blocked because the message exhibits high similarity to phishing campaigns.",
     "explain_spam": "Flagged as advertising or spam pattern.",
-    "explain_legitimate": "Classified as safe and passed to inbox."
+    "explain_legitimate": "Classified as safe and passed to inbox.",
+    "date_filter_label": "Period"
   },
   "topbar": {
     "now": "now",
@@ -360,7 +364,8 @@
     "no_active_alerts": "No active alerts",
     "no_active_alerts_desc": "New alerts will appear here.",
     "open_setup": "Open setup",
-    "view_all_alerts": "View all alerts"
+    "view_all_alerts": "View all alerts",
+    "unread_item": "Unread"
   },
   "support": {
     "title": "Technical support",
@@ -423,7 +428,8 @@
       "original_unavailable": "This historical item has no original email available for delivery.",
       "integration_required": "Reconnect Cloudflare before delivering this message.",
       "delivery_failed": "Delivery failed. The email remains quarantined."
-    }
+    },
+    "verdict": "Verdict"
   },
   "alerts": {
     "title": "Notifications",
@@ -727,7 +733,7 @@
     "confirm_disable": "Disable",
     "verify_email": "Verify the destination address",
     "verify_email_desc": "Cloudflare sent a confirmation link to",
-    "dmarc_withdrawal_failed": "Disconnected, but Sicurre\u2019s reporting address could not be removed from your DMARC record. Remove mailto:dmarc@sicurre.com from the rua= list on _dmarc for your domain to stop sending us reports.",
+    "dmarc_withdrawal_failed": "Disconnected, but Sicurre’s reporting address could not be removed from your DMARC record. Remove mailto:dmarc@sicurre.com from the rua= list on _dmarc for your domain to stop sending us reports.",
     "zone": "Zone:",
     "refresh_status": "Refresh status",
     "cancel_and_delete": "Cancel and delete",
@@ -765,7 +771,9 @@
     "plan_keep": "Unchanged",
     "plan_footnote": "No record is deleted, and nothing outside these is touched. Untick to leave a record as it is.",
     "check_domain": "Check this domain",
-    "checking": "Checking…"
+    "checking": "Checking…",
+    "show_token": "Show the token",
+    "hide_token": "Hide the token"
   },
   "landing": {
     "nav_login": "Sign in",

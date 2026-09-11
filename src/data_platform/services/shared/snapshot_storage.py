@@ -142,14 +142,9 @@ def build_evaluation_set_store(
 ) -> SnapshotStore:
     """Return a store addressing the dedicated evaluation bucket.
 
-    The shared snapshot store resolves every R2 backend to the raw ingestion
-    bucket, because that is the only destination raw snapshots need. Publishing
-    the golden set through it wrote the asset to `sicurre-raw` while Sicurre-ML
-    read from `sicurre-golden-evaluation-dataset`, so a publish reported success
-    and registered an `object_uri` the consumer could never fetch.
-
-    Keeping the evaluation set in its own bucket is what makes "cannot enter
-    training splits" a permission boundary rather than a prefix convention.
+    The shared snapshot store always targets the raw ingestion bucket. The
+    golden evaluation set lives in its own bucket so that "cannot enter
+    training splits" is a permission boundary rather than a prefix convention.
     """
     settings = get_settings()
     resolved_backend = (backend or settings.raw_snapshot_storage_backend).strip().lower()

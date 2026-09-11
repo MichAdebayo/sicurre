@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
 
@@ -129,6 +129,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
   // declining the integration.
   const [dnsPlan, setDnsPlan] = useState<CloudflareDnsPlan | null>(null);
   const [verifyError, setVerifyError] = useState("");
+  const verifyErrorRef = useRef<HTMLParagraphElement>(null);
   const [applySpf, setApplySpf] = useState(true);
   const [applyDmarc, setApplyDmarc] = useState(true);
   const setupMutation  = useSetupCloudflare();
@@ -149,6 +150,11 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
 
   // Teardown state
   const [showTeardown, setShowTeardown] = useState(false);
+
+  // Move focus to the verification error so keyboard and screen-reader users land on it.
+  useEffect(() => {
+    if (verifyError) verifyErrorRef.current?.focus();
+  }, [verifyError]);
 
   // Sync background provisioning state with UI progress checklist
   useEffect(() => {
@@ -187,12 +193,8 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
   // ── Integration Orchestration ─────────────────────────────────────────────
 
   /**
-   * Step one: read the zone and stop.
-   *
-   * Nothing is provisioned here. Showing the plan and then provisioning in the
-   * same handler would render the preview at the moment the write began, which
-   * is the failure this whole change exists to remove - the customer must be
-   * able to decline a record before it is written, not while it is.
+   * Step one: read the zone and stop. Nothing is written here; the plan is
+   * shown so the customer can decline a record before provisioning starts.
    */
   const handleVerify = async () => {
     if (!cfToken.trim() || !zoneName.trim()) return;
@@ -551,7 +553,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
             <button
               type="button"
               onClick={() => setShowHelp(v => !v)}
-              className="text-on-surface-variant/50 hover:text-primary transition-colors cursor-help p-0.5 rounded-full hover:bg-surface-low/50 flex items-center justify-center outline-none"
+              className="text-on-surface-variant/50 hover:text-primary transition-colors cursor-help p-0.5 rounded-full hover:bg-surface-low/50 flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-primary"
               aria-label={t("cloudflare.setup_help")}
             >
               <HelpCircle className="w-3.5 h-3.5" />
@@ -602,8 +604,14 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
               onChange={e => { setCfToken(e.target.value); setDnsPlan(null); setVerifyError(""); }}
               placeholder={t("cloudflare.api_token_placeholder")}
               suffix={
-                <button type="button" onClick={() => setShowToken(v => !v)} className="text-on-surface-variant/60 hover:text-on-surface transition-colors cursor-pointer">
-                  {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                <button
+                  type="button"
+                  onClick={() => setShowToken(v => !v)}
+                  aria-label={showToken ? t("cloudflare.hide_token") : t("cloudflare.show_token")}
+                  aria-pressed={showToken}
+                  className="rounded text-on-surface-variant/60 hover:text-on-surface transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  {showToken ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                 </button>
               }
             />
@@ -660,7 +668,9 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
       )}
 
       {verifyError && (
-        <p className="text-xs font-semibold text-error">{verifyError}</p>
+        <p ref={verifyErrorRef} role="alert" tabIndex={-1} className="text-xs font-semibold text-error outline-none">
+          {verifyError}
+        </p>
       )}
 
       <div className="flex justify-end pt-1">

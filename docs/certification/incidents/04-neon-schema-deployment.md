@@ -8,9 +8,8 @@ l'application.
 
 ## Cause
 
-Le conteneur ne peut servir l'API avant l'application des deux chaînes Alembic.
-Le problème n'était pas un `entrypoint.sh` défectueux : aucun fichier de ce nom
-n'existe dans le runtime.
+Le conteneur ne peut servir l'API avant l'application des deux chaînes Alembic,
+et la commande de démarrage ne les exécutait pas.
 
 ## Correction implémentée
 
@@ -38,10 +37,5 @@ seule preuve du schéma déployé.
 ## Traçabilité
 
 Commit `e45da80` · merge `a5ef3ba` (« Merge develop into main for first
-production deployment ») · 11 juillet 2026
-
-**Pas de numéro de PR.** La séquence Alembic du service `sicurre-api` dans
-`docker-compose.prod.yml` est arrivée sur `main` par une fusion directe
-`develop → main` lors du premier déploiement de production, avant que le flux
-par pull request ne soit systématique. Le champ est laissé vide plutôt que
-rempli d'un numéro plausible.
+production deployment ») · 11 juillet 2026. Fusion directe `develop → main`,
+antérieure au flux par pull request adopté ensuite.

@@ -53,20 +53,14 @@ class ModelCandidateRegistration(BaseModel):
 
 
 #: Non-inferiority margin on phishing recall, mirroring
-#: ``sicurre-ml/src/evaluation/promotion.py::PromotionThresholds``.
+#: ``sicurre-ml/src/evaluation/promotion.py::PromotionThresholds``. The two
+#: must move together: this schema re-derives the gate so a reported pass
+#: cannot contradict its metrics, and a margin changed in one repository only
+#: rejects every evaluation with HTTP 422.
 #:
-#: DUPLICATED RULE - the two must move together. This class re-derives the gate
-#: independently so a reported pass cannot contradict the metrics behind it,
-#: which is deliberate defence in depth; the cost is that a margin changed in
-#: one repository and not the other rejects every evaluation with HTTP 422 and
-#: no obvious cause. That is exactly what happened on 2 September 2026, on the
-#: first candidate ever to pass.
-#:
-#: The value is derived, not chosen: phishing recall is estimated on 42 golden
-#: samples, where the incumbent's 0.8810 carries a Wilson 95% half-width of
-#: 0.0990. A margin of 0.099 declines to reject on a difference the evaluation
-#: set cannot distinguish from zero. Re-derive it when the golden set changes
-#: size, in both repositories.
+#: Derived, not chosen: the Wilson 95% half-width of the incumbent's recall on
+#: the 42-sample golden set. Re-derive it in both repositories when the golden
+#: set changes size.
 PHISHING_RECALL_REGRESSION_TOLERANCE = 0.099
 
 

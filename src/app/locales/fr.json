@@ -50,7 +50,9 @@
     "previous": "Précédent",
     "next": "Suivant",
     "open_navigation": "Ouvrir la navigation",
-    "close_navigation": "Fermer la navigation"
+    "close_navigation": "Fermer la navigation",
+    "close": "Fermer",
+    "help": "Aide"
   },
   "page_titles": {
     "login": "Connexion",
@@ -158,7 +160,8 @@
     "checklist_dkim_missing": "L'enregistrement DKIM est manquant ou invalide pour le domaine",
     "checklist_dmarc_missing": "La politique DMARC est manquante ou définie sur 'none'",
     "checklist_threats_active": "Alertes de menaces non résolues dans le journal",
-    "all_clear": "Toutes les configurations sont optimales ! Le bouclier est vert."
+    "all_clear": "Toutes les configurations sont optimales ! Le bouclier est vert.",
+    "grade_unavailable": "Note indisponible"
   },
   "admin": {
     "title": "Console d’administration",
@@ -330,7 +333,8 @@
     "no_subject": "(Aucun objet)",
     "explain_phishing": "Bloqué car le message présente de fortes similitudes avec des campagnes de phishing connues.",
     "explain_spam": "Classé comme spam par le modèle.",
-    "explain_legitimate": "Classé comme sûr et distribué dans la boîte de réception."
+    "explain_legitimate": "Classé comme sûr et distribué dans la boîte de réception.",
+    "date_filter_label": "Période"
   },
   "topbar": {
     "now": "maintenant",
@@ -360,7 +364,8 @@
     "no_active_alerts": "Aucune alerte active",
     "no_active_alerts_desc": "Les nouvelles alertes apparaîtront ici.",
     "open_setup": "Ouvrir la configuration",
-    "view_all_alerts": "Voir toutes les alertes"
+    "view_all_alerts": "Voir toutes les alertes",
+    "unread_item": "Non lu"
   },
   "support": {
     "title": "Support et assistance technique",
@@ -423,7 +428,8 @@
       "original_unavailable": "Ce message historique ne contient pas l’original nécessaire à la délivrance.",
       "integration_required": "Reconnectez Cloudflare avant de délivrer ce message.",
       "delivery_failed": "Délivrance impossible. L’e-mail reste en quarantaine."
-    }
+    },
+    "verdict": "Verdict"
   },
   "alerts": {
     "title": "Notifications",
@@ -727,7 +733,7 @@
     "confirm_disable": "Désactiver",
     "verify_email": "Validez l’adresse de destination",
     "verify_email_desc": "Cloudflare a envoyé un lien de confirmation à",
-    "dmarc_withdrawal_failed": "D\u00e9connect\u00e9, mais l\u2019adresse de rapport de Sicurre n\u2019a pas pu \u00eatre retir\u00e9e de votre enregistrement DMARC. Retirez mailto:dmarc@sicurre.com de la liste rua= sur _dmarc de votre domaine pour cesser de nous envoyer des rapports.",
+    "dmarc_withdrawal_failed": "Déconnecté, mais l’adresse de rapport de Sicurre n’a pas pu être retirée de votre enregistrement DMARC. Retirez mailto:dmarc@sicurre.com de la liste rua= sur _dmarc de votre domaine pour cesser de nous envoyer des rapports.",
     "zone": "Zone :",
     "refresh_status": "Actualiser le statut",
     "cancel_and_delete": "Annuler et supprimer",
@@ -765,7 +771,9 @@
     "plan_keep": "Inchangé",
     "plan_footnote": "Aucun enregistrement n'est supprimé et rien d'autre n'est touché. Décochez pour laisser un enregistrement tel quel.",
     "check_domain": "Vérifier ce domaine",
-    "checking": "Vérification…"
+    "checking": "Vérification…",
+    "show_token": "Afficher le jeton",
+    "hide_token": "Masquer le jeton"
   },
   "landing": {
     "nav_login": "Connexion",

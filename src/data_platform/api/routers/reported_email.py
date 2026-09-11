@@ -102,13 +102,8 @@ async def list_reported_emails(
 ) -> dict[str, list[dict[str, object]]]:
     """List forwarded reports for the authenticated workspace.
 
-    The ingest path wrote these rows and nothing read them back, so a user who
-    forwarded a missed phishing email saw no confirmation anywhere in the
-    product and had no reason to believe it had worked.
-
-    Metadata only. The ingest pipeline anonymises the message into private R2
-    precisely so the forwarded content stops circulating; returning a body here
-    would undo that. Scoped on workspace_id like every other tenant route.
+    Returns metadata only; the message content stays in private R2. Scoped
+    on ``workspace_id`` like every other tenant route.
     """
     rows = await auth_query(
         "SELECT id, received_at, size_bytes, status FROM app_reported_email "
@@ -247,11 +242,9 @@ async def ingest_dmarc_email(
     domain, xml_payload = _dmarc_attachment(raw_message)
     candidates = _zone_candidates(domain)
     placeholders = ",".join("?" for _ in candidates)
-    # A domain can carry more than one active integration: re-onboarding leaves
-    # the previous row behind, pointing at a workspace nobody belongs to any
-    # more. Ordering by age alone picks that dead one and files the report where
-    # no one can read it, so require a workspace that still has a member and
-    # prefer the most recent.
+    # Re-onboarding can leave an older integration row pointing at a workspace
+    # with no members; require a workspace that still has a member and prefer
+    # the most recent.
     integrations = await auth_query(
         "SELECT ci.workspace_id, ci.zone_name FROM cloudflare_integration ci "
         f"WHERE lower(ci.zone_name) IN ({placeholders}) AND ci.status = 'active' "

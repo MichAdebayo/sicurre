@@ -1,23 +1,15 @@
 """Prometheus metrics for the email scan decision path.
 
-The SLA is stated end to end ("temps de réponse global < 2.0 s"), but until now
-nothing exported the time to reach a verdict. The only latency series reaching
-Grafana was generic HTTP request duration, which is why the dashboard read
-~1.5 s while the stored inference events said ~3.75 s.
+* ``sicurre_scan_duration_seconds``: the whole decision, labelled by verdict;
+  the number the 2 s objective is judged on.
+* ``sicurre_scan_stage_duration_seconds``: the same request split by stage, so
+  a breach can be attributed.
+* ``sicurre_scan_failure_total``: scans that reached no verdict, by reason.
+  The duration instruments are only observed once a verdict exists, so a
+  failed scan is counted here instead.
 
-Two instruments, deliberately separated:
-
-* ``sicurre_scan_duration_seconds`` — the whole decision, the number the
-  customer-facing SLA is judged on.
-* ``sicurre_scan_stage_duration_seconds`` — the same request split by stage, so
-  a breach can be attributed instead of guessed at.
-* ``sicurre_scan_failure_total`` — scans that reached no verdict at all. The
-  duration and total instruments are only reached once a verdict exists, so a
-  failed scan would otherwise be absent rather than counted.
-
-Buckets straddle the 2 s objective closely enough to read compliance directly
-off the histogram, and extend far enough to keep provider stalls visible rather
-than collapsed into +Inf.
+Bucket boundaries straddle the 2 s objective so compliance reads directly off
+the histogram, and extend to 30 s so provider stalls stay visible.
 """
 
 from __future__ import annotations

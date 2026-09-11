@@ -2219,10 +2219,8 @@ async def check_domain_shield_status(
                     updated_at = updated_at.replace(tzinfo=timezone.utc)
                 elapsed_days = max(0, (datetime.now(timezone.utc) - updated_at).days)
                 cached_ssl_days = max(0, cached_ssl_days - elapsed_days)
-            # The two reads of this row must agree. Refresh names why a
-            # certificate is not valid; the cache used to return `error: None`
-            # regardless, so a domain we could not inspect came back as invalid
-            # with no reason given.
+            # The cached read must name why a certificate is not valid, as the
+            # refresh path does.
             ssl_measured = bool(row["ssl_valid"])
             ssl_is_valid = ssl_measured and cached_ssl_days > 0
             if ssl_is_valid:

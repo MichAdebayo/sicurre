@@ -265,12 +265,13 @@ export default function ThreatsRoute() {
         <div className="flex w-full flex-wrap items-center gap-3 self-start sm:w-auto sm:self-center">
           {/* Date range filter dropdown */}
           <select
+            aria-label={t("threats.date_filter_label")}
             value={dateFilter}
             onChange={(e) => {
               setDateFilter(e.target.value as any);
               setCurrentPage(1);
             }}
-            className="px-3 py-2 bg-white border border-border-subtle rounded-lg text-xs font-bold text-on-surface focus:outline-none focus:border-primary cursor-pointer shadow-sm h-9"
+            className="px-3 py-2 bg-white border border-border-subtle rounded-lg text-xs font-bold text-on-surface focus:outline-none focus:border-primary cursor-pointer shadow-sm h-9 focus-visible:ring-2 focus-visible:ring-primary"
           >
             <option value="all">{t("threats.range_all")}</option>
             <option value="today">{t("threats.range_today")}</option>
@@ -421,7 +422,7 @@ export default function ThreatsRoute() {
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-border-subtle rounded-lg text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:border-primary shadow-sm"
+              className="w-full pl-10 pr-4 py-2 bg-white border border-border-subtle rounded-lg text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:border-primary shadow-sm focus-visible:ring-2 focus-visible:ring-primary"
             />
           </div>
         </div>

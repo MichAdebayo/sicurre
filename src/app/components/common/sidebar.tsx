@@ -259,7 +259,7 @@ export function Sidebar({
                 <select
                   value={activeDomain}
                   onChange={(event) => setActiveDomain(event.target.value)}
-                  className="mt-2 w-full rounded-md border border-border-subtle bg-surface-lowest px-2 py-1.5 text-xs font-semibold text-on-surface focus:border-primary focus:outline-none"
+                  className="mt-2 w-full rounded-md border border-border-subtle bg-surface-lowest px-2 py-1.5 text-xs font-semibold text-on-surface focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   aria-label={t("sidebar.active_domain")}
                 >
                   {domains.map((domain) => (
