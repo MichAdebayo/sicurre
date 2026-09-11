@@ -1,27 +1,29 @@
-# Documentation Visibility Policy
+# Documentation
 
-This repository uses a split documentation model:
+Everything under `docs/` that is tracked by git is public. A few folders stay
+local because they hold third-party material, working notes, or the Word and
+PDF versions of the certification reports.
 
-- Public docs are committed and shared for collaboration.
-- Private docs are kept locally and excluded by `.gitignore`.
+## Public
 
-## Public (committed)
+| Folder | Covers |
+|--------|--------|
+| [`architecture/`](architecture/README.md) | System context, data design, component design, threat model, monitoring design, accessibility criteria, non-functional requirements |
+| [`adr/`](adr/README.md) | Architecture decision records. Superseded ADRs are kept and marked as such |
+| [`api/`](api/README.md) | The generated OpenAPI contract and request/response examples |
+| [`ops/`](ops/README.md) | Development setup, deployment, logging and monitoring, SLOs, runbooks, incident template |
+| [`brand/`](brand/DESIGN.md) | Brand identity and the implementation-facing design system |
+| [`data-platform/`](data-platform/rgpd-register.md) | RGPD processing register, generated from the source-system table |
+| [`certification/`](certification/README.md) | Incident records, the veille register, the soutenance script, the business specification |
 
-- `docs/architecture/` except `threat-model.md` and `privacy-rgpd.md`
-- `docs/adr/` except internal ADRs `0001`, `0006`, and `0007`
-- `docs/api/`
-- `docs/brand/`
-- `docs/model/`
-- `docs/research/`
-- `docs/README.md`
+## Local only (ignored by git)
 
-## Private (local-only, ignored)
+- `simplon/` — the Simplon référentiel and règlement (third-party PDFs)
+- `raw_sources/` — third-party papers and CERT-FR bulletins
+- `research/` — early surveys and competitive analysis
+- `model/`, `deployment/`, `email-intercept.md` — superseded planning notes
+- `architecture/notebook-*.md`, `architecture/diagrams/claude/`, `architecture/diagrams/final/` — working notes and rendered diagram exports
+- `certification/evaluation-word/` and `certification/screenshots/` — the submitted reports (Word and PDF) and the raw captures they use
 
-- `docs/ops/`
-- `docs/architecture/threat-model.md`
-- `docs/architecture/privacy-rgpd.md`
-- `docs/adr/0001-post-delivery-gmail_superseded.md`
-- `docs/adr/0006-scope-selection-gmail_superseded.md`
-- `docs/adr/0007-idempotency-pubsub-history_superseded.md`
-
-If a private document needs to be published later, remove its ignore rule first and review for sensitive content before committing.
+If a local document needs to be published, remove its ignore rule first and
+review it for personal data, hostnames and credentials before committing.

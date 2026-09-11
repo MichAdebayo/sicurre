@@ -1,17 +1,17 @@
 # Operations
 
-This folder defines how Sicurre is deployed and operated:
-- Deployments (Hetzner-hosted API/app runtime)
-- Monitoring/alerting
-- SLOs/SLIs
-- Runbooks for common failures
-- Incident postmortems
+How Sicurre is set up, deployed and watched in production.
 
-Key operational references:
+| Document | Use it for |
+|----------|------------|
+| [development-setup.md](development-setup.md) | Tooling versions, database setup, running the stack locally, the CI jobs and how to run them locally, the delivery chain |
+| [deployment.md](deployment.md) | Environments, services, secrets, CI/CD and the host layout |
+| [logging-monitoring.md](logging-monitoring.md) | The metrics and logs actually emitted, the Grafana dashboards and alert rules, and which controls are declared but unverified |
+| [slo-sli.md](slo-sli.md) | Service objectives and the indicators that measure them |
+| [runbooks.md](runbooks.md) | Runtime incident procedures |
+| [bloc1-sql-runbook.md](bloc1-sql-runbook.md) | Bloc 1 SQL evidence, import steps and baseline execution commands |
+| [incident-postmortem-template.md](incident-postmortem-template.md) | The template every incident record under `docs/certification/incidents/` follows |
+| [loops-templates.md](loops-templates.md) | Transactional e-mail templates (Loops) and their variables |
 
-- `runbooks.md` for runtime incident procedures
-- `bloc1-sql-runbook.md` for Bloc 1 SQL evidence, import steps, and baseline execution commands
-
-
-Real-Time Blacklist Lookups (DNSBL RBL Integration)
-Real Feed Checks: Wired active domain blacklist lookups against Spamhaus Domain Block List (dbl.spamhaus.org) and SURBL (multi.surbl.org) in the python backend resolver.
+Host provisioning, Nginx, Alloy and Grafana provisioning notes live under
+`deploy/`.

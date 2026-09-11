@@ -1,12 +1,11 @@
 # Accessibility
 
 The target is WCAG 2.1 level AA. This document records what was verified, how,
-and what is not yet met — measured on 3 September 2026 against the design
+and what is not yet met — measured on 11 September 2026 against the design
 system's palette and the components in `src/app/`.
 
-The palette values are reproduced here rather than cited, because the brand
-document that defines them is not tracked in this repository. A reference a
-reader cannot follow is worse than the values themselves.
+The palette values are reproduced here from `docs/brand/DESIGN.md` so the
+ratios can be read against the exact hex values they were computed from.
 
 It is written as a status, not as a claim of conformance. A conformance
 statement needs an audit of every page against every applicable criterion; what
@@ -63,23 +62,39 @@ Applied to interface work. Each is checkable by a reviewer without tooling.
 
 ## Current state
 
-Measured across the 39 component files in `src/app/`:
+Measured across the 59 TypeScript files in `src/app/` on 11 September 2026:
 
 | Signal | Files |
 |---|---|
-| `aria-label` | 18 |
-| `aria-hidden` | 11 |
-| `role=` | 12 |
+| `aria-label` | 21 |
+| `aria-hidden` | 15 |
+| `role=` | 14 |
 | `alt=` | 9 |
-| `focus-visible` | 4 |
-| `aria-labelledby` / `aria-describedby` | 2 each |
-| `aria-live` | 1 |
+| `focus-visible` | 6 |
+| `aria-labelledby` | 5 |
+| `aria-describedby` | 2 |
+| `aria-current` | 2 |
+| `aria-live` | 1 (plus `role="status"` or `role="alert"` in 10 more files) |
 
 Accessibility work is present and deliberate rather than incidental — the
-`aria-hidden` count in particular shows decorative elements being hidden on
-purpose. It is also uneven: one `aria-live` region across the application is
-thin for a product whose primary output is an asynchronous verdict, and
-criterion 5 above is the least well met of the seven.
+`aria-hidden` count shows decorative elements being hidden on purpose, and
+every `Input` associates its label by a generated id. It is also uneven. The
+known gaps, in the order they will be addressed:
+
+1. No dialog carries `role="dialog"`, `aria-modal`, a focus trap or an Escape
+   handler (`components/ui/dialog.tsx` and the two overlays in
+   `routes/quarantine.tsx`).
+2. The Cloudflare connection form reports its error in a plain paragraph
+   rather than a live region; the login form already uses `role="alert"`.
+3. Status badges rely on colour plus icon; the screen-reader text that names
+   the state is present on three elements only.
+4. 25 elements remove the outline with `outline-none` without a
+   `focus-visible` ring, including the input and toggle primitives.
+5. Six routes have no `h1` (the four admin routes, logs, contact).
+6. The notification popover and the two Domain Shield tooltips are
+   mouse-only.
+7. Two selects have no associated label (`routes/threats.tsx`,
+   `routes/settings.tsx` domain picker).
 
 ## Resolved: danger text
 

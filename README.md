@@ -49,8 +49,9 @@ flowchart LR
 ```
 
 Verdicts are written to the threat journal with the model version and revision
-that produced them, and a classifier verdict carries a short plain-language
-French explanation shown to the user beside it.
+that produced them. When the optional LLM tier is enabled, the verdict also
+carries a short plain-language French explanation shown beside it; the tier is
+off in production today because its latency did not fit the two-second budget.
 
 ## Install and run
 
@@ -108,7 +109,7 @@ make dev-stop                # tear it down
 | `src/core/` | Shared domain logic: rules, MIME decoding, alerting, operational exercises |
 | `src/db/` | SQLAlchemy models and the two Alembic migration trees |
 | `src/poc/` | Standalone local runtime used for the proof of concept |
-| `deploy/` | Production deployment — Compose files, Caddy, cron, runbooks |
+| `deploy/` | Production deployment — Compose files, Nginx, cron, runbooks |
 | `tests/` | Unit, integration and end-to-end suites |
 
 ## Documentation

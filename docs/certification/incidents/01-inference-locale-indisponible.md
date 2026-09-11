@@ -64,8 +64,8 @@ Voir [config.py](../../../src/poc/config.py),
 | Réseau indisponible | `test_live_network_failure_is_contextual` | passé |
 
 Le 17 juillet 2026, le pré-vol réel a réussi et une classification ONNX a retourné
-`source=live`, `label_verdict=legitimate`. Les captures avant/incident/reprise et
-la trace console anonymisée restent à insérer dans le dossier illustré.
+`source=live`, `label_verdict=legitimate`. Le rejeu du scénario en production et
+ses captures figurent dans le rapport E5 (figure 2).
 
 ## Traçabilité
 
