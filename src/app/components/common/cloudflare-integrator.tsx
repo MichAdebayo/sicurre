@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
+
+import {
+  SICURRE_TOKEN_PERMISSIONS,
+  cloudflareTokenTemplateUrl,
+} from "../../lib/cloudflare-token-template";
 import type { TFunction } from "i18next";
 import {
   Cloud,
@@ -536,12 +541,26 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
                   className="absolute left-6 -top-2 z-30 w-72 bg-white border border-border-subtle p-4 rounded-xl shadow-lg text-[11px] text-on-surface-variant/80 space-y-1.5 leading-normal"
                 >
                   <p className="font-bold text-on-surface">{t("cloudflare.token_help_title")}</p>
-                  <p>1. {t("cloudflare.token_help_login")} <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noreferrer" className="text-primary underline inline-flex items-center gap-0.5 font-semibold">dash.cloudflare.com <ExternalLink className="w-3 h-3" /></a>.</p>
-                  <p>2. {t("cloudflare.token_help_permissions")}</p>
-                  <ul className="list-disc pl-4 space-y-0.5 mt-1 font-medium text-on-surface">
-                    <li>Zone › DNS › Edit</li>
-                    <li>Workers Scripts › Edit</li>
-                    <li>Email Routing › Edit</li>
+                  <p>1. {t("cloudflare.token_help_prefilled")}</p>
+                  {/* Cloudflare pre-ticks these five from the link, so nobody has
+                      to find them in a dropdown. The list stays visible below:
+                      this asks for write access to someone's DNS, and hiding
+                      what is being granted behind a button would be worse than
+                      the dropdown it replaces. */}
+                  <a
+                    href={cloudflareTokenTemplateUrl(zoneName || undefined)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-1 inline-flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/[0.06] px-2.5 py-1.5 font-semibold text-primary transition-colors hover:bg-primary/[0.12]"
+                  >
+                    {t("cloudflare.token_help_open")} <ExternalLink className="w-3 h-3" />
+                  </a>
+                  <p className="pt-1">2. {t("cloudflare.token_help_copy")}</p>
+                  <p className="pt-1 font-semibold text-on-surface">{t("cloudflare.token_help_grants")}</p>
+                  <ul className="list-disc pl-4 space-y-0.5 font-medium text-on-surface">
+                    {SICURRE_TOKEN_PERMISSIONS.map(({ key, scope, label }) => (
+                      <li key={key}>{scope} › {label} › Edit</li>
+                    ))}
                   </ul>
                 </MotionDiv>
               )}
