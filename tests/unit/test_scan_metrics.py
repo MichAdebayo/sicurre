@@ -78,6 +78,7 @@ def test_keepalive_only_runs_for_a_remote_database() -> None:
 
     class _S:
         database_url = "sqlite+aiosqlite:///./local.db"
+        db_keepalive_enabled = True
 
     original = db_keepalive.get_settings
     db_keepalive.get_settings = lambda: _S()  # type: ignore[assignment]
@@ -87,6 +88,36 @@ def test_keepalive_only_runs_for_a_remote_database() -> None:
         assert db_keepalive.keepalive_enabled() is True
     finally:
         db_keepalive.get_settings = original  # type: ignore[assignment]
+
+
+def test_keepalive_can_be_turned_off_by_an_operator() -> None:
+    """The ping is what stops Neon suspending compute, and compute is metered.
+
+    Holding the connection open costs roughly 720 compute-hours a month against
+    a quota measured in the low hundreds, so whether it runs is an operational
+    decision, not a property of the database driver.
+    """
+    from core import db_keepalive
+
+    class _S:
+        database_url = "postgresql+psycopg://user@host/db"
+        db_keepalive_enabled = False
+
+    original = db_keepalive.get_settings
+    db_keepalive.get_settings = lambda: _S()  # type: ignore[assignment]
+    try:
+        assert db_keepalive.keepalive_enabled() is False
+        _S.db_keepalive_enabled = True
+        assert db_keepalive.keepalive_enabled() is True
+    finally:
+        db_keepalive.get_settings = original  # type: ignore[assignment]
+
+
+def test_the_keepalive_defaults_to_on() -> None:
+    """Turning it off is a deliberate act; the default preserves today's behaviour."""
+    from core.config import Settings
+
+    assert Settings.model_fields["db_keepalive_enabled"].default is True
 
 
 def test_keepalive_survives_a_failing_ping() -> None:
