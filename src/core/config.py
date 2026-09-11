@@ -62,11 +62,9 @@ class Settings(BaseSettings):
     raw_snapshot_r2_secret_access_key: str | None = None
     raw_snapshot_r2_region: str = "auto"
 
-    # The golden evaluation set lives in its own bucket, not under the raw
-    # ingestion prefix. That separation is a permission boundary rather than a
-    # naming convention: Sicurre-ML holds credentials scoped to this bucket
-    # alone and read-only, which is what keeps an evaluation-only asset out of
-    # the training lineage store.
+    # The golden evaluation set lives in its own bucket: Sicurre-ML holds
+    # read-only credentials scoped to it, which keeps an evaluation-only asset
+    # out of the training lineage store by permission, not by naming.
     evaluation_set_prefix: str = "evaluation_sets"
     evaluation_set_r2_bucket_name: str | None = None
     evaluation_set_r2_endpoint_url: str | None = None
@@ -404,16 +402,10 @@ def get_settings() -> Settings:
 
 
 def redact_database_url(url: str | None) -> str:
-    """Return *url* with any password replaced, safe for logs.
+    """Return *url* with the password replaced, safe for logs.
 
-    Connection strings were being written verbatim into the cron log files, so a
-    live Neon password sat in world-readable plaintext on the server and was
-    rewritten on every scheduled run. Logging the target database is genuinely
-    useful when a job connects somewhere unexpected; logging the credential is
-    never useful.
-
-    The host, port, database and user are preserved because those are what make
-    the line worth reading. Only the secret is removed.
+    Host, port, database and user are preserved; only the credential is
+    removed. A password containing ``@`` is removed whole.
     """
     if not url:
         return "(unset)"

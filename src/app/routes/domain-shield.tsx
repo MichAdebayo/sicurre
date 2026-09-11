@@ -75,8 +75,7 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
   const hasSicurreDmarcReporting = !!shieldStatus?.dmarc?.reporting_enabled || !!(shieldStatus?.dmarc?.record || "").includes("dmarc@sicurre.com");
   const isDmarcValid = !!(shieldStatus?.dmarc?.valid && hasRestrictiveDmarcPolicy);
   const isDmarcComplete = isDmarcValid && hasSicurreDmarcReporting;
-  // How many of the three DMARC facts still need work. The card used to show a
-  // colour and nothing else, so a grade could drop with no way to tell why.
+  // How many of the three DMARC facts still need work; the card names them.
   const dmarcOpenItems = shieldStatus
     ? [!shieldStatus.dmarc.valid, !hasRestrictiveDmarcPolicy, !hasSicurreDmarcReporting]
         .filter(Boolean).length
@@ -843,8 +842,19 @@ export default function DomainShieldRoute({ session }: DomainShieldRouteProps) {
                             {t("domain_shield.ssl_expiry")}
                           </h4>
                           <div className="relative group">
-                            <Info className="w-3.5 h-3.5 text-primary cursor-help hover:text-primary-hover transition-colors" />
-                            <div className="absolute bottom-full right-0 mb-1.5 w-60 max-w-[calc(100vw-3rem)] rounded-lg border border-border-subtle bg-surface-lowest p-2.5 text-center font-sans text-[10px] font-bold normal-case leading-normal text-on-surface opacity-0 shadow-xl transition-opacity duration-200 pointer-events-none group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50">
+                            <button
+                              type="button"
+                              aria-label={t("common.help")}
+                              aria-describedby="domain-shield-ssl-help"
+                              className="flex rounded-full text-primary transition-colors hover:text-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            >
+                              <Info className="w-3.5 h-3.5" aria-hidden="true" />
+                            </button>
+                            <div
+                              id="domain-shield-ssl-help"
+                              role="tooltip"
+                              className="absolute bottom-full right-0 mb-1.5 w-60 max-w-[calc(100vw-3rem)] rounded-lg border border-border-subtle bg-surface-lowest p-2.5 text-center font-sans text-xs font-semibold leading-normal text-on-surface opacity-0 shadow-xl transition-opacity duration-200 pointer-events-none group-hover:opacity-100 group-focus-within:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50"
+                            >
                               {t("domain_shield.ssl_help")}
                             </div>
                           </div>

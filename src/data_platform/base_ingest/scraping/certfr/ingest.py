@@ -16,8 +16,8 @@ Each TXT file maps to:
 The manifest is written to data/local/certfr_base_ingest_manifest.json before
 any DB writes so replay provenance is always available.
 
-Must be run AFTER file-ingest-base (DB already contains ~163,367 records).
-PRIOR_RECORD_COUNT reflects the cumulative count after File source ingestion.
+Must be run AFTER file-ingest-base; PRIOR_RECORD_COUNT is the cumulative
+record count expected after File source ingestion.
 """
 
 from __future__ import annotations

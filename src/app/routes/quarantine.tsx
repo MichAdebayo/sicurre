@@ -1,10 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   Inbox,
   Calendar,
-  X,
   Mail,
   Trash2,
   AlertCircle,
@@ -12,6 +11,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
+import { Dialog } from "../components/ui/dialog";
 import { AppToast } from "../components/common/app-toast";
 import {
   useQuarantineItems,
@@ -46,6 +46,7 @@ export default function QuarantineRoute() {
   // Selected item for the Zoom Modal
   const [selectedItem, setSelectedItem] = useState<QuarantineItem | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const cancelDeleteRef = useRef<HTMLButtonElement>(null);
 
   // Page pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -308,169 +309,146 @@ export default function QuarantineRoute() {
         )}
       </section>
 
-      {/* Floating zoom modal backdrop overlay with background blur */}
-      <AnimatePresence>
+      <Dialog
+        isOpen={!!selectedItem}
+        onClose={() => setSelectedItem(null)}
+        size="lg"
+        title={t("quarantine.safe_preview")}
+        description={t("quarantine.preview_notice")}
+        footer={
+          selectedItem && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <Button
+                  variant="primary"
+                  className="w-full gap-2 text-xs py-2.5 font-bold"
+                  onClick={() => handleRelease(selectedItem.id)}
+                >
+                  <Mail className="w-4 h-4" aria-hidden="true" />
+                  {t("quarantine.release")}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full gap-2 text-xs py-2.5 border-safe/30 text-safe hover:bg-safe/5 font-bold"
+                  onClick={() => handleWhitelist(selectedItem.id)}
+                >
+                  <ShieldCheck className="w-4 h-4 text-safe" aria-hidden="true" />
+                  {t("quarantine.whitelist")}
+                </Button>
+                <Button
+                  variant="danger"
+                  className="w-full gap-2 text-xs py-2.5 font-bold"
+                  onClick={() => handleDelete(selectedItem.id)}
+                >
+                  <Trash2 className="w-4 h-4" aria-hidden="true" />
+                  {t("quarantine.delete")}
+                </Button>
+              </div>
+              <p className="text-[11px] text-on-surface-variant/70 mt-3.5 leading-normal italic text-center">
+                {t("quarantine.action_note")}
+              </p>
+            </>
+          )
+        }
+      >
         {selectedItem && (
-          <div className="fixed inset-0 z-50 bg-neutral-900/60 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto select-none">
-            <MotionDiv
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.2 }}
-              className="bg-white border border-border-subtle rounded-2xl p-6 w-full max-w-2xl shadow-2xl relative max-h-[90vh] overflow-y-auto flex flex-col justify-between font-sans select-text"
-            >
-              <div>
-                <div className="flex justify-between items-start border-b border-border-subtle pb-4 select-none">
-                  <div>
-                    <h3 className="app-h2 text-on-surface">
-                      {t("quarantine.safe_preview")}
-                    </h3>
-                    <p className="app-body-sub mt-0.5">
-                      {t("quarantine.preview_notice")}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setSelectedItem(null)}
-                    className="p-1 rounded-md hover:bg-surface-low transition-colors cursor-pointer"
-                  >
-                    <X className="w-4.5 h-4.5 text-on-surface-variant" />
-                  </button>
-                </div>
+          <div className="space-y-4 text-xs">
+            <div>
+              <span className="app-label-tiny block text-on-surface-variant/80 font-bold text-xs">
+                {t("quarantine.sender")}
+              </span>
+              <span className="text-[14px] font-medium text-on-surface select-all block mt-1">
+                {selectedItem.sender}
+              </span>
+            </div>
 
-                <div className="space-y-4 pt-4 text-xs">
-                  <div>
-                    <span className="app-label-tiny block text-on-surface-variant/80 font-bold text-xs">
-                      From
-                    </span>
-                    <span className="text-[14px] font-medium text-on-surface select-all block mt-1">
-                      {selectedItem.sender}
-                    </span>
-                  </div>
+            <div>
+              <span className="app-label-tiny block text-on-surface-variant/80 font-bold text-xs">
+                {t("quarantine.subject")}
+              </span>
+              <span className="text-[14px] font-medium text-on-surface block mt-1">
+                {selectedItem.subject || t("threats.no_subject")}
+              </span>
+            </div>
 
-                  <div>
-                    <span className="app-label-tiny block text-on-surface-variant/80 font-bold text-xs">
-                      Subject
-                    </span>
-                    <span className="text-[14px] font-medium text-on-surface block mt-1">
-                      {selectedItem.subject || t("threats.no_subject")}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="app-label-tiny block text-on-surface-variant/80 font-bold text-xs">
-                      Quarantined Risk Analysis
-                    </span>
-                    <div className="flex items-center gap-2 mt-1.5 select-none">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-error/15 text-error">
-                        {selectedItem.safety_verdict}
-                      </span>
-                      <span className="text-xs font-sans text-on-surface-variant font-medium">
-                        Score: {Math.round(selectedItem.composite_score * 100)}%
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Sandboxed Preview Frame */}
-                  <div className="pt-2">
-                    <iframe
-                      title="Quarantine Safe Preview Frame"
-                      srcDoc={`<!DOCTYPE html><html><head><style>body { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #374151; font-size: 13.5px; line-height: 1.6; margin: 10px; word-break: break-word; } a { color: #2563eb; pointer-events: none !important; text-decoration: underline; } img { display: none !important; }</style></head><body>${renderSafeHtml(selectedItem.body_text)}</body></html>`}
-                      sandbox=""
-                      className="w-full h-[240px] bg-surface-low border border-border-subtle rounded-xl select-text"
-                    />
-                  </div>
-                </div>
+            <div>
+              <span className="app-label-tiny block text-on-surface-variant/80 font-bold text-xs">
+                {t("quarantine.verdict")}
+              </span>
+              <div className="flex items-center gap-2 mt-1.5">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-error/15 text-error">
+                  {selectedItem.safety_verdict}
+                </span>
+                <span className="text-xs font-sans text-on-surface-variant font-medium">
+                  {t("quarantine.composite_score")} : {Math.round(selectedItem.composite_score * 100)}%
+                </span>
               </div>
+            </div>
 
-              {/* Action task buttons in the footer modal */}
-              <div className="pt-5 border-t border-border-subtle mt-5">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 select-none">
-                  <Button
-                    variant="primary"
-                    className="w-full gap-2 text-xs py-2.5 font-bold"
-                    onClick={() => handleRelease(selectedItem.id)}
-                  >
-                    <Mail className="w-4 h-4" />
-                    {t("quarantine.release")}
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    className="w-full gap-2 text-xs py-2.5 border-safe/30 text-safe hover:bg-safe/5 font-bold"
-                    onClick={() => handleWhitelist(selectedItem.id)}
-                  >
-                    <ShieldCheck className="w-4 h-4 text-safe" />
-                    {t("quarantine.whitelist")}
-                  </Button>
-
-                  <Button
-                    variant="danger"
-                    className="w-full gap-2 text-xs py-2.5 font-bold"
-                    onClick={() => handleDelete(selectedItem.id)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    {t("quarantine.delete")}
-                  </Button>
-                </div>
-
-                <p className="text-[11px] text-on-surface-variant/70 mt-3.5 leading-normal italic text-center select-none">
-                  {t("quarantine.action_note")}
-                </p>
-              </div>
-            </MotionDiv>
+            {/* Sandboxed preview frame: scripts, images and links are inert. */}
+            <div className="pt-2">
+              <iframe
+                title={t("quarantine.safe_preview")}
+                srcDoc={`<!DOCTYPE html><html><head><style>body { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #374151; font-size: 13.5px; line-height: 1.6; margin: 10px; word-break: break-word; } a { color: #2563eb; pointer-events: none !important; text-decoration: underline; } img { display: none !important; }</style></head><body>${renderSafeHtml(selectedItem.body_text)}</body></html>`}
+                sandbox=""
+                className="w-full h-[240px] bg-surface-low border border-border-subtle rounded-xl"
+              />
+            </div>
           </div>
         )}
-      </AnimatePresence>
+      </Dialog>
 
-      {/* Confirmation Modal */}
-      {confirmDeleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm select-none">
-          <div className="bg-white border border-border-subtle rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-error/10 text-error rounded-xl">
-                <AlertCircle className="w-5 h-5" />
-              </div>
-              <h4 className="font-display font-bold text-base text-on-surface">
-                {t("quarantine.confirm_delete")}
-              </h4>
-            </div>
-            <p className="text-xs font-semibold text-on-surface-variant leading-relaxed">
-              {t("quarantine.confirm_delete_desc")}
-            </p>
-            <div className="flex justify-end gap-2.5">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setConfirmDeleteId(null)}
-                className="font-bold text-xs"
-              >
-                {t("common.cancel")}
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={async () => {
-                  const id = confirmDeleteId;
-                  setConfirmDeleteId(null);
-                  setActionError("");
-                  setActionSuccess("");
-                  try {
-                    await deleteMutation.mutateAsync(id);
-                    setActionSuccess(t("quarantine.delete_success"));
-                    setSelectedItem(null);
-                    refetch();
-                  } catch (err) {
-                    setActionError(err instanceof Error ? err.message : "Failed to delete item.");
-                  }
-                }}
-                className="font-bold text-xs"
-              >
-                {t("quarantine.delete")}
-              </Button>
-            </div>
+      <Dialog
+        isOpen={!!confirmDeleteId}
+        onClose={() => setConfirmDeleteId(null)}
+        role="alertdialog"
+        size="sm"
+        initialFocusRef={cancelDeleteRef}
+        title={
+          <span className="flex items-center gap-3">
+            <span className="p-2 bg-error/10 text-error rounded-xl">
+              <AlertCircle className="w-5 h-5" aria-hidden="true" />
+            </span>
+            {t("quarantine.confirm_delete")}
+          </span>
+        }
+        description={t("quarantine.confirm_delete_desc")}
+        footer={
+          <div className="flex justify-end gap-2.5">
+            <Button
+              ref={cancelDeleteRef}
+              variant="outline"
+              size="sm"
+              onClick={() => setConfirmDeleteId(null)}
+              className="font-bold text-xs"
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={async () => {
+                const id = confirmDeleteId;
+                if (!id) return;
+                setConfirmDeleteId(null);
+                setActionError("");
+                setActionSuccess("");
+                try {
+                  await deleteMutation.mutateAsync(id);
+                  setActionSuccess(t("quarantine.delete_success"));
+                  setSelectedItem(null);
+                  refetch();
+                } catch (err) {
+                  setActionError(err instanceof Error ? err.message : t("quarantine.errors.delivery_failed"));
+                }
+              }}
+              className="font-bold text-xs"
+            >
+              {t("quarantine.delete")}
+            </Button>
           </div>
-        </div>
-      )}
+        }
+      />
 
     </MotionDiv>
   );

@@ -14,8 +14,8 @@ Key properties:
 - Re-seeding disabled by default; set SICURRE_DB_INGEST_FORCE_RESEED=true to
   re-generate the DB from archetypes and re-upload to R2 manually
 
-Must be run AFTER sap-ingest-base (DB already contains 163,477 records).
-PRIOR_RECORD_COUNT reflects the cumulative count after SAP Labs ingestion.
+Must be run AFTER sap-ingest-base; PRIOR_RECORD_COUNT is the cumulative
+record count expected after SAP Labs ingestion.
 """
 
 from __future__ import annotations

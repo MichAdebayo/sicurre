@@ -3055,21 +3055,14 @@ paths:
       - system
   /health/ready:
     get:
-      description: 'Report whether the database is reachable, without forcing a restart.
+      description: 'Report whether the database is reachable.
 
 
-        Kept apart from `/health` on purpose: Docker restarts this container on
+        Separate from ``/health``, which Docker restarts the container on;
 
-        a failing health check, and a restart cannot mend a database that is
+        this endpoint is for alerting. Uses the keepalive''s last observation
 
-        down — it only loops and buries the cause. This one is for alerting.
-
-
-        The answer comes from the keepalive''s last ping where that is recent
-
-        enough, so scraping it does not add load or hold a serverless compute
-
-        awake. Only a stale record triggers a probe of its own.'
+        when it is recent, otherwise probes once.'
       operationId: readiness_health_ready_get
       responses:
         '200':
@@ -4584,18 +4577,9 @@ paths:
       description: 'List forwarded reports for the authenticated workspace.
 
 
-        The ingest path wrote these rows and nothing read them back, so a user who
+        Returns metadata only; the message content stays in private R2. Scoped
 
-        forwarded a missed phishing email saw no confirmation anywhere in the
-
-        product and had no reason to believe it had worked.
-
-
-        Metadata only. The ingest pipeline anonymises the message into private R2
-
-        precisely so the forwarded content stops circulating; returning a body here
-
-        would undo that. Scoped on workspace_id like every other tenant route.'
+        on ``workspace_id`` like every other tenant route.'
       operationId: list_reported_emails_v1_feedback_reports_get
       responses:
         '200':

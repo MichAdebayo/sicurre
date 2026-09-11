@@ -590,20 +590,10 @@ class ReviewPersistenceService:
             ).all()
         }
 
-        # Two separate sources of duplication, and both reach the same unique
-        # index on data_normalized_message.text_sha256:
-        #
-        #   * already curated  - a previous release wrote this text. The lanes are
-        #     deterministic, so every monthly run reproduces its own back
-        #     catalogue.
-        #   * repeated in this batch - two lanes in one run can synthesise the
-        #     same text from the same seed material, and an earlier lane in the
-        #     same run may already have committed it.
-        #
-        # Filtering only the first still lets the second reach the database,
-        # where it surfaces as IntegrityError mid-INSERT and aborts the release
-        # after earlier lanes have already committed - a half-finished release,
-        # which is worse than one that never started.
+        # Two sources of duplication reach the same unique index on
+        # text_sha256: text a previous release already curated (the lanes are
+        # deterministic), and text repeated within this batch. Both are
+        # filtered here so neither surfaces as an IntegrityError mid-release.
         kept: list[dict[str, Any]] = []
         seen_in_batch: set[str] = set()
         for sample, text_hash in hashed:
@@ -638,16 +628,9 @@ class ReviewPersistenceService:
             if str(sample.get("review_state") or "")
             == GenerationReviewState.USABLE.value
         ]
-        # A monthly release re-runs every generation lane, and the adapted lane is
-        # deterministic: the same seeds produce the same texts. Everything already
-        # curated therefore comes back on the next run and trips the duplicate
-        # guard in persist_generated_promotion_review, which raises and takes the
-        # whole release down with it - normalize succeeds, generation aborts, no
-        # dataset is ever built.
-        #
-        # Skip what is already curated and promote what is new. The guard stays
-        # in place downstream: it still fires for a duplicate this filter did not
-        # anticipate, which is the case it was written for.
+        # The adapted lane is deterministic, so a monthly release reproduces
+        # text already curated. Skip it and promote only what is new; the
+        # duplicate guard downstream still catches anything this misses.
         promotable_samples, already_curated = (
             await ReviewPersistenceService._drop_already_curated(
                 session, promotable_samples, payload.get("run")
@@ -994,15 +977,10 @@ class ReviewPersistenceService:
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int]:
         """Drop candidates whose text is already curated or repeated in this batch.
 
-        This is the second of the two write paths into
-        data_normalized_message. The gated-promotion path has its own filter;
-        this one is reached by the Common Crawl acceptance lane, which builds
-        rows directly. Both hit the same unique index on text_sha256, so a
-        filter on only one path still lets the release die mid-INSERT - after
-        earlier lanes have committed.
-
-        The two lists are consumed by a strict zip, so they must be filtered in
-        lockstep or the pairing silently shifts.
+        Both write paths into ``data_normalized_message`` filter on
+        ``text_sha256`` before insert, because the unique index would otherwise
+        fail mid-release. ``accepted_candidates`` and ``proposed_messages`` are
+        consumed by a strict zip and are filtered in lockstep.
         """
         hashes = [str(m.get("text_sha256") or "") for m in proposed_messages]
         present = [h for h in hashes if h]

@@ -378,7 +378,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                       id="settings-user-role"
                       value={role}
                       onChange={(e) => setRole(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-surface-lowest border border-border-subtle rounded-lg text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer h-[44px] font-semibold"
+                      className="w-full px-4 py-2.5 bg-surface-lowest border border-border-subtle rounded-lg text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer h-[44px] font-semibold focus-visible:ring-2 focus-visible:ring-primary"
                     >
                       <option value="owner">Owner</option>
                       <option value="admin">Administrator</option>
@@ -472,7 +472,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                     aria-labelledby="settings-language-label"
                     value={lang}
                     onChange={(e) => handleLanguageChange(e.target.value)}
-                    className="px-3.5 py-2 bg-surface-lowest border border-border-subtle rounded-lg text-sm text-on-surface focus:outline-none focus:border-primary outline-none cursor-pointer font-semibold"
+                    className="px-3.5 py-2 bg-surface-lowest border border-border-subtle rounded-lg text-sm text-on-surface focus:outline-none focus:border-primary outline-none cursor-pointer font-semibold focus-visible:ring-2 focus-visible:ring-primary"
                   >
                     <option value="fr">Français</option>
                     <option value="en">English</option>
@@ -492,7 +492,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                     aria-labelledby="settings-theme-label"
                     value={theme}
                     onChange={(e) => handleThemeChange(e.target.value)}
-                    className="px-3.5 py-2 bg-surface-lowest border border-border-subtle rounded-lg text-sm text-on-surface focus:outline-none focus:border-primary outline-none cursor-pointer font-semibold"
+                    className="px-3.5 py-2 bg-surface-lowest border border-border-subtle rounded-lg text-sm text-on-surface focus:outline-none focus:border-primary outline-none cursor-pointer font-semibold focus-visible:ring-2 focus-visible:ring-primary"
                   >
                     <option value="light">{t("settings.theme_light")}</option>
                     <option value="dark">{t("settings.theme_dark")}</option>
@@ -664,13 +664,14 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                   {/* Connected domains selector dropdown next to the title */}
                   {!domainsLoading && domains && domains.length > 0 && (
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs font-semibold text-on-surface-variant">
+                      <span id="settings-integration-domain-label" className="text-xs font-semibold text-on-surface-variant">
                         {t("settings.domain_label")}
                       </span>
                       <select
+                        aria-labelledby="settings-integration-domain-label"
                         value={selectedIntegrationDomainId}
                         onChange={(e) => setSelectedIntegrationDomainId(e.target.value)}
-                        className="bg-surface-low border border-border-subtle rounded-lg text-xs font-bold px-3 py-1.5 focus:outline-none focus:border-primary text-on-surface cursor-pointer"
+                        className="bg-surface-low border border-border-subtle rounded-lg text-xs font-bold px-3 py-1.5 focus:outline-none focus:border-primary text-on-surface cursor-pointer focus-visible:ring-2 focus-visible:ring-primary"
                       >
                         {domains.map((dom) => (
                           <option key={dom.id} value={dom.id}>

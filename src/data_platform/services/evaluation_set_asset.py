@@ -10,14 +10,9 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-# Version one fixed the composition at exactly 25/25/10. That blocked any
-# growth of the set, which matters because v1 covered business email compromise
-# only and carried no administrative-impersonation records at all.
-#
-# What actually has to hold is the balance, not a magic total: phishing and
-# legitimate must stay equal so aggregate metrics cannot drift through
-# composition alone, and every class must remain represented well enough for a
-# per-class metric to mean something.
+# Minimum counts, not a fixed composition: phishing and legitimate stay equal
+# so aggregate metrics cannot drift through composition alone, and every class
+# stays large enough for a per-class metric to mean something.
 MINIMUM_LABEL_COUNTS = {"phishing": 25, "legitimate": 25, "spam": 10}
 BALANCED_LABELS = ("phishing", "legitimate")
 

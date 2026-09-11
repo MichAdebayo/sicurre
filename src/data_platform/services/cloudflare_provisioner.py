@@ -35,9 +35,7 @@ CF_BASE = "https://api.cloudflare.com/client/v4"
 # Embedded Cloudflare Email Worker script
 # ---------------------------------------------------------------------------
 #: The Worker script deployed to Cloudflare, read from the single copy that
-#: ships inside the package. It used to be inlined here as well, and the two
-#: drifted: this copy never gained the DMARC and reported-email branches, so
-#: every re-provision silently reverted ingestion to plain classification.
+#: ships inside the package. Never duplicate it here.
 _WORKER_JS = (Path(__file__).parent / "assets" / "email_gateway_worker.js").read_text(
     encoding="utf-8"
 )
@@ -187,13 +185,9 @@ class CloudflareProvisioner:
     async def enable_email_routing(self, zone_id: str) -> None:
         """Enable Email Routing for a zone (idempotent).
 
-        Refuses a zone whose mail is served by someone else. Cloudflare
-        documents that Email Routing requires its own MX records, cannot be
-        used with an external mail server, and locks the records it adds
-        against deletion from the DNS panel - so enabling it on a domain
-        running Google Workspace or Microsoft 365 takes over that domain's
-        inbound mail. Sicurre's own promise to the customer is "no migration,
-        no mailbox changes", and this is the one place that could break it.
+        Refuses a zone whose MX records point at another mail provider:
+        Email Routing replaces the zone's MX records, so enabling it there
+        would take over the customer's inbound mail.
         """
         dns_records = await self.get_dns_records(zone_id)
         mx_hosts = [
@@ -263,16 +257,12 @@ class CloudflareProvisioner:
         forward_to: str,
         reported_email_ingest_key: str | None = None,
     ) -> None:
-        """
-        Deploy the Sicurre Email Worker script to Cloudflare Workers.
+        """Deploy the Sicurre Email Worker script to Cloudflare Workers.
 
         The script handles the email event, calls the scan API, and either
-        forwards clean mail or rejects phishing.
-
-        Cloudflare replaces the whole binding set on every PUT, so a binding
-        left out here is deleted from the running Worker. Omitting the ingest
-        key is what turns DMARC and reported-email ingestion back off: the
-        script keeps its branches, finds no key, and silently forwards instead.
+        forwards clean mail or rejects phishing. Cloudflare replaces the whole
+        binding set on every PUT, so every binding the script needs, including
+        the ingest key, is sent on each deploy.
         """
         bindings: list[dict[str, str]] = [
             {"type": "plain_text", "name": "SICURRE_SCAN_URL", "text": scan_url},
@@ -385,12 +375,9 @@ class CloudflareProvisioner:
     async def get_dns_records(self, zone_id: str) -> list[dict[str, Any]]:
         """Fetch every DNS record for a zone, following pagination.
 
-        Truncating this list is not a cosmetic loss. Callers decide whether a
-        record already exists from what they find here, so a customer whose SPF
-        record sits past the first page looked to Sicurre like a zone with no
-        SPF at all - and the fix would then *create a second one*. Two v=spf1
-        records at an apex is a permanent error under RFC 7208 and takes SPF
-        down for the whole domain.
+        Callers decide whether a record exists from this list, so it must be
+        complete: a missed SPF record would lead to a second ``v=spf1`` record
+        at the apex, a permanent error under RFC 7208.
         """
         records: list[dict[str, Any]] = []
         page = 1
@@ -566,12 +553,10 @@ class CloudflareProvisioner:
     ) -> None:
         """Create or update a DNS record for the zone.
 
-        `match_prefix` narrows which existing record counts as the one being
-        replaced. A zone apex carries many TXT records - SPF beside Google and
-        Microsoft verification tokens - and matching on name alone takes
-        whichever the API happens to return first, so writing SPF could
-        overwrite a verification record and destroy it. Callers that own one
-        record among several at a name must pass the prefix that identifies it.
+        ``match_prefix`` selects which existing record at ``name`` is
+        replaced. An apex carries several TXT records (SPF beside provider
+        verification tokens), so a caller that owns one record among several
+        must pass the prefix that identifies it.
         """
         # Clean record value: remove any raw python byte literal indicators (e.g. b'...')
         content_clean = content

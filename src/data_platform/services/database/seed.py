@@ -42,20 +42,9 @@ CORPUS_PATH = (
 SEED = 42
 SYNTHETIC_PHISHING_COUNT = 7_500
 SYNTHETIC_SPAM_COUNT = 10_000
-#: Raised from 5_000. At 5_000 the corpus came out 45.8% phishing to 24.4%
-#: legitimate - a 1.88x ratio - once the faker sources grew to a larger share
-#: of it after the truncation fix.
-#:
-#: That ratio is the axis the model fails on. inverse_freq balances the
-#: gradient exactly, so the loss is not the problem; the problem is
-#: information. At 1.88x the model sees nearly twice as many distinct phishing
-#: emails as legitimate ones, learns a richer phishing concept and a thinner
-#: legitimate one, and reads legitimate mail as phishing - 22 of 42 on the
-#: golden set at worst.
-#:
-#: 10_000 brings the corpus to roughly 1.23x. Deliberately not parity: real
-#: inboxes are not balanced either, and the aim is to stop starving the
-#: legitimate class rather than to invent a uniform world.
+#: Kept level with spam so the phishing-to-legitimate ratio stays near 1.2x;
+#: a wider ratio starves the legitimate class of distinct examples. Not
+#: parity, because real inboxes are not balanced either.
 SYNTHETIC_LEGITIMATE_COUNT = 10_000
 
 
@@ -120,22 +109,9 @@ class ExternalModelVersion(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
-#: Upper bound on a stored body, in characters.
-#:
-#: The column was called body_preview and was cut to 200 characters, which is a
-#: sensible size for a preview and the wrong size for training data. The
-#: archetype templates that feed it run 297-611 characters, so every synthetic
-#: email in the corpus was stored as its opening paragraph and nothing else -
-#: 23,822 records across all three classes, each missing its back half.
-#:
-#: That cost the corpus its long-form register. Real French business mail runs
-#: 400-1200 characters, and the model had never seen a full-length example of
-#: any class. Measured on the current tokenizer, full templates reach a median
-#: of 133 tokens and a maximum of 214, so nothing approaches max_length=256:
-#: the truncation was discarding content the model had room for.
-#:
-#: 4000 is a guard against a pathological input rather than a working limit;
-#: no template comes close.
+#: Upper bound on a stored body, in characters. Bodies are stored whole (the
+#: archetype templates run up to about 600 characters and fit within the
+#: tokenizer's 256-token window); 4000 guards against a pathological input.
 MAX_BODY_CHARS = 4_000
 
 #: Subjects stay short. A subject line is genuinely bounded, unlike a body,

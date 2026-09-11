@@ -21,8 +21,7 @@ line.)
 The label comes from the filename prefix, not from the content: ``spam_1.txt``
 contributes spam, ``legitimate_1.txt`` contributes legitimate, ``phishing_1.txt``
 contributes phishing.  See ``TXT_SOURCE_LABELS``.  An unrecognised prefix falls
-back to ``"spam"``, which is what the original four Spam_*.txt exports relied
-on.  The persisted text combines the subject and body.
+back to ``"spam"``.  The persisted text combines the subject and body.
 
 Returns a plain list of parsed records; the caller owns DB persistence.
 """
@@ -54,17 +53,9 @@ class TxtEmailRecord:
     language: str | None
 
 
-#: Dropzone filename prefix -> corpus label.
-#:
-#: The dropzone turns a filename into a source name
-#: (``entry.filename.rsplit(".", 1)[0].lower()``), so ``spam_1.txt`` arrives as
-#: source ``spam_1``. The label used to be hardcoded to "spam" here, which meant
-#: a file could only ever contribute spam no matter what it was called - and a
-#: ``legitimate_1.txt`` would have been ingested, labelled spam, and then sat
-#: under a source with no normalization policy: never examined, never rejected.
-#:
-#: Legitimate is the class the corpus is shortest of (26.8% and static) and the
-#: one the model actually misreads, so it needs a way in.
+#: Dropzone filename prefix -> corpus label. The dropzone derives the source
+#: name from the filename (``spam_1.txt`` -> source ``spam_1``), so the prefix
+#: decides which class a file contributes.
 TXT_SOURCE_LABELS: dict[str, str] = {
     "spam": "spam",
     "phishing": "phishing",

@@ -3,15 +3,10 @@
 Revision ID: 20260907_app_0010
 Revises: 20260904_app_0009
 
-The table was keyed on `domain` alone, so two workspaces protecting the same
-domain shared one row and overwrote each other's status. That is not
-hypothetical here: vinse.app carried two active integrations in two workspaces
-at once. Reads were already scoped by workspace, so the row a customer saw
-could be a status written for someone else's copy of the domain.
-
-The model now declares the composite key, so a database created from scratch
-arrives correct and this migration finds nothing to do. It runs for real only
-against a database that predates the change.
+Two workspaces protecting the same domain previously shared one status row.
+The model declares the composite ``(workspace_id, domain)`` key, so a database
+created from scratch is already correct and this migration is a no-op there;
+it rebuilds the key only on databases that predate the change.
 """
 
 from __future__ import annotations

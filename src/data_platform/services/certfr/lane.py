@@ -1,40 +1,25 @@
 """Run the CERT-FR chain end to end: CTI records in, generation bundle out.
 
-Five CERT-FR services exist and every one is unit-tested, but only the router
-(``CertFRStageTwoService``) had a caller. ``stage_two`` correctly marks CTI
-records ``specialized_processing`` with a subtype - ``threat_intel``,
-``synthetic_lure_candidate``, ``procedural_notification`` - and those subtypes
-are the hand-off contract to the other four. Nothing performed the hand-off, so
-88 ANSSI records routed to a destination that was never reached, against a
-corpus holding 7 real phishing samples.
-
-The unit tests could not catch this by construction: they instantiate each
-service directly and assert it behaves, which says nothing about whether the
-sequence is ever run.
-
-This module is the missing sequence, and only that. It composes existing
-services and emits the same bundle contract the adapted and Common Crawl lanes
-already produce, so downstream review and persistence are untouched:
+Composes the CERT-FR services in sequence and emits the generation-bundle
+contract shared with the adapted and Common Crawl lanes, so review and
+persistence downstream are common to all three:
 
     raw CTI  ->  stage_two.review        (route + derived payload)
              ->  build_summary           (aggregate themes and IOCs)
              ->  build_inputs            (synthesis inputs)
              ->  build_drafts            (French phishing drafts)
              ->  build_stage_payload     (staged for human review)
-             ->  generation bundle       (existing contract)
+             ->  generation bundle
 
-Promotion gating is left to the persistence layer, which already offers
-``persist_generation_bundle_with_gated_promotion``. That matters for CERT-FR
-more than for any other source: it is the most valuable phishing signal in the
-platform, and machine-written lures derived from it are indistinguishable from
-real ones once mixed into the corpus.
+Promotion is gated by the persistence layer
+(``persist_generation_bundle_with_gated_promotion``): machine-written lures
+are never promoted without review.
 
-Note that ``build_summary`` consumes only the ``threat_intel`` and
-``procedural_notification`` rules. A record routed to
-``synthetic_lure_candidate`` contributes nothing downstream, which is easy to
-miss when testing with hand-written text - a CTI report needs its report
-markers (ANSSI, TLP:CLEAR, "panorama de la cybermenace") in the first 800
-characters to route as threat intelligence at all.
+``build_summary`` consumes only records routed as ``threat_intel`` or
+``procedural_notification``; a ``synthetic_lure_candidate`` record contributes
+nothing downstream. A record routes as threat intelligence only when its
+report markers (ANSSI, TLP:CLEAR, "panorama de la cybermenace") appear in the
+first 800 characters.
 """
 
 from __future__ import annotations
@@ -143,12 +128,8 @@ def build_certfr_generation_bundle(
                 "parent_source": CERTFR_SOURCE,
                 "target_label": "phishing",
                 "primary_theme": str(draft.get("primary_theme") or ""),
-                # The draft builder's own quality checks decide this, including
-                # its duplicate-downgrade pass; it is not overridden here. Human
-                # gating is a persistence concern - see
-                # persist_generation_bundle_with_gated_promotion - so forcing a
-                # state here would discard the builder's judgement and duplicate
-                # a control that already exists downstream.
+                # Decided by the draft builder's quality checks; human gating
+                # happens in persist_generation_bundle_with_gated_promotion.
                 "review_state": str(draft.get("review_state") or "pending_review"),
                 "review_notes": list(draft.get("review_notes") or []),
                 "text_sha256": sha256(normalized_text.encode("utf-8")).hexdigest(),

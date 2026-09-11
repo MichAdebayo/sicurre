@@ -150,7 +150,7 @@ export default function SupportRoute({ session }: SupportRouteProps) {
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full pl-3.5 pr-10 py-2 bg-white border border-border-subtle rounded-lg text-xs font-semibold text-on-surface focus:outline-none focus:border-primary cursor-pointer shadow-sm h-10 appearance-none"
+                    className="w-full pl-3.5 pr-10 py-2 bg-white border border-border-subtle rounded-lg text-xs font-semibold text-on-surface focus:outline-none focus:border-primary cursor-pointer shadow-sm h-10 appearance-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
                     <option value="incident">
                       {t("support.category_incident")}
@@ -183,7 +183,7 @@ export default function SupportRoute({ session }: SupportRouteProps) {
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   placeholder={t("support.message_placeholder")}
-                  className="w-full px-3.5 py-2.5 bg-white border border-border-subtle rounded-xl text-xs text-on-surface font-medium placeholder:text-on-surface-variant/40 focus:outline-none focus:border-primary shadow-sm min-h-[120px]"
+                  className="w-full px-3.5 py-2.5 bg-white border border-border-subtle rounded-xl text-xs text-on-surface font-medium placeholder:text-on-surface-variant/40 focus:outline-none focus:border-primary shadow-sm min-h-[120px] focus-visible:ring-2 focus-visible:ring-primary"
                 />
               </div>
 

@@ -139,19 +139,10 @@ def _validate_csv_rows(
     return True
 
 
-#: Governance defaults for file sources, chosen by the shape of the source name.
-#:
-#: Every other extractor sets legal_basis, contains_personal_data and
-#: retention_days when it registers its source. File sources did not, so eleven
-#: rows carried NULL legal basis, no retention and contains_personal_data=False -
-#: including the operator's own mailbox exports, which hold real sender addresses
-#: and display names. Defaulting personal data to False is the wrong default for
-#: precisely the sources most likely to contain it.
-#:
-#: Dropzone exports (spam_1, legitimate_2, phishing_3 …) are mail from a real
-#: mailbox. Personal data is present in the raw record; normalization redacts it
-#: before anything reaches the corpus, but the raw record is what this field
-#: describes.
+#: Governance defaults for file sources, chosen by the shape of the source
+#: name. Dropzone exports (spam_1, legitimate_2, phishing_3 ...) are mail from
+#: a real mailbox: personal data is present in the raw record and redacted at
+#: normalization, and these fields describe the raw record.
 _DROPZONE_GOVERNANCE = {
     "legal_basis": "legitimate_interest_security",
     "contains_personal_data": True,

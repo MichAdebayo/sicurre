@@ -1,12 +1,11 @@
 # Accessibility
 
 The target is WCAG 2.1 level AA. This document records what was verified, how,
-and what is not yet met — measured on 3 September 2026 against the design
+and what is not yet met — measured on 12 September 2026 against the design
 system's palette and the components in `src/app/`.
 
-The palette values are reproduced here rather than cited, because the brand
-document that defines them is not tracked in this repository. A reference a
-reader cannot follow is worse than the values themselves.
+The palette values are reproduced here from `docs/brand/DESIGN.md` so the
+ratios can be read against the exact hex values they were computed from.
 
 It is written as a status, not as a claim of conformance. A conformance
 statement needs an audit of every page against every applicable criterion; what
@@ -63,23 +62,54 @@ Applied to interface work. Each is checkable by a reviewer without tooling.
 
 ## Current state
 
-Measured across the 39 component files in `src/app/`:
+Measured across the 59 TypeScript files in `src/app/` on 12 September 2026:
 
 | Signal | Files |
 |---|---|
-| `aria-label` | 18 |
-| `aria-hidden` | 11 |
-| `role=` | 12 |
+| `aria-label` | 23 |
+| `aria-hidden` | 19 |
+| `focus-visible` | 19 |
+| `role=` | 18 |
 | `alt=` | 9 |
-| `focus-visible` | 4 |
-| `aria-labelledby` / `aria-describedby` | 2 each |
-| `aria-live` | 1 |
+| `aria-labelledby` | 6 |
+| `aria-describedby` | 4 |
+| `aria-expanded` | 2 |
+| `aria-current` | 2 |
+| `aria-live` | 1 (plus `role="status"` or `role="alert"` in 11 more files) |
 
-Accessibility work is present and deliberate rather than incidental — the
-`aria-hidden` count in particular shows decorative elements being hidden on
-purpose. It is also uneven: one `aria-live` region across the application is
-thin for a product whose primary output is an asynchronous verdict, and
-criterion 5 above is the least well met of the seven.
+Every `Input` associates its label by a generated id, verdict and Domain
+Shield status badges carry their state as visible text beside the icon, and
+decorative icons are hidden from assistive technology.
+
+Closed on 12 September 2026:
+
+1. **Dialogs.** `components/ui/dialog.tsx` is a modal dialog: `role="dialog"`
+   (or `alertdialog`), `aria-modal`, labelled by its title and described by
+   its subtitle, focus moved inside on open and returned on close, Tab kept
+   within the panel, Escape and the backdrop close it, named close control.
+   The quarantine preview and the delete confirmation use it.
+   `tests/unit/app/dialog.test.tsx` pins the contract.
+2. **Form errors.** The Cloudflare connection error is a `role="alert"`
+   region that receives focus when it appears, as the login form already did.
+3. **Keyboard focus.** The button, input and toggle primitives and every
+   native control that removed the outline show a 2 px primary ring on
+   keyboard focus (`focus-visible`), never on mouse click.
+4. **Headings.** Every route has one `h1`; the contact page was the last
+   without one (the admin routes already get theirs from `AdminPage`).
+5. **Notifications.** Items are buttons in a labelled region, the bell
+   reports `aria-expanded`, Escape closes the popover, and unread state
+   carries the text "Non lu" for screen readers as well as the dot.
+6. **Tooltip.** The SSL help on Domain Shield is a button with
+   `aria-describedby`; the tooltip shows on focus as well as hover.
+7. **Labels.** The threats period filter and the settings domain picker are
+   labelled.
+8. **Placeholders.** Loading and unavailable values on the dashboard are
+   words, not an em dash.
+
+Still open:
+
+- The "managed records" help icon in the Domain Shield auto-fix panel is
+  hover-only; that panel is being reverted and the icon goes with it.
 
 ## Resolved: danger text
 
@@ -100,13 +130,42 @@ background — so verdict badges keep their identity while their text becomes
 legible. `test_palette_contrast.py` asserts both surfaces now pass AA; if either
 regresses, restore the token rather than relaxing the test.
 
-## What has not been done
+## Automated audit
 
-No automated audit (axe, Lighthouse) and no screen-reader pass has been run.
-The criteria above are stated so that interface work can be reviewed against
-them; they are not evidence that every existing screen already satisfies them.
-Stating that limit is more useful than a conformance claim the project cannot
-support.
+axe-core 4.13 (`@axe-core/cli`, headless Chrome, rule tags `wcag2a`,
+`wcag2aa`, `wcag21a`, `wcag21aa`, `best-practice`, 5 s render delay so the
+React routes are mounted) was run on 12 September 2026 against the eight
+public routes: `/`, `/login`, `/signup`, `/verify-email`, `/cgu`,
+`/mentions-legales`, `/confidentialite`, `/contact`.
+
+| Build | Result |
+|---|---|
+| Production before the fixes | 7 of 8 pages without a `main` landmark; content outside landmarks on those pages; the password show/hide button unnamed on login and signup; `aria-label` on the Turnstile container, which is a plain `div`; on contact an unlabelled select, a 1.8:1 button text in dark mode (white text on the dark-mode primary token), and no `h1` |
+| Local production build after the fixes | 0 violations on all 8 pages |
+
+What changed: `header`, `main` and `footer` landmarks on the landing, login,
+legal and contact pages; a name and pressed state on the password toggle;
+`role="group"` on the Turnstile container; an explicit label on the contact
+subject select; the contact button text uses the `on-primary` token so it
+pairs with the primary background in both themes; contact headings run
+h1, h2.
+
+Limits of the result: axe finds the subset of WCAG failures that can be
+detected from the DOM, roughly a third of real defects. It says nothing about
+keyboard operation, focus order, or how a screen reader reads a flow; those
+are covered by the criteria above and by `tests/unit/app/dialog.test.tsx`.
+The signed-in routes (dashboard, threats, quarantine, Domain Shield, alerts,
+settings) were not scanned by the command line tool because it has no
+session; they follow the same primitives. No screen-reader pass has been
+run.
+
+To repeat the scan on a local build:
+
+```bash
+npm run build && npx vite preview --port 4173 &
+npx @axe-core/cli http://localhost:4173/ http://localhost:4173/login \
+  --load-delay 5000 --tags wcag2a,wcag2aa,wcag21a,wcag21aa,best-practice
+```
 
 ## Documents
 

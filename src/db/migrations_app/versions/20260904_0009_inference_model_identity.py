@@ -3,16 +3,11 @@
 Revision ID: 20260904_app_0009
 Revises: 20260830_app_0008
 
-The inference service returns its identity on every classification -
-X-Sicurre-Model-Version and X-Sicurre-Model-Revision - and the application
-discarded both. A verdict in the threat journal could therefore not be
-attributed to the model that produced it, which is the question an audit of a
-disputed classification starts with, and the one a retrained model makes
-unanswerable retrospectively.
-
-Both columns are nullable: rows written before this migration genuinely do not
-know their model, and inventing a value for them would be worse than a null
-that says so.
+Adds nullable ``model_version`` and ``model_revision`` columns to
+``app_inference_event``, filled from the ``X-Sicurre-Model-Version`` and
+``X-Sicurre-Model-Revision`` headers the inference service returns, so a
+verdict can be attributed to the model that produced it. Rows written before
+this migration keep NULL.
 """
 
 from __future__ import annotations

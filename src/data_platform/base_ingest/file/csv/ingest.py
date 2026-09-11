@@ -17,9 +17,8 @@ Key properties:
 - Must be run AFTER sicurre.db exists (alembic upgrade head or
   phishtank-ingest-base creates it)
 
-data/raw/file/csv/french-spamham-detection-free/data.jsonl is excluded
-per user decision — its 1,000 French spam/ham entries are already covered by
-fr/french_spamham_1000_20260301.csv.
+data/raw/file/csv/french-spamham-detection-free/data.jsonl is excluded: its
+1,000 French spam/ham entries duplicate fr/french_spamham_1000_20260301.csv.
 """
 
 from __future__ import annotations

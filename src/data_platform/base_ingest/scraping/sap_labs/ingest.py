@@ -11,8 +11,8 @@ This script:
      and a NoOpSnapshotStore (no R2 write).
   3. Writes a manifest to data/local/sap_labs_base_ingest_manifest.json.
 
-Must be run AFTER certfr-ingest-base (DB contains ~163,459 records).
-PRIOR_RECORD_COUNT reflects the cumulative count after CERT-FR ingestion.
+Must be run AFTER certfr-ingest-base; PRIOR_RECORD_COUNT is the cumulative
+record count expected after CERT-FR ingestion.
 """
 
 from __future__ import annotations

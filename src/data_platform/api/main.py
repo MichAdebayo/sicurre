@@ -189,15 +189,11 @@ def create_app() -> FastAPI:
     @app.get("/health/ready", tags=["system"], response_model=ReadinessResponse)
     @limiter.exempt
     async def readiness(response: Response) -> dict[str, object]:
-        """Report whether the database is reachable, without forcing a restart.
+        """Report whether the database is reachable.
 
-        Kept apart from `/health` on purpose: Docker restarts this container on
-        a failing health check, and a restart cannot mend a database that is
-        down — it only loops and buries the cause. This one is for alerting.
-
-        The answer comes from the keepalive's last ping where that is recent
-        enough, so scraping it does not add load or hold a serverless compute
-        awake. Only a stale record triggers a probe of its own.
+        Separate from ``/health``, which Docker restarts the container on;
+        this endpoint is for alerting. Uses the keepalive's last observation
+        when it is recent, otherwise probes once.
         """
         if db_health.is_stale():
             try:

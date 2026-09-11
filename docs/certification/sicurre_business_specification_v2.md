@@ -1,6 +1,5 @@
 # Sicurre — Spécification Métier, Architecture Technique & Modèle Économique (V2)
 
-![Sicurre Logo](../../src/app/assets/sicurre.png)
 
 > **DOSSIER DE CERTIFICATION SIMPLON — RNCP37827 (Développeur en Intelligence Artificielle)**  
 > **Document :** Spécification Métier, Évaluation Économique et Architecture MLOps / Microservices  
