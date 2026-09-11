@@ -145,8 +145,7 @@ async def test_a_value_that_is_not_a_hostname_is_refused_with_422() -> None:
 
 def test_the_default_resolver_reads_txt_mx_and_ns_answers(monkeypatch) -> None:
     """The dnspython adapter joins TXT chunks, keeps MX exchanges, strips trailing dots."""
-    import sys
-    import types
+    import dns.resolver
 
     from core import domain_preview
 
@@ -161,8 +160,7 @@ def test_the_default_resolver_reads_txt_mx_and_ns_answers(monkeypatch) -> None:
             return "ada.ns.cloudflare.com."
 
     answers = {"TXT": [Txt()], "MX": [Mx()], "NS": [Ns()]}
-    fake = types.SimpleNamespace(resolve=lambda name, rrtype: answers[rrtype])
-    monkeypatch.setitem(sys.modules, "dns.resolver", fake)
+    monkeypatch.setattr(dns.resolver, "resolve", lambda name, rrtype: answers[rrtype])
 
     assert domain_preview._default_resolver("example.test", "TXT") == ["v=spf1 include:_spf.google.com ~all"]
     assert domain_preview._default_resolver("example.test", "MX") == ["aspmx.l.google.com"]
