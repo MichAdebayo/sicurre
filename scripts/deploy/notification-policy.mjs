@@ -22,7 +22,7 @@ export function withOperationsRoutes(policy, receiver) {
         routes: [{
           receiver,
           object_matchers: [["exercise", "=", "synthetic"]],
-          group_wait: "30s",
+          group_wait: "10s",
           group_interval: "1m",
           repeat_interval: "4h",
         }, ...children],
