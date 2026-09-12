@@ -835,3 +835,25 @@ async def test_the_reader_cannot_page_forever() -> None:
 
     assert route.call_count == 50, "the page guard did not stop the read"
     assert len(records) == 5000
+
+
+def test_encrypt_provider_token_uses_the_configured_key(monkeypatch) -> None:
+    """A stored token is ciphertext under the workspace key, never the secret itself."""
+    import base64
+    from types import SimpleNamespace
+
+    from core.secret_cipher import decrypt_secret
+    from data_platform.services import cloudflare_provisioner
+
+    key = base64.urlsafe_b64encode(bytes(range(32))).decode("ascii")
+    monkeypatch.setattr(
+        cloudflare_provisioner,
+        "get_settings",
+        lambda: SimpleNamespace(secret_encryption_key=key, environment="test"),
+    )
+
+    stored = cloudflare_provisioner.encrypt_provider_token("cf-secret")
+
+    assert stored.startswith("enc:v1:")
+    assert "cf-secret" not in stored
+    assert decrypt_secret(stored, configured_key=key, environment="test") == "cf-secret"

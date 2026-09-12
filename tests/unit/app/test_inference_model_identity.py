@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import inspect
 
-from data_platform.api.routers import integrations
+from data_platform.api.routers import email_scan
 from data_platform.api.schemas.app_responses import ThreatLogResponse
 
 
 def _scan_source() -> str:
-    return inspect.getsource(integrations)
+    return inspect.getsource(email_scan)
 
 
 def test_the_identity_headers_are_read_from_the_response() -> None:

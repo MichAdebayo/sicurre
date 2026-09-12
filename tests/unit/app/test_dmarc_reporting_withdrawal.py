@@ -19,10 +19,7 @@ import pytest
 
 from data_platform.api.auth import AuthUser
 from data_platform.api.routers import integrations
-from data_platform.api.routers.integrations import (
-    _merge_dmarc,
-    _withdraw_dmarc_reporting,
-)
+from data_platform.services.dns_records import merge_dmarc, withdraw_dmarc_reporting
 
 
 def _user() -> AuthUser:
@@ -40,7 +37,7 @@ def _user() -> AuthUser:
 def test_our_address_is_removed_from_a_shared_list() -> None:
     """The customer's own reporting addresses survive."""
     record = "v=DMARC1; p=reject; rua=mailto:michael@vinse.app,mailto:dmarc@sicurre.com"
-    assert _withdraw_dmarc_reporting(record) == (
+    assert withdraw_dmarc_reporting(record) == (
         "v=DMARC1; p=reject; rua=mailto:michael@vinse.app"
     )
 
@@ -48,7 +45,7 @@ def test_our_address_is_removed_from_a_shared_list() -> None:
 def test_order_does_not_matter() -> None:
     """Ours may sit anywhere in the list."""
     record = "v=DMARC1; p=reject; rua=mailto:dmarc@sicurre.com,mailto:michael@vinse.app"
-    assert _withdraw_dmarc_reporting(record) == (
+    assert withdraw_dmarc_reporting(record) == (
         "v=DMARC1; p=reject; rua=mailto:michael@vinse.app"
     )
 
@@ -56,26 +53,26 @@ def test_order_does_not_matter() -> None:
 def test_a_reporting_tag_left_empty_is_dropped_not_blanked() -> None:
     """`rua=` with nothing after it is a malformed record."""
     record = "v=DMARC1; p=reject; rua=mailto:dmarc@sicurre.com"
-    assert _withdraw_dmarc_reporting(record) == "v=DMARC1; p=reject"
+    assert withdraw_dmarc_reporting(record) == "v=DMARC1; p=reject"
 
 
 def test_forensic_reporting_is_withdrawn_too() -> None:
     """`ruf` carries message samples; leaving it would be worse than `rua`."""
     record = "v=DMARC1; p=reject; rua=mailto:dmarc@sicurre.com; ruf=mailto:dmarc@sicurre.com"
-    assert _withdraw_dmarc_reporting(record) == "v=DMARC1; p=reject"
+    assert withdraw_dmarc_reporting(record) == "v=DMARC1; p=reject"
 
 
 def test_a_record_without_us_is_left_alone() -> None:
     """Nothing of ours means nothing to do - and no needless DNS write."""
-    assert _withdraw_dmarc_reporting("v=DMARC1; p=reject; rua=mailto:michael@vinse.app") is None
-    assert _withdraw_dmarc_reporting("") is None
+    assert withdraw_dmarc_reporting("v=DMARC1; p=reject; rua=mailto:michael@vinse.app") is None
+    assert withdraw_dmarc_reporting("") is None
 
 
 def test_the_policy_is_never_touched() -> None:
     """Withdrawing must not weaken a domain we no longer protect."""
     for policy in ("none", "quarantine", "reject"):
         record = f"v=DMARC1; p={policy}; rua=mailto:dmarc@sicurre.com; pct=50"
-        result = _withdraw_dmarc_reporting(record)
+        result = withdraw_dmarc_reporting(record)
         assert result is not None
         assert f"p={policy}" in result, f"policy {policy} was altered"
         assert "pct=50" in result, "an unrelated tag was dropped"
@@ -83,9 +80,9 @@ def test_the_policy_is_never_touched() -> None:
 
 def test_a_record_sicurre_created_is_kept_not_deleted() -> None:
     """The customer keeps the protection, we just stop reading their mail."""
-    created = _merge_dmarc("")
+    created = merge_dmarc("")
     assert created == "v=DMARC1; p=reject; rua=mailto:dmarc@sicurre.com"
-    assert _withdraw_dmarc_reporting(created) == "v=DMARC1; p=reject"
+    assert withdraw_dmarc_reporting(created) == "v=DMARC1; p=reject"
 
 
 def test_withdrawal_undoes_a_merge_exactly() -> None:
@@ -94,9 +91,9 @@ def test_withdrawal_undoes_a_merge_exactly() -> None:
         "v=DMARC1; p=reject; rua=mailto:michael@vinse.app",
         "v=DMARC1; p=reject; rua=mailto:a@b.test,mailto:c@d.test; pct=100",
     ):
-        merged = _merge_dmarc(original)
+        merged = merge_dmarc(original)
         assert "dmarc@sicurre.com" in merged, "the merge did not add our address"
-        assert _withdraw_dmarc_reporting(merged) == original
+        assert withdraw_dmarc_reporting(merged) == original
 
 
 def test_teardown_withdraws_before_it_forgets_the_domain() -> None:
@@ -105,7 +102,7 @@ def test_teardown_withdraws_before_it_forgets_the_domain() -> None:
     The helper existing is not the fix; teardown using it is.
     """
     source = inspect.getsource(integrations.teardown_cloudflare)
-    assert "_withdraw_dmarc_reporting" in source, (
+    assert "withdraw_dmarc_reporting" in source, (
         "teardown no longer withdraws Sicurre's reporting address"
     )
 

@@ -10,7 +10,10 @@ The implemented product runtime no longer uses Gmail watches or Pub/Sub as the p
 
 The current implementation is documented and exercised through:
 
-- `src/data_platform/api/routers/integrations.py`
+- `src/data_platform/api/routers/integrations.py` (connect and disconnect a domain)
+- `src/data_platform/api/routers/email_scan.py` (the routes the Email Worker calls)
+- `src/data_platform/api/routers/cloudflare_account.py` (domain preview, token check, stored token)
+- `src/data_platform/services/dns_records.py` (SPF, DKIM and DMARC record logic)
 - `src/data_platform/services/cloudflare_provisioner.py`
 - `docs/email-intercept.md`
 
