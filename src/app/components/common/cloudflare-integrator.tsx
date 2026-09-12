@@ -78,8 +78,8 @@ function StatusBadge({ status }: { status: string }) {
   const { t } = useTranslation();
   const map: Record<string, { label: string; className: string; icon: React.ReactNode }> = {
     not_configured:       { label: t("cloudflare.status_not_configured"), className: "text-on-surface-variant bg-surface-container border-border-subtle", icon: <Cloud className="w-3 h-3" /> },
-    provisioning:         { label: t("cloudflare.status_provisioning"), className: "text-amber-600 bg-amber-50 border-amber-200", icon: <Loader2 className="w-3 h-3 animate-spin" /> },
-    pending_verification: { label: t("cloudflare.status_pending"), className: "text-amber-600 bg-amber-50 border-amber-200", icon: <Mail className="w-3 h-3" /> },
+    provisioning:         { label: t("cloudflare.status_provisioning"), className: "text-warning bg-warning-bg border-warning/25", icon: <Loader2 className="w-3 h-3 animate-spin" /> },
+    pending_verification: { label: t("cloudflare.status_pending"), className: "text-warning bg-warning-bg border-warning/25", icon: <Mail className="w-3 h-3" /> },
     active:               { label: t("cloudflare.status_active"), className: "text-safe bg-safe/[0.08] border-safe/20", icon: <Zap className="w-3 h-3" /> },
     error:                { label: t("cloudflare.status_error"), className: "text-error bg-error/[0.06] border-error/20", icon: <XCircle className="w-3 h-3" /> },
   };
@@ -465,7 +465,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
               <p className="text-xs text-error">{(teardownMutation.error as Error)?.message}</p>
             )}
             {dmarcStillReporting && (
-              <p className="text-xs text-amber-700">{t("cloudflare.dmarc_withdrawal_failed")}</p>
+              <p className="text-xs text-warning">{t("cloudflare.dmarc_withdrawal_failed")}</p>
             )}
             <div className="flex gap-2">
               <Button
@@ -492,11 +492,11 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
   if (intStatus.status === "pending_verification") {
     return (
       <MotionDiv initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-        <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-          <Mail className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 p-4 bg-warning-bg border border-warning/25 rounded-xl">
+          <Mail className="w-5 h-5 text-warning shrink-0 mt-0.5" />
           <div>
-            <p className="font-bold text-sm text-amber-800 mb-1">{t("cloudflare.verify_email")}</p>
-            <p className="text-xs text-amber-700">
+            <p className="font-bold text-sm text-warning mb-1">{t("cloudflare.verify_email")}</p>
+            <p className="text-xs text-warning">
               {t("cloudflare.verify_email_desc")}{" "}
               <strong>{intStatus.destination_email}</strong>.
             </p>

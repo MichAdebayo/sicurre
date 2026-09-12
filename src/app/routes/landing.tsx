@@ -84,7 +84,7 @@ function LanguageSwitcher({ scrolled }: { scrolled: boolean }) {
         <ChevronDown className="w-3.5 h-3.5 opacity-60" />
       </button>
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-36 rounded-xl border border-white/15 bg-[#101424]/95 backdrop-blur-2xl text-white shadow-2xl shadow-black/80 py-1 text-[13px] font-medium text-left z-50 overflow-hidden">
+        <div className="absolute right-0 mt-2 w-36 rounded-xl border border-white/15 bg-night-surface/95 backdrop-blur-2xl text-white shadow-2xl shadow-black/80 py-1 text-[13px] font-medium text-left z-50 overflow-hidden">
           <button
             onClick={() => changeLanguage("fr")}
             className={`w-full px-3.5 py-2.5 transition-all flex items-center gap-2.5 cursor-pointer border-0 outline-none focus-visible:ring-2 focus-visible:ring-primary hover:bg-primary/20 hover:text-white ${
@@ -122,10 +122,10 @@ function IntegrationTerminal() {
   }, []);
 
   const steps = [
-    { icon: Key, color: "#f59e0b", title: t("landing.integration_step_1_title"), desc: t("landing.integration_step_1_desc") },
-    { icon: SearchIcon, color: "#4a90d9", title: t("landing.integration_step_2_title"), desc: t("landing.integration_step_2_desc") },
-    { icon: FileCheck, color: "#8b5cf6", title: t("landing.integration_step_3_title"), desc: t("landing.integration_step_3_desc") },
-    { icon: CheckCircle2, color: "#10b981", title: t("landing.integration_step_4_title"), desc: t("landing.integration_step_4_desc") },
+    { icon: Key, color: "var(--color-night-accent)", title: t("landing.integration_step_1_title"), desc: t("landing.integration_step_1_desc") },
+    { icon: SearchIcon, color: "var(--color-primary)", title: t("landing.integration_step_2_title"), desc: t("landing.integration_step_2_desc") },
+    { icon: FileCheck, color: "var(--color-inverse-primary)", title: t("landing.integration_step_3_title"), desc: t("landing.integration_step_3_desc") },
+    { icon: CheckCircle2, color: "var(--color-night-safe)", title: t("landing.integration_step_4_title"), desc: t("landing.integration_step_4_desc") },
   ];
 
   return (
@@ -172,13 +172,13 @@ function IntegrationTerminal() {
               <div className="flex-1 min-w-0">
                 <div
                   className="text-[15px] sm:text-[16px] font-semibold leading-snug transition-colors"
-                  style={{ color: isActive ? "#f8fafc" : "#64748b" }}
+                  style={{ color: isActive ? "var(--color-night-text)" : "var(--color-night-faint)" }}
                 >
                   {step.title}
                 </div>
                 <p
                   className={`text-[13px] sm:text-[14px] leading-relaxed transition-all duration-300 ${
-                    isCurrent ? "text-slate-400 mt-1 max-h-16 opacity-100" : "text-slate-500/40 mt-0.5 max-h-0 opacity-0 overflow-hidden"
+                    isCurrent ? "text-night-muted mt-1 max-h-16 opacity-100" : "text-night-faint/40 mt-0.5 max-h-0 opacity-0 overflow-hidden"
                   }`}
                 >
                   {step.desc}
@@ -232,14 +232,14 @@ export default function LandingRoute({
         <div className="mt-5 p-3.5 rounded-xl bg-white/[0.03] border border-white/10 text-[13px] space-y-2 text-white/80 font-sans">
           <div className="flex items-center justify-between text-white font-medium">
             <span className="flex items-center gap-1.5 text-white/90">
-              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-night-danger animate-pulse" />
               {t("landing.preview_verdict")}
             </span>
-            <span className="px-2.5 py-0.5 rounded-md bg-rose-500/20 text-rose-300 font-semibold border border-rose-500/30 text-[12px]">
+            <span className="px-2.5 py-0.5 rounded-md bg-night-danger/20 text-night-danger font-semibold border border-night-danger/30 text-[12px]">
               {t("landing.preview_score")}
             </span>
           </div>
-          <div className="text-[12px] text-slate-400">{t("landing.preview_action")}</div>
+          <div className="text-[12px] text-night-muted">{t("landing.preview_action")}</div>
         </div>
       ),
     },
@@ -251,8 +251,8 @@ export default function LandingRoute({
       desc: t("landing.feat_remediation_desc"),
       preview: (
         <div className="mt-5 p-3.5 rounded-xl bg-white/[0.03] border border-white/10 text-[13px] flex items-center justify-between text-white/80 font-sans">
-          <span className="text-slate-300 font-normal">{t("landing.preview_retention")}</span>
-          <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30 text-[12px]">
+          <span className="text-night-muted font-normal">{t("landing.preview_retention")}</span>
+          <span className="px-2.5 py-0.5 rounded-md bg-night-safe/20 text-night-safe font-semibold border border-night-safe/30 text-[12px]">
             {t("landing.preview_active")}
           </span>
         </div>
@@ -266,9 +266,9 @@ export default function LandingRoute({
       desc: t("landing.feat_dns_desc"),
       preview: (
         <div className="mt-5 p-3.5 rounded-xl bg-white/[0.03] border border-white/10 text-[13px] flex items-center justify-between text-white/80 font-sans">
-          <span className="text-emerald-400 font-semibold">SPF ✓</span>
-          <span className="text-emerald-400 font-semibold">DKIM ✓</span>
-          <span className="text-emerald-400 font-semibold">DMARC ✓</span>
+          <span className="text-night-safe font-semibold">SPF ✓</span>
+          <span className="text-night-safe font-semibold">DKIM ✓</span>
+          <span className="text-night-safe font-semibold">DMARC ✓</span>
         </div>
       ),
     },
@@ -333,7 +333,7 @@ export default function LandingRoute({
                 {t("landing.hero_title_line2") && <span className="block text-white/50 font-semibold mt-1">{t("landing.hero_title_line2")}</span>}
               </h1>
             </MotionDiv>
-            <MotionDiv initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }} className="text-[17px] sm:text-[19px] text-slate-400 leading-[1.65] max-w-[34rem] font-normal">
+            <MotionDiv initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }} className="text-[17px] sm:text-[19px] text-night-muted leading-[1.65] max-w-[34rem] font-normal">
               {t("landing.hero_desc")}
             </MotionDiv>
             <MotionDiv initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.3 }} className="flex items-center gap-4 pt-2">
@@ -375,10 +375,10 @@ export default function LandingRoute({
         <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 80% 50% at 50% 20%, rgba(74,144,217,0.06) 0%, transparent 60%)" }} />
         <div className="max-w-7xl mx-auto px-6 lg:px-8 space-y-16 lg:space-y-20 relative z-10">
           <FadeInSection className="text-center max-w-4xl mx-auto space-y-4">
-            <h2 className="font-display font-medium text-[clamp(2.15rem,4.2vw,3.25rem)] leading-[1.12] tracking-[-0.02em] text-slate-100">
+            <h2 className="font-display font-medium text-[clamp(2.15rem,4.2vw,3.25rem)] leading-[1.12] tracking-[-0.02em] text-night-text">
               {t("landing.features_title")}
             </h2>
-            <p className="text-[16px] sm:text-[18px] lg:text-[19px] leading-[1.65] max-w-4xl mx-auto font-normal text-slate-400">
+            <p className="text-[16px] sm:text-[18px] lg:text-[19px] leading-[1.65] max-w-4xl mx-auto font-normal text-night-muted">
               {t("landing.features_desc")}
             </p>
           </FadeInSection>
@@ -416,10 +416,10 @@ export default function LandingRoute({
                         <div className="text-[11px] uppercase tracking-[0.12em] font-bold text-primary">
                           {feat.label}
                         </div>
-                        <h3 className="font-display font-medium text-[20px] text-slate-100 tracking-tight leading-snug">
+                        <h3 className="font-display font-medium text-[20px] text-night-text tracking-tight leading-snug">
                           {feat.title}
                         </h3>
-                        <p className="text-[15px] leading-[1.65] text-slate-400 font-normal">
+                        <p className="text-[15px] leading-[1.65] text-night-muted font-normal">
                           {feat.desc}
                         </p>
                       </div>
@@ -441,16 +441,16 @@ export default function LandingRoute({
         <div className="max-w-7xl mx-auto px-6 lg:px-8 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             <FadeInSection className="space-y-6">
-              <h2 className="font-display font-medium text-[clamp(2.15rem,4.2vw,3.25rem)] leading-[1.12] tracking-[-0.02em] text-slate-100">
+              <h2 className="font-display font-medium text-[clamp(2.15rem,4.2vw,3.25rem)] leading-[1.12] tracking-[-0.02em] text-night-text">
                 {t("landing.integration_title")}
               </h2>
-              <p className="text-[17px] sm:text-[19px] leading-[1.65] text-slate-400 font-normal max-w-lg">
+              <p className="text-[17px] sm:text-[19px] leading-[1.65] text-night-muted font-normal max-w-lg">
                 {t("landing.integration_desc")}
               </p>
               <div className="flex flex-col sm:flex-row items-start gap-4 pt-2">
                 <button
                   onClick={onNavigateToSignUp}
-                  className="flex items-center gap-2.5 px-7 py-3.5 rounded-xl text-[15px] font-semibold text-white bg-white/[0.08] border border-white/15 hover:bg-[#f59e0b] hover:text-black hover:border-[#f59e0b] hover:shadow-[0_0_25px_rgba(245,158,11,0.35)] transition-all duration-200 active:scale-[0.98] cursor-pointer"
+                  className="flex items-center gap-2.5 px-7 py-3.5 rounded-xl text-[15px] font-semibold text-white bg-white/[0.08] border border-white/15 hover:bg-night-accent hover:text-black hover:border-night-accent hover:shadow-[0_0_25px_rgba(245,158,11,0.35)] transition-all duration-200 active:scale-[0.98] cursor-pointer"
                 >
                   <span>{t("landing.integration_cta")}</span>
                   <ArrowRight className="w-4.5 h-4.5" />
@@ -477,10 +477,10 @@ export default function LandingRoute({
 
         <div className="max-w-4xl mx-auto px-6 lg:px-8 text-center space-y-10 relative z-10">
           <FadeInSection className="space-y-4">
-            <h2 className="font-display font-medium text-[clamp(2rem,4vw,3rem)] leading-[1.12] tracking-[-0.02em] text-slate-100 mt-2">
+            <h2 className="font-display font-medium text-[clamp(2rem,4vw,3rem)] leading-[1.12] tracking-[-0.02em] text-night-text mt-2">
               {t("landing.cta_section_title")}
             </h2>
-            <p className="text-[16px] sm:text-[18px] lg:text-[19px] leading-[1.65] max-w-3xl mx-auto font-normal text-slate-400 md:whitespace-nowrap">
+            <p className="text-[16px] sm:text-[18px] lg:text-[19px] leading-[1.65] max-w-3xl mx-auto font-normal text-night-muted md:whitespace-nowrap">
               {t("landing.cta_section_desc")}
             </p>
           </FadeInSection>
@@ -501,22 +501,22 @@ export default function LandingRoute({
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
-            <div className="text-[13px] text-slate-400 mt-3 font-medium">
+            <div className="text-[13px] text-night-muted mt-3 font-medium">
               {t("landing.cta_no_card")}
             </div>
           </FadeInSection>
 
           <FadeInSection delay={0.18} className="pt-4 flex flex-wrap justify-center gap-x-8 gap-y-3 text-[14px] font-medium">
-            <div className="flex items-center gap-2 text-slate-300">
-              <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
+            <div className="flex items-center gap-2 text-night-muted">
+              <ShieldCheck className="w-4.5 h-4.5 text-night-safe" />
               <span>{t("landing.cta_badge_rgpd")}</span>
             </div>
-            <div className="flex items-center gap-2 text-slate-300">
-              <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
+            <div className="flex items-center gap-2 text-night-muted">
+              <ShieldCheck className="w-4.5 h-4.5 text-night-safe" />
               <span>{t("landing.cta_badge_sovereign")}</span>
             </div>
-            <div className="flex items-center gap-2 text-slate-300">
-              <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
+            <div className="flex items-center gap-2 text-night-muted">
+              <ShieldCheck className="w-4.5 h-4.5 text-night-safe" />
               <span>{t("landing.cta_badge_instant")}</span>
             </div>
           </FadeInSection>
@@ -537,24 +537,24 @@ export default function LandingRoute({
           <div className="flex flex-wrap items-center gap-6 text-[13px] font-medium">
             <button
               onClick={onNavigateToMentionsLegales}
-              className="text-slate-300 hover:text-white transition-colors cursor-pointer border-none bg-transparent p-0 font-medium outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="text-night-muted hover:text-white transition-colors cursor-pointer border-none bg-transparent p-0 font-medium outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               {t("landing.footer_mentions")}
             </button>
             <button
               onClick={onNavigateToConfidentialite}
-              className="text-slate-300 hover:text-white transition-colors cursor-pointer border-none bg-transparent p-0 font-medium outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="text-night-muted hover:text-white transition-colors cursor-pointer border-none bg-transparent p-0 font-medium outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               {t("landing.footer_privacy")}
             </button>
             <button
               onClick={onNavigateToContact}
-              className="text-slate-300 hover:text-white transition-colors cursor-pointer border-none bg-transparent p-0 font-medium outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="text-night-muted hover:text-white transition-colors cursor-pointer border-none bg-transparent p-0 font-medium outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               {t("landing.footer_contact")}
             </button>
           </div>
-          <div className="text-[12px] text-slate-400 font-normal">
+          <div className="text-[12px] text-night-muted font-normal">
             {t("landing.footer_copyright")}
           </div>
         </div>

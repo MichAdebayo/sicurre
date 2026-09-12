@@ -93,6 +93,18 @@
   --color-warning-bg: #fffbeb;
   --color-spam-text: #7a4700;
 
+  /* ── Fixed dark surfaces (public pages are always dark; these do not flip with the theme) ── */
+  --color-night: #07111f;
+  --color-night-surface: #0b1626;
+  --color-night-raised: #111c2d;
+  --color-night-border: #26364f;
+  --color-night-text: #f8fafc;
+  --color-night-muted: #b7c4d7;
+  --color-night-faint: #8a9bb3;
+  --color-night-accent: #fbbf24;
+  --color-night-safe: #34d399;
+  --color-night-danger: #f87171;
+
   /* ── Spacing (4px base unit) ── */
   --spacing-unit: 4px;
   --spacing-stack-sm: 8px;

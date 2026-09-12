@@ -69,6 +69,22 @@ def test_body_and_status_colours_pass_aa_on_white() -> None:
         assert _contrast(colour, _WHITE) >= _AA_BODY, f"{colour} fell below AA"
 
 
+#: The public pages are always dark, whatever the theme. Their tokens are fixed
+#: and must read on the darkest ground they are placed on.
+_NIGHT_GROUND = "#0B1626"
+_NIGHT_FOREGROUNDS = ("#F8FAFC", "#B7C4D7", "#8A9BB3", "#FBBF24", "#34D399", "#F87171")
+
+
+def test_fixed_dark_surface_tokens_pass_aa() -> None:
+    css = (Path(__file__).resolve().parents[3] / "src/app/index.css").read_text()
+    declared = dict(re.findall(r"--color-night-?([\w-]*):\s*(#[0-9a-fA-F]{6})\s*;", css))
+    for name in ("text", "muted", "faint", "accent", "safe", "danger"):
+        colour = declared[name]
+        assert colour.upper() in _NIGHT_FOREGROUNDS, f"night-{name} changed; re-derive its ratio"
+        ratio = _contrast(colour, _NIGHT_GROUND)
+        assert ratio >= _AA_BODY, f"night-{name} on the night surface is {ratio:.2f}:1"
+
+
 def test_text_on_the_dark_surface_passes_aa() -> None:
     for colour in _ON_DARK_SURFACE:
         assert _contrast(colour, _DARK_SURFACE) >= _AA_BODY, f"{colour} fell below AA"

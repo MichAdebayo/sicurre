@@ -199,3 +199,6 @@ _to_delete/
 # Scoped rather than a bare *.html, which would also hide index.html
 # (the Vite entry point) and the tests/fixtures/*.html preview files.
 /vema-architecture-*.html
+
+# Local working notes and scratch material, never published
+_local/
