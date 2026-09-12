@@ -29,6 +29,7 @@ describe("shared Operations routing", () => {
     expect(app.group_interval).toBe("5m");
     expect(app.repeat_interval).toBe("4h");
     expect(app.routes[0].group_interval).toBe("1m");
+    expect(app.routes[0].group_wait).toBe("10s");
     expect(matches(app.routes[0], { exercise: "synthetic" })).toBe(true);
   });
 
@@ -61,8 +62,10 @@ describe("shared Operations routing", () => {
     for (const rule of exercises) {
       expect(rule.expression).toContain(`exercise_type="${rule.labels.exercise_type}"`);
       expect(rule.title).toContain("(synthetic test)");
-      expect(rule.for).toBe("1m");
+      // Synthetic: fire on the first true evaluation, in the 30 s group.
+      expect(rule.for).toBe("0s");
     }
+    expect(config.syntheticGroup).toEqual({ name: "Sicurre synthetic", intervalSeconds: 30 });
     expect(new Set(exercises.map((rule) => rule.title)).size).toBe(3);
     expect(config.contactPoint.settings.subject).toContain(".CommonLabels.alertname");
     expect(config.contactPoint.settings.subject).not.toContain(".CommonLabels.Values");

@@ -117,10 +117,10 @@ async function ensureContactPoint(contactPoint) {
   return payload.name;
 }
 
-function alertQuery(rule, prometheusUid) {
+function alertQuery(rule, prometheusUid, ruleGroup) {
   return {
     title: rule.title,
-    ruleGroup: "Sicurre production",
+    ruleGroup,
     folderUID: folderUid,
     noDataState: rule.noDataState,
     execErrState: "Error",
@@ -180,8 +180,8 @@ function alertQuery(rule, prometheusUid) {
   };
 }
 
-async function ensureAlertRule(rule, prometheusUid) {
-  const payload = alertQuery(rule, prometheusUid);
+async function ensureAlertRule(rule, prometheusUid, ruleGroup) {
+  const payload = alertQuery(rule, prometheusUid, ruleGroup);
   const existing = await grafanaFetch(`/api/v1/provisioning/alert-rules/${rule.uid}`).catch(
     () => null,
   );
@@ -193,6 +193,18 @@ async function ensureAlertRule(rule, prometheusUid) {
       body: JSON.stringify(payload),
     },
   );
+}
+
+/** Evaluate a rule group on its own cadence; the synthetic rules run every 30 s. */
+async function ensureRuleGroupInterval(group) {
+  const endpoint = `/api/v1/provisioning/folder/${folderUid}/rule-groups/${encodeURIComponent(group.name)}`;
+  const { body } = await grafanaFetch(endpoint);
+  if (body?.interval === group.intervalSeconds) return;
+  await grafanaFetch(endpoint, {
+    method: "PUT",
+    headers: { "X-Disable-Provenance": "true" },
+    body: JSON.stringify({ ...body, interval: group.intervalSeconds }),
+  });
 }
 
 async function ensureNotificationPolicy(receiver) {
@@ -296,9 +308,12 @@ for (const dashboardPath of dashboardPaths) {
 
 const alerting = JSON.parse(await readFile(alertingPath, "utf8"));
 const receiver = await ensureContactPoint(alerting.contactPoint);
+const syntheticGroup = alerting.syntheticGroup;
 for (const rule of alerting.rules) {
-  await ensureAlertRule(rule, datasources.prometheus.uid);
+  const synthetic = rule.labels?.exercise === "synthetic";
+  await ensureAlertRule(rule, datasources.prometheus.uid, synthetic ? syntheticGroup.name : alerting.group);
 }
+await ensureRuleGroupInterval(syntheticGroup);
 await ensureNotificationPolicy(receiver);
 
 const { body: provisionedRules } = await grafanaFetch("/api/v1/provisioning/alert-rules");

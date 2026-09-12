@@ -140,3 +140,29 @@ Final production captures:
 
 The earlier `admin-active-*` images remain explicitly local fixtures. Use the
 `admin-production-*` captures for evidence of the deployed interface.
+
+## Detection delay, 12 September 2026
+
+A full-length (240 s) server-error exercise run in production, times in UTC,
+read from Prometheus, the Grafana rule state history and the Gmail receipt
+timestamps rather than from a mail client:
+
+| Observation | Time | Source |
+| --- | --- | --- |
+| Signal first scraped at 1 | 19:59:20 | Prometheus (`sicurre_operational_exercise_active`) |
+| Rule Pending | 19:59:10 | Grafana rule state history |
+| Rule Alerting | 20:00:10 | Grafana rule state history |
+| Firing email received | 20:00:45 | Gmail internal timestamp |
+| Signal back to 0, rule Normal | 20:03:10 to 20:03:20 | Prometheus and rule state history |
+| Resolved email received | 20:03:45 | Gmail internal timestamp |
+
+The chain fired in order; a mail client that fetched late showed both emails
+at once. The 1 min 30 s from click to firing email came from the 60 s scrape,
+the 60 s evaluation, the 60 s pending period and the 30 s route wait. The
+synthetic rules now fire on their first true evaluation, in their own 30 s
+evaluation group, with a 10 s route wait; the scrape interval stays at 60 s
+(Grafana Cloud free tier accepts one data point per minute per series). The
+expected delay is between 10 s and 1 min 40 s, about one minute typically.
+Real alert rules keep their thresholds. The run recorded after the change
+follows below.
+

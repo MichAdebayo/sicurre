@@ -12,6 +12,10 @@
   },
   "group": "Sicurre production",
   "interval": "1m",
+  "syntheticGroup": {
+    "name": "Sicurre synthetic",
+    "intervalSeconds": 30
+  },
   "rules": [
     {
       "uid": "sicurre-api-unavailable",
@@ -74,7 +78,7 @@
       "expression": "max(sicurre_operational_exercise_active{stack=\"sicurre\",exercise_type=\"api_unavailable\"})",
       "operator": "gt",
       "threshold": 0,
-      "for": "1m",
+      "for": "0s",
       "noDataState": "OK",
       "labels": {
         "exercise": "synthetic",
@@ -89,7 +93,7 @@
       "expression": "max(sicurre_operational_exercise_active{stack=\"sicurre\",exercise_type=\"high_latency\"})",
       "operator": "gt",
       "threshold": 0,
-      "for": "1m",
+      "for": "0s",
       "noDataState": "OK",
       "labels": {
         "exercise": "synthetic",
@@ -104,7 +108,7 @@
       "expression": "max(sicurre_operational_exercise_active{stack=\"sicurre\",exercise_type=\"elevated_5xx\"})",
       "operator": "gt",
       "threshold": 0,
-      "for": "1m",
+      "for": "0s",
       "noDataState": "OK",
       "labels": {
         "exercise": "synthetic",

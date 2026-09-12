@@ -16,6 +16,14 @@ version.
   animation tests; the handlers are now read through a ref.
 - The front files that had no test have one: 105 new Vitest tests, whole-tree
   line coverage from 44% to 64%.
+- The synthetic operational exercises alert within about a minute of the click
+  instead of one and a half to four. The three synthetic rules fire on their
+  first true evaluation (no pending period), evaluate in their own 30 s group,
+  and their notification route waits 10 s instead of 30 s. Real alert rules and
+  their thresholds are unchanged. Measured on 12 September 2026 before the
+  change: firing email 1 min 30 s after the click, resolved 3 min later; the
+  two emails were 3 minutes apart in Gmail even though a mail client showed
+  them together.
 - A CD dispatch that names an image tag is now a rollback: the build job is
   skipped, the deploy job verifies the four images exist in GHCR under that tag
   before touching the host, and the tag and registry owner come from the
