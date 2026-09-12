@@ -30,6 +30,8 @@ from core.rate_limit import limiter
 from data_platform.api.routers import router as data_platform_router
 from data_platform.api.routers.app_routes import router as app_routes_router
 from data_platform.api.routers.app_routes import synchronize_operational_exercises
+from data_platform.api.routers.cloudflare_account import router as cloudflare_account_router
+from data_platform.api.routers.email_scan import router as email_scan_router
 from data_platform.api.routers.integrations import router as integrations_router
 from data_platform.api.routers.internal import router as internal_router
 from data_platform.api.routers.reported_email import router as reported_email_router
@@ -178,6 +180,8 @@ def create_app() -> FastAPI:
     app.include_router(internal_router)
     app.include_router(app_routes_router)
     app.include_router(integrations_router)
+    app.include_router(email_scan_router)
+    app.include_router(cloudflare_account_router)
     app.include_router(reported_email_router)
     configure_tracing(app)
 

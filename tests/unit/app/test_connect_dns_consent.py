@@ -17,13 +17,9 @@ import inspect
 import pytest
 
 from data_platform.api.auth import AuthUser
-from data_platform.api.routers import integrations
-from data_platform.api.routers.integrations import (
-    CloudflareSetupRequest,
-    _merge_dmarc,
-    _merge_spf,
-    _planned_change,
-)
+from data_platform.api.routers import cloudflare_account
+from data_platform.api.routers.integrations import CloudflareSetupRequest
+from data_platform.services.dns_records import merge_dmarc, merge_spf, planned_change
 
 
 def _user() -> AuthUser:
@@ -59,39 +55,39 @@ def test_consent_still_travels_when_it_is_given() -> None:
 
 
 def test_a_missing_record_is_reported_as_an_addition() -> None:
-    assert _planned_change("", _merge_spf("")) == "add"
-    assert _planned_change("", _merge_dmarc("")) == "add"
+    assert planned_change("", merge_spf("")) == "add"
+    assert planned_change("", merge_dmarc("")) == "add"
 
 
 def test_an_existing_record_that_changes_is_reported_as_a_modification() -> None:
     current = "v=spf1 include:_spf.google.com ~all"
-    assert _planned_change(current, _merge_spf(current)) == "modify"
+    assert planned_change(current, merge_spf(current)) == "modify"
 
 
 def test_a_record_already_correct_is_reported_as_unchanged() -> None:
     """Nothing to do must not be shown as a change the customer is consenting to."""
-    settled = _merge_spf("v=spf1 include:_spf.google.com ~all")
-    assert _planned_change(settled, _merge_spf(settled)) == "keep"
+    settled = merge_spf("v=spf1 include:_spf.google.com ~all")
+    assert planned_change(settled, merge_spf(settled)) == "keep"
 
-    dmarc = _merge_dmarc("v=DMARC1; p=reject; rua=mailto:owner@sicurre.com")
-    assert _planned_change(dmarc, _merge_dmarc(dmarc)) == "keep"
+    dmarc = merge_dmarc("v=DMARC1; p=reject; rua=mailto:owner@sicurre.com")
+    assert planned_change(dmarc, merge_dmarc(dmarc)) == "keep"
 
 
 def test_the_preview_is_computed_from_the_write_path() -> None:
     """A preview derived separately could promise something else.
 
-    `_planned_change` compares the current record against the very merge the
+    `planned_change` compares the current record against the very merge the
     provisioner applies, so what the customer approves is what is written.
     """
-    source = inspect.getsource(integrations.verify_cloudflare_token)
-    assert "_merge_spf" in source
-    assert "_merge_dmarc" in source
-    assert "_read_dns_state" in source
+    source = inspect.getsource(cloudflare_account.verify_cloudflare_token)
+    assert "merge_spf" in source
+    assert "merge_dmarc" in source
+    assert "read_dns_state" in source
 
 
 def test_verifying_a_token_writes_nothing() -> None:
     """The preview reads the zone. It must never deploy while doing so."""
-    source = inspect.getsource(integrations.verify_cloudflare_token)
+    source = inspect.getsource(cloudflare_account.verify_cloudflare_token)
     assert "deploy_dns_record" not in source, "the preview wrote to the zone"
 
 
@@ -126,10 +122,10 @@ async def test_the_preview_reports_the_real_zone(monkeypatch) -> None:
                  "content": "v=DMARC1; p=reject"},
             ]
 
-    monkeypatch.setattr(integrations, "CloudflareProvisioner", Provisioner)
+    monkeypatch.setattr(cloudflare_account, "CloudflareProvisioner", Provisioner)
 
-    result = await integrations.verify_cloudflare_token(
-        integrations.TokenVerifyRequest(cf_api_token="token-abc", zone_name="sicurre.com"),
+    result = await cloudflare_account.verify_cloudflare_token(
+        cloudflare_account.TokenVerifyRequest(cf_api_token="token-abc", zone_name="sicurre.com"),
         _user(),
     )
 
@@ -154,10 +150,10 @@ async def test_an_empty_zone_is_reported_as_additions(monkeypatch) -> None:
         async def get_dns_records(self, _zone_id: str) -> list[dict[str, str]]:
             return []
 
-    monkeypatch.setattr(integrations, "CloudflareProvisioner", Provisioner)
+    monkeypatch.setattr(cloudflare_account, "CloudflareProvisioner", Provisioner)
 
-    result = await integrations.verify_cloudflare_token(
-        integrations.TokenVerifyRequest(cf_api_token="t", zone_name="sicurre.com"),
+    result = await cloudflare_account.verify_cloudflare_token(
+        cloudflare_account.TokenVerifyRequest(cf_api_token="t", zone_name="sicurre.com"),
         _user(),
     )
 

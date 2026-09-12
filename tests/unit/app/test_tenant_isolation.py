@@ -16,7 +16,7 @@ import pytest
 from fastapi import HTTPException
 
 from data_platform.api.auth import AuthUser
-from data_platform.api.routers import app_routes, integrations
+from data_platform.api.routers import app_routes, cloudflare_account
 from data_platform.api.routers.app_routes import (
     FeedbackCreate,
     SecurityRuleCreate,
@@ -40,7 +40,7 @@ from data_platform.api.routers.app_routes import (
     update_alert_preferences,
     update_threat_status,
 )
-from data_platform.api.routers.integrations import (
+from data_platform.api.routers.cloudflare_account import (
     delete_workspace_cloudflare_token,
     get_workspace_cloudflare_token,
 )
@@ -657,7 +657,7 @@ async def test_empty_active_domain_is_rejected() -> None:
 async def test_cloudflare_list_is_workspace_scoped(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """GET /v1/integrations/cloudflare/list returns only the caller's integrations."""
+    """GET /v1/cloudflare_account/cloudflare/list returns only the caller's cloudflare_account."""
     captured, query = _tracking_query(
         {
             "workspace-2": [
@@ -680,7 +680,7 @@ async def test_cloudflare_list_is_workspace_scoped(
 
     result = await list_cloudflare_integrations(USER_A)
 
-    assert result == [], "User A must not see integrations from workspace-2"
+    assert result == [], "User A must not see cloudflare_account from workspace-2"
 
 
 # ── Domain Shield ────────────────────────────────────────────────────────────
@@ -813,7 +813,7 @@ async def test_kpis_are_workspace_scoped(monkeypatch: pytest.MonkeyPatch) -> Non
 async def test_cloudflare_token_retrieval_is_workspace_scoped(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """GET /v1/integrations/cloudflare/token returns configured only for caller's workspace."""
+    """GET /v1/cloudflare_account/cloudflare/token returns configured only for caller's workspace."""
     captured: list[tuple[str, tuple[Any, ...]]] = []
 
     async def mock_query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
@@ -822,8 +822,8 @@ async def test_cloudflare_token_retrieval_is_workspace_scoped(
             return [{"api_token": "token-b"}]
         return []
 
-    monkeypatch.setattr(integrations, "_async_query", mock_query)
-    monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
+    monkeypatch.setattr(cloudflare_account, "_async_query", mock_query)
+    monkeypatch.setattr(cloudflare_account, "ensure_runtime_tables", lambda: None)
 
     result = await get_workspace_cloudflare_token(USER_A)
     assert result == {"configured": False}
@@ -834,14 +834,14 @@ async def test_cloudflare_token_retrieval_is_workspace_scoped(
 async def test_cloudflare_token_deletion_is_workspace_scoped(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """DELETE /v1/integrations/cloudflare/token scopes deletions to workspace_id."""
+    """DELETE /v1/cloudflare_account/cloudflare/token scopes deletions to workspace_id."""
     captured: list[tuple[str, tuple[Any, ...]]] = []
 
     async def mock_query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
         captured.append((sql, params))
         return []
 
-    monkeypatch.setattr(integrations, "_async_query", mock_query)
+    monkeypatch.setattr(cloudflare_account, "_async_query", mock_query)
 
     result = await delete_workspace_cloudflare_token(USER_A)
     assert result == {"status": "deleted"}

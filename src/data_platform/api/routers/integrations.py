@@ -1,40 +1,31 @@
-"""Email scan and Cloudflare integration router.
+"""Connect a customer domain to Sicurre through Cloudflare, and disconnect it.
 
-- ``POST /v1/email/scan``: called by the Email Worker with the shared secret;
-  runs rules, blocklists and the inference service, records the event and
-  returns the verdict.
-- ``PUT /v1/email/quarantine/{item_id}/content``: the Worker deposits a held
-  message's MIME.
-- ``POST /v1/integrations/cloudflare/verify-token``: read the zone and return
-  the DNS plan without writing anything.
 - ``POST /v1/integrations/cloudflare/setup``: provision Email Routing, the
   Worker, the catch-all rule and the consented DNS records.
-- ``GET /v1/integrations/cloudflare/status``, ``DELETE
-  /v1/integrations/cloudflare``: report or tear down the integration.
-- ``GET``/``POST``/``DELETE /v1/integrations/cloudflare/token``: the
-  workspace's encrypted Cloudflare token.
+- ``GET /v1/integrations/cloudflare/status``: the workspace's most recent
+  integration record.
+- ``DELETE /v1/integrations/cloudflare``: tear the integration down and
+  withdraw Sicurre's DMARC reporting address.
+
+The Worker-facing scan routes live in ``email_scan``; the domain preview,
+token check and stored token in ``cloudflare_account``; the record merges in
+``services.dns_records``.
 """
 
 from __future__ import annotations
 
 import asyncio
 import hashlib
-import json
 import logging
-import re
 import secrets
-import sqlite3
-from datetime import datetime, timedelta, timezone
-from time import perf_counter
-from typing import Any, Literal
-from uuid import NAMESPACE_URL, uuid4, uuid5
+from datetime import datetime, timezone
+from typing import Any
+from uuid import uuid4
 
-import httpx
 from fastapi import (
     APIRouter,
     BackgroundTasks,
     Depends,
-    Header,
     HTTPException,
     Request,
     status,
@@ -42,123 +33,29 @@ from fastapi import (
 from pydantic import BaseModel, Field
 
 from core.config import get_settings
-from core.domain_preview import normalize_zone, read_public_dns
-from core.inference_client import get_inference_client
-from core.loops import send_loops_transactional
-from core.mime_headers import decode_mime_header, extract_mime_body
 from core.rate_limit import limiter
-from core.scan_metrics import observe_scan, observe_scan_failure, observe_stage
-from core.secret_cipher import decrypt_secret, encrypt_secret
+from core.secret_cipher import decrypt_secret
 from core.tls_certificate import get_ssl_expiry_days
 from data_platform.api.auth import AuthUser, ensure_runtime_tables, get_current_user
 from data_platform.api.schemas.app_responses import (
     CloudflareIntegrationResponse,
-    StatusResponse,
 )
 from data_platform.api.schemas.integration_responses import (
-    CloudflareDomainPreviewResponse,
     CloudflareSetupResponse,
     CloudflareTeardownResponse,
-    CloudflareTokenStatusResponse,
-    CloudflareTokenVerificationResponse,
-    QuarantineCustodyResponse,
 )
-from data_platform.cleaning.normalization import anonymize_pii
 from data_platform.services.cloudflare_provisioner import (
     CloudflareAPIError,
     CloudflareProvisioner,
+    encrypt_provider_token,
 )
-from data_platform.services.email_context import derive_email_context
-from data_platform.services.notification_policy import notification_is_allowed
-from data_platform.services.quarantine_storage import build_quarantine_store
+from data_platform.services.dns_records import (
+    merge_dmarc,
+    merge_spf,
+    read_dns_state,
+    withdraw_dmarc_reporting,
+)
 from db.runtime import execute_runtime_query
-
-
-def _clean_str(val: str) -> str:
-    if not val:
-        return ""
-    val = val.strip()
-    if val.startswith("b'") or val.startswith('b"'):
-        val = val[2:-1]
-    return val
-
-
-#: The only include Email Routing needs. ``spf.cloudflare.com`` publishes no
-#: SPF record and a missing include target is a permerror under RFC 7208;
-#: each include also costs one of the ten DNS lookups a record is allowed.
-_CLOUDFLARE_ROUTING_INCLUDE = "include:_spf.mx.cloudflare.net"
-
-#: Mechanisms Sicurre has published in the past and now withdraws. Only ever
-#: strings Sicurre itself injected - a customer's own includes are untouchable.
-_WITHDRAWN_SPF_INCLUDES = ("include:spf.cloudflare.com", "include:sicurre.com")
-
-#: A record created from nothing keeps softfail. Sicurre cannot see whose
-#: newsletter or invoicing tool also sends for this domain, and `-all` would
-#: have receivers reject that mail outright. Tightening to `-all` is the
-#: customer's call once they know their own senders; an existing `all` is
-#: always preserved, so a domain that already chose `-all` keeps it.
-_DEFAULT_ALL = "~all"
-
-
-def _merge_spf(current_spf: str) -> str:
-    cleaned = _clean_str(current_spf)
-    parts = cleaned.split()
-    if not parts or parts[0] != "v=spf1":
-        return f"v=spf1 {_CLOUDFLARE_ROUTING_INCLUDE} {_DEFAULT_ALL}"
-
-    mechanisms: list[str] = []
-    all_mechanism = _DEFAULT_ALL
-    for mechanism in parts[1:]:
-        if mechanism in ("-all", "~all", "?all", "+all"):
-            all_mechanism = mechanism
-        elif mechanism in _WITHDRAWN_SPF_INCLUDES:
-            continue
-        elif mechanism not in mechanisms:
-            mechanisms.append(mechanism)
-
-    if _CLOUDFLARE_ROUTING_INCLUDE not in mechanisms:
-        mechanisms.append(_CLOUDFLARE_ROUTING_INCLUDE)
-
-    return f"v=spf1 {' '.join(mechanisms)} {all_mechanism}"
-
-
-def _has_usable_dkim(content: str) -> bool:
-    """True when a DKIM record carries a real public key.
-
-    A genuine RSA public key is a few hundred base64 characters; a short
-    placeholder or an empty ``p=`` (a revoked key) is rejected.
-    """
-    if "v=dkim1" not in content.lower():
-        return False
-    match = re.search(r"p=([A-Za-z0-9+/=]*)", content)
-    return bool(match) and len(match.group(1)) >= 100
-
-
-def _read_dns_state(
-    dns_records: list[dict[str, Any]], zone_name: str
-) -> tuple[str, str, str]:
-    """Pick the SPF, DKIM and DMARC records out of a zone's TXT records.
-
-    Returns the raw content of each, or "" when absent. An apex TXT record
-    counts as SPF only when it starts with ``v=spf1``; other apex records
-    (provider verification tokens) are ignored. Shared by the setup route and
-    the DNS sync.
-    """
-    spf = dkim = dmarc = ""
-    zone = zone_name.lower().rstrip(".")
-    for rec in dns_records:
-        if rec.get("type") != "TXT":
-            continue
-        name = _clean_str(rec.get("name", "")).lower().rstrip(".")
-        content = _clean_str(rec.get("content", "")).strip('"')
-        if name == zone and content.lower().startswith("v=spf1"):
-            spf = content
-        elif "._domainkey." in name or name.startswith("_domainkey."):
-            if _has_usable_dkim(content):
-                dkim = content
-        elif name == f"_dmarc.{zone}":
-            dmarc = content
-    return spf, dkim, dmarc
 
 
 async def _measure_ssl(domain: str) -> tuple[int, int]:
@@ -169,72 +66,6 @@ async def _measure_ssl(domain: str) -> tuple[int, int]:
     """
     days_remaining = await asyncio.to_thread(get_ssl_expiry_days, domain)
     return (1, days_remaining) if days_remaining >= 0 else (0, 0)
-
-
-def _merge_dmarc(current_dmarc: str) -> str:
-    cleaned = _clean_str(current_dmarc)
-    if not cleaned:
-        return "v=DMARC1; p=reject; rua=mailto:dmarc@sicurre.com"
-
-    policy = "quarantine"
-    if "p=reject" in cleaned:
-        policy = "reject"
-
-    rec = re.sub(r"p=[^;]+", f"p={policy}", cleaned)
-
-    if "rua=" in rec:
-        if "dmarc@sicurre.com" not in rec:
-            rec = re.sub(r"(rua=[^;'\"]+)", r"\1,mailto:dmarc@sicurre.com", rec)
-    else:
-        rec = rec.rstrip("; ") + "; rua=mailto:dmarc@sicurre.com"
-
-    return rec
-
-
-_SICURRE_DMARC_MAILBOX = "dmarc@sicurre.com"
-
-
-def _withdraw_dmarc_reporting(current_dmarc: str) -> str | None:
-    """Take Sicurre's reporting address out of a customer's DMARC record.
-
-    Returns the rewritten record, or None when it contains nothing of ours.
-    The policy tag is never changed and the record is never deleted; only
-    Sicurre's mailbox is removed from ``rua`` and ``ruf``.
-    """
-    cleaned = _clean_str(current_dmarc)
-    if not cleaned or _SICURRE_DMARC_MAILBOX not in cleaned.lower():
-        return None
-
-    rebuilt: list[str] = []
-    for tag in cleaned.split(";"):
-        tag = tag.strip()
-        if not tag:
-            continue
-        name, separator, value = tag.partition("=")
-        if not separator or name.strip().lower() not in ("rua", "ruf"):
-            rebuilt.append(tag)
-            continue
-        kept = [
-            uri.strip()
-            for uri in value.split(",")
-            if uri.strip() and _SICURRE_DMARC_MAILBOX not in uri.strip().lower()
-        ]
-        # A reporting tag with no addresses left is dropped, not left empty.
-        if kept:
-            rebuilt.append(f"{name.strip()}={','.join(kept)}")
-
-    return "; ".join(rebuilt)
-
-
-def _planned_change(current: str, proposed: str) -> str:
-    """What connecting would do to one record: add it, change it, or nothing.
-
-    Computed from the same merge the write path uses, so the preview cannot
-    promise something different from what is applied.
-    """
-    if not _clean_str(current):
-        return "add"
-    return "modify" if _clean_str(current) != _clean_str(proposed) else "keep"
 
 
 async def _sync_domain_shield_dns(
@@ -248,14 +79,14 @@ async def _sync_domain_shield_dns(
     """Apply selected Domain Shield DNS fixes and update the local status cache."""
     zone_id, _ = await provisioner.get_zone(zone_name)
     dns_records = await provisioner.get_dns_records(zone_id)
-    existing_spf_content, existing_dkim_content, existing_dmarc_content = _read_dns_state(
+    existing_spf_content, existing_dkim_content, existing_dmarc_content = read_dns_state(
         dns_records, zone_name
     )
 
     spf_val = 1 if "v=spf1" in existing_spf_content else 0
     spf_rec = existing_spf_content or None
     if fix_spf:
-        spf_rec = _merge_spf(existing_spf_content)
+        spf_rec = merge_spf(existing_spf_content)
         await provisioner.deploy_dns_record(
             zone_id=zone_id,
             rec_type="TXT",
@@ -274,7 +105,7 @@ async def _sync_domain_shield_dns(
     dmarc_val = 1 if "v=DMARC1" in existing_dmarc_content else 0
     dmarc_rec = existing_dmarc_content or None
     if fix_dmarc:
-        dmarc_rec = _merge_dmarc(existing_dmarc_content)
+        dmarc_rec = merge_dmarc(existing_dmarc_content)
         await provisioner.deploy_dns_record(
             zone_id=zone_id,
             rec_type="TXT",
@@ -366,32 +197,8 @@ router = APIRouter(tags=["integrations"])
 # --------------------------------------------------------------------------- Database helpers
 
 
-def _db_path() -> str:
-    settings = get_settings()
-    return settings.database_url.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
-
-
-def _query(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
-    conn = sqlite3.connect(_db_path())
-    conn.row_factory = sqlite3.Row
-    try:
-        cur = conn.execute(sql, params)
-        conn.commit()
-        return [dict(r) for r in cur.fetchall()]
-    finally:
-        conn.close()
-
-
 async def _async_query(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
     return await execute_runtime_query(sql, params)
-
-
-async def _timed_query(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
-    """Same as _async_query, but attributed to the "database" scan stage."""
-    # Delegates through _async_query rather than calling the engine directly so
-    # the existing module-level test seam keeps working.
-    with observe_stage("database"):
-        return await _async_query(sql, params)
 
 
 def _ensure_tables() -> None:
@@ -399,56 +206,7 @@ def _ensure_tables() -> None:
     ensure_runtime_tables()
 
 
-def _encrypt_provider_token(token: str) -> str:
-    settings = get_settings()
-    return encrypt_secret(
-        token,
-        configured_key=settings.secret_encryption_key,
-        environment=settings.environment,
-    )
-
-
-# --------------------------------------------------------------------------- Pydantic schemas
-
-
-def _alert_domain(recipient: str | None, zone_name: str | None) -> str:
-    """Name the domain the message was addressed to, not the one that scanned it.
-
-    A single Worker can serve several zones behind one shared secret, so the
-    integration it resolves to is not necessarily the recipient's domain. A
-    DMARC report for mail.sicurre.com was announced to the customer as "votre
-    domaine vinse.app" because the alert used the integration. Older Workers do
-    not send a recipient, so the zone remains the fallback.
-    """
-    local, at, host = (recipient or "").rpartition("@")
-    # rpartition returns the whole string as the tail when there is no "@", so
-    # a malformed recipient would otherwise be shown to the customer as if it
-    # were a domain.
-    domain = host.strip().lower() if at and local else ""
-    return domain or str(zone_name or "").strip().lower() or "votre domaine"
-
-
-class EmailScanRequest(BaseModel):
-    message_id: str | None = Field(default=None, max_length=500)
-    subject: str = Field(default="", max_length=500)
-    sender: str = Field(default="", max_length=200)
-    #: Envelope recipient. One Worker can serve several zones, so the
-    #: integration resolved from its shared secret does not identify the domain
-    #: the message was actually sent to. Optional: older Workers omit it.
-    recipient: str = Field(default="", max_length=200)
-    text: str = Field(default="", max_length=10_000)
-    use_llm: bool = True
-    use_virustotal: bool = False
-
-
-class EmailScanResponse(BaseModel):
-    event_id: str
-    verdict: Literal["safe", "phishing", "quarantine"]
-    label: Literal["phishing", "spam", "legitimate"]
-    score: float = Field(ge=0, le=1)
-    explanation: str = ""
-    quarantine_id: str | None = None
-    latency_ms: float | None = Field(default=None, ge=0)
+# --------------------------------------------------------------------------- Request schemas
 
 
 class CloudflareSetupRequest(BaseModel):
@@ -464,18 +222,6 @@ class CloudflareSetupRequest(BaseModel):
     fix_dmarc: bool = False
 
 
-class CloudflareStatusResponse(BaseModel):
-    id: str
-    user_email: str
-    zone_name: str
-    destination_email: str
-    worker_name: str
-    status: str
-    error_message: str | None
-    created_at: str
-    updated_at: str
-
-
 class TeardownRequest(BaseModel):
     integration_id: str | None = Field(
         default=None, description="Specific connected-domain integration to remove"
@@ -485,464 +231,7 @@ class TeardownRequest(BaseModel):
     )
 
 
-# --------------------------------------------------------------------------- ── 1.
-
-
-@router.post("/v1/email/scan", response_model=EmailScanResponse)
-@limiter.limit("600/minute")
-async def scan_email(
-    request: Request,
-    payload: EmailScanRequest,
-    x_sicurre_secret: str | None = Header(default=None, alias="X-Sicurre-Secret"),
-) -> EmailScanResponse:
-    """Validate the Worker shared secret, call the inference API, log the result, and return a verdict"""
-    request_started_at = perf_counter()
-    _ = request
-    _ensure_tables()
-
-    if not x_sicurre_secret:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing X-Sicurre-Secret header",
-        )
-
-    # Verify the secret against stored hash
-    secret_hash = hashlib.sha256(x_sicurre_secret.encode()).hexdigest()
-    rows = await _timed_query(
-        "SELECT id, user_email, workspace_id, workspace_member_user_id, zone_name, status FROM cloudflare_integration WHERE shared_secret_hash = ? AND status IN ('pending_verification','active') LIMIT 1",
-        (secret_hash,),
-    )
-    if not rows:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid shared secret"
-        )
-
-    integration = rows[0]
-    settings = get_settings()
-    workspace_id = integration.get("workspace_id")
-    now = datetime.now(timezone.utc).isoformat()
-    message_id = payload.message_id.strip() if payload.message_id else ""
-    event_id = (
-        str(
-            uuid5(
-                NAMESPACE_URL,
-                f"{workspace_id}:{integration.get('zone_name', '').lower()}:{message_id}",
-            )
-        )
-        if message_id
-        else str(uuid4())
-    )
-    legacy_event_id = (
-        str(uuid5(NAMESPACE_URL, f"{workspace_id}:{message_id}")) if message_id else event_id
-    )
-    # Run concurrently: independent SELECTs costing 458 ms of the 2 s budget when serial.
-    zone_name = integration.get("zone_name") or ""
-    with observe_stage("database"):
-        existing_quarantine, existing_event, rules = await asyncio.gather(
-            _async_query(
-                "SELECT id, message_id, safety_verdict, composite_score FROM app_quarantine_item "
-                "WHERE workspace_id = ? AND lower(domain) = lower(?) "
-                "AND message_id IN (?, ?) LIMIT 1",
-                (workspace_id, zone_name, event_id, legacy_event_id),
-            ),
-            _async_query(
-                "SELECT id, safety_verdict, label_verdict, composite_score, explanation, latency_ms "
-                "FROM app_inference_event WHERE id IN (?, ?) AND workspace_id = ? "
-                "AND lower(domain) = lower(?) LIMIT 1",
-                (event_id, legacy_event_id, workspace_id, zone_name),
-            ),
-            _async_query(
-                "SELECT rule_type, pattern FROM app_security_rule WHERE workspace_id = ? "
-                "AND lower(domain) = lower(?)",
-                (workspace_id, zone_name),
-            ),
-        )
-
-    if existing_quarantine:
-        held = existing_quarantine[0]
-        return EmailScanResponse(
-            event_id=str(held["message_id"]),
-            verdict="quarantine",
-            label=str(held["safety_verdict"]),
-            score=float(held["composite_score"]),
-            explanation="Existing idempotent quarantine decision.",
-            quarantine_id=str(held["id"]),
-        )
-    if existing_event:
-        event = existing_event[0]
-        return EmailScanResponse(
-            event_id=str(event["id"]),
-            verdict=str(event["safety_verdict"]),
-            label=str(event["label_verdict"]),
-            score=float(event["composite_score"]),
-            explanation=str(event.get("explanation") or "Existing idempotent decision."),
-            latency_ms=float(event.get("latency_ms") or 0.0) or None,
-        )
-
-    # Decode RFC 2047 headers first so rules, classifier, audit and alert see readable text.
-    payload.subject = decode_mime_header(payload.subject)
-    payload.sender = decode_mime_header(payload.sender)
-    # The Worker forwards the raw message, so strip the MIME envelope down to the body.
-    payload.text = extract_mime_body(payload.text)
-
-    # ── Check Whitelist / Blocklist Rules ──────────────────────────────────
-    matched_rule_type = None
-    sender_lower = payload.sender.lower()
-
-    for rule in rules:
-        pattern = rule["pattern"].lower()
-        if "@" in pattern:
-            if pattern.startswith("@"):
-                if sender_lower.endswith(pattern):
-                    matched_rule_type = rule["rule_type"]
-                    break
-            else:
-                if sender_lower == pattern:
-                    matched_rule_type = rule["rule_type"]
-                    break
-        else:
-            if sender_lower.endswith(f"@{pattern}") or sender_lower == pattern:
-                matched_rule_type = rule["rule_type"]
-                break
-
-    verdict_label = "legitimate"
-    verdict_safety = "safe"
-    score = 0.0
-    explanation = ""
-    llm_provider = ""
-    stage_scores: dict[str, Any] = {}
-    stage_labels: dict[str, Any] = {}
-    stage_breakdown: dict[str, Any] = {}
-    # Stays None when a blocklist rule short-circuits before any model is consulted.
-    model_version: str | None = None
-    model_revision: str | None = None
-
-    if matched_rule_type == "blocklist":
-        verdict_safety = "phishing"
-        verdict_label = "phishing"
-        score = 1.0
-        explanation = "Blocked by custom security blocklist rule."
-        stage_scores = {"custom_rule": 1.0}
-        stage_labels = {"custom_rule": "phishing"}
-        stage_breakdown = {"custom_rule": {"active": True, "rule_type": "blocklist"}}
-    else:
-        # ── Call inference API ──────────────────────────────────────────────────
-        inference_url = settings.inference_api_url or "http://localhost:8000/v1/classify"
-        inference_key = settings.inference_api_key or ""
-        with observe_stage("context"):
-            mail_context = derive_email_context(
-                subject=payload.subject,
-                sender=payload.sender,
-                text=payload.text,
-                recipient_expected=matched_rule_type == "whitelist",
-            )
-
-        try:
-            with observe_stage("inference"):
-                # Shared, long-lived client: opening one per request paid a TLS
-                # handshake to the inference host on every email.
-                client = get_inference_client()
-                resp = await client.post(
-                    inference_url,
-                    json={
-                        "subject": payload.subject,
-                        "sender": payload.sender,
-                        "text": payload.text,
-                        "use_llm": payload.use_llm,
-                        "use_virustotal": payload.use_virustotal,
-                        "mail_context": mail_context.as_payload(),
-                    },
-                    headers={"Authorization": f"Bearer {inference_key}"},
-                )
-            resp.raise_for_status()
-            result = resp.json()
-
-            # The inference service reports which model answered on every response.
-            model_version = (resp.headers.get("X-Sicurre-Model-Version") or "").strip() or None
-            model_revision = (resp.headers.get("X-Sicurre-Model-Revision") or "").strip() or None
-
-            is_phishing: bool = bool(result.get("is_phishing", False))
-            verdict_safety = "phishing" if is_phishing else "safe"
-            verdict_label = str(
-                result.get("label_verdict") or ("phishing" if is_phishing else "legitimate")
-            ).lower()
-            score = float(result.get("composite_score") or 0.0)
-            explanation = str(result.get("explanation") or "")
-            llm_provider = str(result.get("llm_provider") or "")
-            stage_scores = dict(result.get("stage_scores") or {})
-            stage_labels = dict(result.get("stage_labels") or {})
-            stage_breakdown = dict(result.get("stage_breakdown") or {})
-            if matched_rule_type == "whitelist":
-                stage_breakdown["custom_rule"] = {
-                    "active": True,
-                    "rule_type": "whitelist",
-                    "effect": "recipient_expected",
-                }
-
-        except (httpx.HTTPError, ValueError, TypeError) as exc:
-            logger.error("Inference API unavailable during email scan: %s", exc)
-            observe_scan_failure(
-                "inference_unavailable"
-                if isinstance(exc, httpx.HTTPError)
-                else "inference_contract"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Inference service is temporarily unavailable",
-            ) from exc
-
-    decision_latency_ms = round((perf_counter() - request_started_at) * 1000, 2)
-    observe_scan(
-        verdict=verdict_label,
-        duration_seconds=decision_latency_ms / 1000.0,
-        sla_seconds=settings.sla_latency_ms / 1000.0,
-    )
-
-    # ── Quarantine Handling ────────────────────────────────────────────────
-    alert_domain = _alert_domain(payload.recipient, integration.get("zone_name"))
-
-    # If verdict is phishing, quarantine the email instead of bouncing
-    quarantine_id: str | None = None
-    classified_as_phishing = verdict_safety == "phishing"
-    if verdict_safety == "phishing":
-        quarantine_id = str(uuid4())
-        expires_at = (
-            datetime.now(timezone.utc) + timedelta(days=settings.quarantine_retention_days)
-        ).isoformat()
-        try:
-            await _async_query(
-                """
-                INSERT INTO app_quarantine_item (
-                    id, workspace_id, domain, message_id, sender, subject, body_text,
-                    safety_verdict, composite_score, status, created_at, expires_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'held', ?, ?)
-                """,
-                (
-                    quarantine_id,
-                    workspace_id,
-                    str(integration.get("zone_name") or "").lower(),
-                    event_id,
-                    payload.sender,
-                    payload.subject,
-                    anonymize_pii(payload.text)[:4000],
-                    verdict_safety,
-                    score,
-                    now,
-                    expires_at,
-                ),
-            )
-            # Log to alert history
-            await _async_query(
-                """
-                INSERT INTO app_alert_history (
-                    id, workspace_id, domain, event_type, action_page,
-                    title, message, is_dismissed, created_at
-                ) VALUES (?, ?, ?, 'phishing_quarantine', 'quarantine', ?, ?, 0, ?)
-                """,
-                (
-                    str(uuid4()),
-                    workspace_id,
-                    str(integration.get("zone_name") or "").lower(),
-                    "Email mis en quarantaine",
-                    "Un email suspect a été intercepté. Consultez la quarantaine pour décider de son sort.",
-                    now,
-                ),
-            )
-            # Switch scan endpoint output verdict to "quarantine"
-            verdict_safety = "quarantine"
-
-            preference_rows = await _async_query(
-                "SELECT * FROM app_alert_preference "
-                "WHERE workspace_id = ? AND lower(domain) = lower(?) LIMIT 1",
-                (workspace_id, integration.get("zone_name") or ""),
-            )
-            notification_time = datetime.now(timezone.utc)
-            if notification_is_allowed(
-                preference_rows[0] if preference_rows else None,
-                notification_time,
-                "phishing",
-            ):
-                user_rows = await _async_query(
-                    'SELECT name FROM "user" WHERE email = ? LIMIT 1',
-                    (integration.get("user_email").lower(),),
-                )
-                first_name = "Utilisateur"
-                if user_rows and user_rows[0].get("name"):
-                    first_name = user_rows[0]["name"].split(" ")[0]
-                await send_loops_transactional(
-                    email=integration.get("user_email"),
-                    transactional_id=settings.loops_threat_quarantined_transaction_id,
-                    data_variables={
-                        "firstName": first_name,
-                        "domainName": alert_domain,
-                        # Loops declares this variable as `sender`; `senderEmail` returned 400.
-                        "sender": payload.sender,
-                        "emailSubject": payload.subject,
-                        "riskScore": int(score * 100),
-                        "interceptedAt": notification_time.strftime("%d/%m/%Y %H:%M UTC"),
-                        "quarantineUrl": f"{settings.public_api_url or 'http://localhost:5173'}/",
-                    },
-                )
-        except Exception as exc:
-            logger.warning("Could not quarantine phishing email: %s", exc)
-
-    # ── Persist to audit log ────────────────────────────────────────────────
-    now = datetime.now(timezone.utc).isoformat()
-
-    db_subject = payload.subject[:240]
-    db_sender = payload.sender[:200]
-    db_snippet = payload.text[:240]
-
-    # event_id is a uuid5 of workspace:zone:message_id, so one message scanned
-    # twice - two rua addresses on one DMARC record, or a retry - lands on one
-    # row. A later, milder scan must not soften a verdict that already
-    # quarantined the message, or the journal contradicts the quarantine.
-    # Anonymize legitimate and spam email contents to ensure user privacy compliance (GDPR)
-    if verdict_safety not in ("phishing", "quarantine"):
-        db_subject = "[Masqué par Sicurre]"
-        db_sender = "[Masqué par Sicurre]"
-        db_snippet = "[Masqué par Sicurre]"
-
-    try:
-        await _async_query(
-            """
-            INSERT INTO app_inference_event (
-                id, created_at, user_email, workspace_id, workspace_member_user_id, domain, context,
-                subject, sender, snippet,
-                safety_verdict, label_verdict, composite_score, is_phishing,
-                delivered_in_smail, llm_provider, explanation, latency_ms,
-                used_llm, used_virustotal, inference_source,
-                stage_scores_json, stage_labels_json, stage_breakdown_json, expected_label,
-                model_version, model_revision
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            ON CONFLICT(id) DO UPDATE SET
-                safety_verdict=excluded.safety_verdict,
-                label_verdict=excluded.label_verdict,
-                composite_score=excluded.composite_score,
-                is_phishing=excluded.is_phishing,
-                subject=excluded.subject, sender=excluded.sender, snippet=excluded.snippet,
-                explanation=excluded.explanation, llm_provider=excluded.llm_provider,
-                latency_ms=excluded.latency_ms, model_version=excluded.model_version,
-                model_revision=excluded.model_revision
-            WHERE app_inference_event.safety_verdict NOT IN ('phishing', 'quarantine')
-            """,
-            (
-                event_id,
-                now,
-                integration["user_email"],
-                integration.get("workspace_id"),
-                integration.get("workspace_member_user_id"),
-                str(integration.get("zone_name") or "").lower(),
-                "cloudflare_intercept",
-                db_subject,
-                db_sender,
-                db_snippet,
-                verdict_safety,
-                verdict_label,
-                score,
-                1 if classified_as_phishing else 0,
-                0 if classified_as_phishing else 1,
-                llm_provider,
-                explanation[:500],
-                decision_latency_ms,
-                1 if payload.use_llm else 0,
-                1 if payload.use_virustotal else 0,
-                "api",
-                json.dumps(stage_scores, sort_keys=True, separators=(",", ":")),
-                json.dumps(stage_labels, sort_keys=True, separators=(",", ":")),
-                json.dumps(stage_breakdown, sort_keys=True, separators=(",", ":")),
-                None,
-                model_version,
-                model_revision,
-            ),
-        )
-        # Mark integration active on first successful scan
-        if integration.get("status") == "pending_verification":
-            await _async_query(
-                "UPDATE cloudflare_integration SET status = 'active', updated_at = ? WHERE id = ?",
-                (now, integration["id"]),
-            )
-    except Exception as exc:
-        logger.warning("Could not persist audit log for email scan: %s", exc)
-
-    return EmailScanResponse(
-        event_id=event_id,
-        verdict=verdict_safety,
-        label=verdict_label,
-        score=score,
-        explanation=explanation,
-        quarantine_id=quarantine_id,
-        latency_ms=decision_latency_ms,
-    )
-
-
-@router.put(
-    "/v1/email/quarantine/{item_id}/content",
-    response_model=QuarantineCustodyResponse,
-)
-@limiter.limit("120/minute")
-async def upload_quarantine_content(
-    item_id: str,
-    request: Request,
-    x_sicurre_secret: str | None = Header(default=None, alias="X-Sicurre-Secret"),
-) -> dict[str, Any]:
-    """Persist original MIME after a Worker receives a quarantine verdict."""
-    if not x_sicurre_secret:
-        raise HTTPException(status_code=401, detail="Missing X-Sicurre-Secret header")
-    secret_hash = hashlib.sha256(x_sicurre_secret.encode()).hexdigest()
-    integrations = await _async_query(
-        "SELECT workspace_id, zone_name FROM cloudflare_integration "
-        "WHERE shared_secret_hash = ? AND status IN ('pending_verification','active') LIMIT 1",
-        (secret_hash,),
-    )
-    if not integrations:
-        raise HTTPException(status_code=401, detail="Invalid shared secret")
-    workspace_id = integrations[0]["workspace_id"]
-    domain = str(integrations[0]["zone_name"]).lower()
-    items = await _async_query(
-        "SELECT raw_storage_uri, raw_content_hash FROM app_quarantine_item "
-        "WHERE id = ? AND workspace_id = ? AND lower(domain) = lower(?) "
-        "AND status = 'held' LIMIT 1",
-        (item_id, workspace_id, domain),
-    )
-    if not items:
-        raise HTTPException(status_code=404, detail="Quarantined item not found")
-
-    settings = get_settings()
-    payload = await request.body()
-    if not payload:
-        raise HTTPException(status_code=400, detail="Raw MIME content is required")
-    if len(payload) > settings.quarantine_max_message_bytes:
-        raise HTTPException(status_code=413, detail="Message exceeds quarantine storage limit")
-    content_hash = hashlib.sha256(payload).hexdigest()
-    existing = items[0]
-    if existing.get("raw_storage_uri"):
-        if existing.get("raw_content_hash") != content_hash:
-            raise HTTPException(status_code=409, detail="Quarantine content already exists")
-        return {"status": "stored", "idempotent": True}
-
-    stored = await build_quarantine_store(settings).write(
-        workspace_id=str(workspace_id),
-        item_id=item_id,
-        payload=payload,
-    )
-    await _async_query(
-        "UPDATE app_quarantine_item SET raw_storage_uri = ?, raw_content_hash = ?, "
-        "raw_size_bytes = ? WHERE id = ? AND workspace_id = ? "
-        "AND lower(domain) = lower(?) AND raw_storage_uri IS NULL",
-        (
-            stored.storage_uri,
-            stored.content_hash,
-            stored.size_bytes,
-            item_id,
-            workspace_id,
-            domain,
-        ),
-    )
-    return {"status": "stored", "idempotent": False}
-
-
-# --------------------------------------------------------------------------- ── 2.
+# --------------------------------------------------------------------------- Connecting a domain
 
 
 @router.post(
@@ -1023,7 +312,7 @@ async def setup_cloudflare(
         except CloudflareAPIError as exc:
             await _async_query(
                 "UPDATE cloudflare_integration SET error_message=?, api_token=?, updated_at=? WHERE id=?",
-                (str(exc)[:500], _encrypt_provider_token(api_token), now, row["id"]),
+                (str(exc)[:500], encrypt_provider_token(api_token), now, row["id"]),
             )
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
@@ -1050,7 +339,7 @@ async def setup_cloudflare(
                     """,
                     (
                         shared_secret_hash,
-                        _encrypt_provider_token(api_token),
+                        encrypt_provider_token(api_token),
                         now,
                         row["id"],
                     ),
@@ -1065,7 +354,7 @@ async def setup_cloudflare(
                     "UPDATE cloudflare_integration SET error_message=?, api_token=?, updated_at=? WHERE id=?",
                     (
                         str(exc)[:500],
-                        _encrypt_provider_token(api_token),
+                        encrypt_provider_token(api_token),
                         now,
                         row["id"],
                     ),
@@ -1081,7 +370,7 @@ async def setup_cloudflare(
             SET api_token=?, error_message=NULL, updated_at=?
             WHERE id=?
             """,
-            (_encrypt_provider_token(api_token), now, row["id"]),
+            (encrypt_provider_token(api_token), now, row["id"]),
         )
         await _async_query(
             """
@@ -1092,7 +381,7 @@ async def setup_cloudflare(
             """,
             (
                 current_user.workspace_id,
-                _encrypt_provider_token(api_token),
+                encrypt_provider_token(api_token),
                 now,
                 now,
             ),
@@ -1144,7 +433,7 @@ async def setup_cloudflare(
             "",
             "unknown",
             str(payload.destination_email),
-            _encrypt_provider_token(api_token),
+            encrypt_provider_token(api_token),
             "",
             "provisioning",
             now,
@@ -1163,7 +452,7 @@ async def setup_cloudflare(
             """,
             (
                 current_user.workspace_id,
-                _encrypt_provider_token(api_token),
+                encrypt_provider_token(api_token),
                 now,
                 now,
             ),
@@ -1226,12 +515,12 @@ async def setup_cloudflare(
                     existing_spf_content,
                     existing_dkim_content,
                     existing_dmarc_content,
-                ) = _read_dns_state(dns_records, payload.zone_name)
+                ) = read_dns_state(dns_records, payload.zone_name)
 
                 spf_val = 1 if "v=spf1" in existing_spf_content else 0
                 spf_rec = existing_spf_content or None
                 if payload.fix_spf:
-                    spf_rec = _merge_spf(existing_spf_content)
+                    spf_rec = merge_spf(existing_spf_content)
                     await provisioner.deploy_dns_record(
                         zone_id=result.zone_id,
                         rec_type="TXT",
@@ -1248,7 +537,7 @@ async def setup_cloudflare(
                 dmarc_val = 1 if "v=DMARC1" in existing_dmarc_content else 0
                 dmarc_rec = existing_dmarc_content or None
                 if payload.fix_dmarc:
-                    dmarc_rec = _merge_dmarc(existing_dmarc_content)
+                    dmarc_rec = merge_dmarc(existing_dmarc_content)
                     await provisioner.deploy_dns_record(
                         zone_id=result.zone_id,
                         rec_type="TXT",
@@ -1369,7 +658,7 @@ async def setup_cloudflare(
     }
 
 
-# --------------------------------------------------------------------------- ── 3.
+# --------------------------------------------------------------------------- Integration status
 
 
 @router.get(
@@ -1404,7 +693,7 @@ async def cloudflare_status(
     }
 
 
-# --------------------------------------------------------------------------- ── 4.
+# --------------------------------------------------------------------------- Disconnecting a domain
 
 
 @router.delete(
@@ -1484,10 +773,10 @@ async def teardown_cloudflare(
         # Withdraw Sicurre's DMARC reporting address. The Worker and rule are
         # already gone, so a DNS failure here is reported rather than raised.
         try:
-            _, _, existing_dmarc = _read_dns_state(
+            _, _, existing_dmarc = read_dns_state(
                 await provisioner.get_dns_records(row["zone_id"]), row["zone_name"]
             )
-            withdrawn = _withdraw_dmarc_reporting(existing_dmarc)
+            withdrawn = withdraw_dmarc_reporting(existing_dmarc)
             if withdrawn is not None:
                 await provisioner.deploy_dns_record(
                     zone_id=row["zone_id"],
@@ -1538,198 +827,3 @@ async def teardown_cloudflare(
         "zone_name": row["zone_name"],
         "dmarc_reporting_withdrawn": dmarc_reporting_withdrawn,
     }
-
-
-# --------------------------------------------------------------------------- ── 5.
-
-
-class TokenVerifyRequest(BaseModel):
-    cf_api_token: str
-    zone_name: str
-
-
-@router.post(
-    "/v1/integrations/cloudflare/verify-token",
-    response_model=CloudflareTokenVerificationResponse,
-    response_model_exclude_unset=True,
-)
-async def verify_cloudflare_token(
-    payload: TokenVerifyRequest,
-    current_user: AuthUser = Depends(get_current_user),
-) -> dict[str, Any]:
-    """
-    Lightweight check: verify the token is valid and can see the requested zone.
-    Called by the UI before the actual setup to give early feedback.
-    """
-    try:
-        provisioner = CloudflareProvisioner(api_token=payload.cf_api_token)
-        token_ok = await provisioner.verify_token()
-        if not token_ok:
-            return {"valid": False, "error": "Token verification failed"}
-        zone_id, _ = await provisioner.get_zone(payload.zone_name)
-        # Read the zone and work out what connecting would actually change, so
-        # the customer can be shown it before they press the button rather than
-        # after. This is the same read provisioning does; nothing is written.
-        spf, dkim, dmarc = _read_dns_state(
-            await provisioner.get_dns_records(zone_id), payload.zone_name
-        )
-        return {
-            "valid": True,
-            "zone_id": zone_id,
-            "plan": {
-                "spf": _planned_change(spf, _merge_spf(spf)),
-                "dmarc": _planned_change(dmarc, _merge_dmarc(dmarc)),
-                "dkim_present": bool(dkim),
-            },
-        }
-    except CloudflareAPIError as exc:
-        return {"valid": False, "error": str(exc)}
-
-
-class DomainPreviewRequest(BaseModel):
-    zone_name: str = Field(..., min_length=3, max_length=253)
-
-
-@router.post(
-    "/v1/integrations/cloudflare/preview",
-    response_model=CloudflareDomainPreviewResponse,
-    response_model_exclude_unset=True,
-)
-@limiter.limit("30/minute")
-async def preview_cloudflare_domain(
-    payload: DomainPreviewRequest,
-    request: Request,
-    current_user: AuthUser = Depends(get_current_user),
-) -> dict[str, Any]:
-    """Describe a domain from public DNS, before the customer creates a token.
-
-    Reports whether the zone is on Cloudflare, who receives its mail, and
-    what connecting would add or modify. Reads only; needs no credentials.
-    """
-    zone = normalize_zone(payload.zone_name)
-    if zone is None:
-        raise HTTPException(status_code=422, detail="zone_name must be a hostname")
-    snapshot = await read_public_dns(zone)
-    if not snapshot.resolvable:
-        return {
-            "zone_name": zone,
-            "resolvable": False,
-            "on_cloudflare": False,
-            "mail_provider": "none",
-        }
-    dmarc = _clean_str(snapshot.dmarc)
-    policy = "reject" if "p=reject" in dmarc else "quarantine" if "p=quarantine" in dmarc else "none"
-    return {
-        "zone_name": zone,
-        "resolvable": True,
-        "on_cloudflare": snapshot.on_cloudflare,
-        "nameservers": snapshot.nameservers,
-        "mail_provider": snapshot.mail_provider,
-        "mx_hosts": snapshot.mx_hosts,
-        "plan": {
-            "spf": _planned_change(snapshot.spf, _merge_spf(snapshot.spf)),
-            "dmarc": _planned_change(snapshot.dmarc, _merge_dmarc(snapshot.dmarc)),
-            "dkim_present": snapshot.dkim_present,
-        },
-        "dmarc_policy": policy if dmarc else None,
-        "dmarc_reporting": _SICURRE_DMARC_MAILBOX in dmarc.lower(),
-    }
-
-
-# --------------------------------------------------------------------------- ── 6.
-
-
-class CloudflareTokenSaveRequest(BaseModel):
-    cf_api_token: str = Field(..., description="Cloudflare API token to store")
-
-
-@router.get(
-    "/v1/integrations/cloudflare/token",
-    response_model=CloudflareTokenStatusResponse,
-)
-async def get_workspace_cloudflare_token(
-    current_user: AuthUser = Depends(get_current_user),
-) -> dict[str, Any]:
-    """Retrieve the stored Cloudflare API token for the current workspace if an active domain is connected."""
-    _ensure_tables()
-
-    # Require at least one connected domain in cloudflare_integration
-    integ_rows = await _async_query(
-        "SELECT api_token FROM cloudflare_integration WHERE workspace_id = ? AND api_token IS NOT NULL AND api_token != '' ORDER BY created_at DESC LIMIT 1",
-        (current_user.workspace_id,),
-    )
-    if not integ_rows:
-        # Parent domain missing: purge orphaned token config if any
-        await _async_query(
-            "DELETE FROM app_cloudflare_config WHERE workspace_id = ?",
-            (current_user.workspace_id,),
-        )
-        return {"configured": False}
-
-    rows = await _async_query(
-        "SELECT api_token FROM app_cloudflare_config WHERE workspace_id = ? LIMIT 1",
-        (current_user.workspace_id,),
-    )
-    if rows and rows[0]["api_token"]:
-        return {"configured": True}
-
-    return {"configured": bool(integ_rows[0]["api_token"])}
-
-
-@router.post("/v1/integrations/cloudflare/token", response_model=StatusResponse)
-async def save_workspace_cloudflare_token(
-    payload: CloudflareTokenSaveRequest,
-    current_user: AuthUser = Depends(get_current_user),
-) -> dict[str, Any]:
-    """Save or overwrite the stored Cloudflare API token for the current workspace."""
-    # Lightweight check: verify token works
-    try:
-        provisioner = CloudflareProvisioner(api_token=payload.cf_api_token)
-        token_ok = await provisioner.verify_token()
-        if not token_ok:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Token verification failed on Cloudflare API",
-            )
-    except CloudflareAPIError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Token verification failed: {str(exc)}",
-        ) from exc
-
-    ts = datetime.now(timezone.utc).isoformat()
-    await _async_query(
-        """
-        INSERT INTO app_cloudflare_config (workspace_id, api_token, created_at, updated_at)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(workspace_id) DO UPDATE SET
-            api_token=excluded.api_token, updated_at=excluded.updated_at
-        """,
-        (
-            current_user.workspace_id,
-            _encrypt_provider_token(payload.cf_api_token),
-            ts,
-            ts,
-        ),
-    )
-    return {"status": "saved"}
-
-
-@router.delete("/v1/integrations/cloudflare/token", response_model=StatusResponse)
-async def delete_workspace_cloudflare_token(
-    current_user: AuthUser = Depends(get_current_user),
-) -> dict[str, Any]:
-    """Delete the stored Cloudflare API token and all connected integrations for the current workspace."""
-    await _async_query(
-        "DELETE FROM app_cloudflare_config WHERE workspace_id = ?",
-        (current_user.workspace_id,),
-    )
-    await _async_query(
-        "DELETE FROM cloudflare_integration WHERE workspace_id = ?",
-        (current_user.workspace_id,),
-    )
-    await _async_query(
-        "DELETE FROM app_domain_shield_status WHERE workspace_id = ?",
-        (current_user.workspace_id,),
-    )
-    return {"status": "deleted"}

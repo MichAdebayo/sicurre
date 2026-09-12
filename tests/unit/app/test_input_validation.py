@@ -17,7 +17,7 @@ from pydantic import ValidationError
 from starlette.requests import Request
 
 from data_platform.api.auth import AuthUser
-from data_platform.api.routers import app_routes, integrations
+from data_platform.api.routers import app_routes, email_scan
 from data_platform.api.routers.app_routes import (
     FeedbackCreate,
     SecurityRuleCreate,
@@ -25,7 +25,7 @@ from data_platform.api.routers.app_routes import (
     SupportRequestCreate,
     UpdateProfileRequest,
 )
-from data_platform.api.routers.integrations import EmailScanRequest
+from data_platform.api.routers.email_scan import EmailScanRequest
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -59,10 +59,10 @@ def _limiter_request() -> Request:
 @pytest.mark.asyncio
 async def test_scan_email_rejects_missing_secret(monkeypatch: pytest.MonkeyPatch) -> None:
     """POST /v1/email/scan rejects when the X-Sicurre-Secret header is absent."""
-    monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
+    monkeypatch.setattr(email_scan, "ensure_runtime_tables", lambda: None)
 
     with pytest.raises(HTTPException) as exc_info:
-        await integrations.scan_email(
+        await email_scan.scan_email(
             request=_limiter_request(),
             payload=EmailScanRequest(subject="Test", sender="a@b.com", text="Hi"),
             x_sicurre_secret=None,
@@ -75,15 +75,15 @@ async def test_scan_email_rejects_missing_secret(monkeypatch: pytest.MonkeyPatch
 @pytest.mark.asyncio
 async def test_scan_email_rejects_invalid_secret(monkeypatch: pytest.MonkeyPatch) -> None:
     """POST /v1/email/scan rejects when the shared secret does not match any integration."""
-    monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
+    monkeypatch.setattr(email_scan, "ensure_runtime_tables", lambda: None)
 
     async def empty_query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
         return []
 
-    monkeypatch.setattr(integrations, "_async_query", empty_query)
+    monkeypatch.setattr(email_scan, "_async_query", empty_query)
 
     with pytest.raises(HTTPException) as exc_info:
-        await integrations.scan_email(
+        await email_scan.scan_email(
             request=_limiter_request(),
             payload=EmailScanRequest(subject="Test", sender="a@b.com", text="Hi"),
             x_sicurre_secret="completely-invalid-secret",
@@ -105,7 +105,7 @@ async def test_scan_email_returns_503_when_inference_unavailable(
 
     secret = "valid-secret"
 
-    monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
+    monkeypatch.setattr(email_scan, "ensure_runtime_tables", lambda: None)
 
     call_count = 0
     expected_hash = hashlib.sha256(secret.encode()).hexdigest()
@@ -129,7 +129,7 @@ async def test_scan_email_returns_503_when_inference_unavailable(
         # All subsequent queries return empty (no existing quarantine/event, no rules)
         return []
 
-    monkeypatch.setattr(integrations, "_async_query", query)
+    monkeypatch.setattr(email_scan, "_async_query", query)
 
     # Make httpx.AsyncClient always raise a connection error
     class FailingClient:
@@ -145,10 +145,10 @@ async def test_scan_email_returns_503_when_inference_unavailable(
         async def post(self, *_: Any, **__: Any) -> None:
             raise httpx.ConnectError("Connection refused")
 
-    monkeypatch.setattr(integrations, "get_inference_client", lambda: FailingClient())
+    monkeypatch.setattr(email_scan, "get_inference_client", lambda: FailingClient())
 
     with pytest.raises(HTTPException) as exc_info:
-        await integrations.scan_email(
+        await email_scan.scan_email(
             request=_limiter_request(),
             payload=EmailScanRequest(subject="Test", sender="a@b.com", text="Body"),
             x_sicurre_secret=secret,
@@ -217,11 +217,11 @@ async def test_scan_email_records_whitelist_stage_evidence(
             inference_payload.update(kwargs["json"])
             return SuccessResponse()
 
-    monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
-    monkeypatch.setattr(integrations, "_async_query", query)
-    monkeypatch.setattr(integrations, "get_inference_client", lambda: SuccessClient())
+    monkeypatch.setattr(email_scan, "ensure_runtime_tables", lambda: None)
+    monkeypatch.setattr(email_scan, "_async_query", query)
+    monkeypatch.setattr(email_scan, "get_inference_client", lambda: SuccessClient())
 
-    response = await integrations.scan_email(
+    response = await email_scan.scan_email(
         request=_limiter_request(),
         payload=EmailScanRequest(
             subject="Expected message",
@@ -306,11 +306,11 @@ async def test_scan_email_persists_ml_stage_contract(
             inference_payload.update(kwargs["json"])
             return SuccessResponse()
 
-    monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
-    monkeypatch.setattr(integrations, "_async_query", query)
-    monkeypatch.setattr(integrations, "get_inference_client", lambda: SuccessClient())
+    monkeypatch.setattr(email_scan, "ensure_runtime_tables", lambda: None)
+    monkeypatch.setattr(email_scan, "_async_query", query)
+    monkeypatch.setattr(email_scan, "get_inference_client", lambda: SuccessClient())
 
-    response = await integrations.scan_email(
+    response = await email_scan.scan_email(
         request=_limiter_request(),
         payload=EmailScanRequest(
             message_id="message-1",
@@ -543,9 +543,9 @@ async def test_scan_email_runs_independent_lookups_concurrently(
 
     import httpx
 
-    from data_platform.api.routers import integrations
+    from data_platform.api.routers import email_scan
 
-    monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
+    monkeypatch.setattr(email_scan, "ensure_runtime_tables", lambda: None)
 
     in_flight = 0
     max_in_flight = 0
@@ -571,7 +571,7 @@ async def test_scan_email_runs_independent_lookups_concurrently(
         finally:
             in_flight -= 1
 
-    monkeypatch.setattr(integrations, "_async_query", query)
+    monkeypatch.setattr(email_scan, "_async_query", query)
 
     class FailingClient:
         def __init__(self, *args: Any, **kwargs: Any) -> None: ...
@@ -581,13 +581,13 @@ async def test_scan_email_runs_independent_lookups_concurrently(
         async def post(self, *args: Any, **kwargs: Any) -> Any:
             raise httpx.ConnectError("Connection refused")
 
-    monkeypatch.setattr(integrations, "get_inference_client", lambda: FailingClient())
+    monkeypatch.setattr(email_scan, "get_inference_client", lambda: FailingClient())
 
-    payload = integrations.EmailScanRequest(
+    payload = email_scan.EmailScanRequest(
         subject="Objet", sender="expediteur@example.com", text="corps", message_id="m-1"
     )
     with pytest.raises(HTTPException):
-        await integrations.scan_email(
+        await email_scan.scan_email(
             request=_limiter_request(),
             payload=payload,
             x_sicurre_secret="secret",

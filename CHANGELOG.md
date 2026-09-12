@@ -5,6 +5,23 @@ notes are generated from Conventional Commits by semantic-release and published
 to [GitHub Releases](https://github.com/MichAdebayo/sicurre/releases), which is
 the authoritative record. This file summarises the notable changes only.
 
+## [Unreleased] - 2026-09-12
+
+Deployed from `main` without a version tag: refactor commits do not bump the
+version.
+
+- The Cloudflare router is split by concern. `routers/integrations.py` keeps
+  connect, status and disconnect; `routers/email_scan.py` holds the two routes
+  the Email Worker calls; `routers/cloudflare_account.py` holds the domain
+  preview, the token check and the stored token; the SPF, DKIM and DMARC record
+  logic is a pure module, `services/dns_records.py`. Routes, schemas and the
+  OpenAPI contract are unchanged. Unused SQLite helpers and an unused response
+  schema were removed.
+- The moved code is covered before it moves: new tests for the scan's
+  idempotent replies, rule matching, notification opt-out and failure paths,
+  the MIME custody refusals, the token check refusals, the record helpers and
+  the auto-configuration write path.
+
 ## [1.33.1] - 2026-09-12
 
 - The always-dark public pages (landing, login, contact, legal) use fixed
