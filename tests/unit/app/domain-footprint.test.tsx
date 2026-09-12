@@ -4,7 +4,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { DomainFootprint, describeDomainFootprint } from "../../../src/app/components/settings/domain-footprint";
+import { DomainFootprint, DomainFootprintSection, describeDomainFootprint } from "../../../src/app/components/settings/domain-footprint";
 import type { DomainShieldStatus } from "../../../src/app/lib/api";
 
 const shield = vi.hoisted(() => ({ data: undefined as unknown, isLoading: false }));
@@ -81,22 +81,46 @@ describe("describeDomainFootprint", () => {
 });
 
 describe("DomainFootprint", () => {
-  it("renders both lists and the disconnect note for a domain", () => {
+  it("renders both lists for a domain, named by its heading", () => {
     shield.data = status();
-    render(<DomainFootprint domain="vinse.app" id="footprint-1" />);
+    render(<DomainFootprint domain="vinse.app" />);
+    expect(screen.getByRole("heading", { level: 3, name: "vinse.app" })).toBeInTheDocument();
     expect(screen.getByText("settings.footprint_writes")).toBeInTheDocument();
     expect(screen.getByText("settings.footprint_reads")).toBeInTheDocument();
-    expect(screen.getByText("settings.footprint_disconnect_note")).toBeInTheDocument();
     expect(screen.getAllByText("settings.footprint_in_place")).toHaveLength(3);
   });
 
   it("says it is reading while the status loads, and says so when it cannot", () => {
     shield.isLoading = true;
-    const { unmount } = render(<DomainFootprint domain="vinse.app" id="footprint-1" />);
+    const { unmount } = render(<DomainFootprint domain="vinse.app" />);
     expect(screen.getByRole("status")).toHaveTextContent("settings.footprint_loading");
     unmount();
     shield.isLoading = false;
-    render(<DomainFootprint domain="vinse.app" id="footprint-1" />);
+    render(<DomainFootprint domain="vinse.app" />);
     expect(screen.getByText("settings.footprint_unavailable")).toBeInTheDocument();
+  });
+});
+
+describe("DomainFootprintSection", () => {
+  it("is always shown once a domain is connected, one card per domain, with the intro and the note", () => {
+    shield.data = status();
+    render(
+      <DomainFootprintSection
+        domains={[
+          { id: "1", zone_name: "vinse.app", status: "active" },
+          { id: "2", zone_name: "sicurre.com", status: "pending_verification" },
+        ]}
+      />,
+    );
+    expect(screen.getByRole("heading", { level: 2, name: "settings.footprint_title" })).toBeInTheDocument();
+    expect(screen.getByText("settings.footprint_intro")).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["vinse.app", "sicurre.com"]);
+    expect(screen.getByText("settings.footprint_disconnect_note")).toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("renders nothing when no domain is connected", () => {
+    const { container } = render(<DomainFootprintSection domains={[]} />);
+    expect(container).toBeEmptyDOMElement();
   });
 });

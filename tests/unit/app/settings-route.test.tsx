@@ -41,6 +41,7 @@ vi.mock("../../../src/app/lib/api", () => ({
   useWorkspaceCloudflareToken: () => ({ data: { configured: true }, refetch: vi.fn() }),
   useSaveWorkspaceCloudflareToken: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteWorkspaceCloudflareToken: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDomainShieldStatus: () => ({ data: undefined, isLoading: false }),
 }));
 
 beforeEach(() => {
