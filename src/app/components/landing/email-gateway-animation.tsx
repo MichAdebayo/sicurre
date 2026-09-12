@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
 import {
   Mail,
@@ -421,20 +421,27 @@ function FlyingEmail({
   onArrived: () => void;
 }) {
   const [stage, setStage] = useState<"intake" | "scanning" | "dispatching">("intake");
+  // The parent recreates these handlers on every render. Reading them through
+  // a ref keeps the timeline effect keyed on the message alone, so each email
+  // is scanned once and arrives once instead of restarting on every re-render.
+  const handlers = useRef({ onScanBegin, onScanEnd, onArrived });
+  useEffect(() => {
+    handlers.current = { onScanBegin, onScanEnd, onArrived };
+  });
 
   useEffect(() => {
     const tScanBegin = setTimeout(() => {
       setStage("scanning");
-      onScanBegin();
+      handlers.current.onScanBegin();
     }, 1000);
 
     const tScanEnd = setTimeout(() => {
       setStage("dispatching");
-      onScanEnd();
+      handlers.current.onScanEnd();
     }, 2000);
 
     const tArrive = setTimeout(() => {
-      onArrived();
+      handlers.current.onArrived();
     }, 3200);
 
     return () => {
@@ -442,7 +449,7 @@ function FlyingEmail({
       clearTimeout(tScanEnd);
       clearTimeout(tArrive);
     };
-  }, [id, onScanBegin, onScanEnd, onArrived]);
+  }, [id]);
 
   const getDestCoordinates = () => {
     switch (type) {
