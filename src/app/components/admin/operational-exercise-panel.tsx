@@ -29,6 +29,14 @@ export function OperationalExercisePanel() {
   const busy = start.isPending || recover.isPending;
   const stale = query.isError;
   const remaining = active ? Math.max(0, Math.ceil((Date.parse(active.expires_at) - now) / 1000)) : 0;
+  const actionError = start.error ?? recover.error;
+  const rateLimit = actionError ? /rate limit exceeded.*?(\d+)/i.exec(actionError.message) : null;
+  const openConfirmation = (open: boolean) => {
+    // A failed action must not linger under the next one.
+    start.reset();
+    recover.reset();
+    setConfirming(open);
+  };
 
   useEffect(() => {
     if (active) setSelectedScenario(active.exercise_type);
@@ -111,16 +119,22 @@ export function OperationalExercisePanel() {
             )}>
               <Play className="h-4 w-4" aria-hidden="true" />{t(start.isPending ? "operational_test.starting" : "operational_test.launch")}
             </Button>
-            <Button variant="outline" disabled={busy} onClick={() => setConfirming(false)}>{t("common.cancel")}</Button>
+            <Button variant="outline" disabled={busy} onClick={() => openConfirmation(false)}>{t("common.cancel")}</Button>
           </div>
         </div>
       ) : query.data ? (
-        <Button disabled={!canStart || stale || busy} onClick={() => setConfirming(true)}>
+        <Button disabled={!canStart || stale || busy} onClick={() => openConfirmation(true)}>
           <Play className="h-4 w-4" aria-hidden="true" />{t("operational_test.start")}
         </Button>
       ) : null}
 
-      {(start.isError || recover.isError) && <p role="alert" className="rounded-lg bg-error-container p-3 text-sm text-on-error-container">{t("operational_test.action_error")}</p>}
+      {actionError && (
+        <p role="alert" className="rounded-lg bg-error-container p-3 text-sm text-on-error-container">
+          {rateLimit
+            ? t("operational_test.rate_limited", { limit: rateLimit[1] })
+            : t("operational_test.action_error")}
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
         <a className="inline-flex min-h-10 items-center gap-2 font-semibold text-navy-dark underline underline-offset-4" href={evidence.toString()} target="_blank" rel="noreferrer">
