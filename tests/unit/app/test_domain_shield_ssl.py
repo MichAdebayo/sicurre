@@ -17,7 +17,8 @@ from typing import Any
 import pytest
 
 from core.tls_certificate import CERTIFICATE_UNAVAILABLE, get_ssl_expiry_days
-from data_platform.api.routers import integrations
+from data_platform.api import workspace_scope
+from data_platform.api.routers import domain_shield, integrations
 
 
 def _shield_user() -> Any:
@@ -64,7 +65,9 @@ def _patch_handshake(monkeypatch: pytest.MonkeyPatch, certificate: dict[str, Any
         def wrap_socket(self, _sock: object, server_hostname: str = "") -> _FakeTLSSocket:
             return _FakeTLSSocket(certificate)
 
-    monkeypatch.setattr("core.tls_certificate.socket.create_connection", lambda *_a, **_k: _FakeSocket())
+    monkeypatch.setattr(
+        "core.tls_certificate.socket.create_connection", lambda *_a, **_k: _FakeSocket()
+    )
     monkeypatch.setattr("core.tls_certificate.ssl.create_default_context", _Context)
 
 
@@ -178,9 +181,8 @@ def test_auto_configuration_never_stamps_a_certificate_lifetime() -> None:
 
 def test_both_paths_take_the_measurement_from_the_same_place() -> None:
     """Refresh and auto-configuration cannot drift apart on how SSL is read."""
-    from data_platform.api.routers import app_routes
 
-    assert app_routes.get_ssl_expiry_days is get_ssl_expiry_days
+    assert domain_shield.get_ssl_expiry_days is get_ssl_expiry_days
     assert integrations.get_ssl_expiry_days is get_ssl_expiry_days
 
 
@@ -189,14 +191,19 @@ async def test_the_cached_read_gives_the_same_reason_as_a_refresh(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A row we could not inspect must not come back as invalid with no reason."""
-    from data_platform.api.routers import app_routes
 
     row = {
-        "spf_valid": 1, "spf_record": "v=spf1 -all",
-        "dkim_valid": 0, "dkim_record": None,
-        "dmarc_valid": 1, "dmarc_record": "v=DMARC1; p=reject", "dmarc_policy": "reject",
-        "ssl_valid": 0, "ssl_days_remaining": 0,
-        "reputation_score": 80, "score_grade": "B",
+        "spf_valid": 1,
+        "spf_record": "v=spf1 -all",
+        "dkim_valid": 0,
+        "dkim_record": None,
+        "dmarc_valid": 1,
+        "dmarc_record": "v=DMARC1; p=reject",
+        "dmarc_policy": "reject",
+        "ssl_valid": 0,
+        "ssl_days_remaining": 0,
+        "reputation_score": 80,
+        "score_grade": "B",
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -209,11 +216,14 @@ async def test_the_cached_read_gives_the_same_reason_as_a_refresh(
     async def query(_sql: str, _params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
         return [row]
 
-    monkeypatch.setattr(app_routes, "_require_workspace_domain", allow)
-    monkeypatch.setattr(app_routes, "_check_domain_blacklists", blocklists)
-    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+    monkeypatch.setattr(workspace_scope, "require_workspace_domain", allow)
 
-    result = await app_routes.check_domain_shield_status(
+    monkeypatch.setattr(domain_shield, "require_workspace_domain", allow)
+    monkeypatch.setattr(domain_shield, "_check_domain_blacklists", blocklists)
+    monkeypatch.setattr(domain_shield, "execute_runtime_query", query)
+    monkeypatch.setattr(workspace_scope, "execute_runtime_query", query)
+
+    result = await domain_shield.check_domain_shield_status(
         "mail-only.test", refresh=False, current_user=_shield_user()
     )
 
@@ -230,14 +240,19 @@ async def test_a_healthy_cached_certificate_carries_no_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The reason appears only when there is one; a live certificate is clean."""
-    from data_platform.api.routers import app_routes
 
     row = {
-        "spf_valid": 1, "spf_record": "v=spf1 -all",
-        "dkim_valid": 1, "dkim_record": "v=DKIM1; p=abc",
-        "dmarc_valid": 1, "dmarc_record": "v=DMARC1; p=reject", "dmarc_policy": "reject",
-        "ssl_valid": 1, "ssl_days_remaining": 77,
-        "reputation_score": 100, "score_grade": "A",
+        "spf_valid": 1,
+        "spf_record": "v=spf1 -all",
+        "dkim_valid": 1,
+        "dkim_record": "v=DKIM1; p=abc",
+        "dmarc_valid": 1,
+        "dmarc_record": "v=DMARC1; p=reject",
+        "dmarc_policy": "reject",
+        "ssl_valid": 1,
+        "ssl_days_remaining": 77,
+        "reputation_score": 100,
+        "score_grade": "A",
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -250,11 +265,14 @@ async def test_a_healthy_cached_certificate_carries_no_error(
     async def query(_sql: str, _params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
         return [row]
 
-    monkeypatch.setattr(app_routes, "_require_workspace_domain", allow)
-    monkeypatch.setattr(app_routes, "_check_domain_blacklists", blocklists)
-    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+    monkeypatch.setattr(workspace_scope, "require_workspace_domain", allow)
 
-    result = await app_routes.check_domain_shield_status(
+    monkeypatch.setattr(domain_shield, "require_workspace_domain", allow)
+    monkeypatch.setattr(domain_shield, "_check_domain_blacklists", blocklists)
+    monkeypatch.setattr(domain_shield, "execute_runtime_query", query)
+    monkeypatch.setattr(workspace_scope, "execute_runtime_query", query)
+
+    result = await domain_shield.check_domain_shield_status(
         "vinse.app", refresh=False, current_user=_shield_user()
     )
 
@@ -388,15 +406,20 @@ async def test_a_cached_certificate_that_has_run_out_says_so(
     zero means the certificate we did see has since expired - not that we could
     not see one - so it must not borrow the uninspectable wording.
     """
-    from data_platform.api.routers import app_routes
 
     measured_at = datetime.now(timezone.utc) - timedelta(days=120)
     row = {
-        "spf_valid": 1, "spf_record": "v=spf1 -all",
-        "dkim_valid": 1, "dkim_record": "v=DKIM1; p=abc",
-        "dmarc_valid": 1, "dmarc_record": "v=DMARC1; p=reject", "dmarc_policy": "reject",
-        "ssl_valid": 1, "ssl_days_remaining": 30,   # 30 days left, measured 120 days ago
-        "reputation_score": 100, "score_grade": "A",
+        "spf_valid": 1,
+        "spf_record": "v=spf1 -all",
+        "dkim_valid": 1,
+        "dkim_record": "v=DKIM1; p=abc",
+        "dmarc_valid": 1,
+        "dmarc_record": "v=DMARC1; p=reject",
+        "dmarc_policy": "reject",
+        "ssl_valid": 1,
+        "ssl_days_remaining": 30,  # 30 days left, measured 120 days ago
+        "reputation_score": 100,
+        "score_grade": "A",
         "updated_at": measured_at.isoformat(),
     }
 
@@ -409,11 +432,14 @@ async def test_a_cached_certificate_that_has_run_out_says_so(
     async def query(_sql: str, _params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
         return [row]
 
-    monkeypatch.setattr(app_routes, "_require_workspace_domain", allow)
-    monkeypatch.setattr(app_routes, "_check_domain_blacklists", blocklists)
-    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+    monkeypatch.setattr(workspace_scope, "require_workspace_domain", allow)
 
-    result = await app_routes.check_domain_shield_status(
+    monkeypatch.setattr(domain_shield, "require_workspace_domain", allow)
+    monkeypatch.setattr(domain_shield, "_check_domain_blacklists", blocklists)
+    monkeypatch.setattr(domain_shield, "execute_runtime_query", query)
+    monkeypatch.setattr(workspace_scope, "execute_runtime_query", query)
+
+    result = await domain_shield.check_domain_shield_status(
         "lapsed.test", refresh=False, current_user=_shield_user()
     )
 
@@ -442,7 +468,11 @@ async def test_the_selected_fixes_write_the_merged_records_and_the_row(
     monkeypatch.setattr(integrations, "get_ssl_expiry_days", lambda _domain: 30)
     provisioner = _StubProvisioner(
         [
-            {"type": "TXT", "name": "example.test", "content": "v=spf1 include:_spf.google.com -all"},
+            {
+                "type": "TXT",
+                "name": "example.test",
+                "content": "v=spf1 include:_spf.google.com -all",
+            },
             {"type": "TXT", "name": "_dmarc.example.test", "content": "v=DMARC1; p=none"},
         ]
     )

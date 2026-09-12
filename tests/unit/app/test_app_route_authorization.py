@@ -11,20 +11,29 @@ from fastapi import BackgroundTasks, HTTPException
 from pydantic import ValidationError
 from starlette.requests import Request
 
+from data_platform.api import workspace_scope
 from data_platform.api.auth import AuthUser
-from data_platform.api.routers import app_routes
-from data_platform.api.routers.app_routes import (
+from data_platform.api.routers import alerts, dmarc_reports, domain_shield, quarantine, threats
+from data_platform.api.routers.admin import (
+    list_datasets_alias,
+    run_pipeline,
+)
+from data_platform.api.routers.alerts import (
     AlertPreferenceUpdate,
     SecurityRuleCreate,
-    SupportRequestCreate,
-    create_support_request,
-    delete_quarantine_item,
     dismiss_alert,
+)
+from data_platform.api.routers.dmarc_reports import (
     get_dmarc_report_summary,
     import_dmarc_report,
-    list_datasets_alias,
+)
+from data_platform.api.routers.quarantine import (
+    delete_quarantine_item,
     release_quarantine_item,
-    run_pipeline,
+)
+from data_platform.api.routers.threats import (
+    SupportRequestCreate,
+    create_support_request,
 )
 
 DMARC_XML = b"""<feedback>
@@ -104,7 +113,9 @@ async def test_dmarc_summary_rejects_unconnected_domain(monkeypatch) -> None:
     async def query(_sql: str, _params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
         return []
 
-    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+    monkeypatch.setattr(dmarc_reports, "execute_runtime_query", query)
+
+    monkeypatch.setattr(workspace_scope, "execute_runtime_query", query)
 
     with pytest.raises(HTTPException) as exc_info:
         await get_dmarc_report_summary("other.example", _user(platform_admin=False))
@@ -128,8 +139,9 @@ async def test_dmarc_import_is_idempotent(monkeypatch) -> None:
             return [{"id": "row-1"}]
         return []
 
-    monkeypatch.setattr(app_routes, "_ensure_app_runtime_tables", lambda: None)
-    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+    monkeypatch.setattr(dmarc_reports, "ensure_runtime_tables", lambda: None)
+    monkeypatch.setattr(dmarc_reports, "execute_runtime_query", query)
+    monkeypatch.setattr(workspace_scope, "execute_runtime_query", query)
 
     first = await import_dmarc_report(
         "example.test", _request_with_body(DMARC_XML), _user(platform_admin=False)
@@ -151,10 +163,11 @@ async def test_dmarc_import_rejects_invalid_size(
     monkeypatch, payload: bytes, expected_status: int
 ) -> None:
     """Manual imports reject empty and oversized payloads before parsing."""
-    monkeypatch.setattr(app_routes, "_require_workspace_domain", _allow_domain)
-    monkeypatch.setattr(app_routes, "_ensure_app_runtime_tables", lambda: None)
+    monkeypatch.setattr(workspace_scope, "require_workspace_domain", _allow_domain)
+    monkeypatch.setattr(dmarc_reports, "require_workspace_domain", _allow_domain)
+    monkeypatch.setattr(dmarc_reports, "ensure_runtime_tables", lambda: None)
     monkeypatch.setattr(
-        app_routes,
+        dmarc_reports,
         "get_settings",
         lambda: SimpleNamespace(reported_email_max_message_bytes=4),
     )
@@ -196,11 +209,14 @@ async def test_domain_shield_cache_ages_ssl_days(monkeypatch) -> None:
             }
         ]
 
-    monkeypatch.setattr(app_routes, "_require_workspace_domain", allow_domain)
-    monkeypatch.setattr(app_routes, "_check_domain_blacklists", blocklists)
-    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+    monkeypatch.setattr(workspace_scope, "require_workspace_domain", allow_domain)
 
-    result = await app_routes.check_domain_shield_status(
+    monkeypatch.setattr(domain_shield, "require_workspace_domain", allow_domain)
+    monkeypatch.setattr(domain_shield, "_check_domain_blacklists", blocklists)
+    monkeypatch.setattr(domain_shield, "execute_runtime_query", query)
+    monkeypatch.setattr(workspace_scope, "execute_runtime_query", query)
+
+    result = await domain_shield.check_domain_shield_status(
         "example.test", refresh=False, current_user=_user(platform_admin=False)
     )
 
@@ -222,16 +238,19 @@ async def test_domain_shield_marks_uninspectable_certificate_unavailable(monkeyp
         return []
 
     async def to_thread(function: Any, *_args: Any) -> Any:
-        if function is app_routes.get_ssl_expiry_days:
+        if function is domain_shield.get_ssl_expiry_days:
             return -1
         raise RuntimeError("DNS unavailable")
 
-    monkeypatch.setattr(app_routes, "_require_workspace_domain", allow_domain)
-    monkeypatch.setattr(app_routes, "_check_domain_blacklists", blocklists)
-    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
-    monkeypatch.setattr(app_routes.asyncio, "to_thread", to_thread)
+    monkeypatch.setattr(workspace_scope, "require_workspace_domain", allow_domain)
 
-    result = await app_routes.check_domain_shield_status(
+    monkeypatch.setattr(domain_shield, "require_workspace_domain", allow_domain)
+    monkeypatch.setattr(domain_shield, "_check_domain_blacklists", blocklists)
+    monkeypatch.setattr(domain_shield, "execute_runtime_query", query)
+    monkeypatch.setattr(workspace_scope, "execute_runtime_query", query)
+    monkeypatch.setattr(domain_shield.asyncio, "to_thread", to_thread)
+
+    result = await domain_shield.check_domain_shield_status(
         "example.test", refresh=True, current_user=_user(platform_admin=False)
     )
 
@@ -265,8 +284,10 @@ async def test_quarantine_release_rejects_missing_original_content(monkeypatch) 
         queries.append((sql, params))
         return [{"id": "held-1", "status": "held", "raw_storage_uri": None}]
 
-    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
-    monkeypatch.setattr(app_routes, "_require_workspace_domain", _allow_domain)
+    monkeypatch.setattr(quarantine, "execute_runtime_query", query)
+
+    monkeypatch.setattr(workspace_scope, "execute_runtime_query", query)
+    monkeypatch.setattr(workspace_scope, "require_workspace_domain", _allow_domain)
 
     with pytest.raises(HTTPException) as exc_info:
         await release_quarantine_item("held-1", "example.test", _user(platform_admin=False))
@@ -328,11 +349,13 @@ async def test_quarantine_release_delivers_original_mime_once(monkeypatch) -> No
     async def sending_address(**_kwargs: Any) -> str:
         return "quarantine@example.test"
 
-    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
-    monkeypatch.setattr(app_routes, "_require_workspace_domain", _allow_domain)
-    monkeypatch.setattr(app_routes, "build_quarantine_store", lambda _settings: Store())
-    monkeypatch.setattr(app_routes, "send_raw_email", deliver)
-    monkeypatch.setattr(app_routes, "resolve_sending_address", sending_address)
+    monkeypatch.setattr(quarantine, "execute_runtime_query", query)
+
+    monkeypatch.setattr(workspace_scope, "execute_runtime_query", query)
+    monkeypatch.setattr(workspace_scope, "require_workspace_domain", _allow_domain)
+    monkeypatch.setattr(quarantine, "build_quarantine_store", lambda _settings: Store())
+    monkeypatch.setattr(quarantine, "send_raw_email", deliver)
+    monkeypatch.setattr(quarantine, "resolve_sending_address", sending_address)
 
     response = await release_quarantine_item("held-1", "example.test", _user(platform_admin=False))
 
@@ -351,8 +374,10 @@ async def test_quarantine_delete_write_remains_workspace_scoped(monkeypatch) -> 
         queries.append((sql, params))
         return [{"exists": 1}]
 
-    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
-    monkeypatch.setattr(app_routes, "_require_workspace_domain", _allow_domain)
+    monkeypatch.setattr(quarantine, "execute_runtime_query", query)
+
+    monkeypatch.setattr(workspace_scope, "execute_runtime_query", query)
+    monkeypatch.setattr(workspace_scope, "require_workspace_domain", _allow_domain)
 
     assert await delete_quarantine_item("held-1", "example.test", _user(platform_admin=False)) == {
         "status": "deleted"
@@ -377,9 +402,11 @@ async def test_quarantine_delete_keeps_item_when_storage_fails(monkeypatch) -> N
         async def delete(self, _uri: str) -> None:
             raise RuntimeError("R2 unavailable")
 
-    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
-    monkeypatch.setattr(app_routes, "_require_workspace_domain", _allow_domain)
-    monkeypatch.setattr(app_routes, "build_quarantine_store", lambda _settings: Store())
+    monkeypatch.setattr(quarantine, "execute_runtime_query", query)
+
+    monkeypatch.setattr(workspace_scope, "execute_runtime_query", query)
+    monkeypatch.setattr(workspace_scope, "require_workspace_domain", _allow_domain)
+    monkeypatch.setattr(quarantine, "build_quarantine_store", lambda _settings: Store())
 
     with pytest.raises(HTTPException) as exc_info:
         await delete_quarantine_item("held-1", "example.test", _user(platform_admin=False))
@@ -397,8 +424,10 @@ async def test_alert_dismiss_write_remains_workspace_scoped(monkeypatch) -> None
         queries.append((sql, params))
         return [{"exists": 1}]
 
-    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
-    monkeypatch.setattr(app_routes, "_require_workspace_domain", _allow_domain)
+    monkeypatch.setattr(alerts, "execute_runtime_query", query)
+
+    monkeypatch.setattr(workspace_scope, "execute_runtime_query", query)
+    monkeypatch.setattr(workspace_scope, "require_workspace_domain", _allow_domain)
 
     assert await dismiss_alert("alert-1", "example.test", _user(platform_admin=False)) == {
         "status": "dismissed"
@@ -426,7 +455,8 @@ async def test_support_request_is_tenant_scoped(monkeypatch) -> None:
             "client": ("127.0.0.1", 4000),
         }
     )
-    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+    monkeypatch.setattr(threats, "execute_runtime_query", query)
+    monkeypatch.setattr(workspace_scope, "execute_runtime_query", query)
 
     response = await create_support_request(
         request,

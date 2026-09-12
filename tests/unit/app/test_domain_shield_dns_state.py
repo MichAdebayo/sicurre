@@ -14,8 +14,11 @@ GOOGLE = {"type": "TXT", "name": "example.test", "content": "google-site-verific
 MICROSOFT = {"type": "TXT", "name": "example.test", "content": "MS=ms84720193"}
 SPF = {"type": "TXT", "name": "example.test", "content": "v=spf1 include:mail.example.net -all"}
 DMARC = {"type": "TXT", "name": "_dmarc.example.test", "content": "v=DMARC1; p=reject"}
-DKIM = {"type": "TXT", "name": "cf2024-1._domainkey.example.test",
-        "content": "v=DKIM1; h=sha256; k=rsa; p=" + "MIIBIjANBgkqhkiG9w0BAQEF" * 17}
+DKIM = {
+    "type": "TXT",
+    "name": "cf2024-1._domainkey.example.test",
+    "content": "v=DKIM1; h=sha256; k=rsa; p=" + "MIIBIjANBgkqhkiG9w0BAQEF" * 17,
+}
 MX = {"type": "MX", "name": "example.test", "content": "route1.mx.cloudflare.net"}
 
 
@@ -86,14 +89,20 @@ def test_quoted_and_trailing_dot_forms_are_handled() -> None:
 # --------------------------------------------------------------------------- ──
 
 PLACEHOLDER = {
-    "type": "TXT", "name": "cloudflare._domainkey.example.test",
+    "type": "TXT",
+    "name": "cloudflare._domainkey.example.test",
     "content": "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...",
 }
 REAL_CF = {
-    "type": "TXT", "name": "cf2024-1._domainkey.example.test",
+    "type": "TXT",
+    "name": "cf2024-1._domainkey.example.test",
     "content": "v=DKIM1; h=sha256; k=rsa; p=" + "MIIBIjANBgkqhkiG9w0BAQEF" * 17,
 }
-REVOKED = {"type": "TXT", "name": "cf2024-1._domainkey.example.test", "content": "v=DKIM1; k=rsa; p="}
+REVOKED = {
+    "type": "TXT",
+    "name": "cf2024-1._domainkey.example.test",
+    "content": "v=DKIM1; k=rsa; p=",
+}
 
 
 def test_a_placeholder_key_is_not_accepted_as_dkim() -> None:
@@ -214,9 +223,9 @@ def test_shield_status_is_written_per_workspace() -> None:
     """Upserts must conflict on the whole key, or one workspace overwrites another."""
     import inspect
 
-    from data_platform.api.routers import app_routes, integrations
+    from data_platform.api.routers import domain_shield, integrations
 
-    for module in (app_routes, integrations):
+    for module in (domain_shield, integrations):
         source = inspect.getsource(module)
         assert "ON CONFLICT(domain) DO UPDATE" not in source, (
             f"{module.__name__} still upserts on domain alone"
