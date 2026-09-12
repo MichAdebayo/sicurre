@@ -541,7 +541,7 @@ async def test_setup_replaces_failed_local_attempt_using_saved_token(monkeypatch
     monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
     monkeypatch.setattr(integrations, "_async_query", query)
     monkeypatch.setattr(integrations, "decrypt_secret", lambda *_args, **_kwargs: "saved-token")
-    monkeypatch.setattr(integrations, "_sync_domain_shield_dns", sync_dns)
+    monkeypatch.setattr(integrations, "sync_domain_shield_dns", sync_dns)
 
     response = await setup_cloudflare(
         CloudflareSetupRequest(

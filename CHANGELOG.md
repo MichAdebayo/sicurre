@@ -31,6 +31,13 @@ version.
   threat status and feedback failures, the admin overview and health page,
   exercise refusals, every quarantine release refusal, the Domain Shield
   refresh and the DMARC report helpers.
+- `routers/integrations.py` is down to the connect, status, disconnect and list
+  routes. The background provisioning is `services/cloudflare_onboarding.py`
+  and the Domain Shield DNS sync is `services/domain_shield_sync.py`, which the
+  provisioning now reuses instead of carrying its own copy of the same DNS
+  block. The setup route is an orchestrator over four small helpers with every
+  SQL statement kept verbatim; the setup route was covered to 100% first. The
+  only contract change is the setup route's description.
 
 ## [1.33.1] - 2026-09-12
 

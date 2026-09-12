@@ -19,6 +19,7 @@ import pytest
 from core.tls_certificate import CERTIFICATE_UNAVAILABLE, get_ssl_expiry_days
 from data_platform.api import workspace_scope
 from data_platform.api.routers import domain_shield, integrations
+from data_platform.services import domain_shield_sync
 
 
 def _shield_user() -> Any:
@@ -152,8 +153,8 @@ def test_the_handshake_really_verifies_the_chain(monkeypatch: pytest.MonkeyPatch
 @pytest.mark.asyncio
 async def test_the_write_path_records_what_it_measured(monkeypatch: pytest.MonkeyPatch) -> None:
     """A measured lifetime reaches the status cache unchanged."""
-    monkeypatch.setattr(integrations, "get_ssl_expiry_days", lambda _domain: 77)
-    assert await integrations._measure_ssl("vinse.app") == (1, 77)
+    monkeypatch.setattr(domain_shield_sync, "get_ssl_expiry_days", lambda _domain: 77)
+    assert await domain_shield_sync.measure_ssl("vinse.app") == (1, 77)
 
 
 @pytest.mark.asyncio
@@ -162,28 +163,30 @@ async def test_an_uninspectable_domain_is_not_credited_with_a_lifetime(
 ) -> None:
     """The regression: no certificate must never become a year of validity."""
     monkeypatch.setattr(
-        integrations, "get_ssl_expiry_days", lambda _domain: CERTIFICATE_UNAVAILABLE
+        domain_shield_sync, "get_ssl_expiry_days", lambda _domain: CERTIFICATE_UNAVAILABLE
     )
-    assert await integrations._measure_ssl("mail-only.test") == (0, 0)
+    assert await domain_shield_sync.measure_ssl("mail-only.test") == (0, 0)
 
 
 def test_auto_configuration_never_stamps_a_certificate_lifetime() -> None:
-    """Guard: both status upserts bind SSL from the measurement, not a literal."""
-    source = inspect.getsource(integrations)
+    """Guard: the status upsert binds SSL from the measurement, not a literal."""
+    source = inspect.getsource(domain_shield_sync)
     assert "1, 365" not in source, "a fabricated certificate lifetime is back in the write path"
 
     upserts = source.count("INSERT INTO app_domain_shield_status")
-    assert upserts == 2, f"a new status upsert appeared ({upserts}); check how it sets SSL"
-    assert source.count("await _measure_ssl(") == upserts, (
+    assert upserts == 1, f"a new status upsert appeared ({upserts}); check how it sets SSL"
+    assert source.count("await measure_ssl(") == upserts, (
         "every status upsert must measure the certificate before it writes"
     )
+    # The routers no longer write the status themselves; one write path, one measurement.
+    assert "INSERT INTO app_domain_shield_status" not in inspect.getsource(integrations)
 
 
 def test_both_paths_take_the_measurement_from_the_same_place() -> None:
     """Refresh and auto-configuration cannot drift apart on how SSL is read."""
 
     assert domain_shield.get_ssl_expiry_days is get_ssl_expiry_days
-    assert integrations.get_ssl_expiry_days is get_ssl_expiry_days
+    assert domain_shield_sync.get_ssl_expiry_days is get_ssl_expiry_days
 
 
 @pytest.mark.asyncio
@@ -325,8 +328,8 @@ async def test_the_measurement_lands_in_the_ssl_columns(
             captured["params"] = params
         return []
 
-    monkeypatch.setattr(integrations, "_async_query", capture)
-    monkeypatch.setattr(integrations, "get_ssl_expiry_days", lambda _domain: 77)
+    monkeypatch.setattr(domain_shield_sync, "execute_runtime_query", capture)
+    monkeypatch.setattr(domain_shield_sync, "get_ssl_expiry_days", lambda _domain: 77)
 
     # A fully configured zone, so every column has a distinctive value.
     records = [
@@ -342,7 +345,7 @@ async def test_the_measurement_lands_in_the_ssl_columns(
             "content": "v=DMARC1; p=reject; rua=mailto:dmarc@sicurre.com",
         },
     ]
-    await integrations._sync_domain_shield_dns(
+    await domain_shield_sync.sync_domain_shield_dns(
         provisioner=_StubProvisioner(records),  # type: ignore[arg-type]
         workspace_id="workspace-1",
         zone_name="example.test",
@@ -378,12 +381,12 @@ async def test_an_uninspectable_domain_is_written_as_uninspected(
             captured["params"] = params
         return []
 
-    monkeypatch.setattr(integrations, "_async_query", capture)
+    monkeypatch.setattr(domain_shield_sync, "execute_runtime_query", capture)
     monkeypatch.setattr(
-        integrations, "get_ssl_expiry_days", lambda _domain: CERTIFICATE_UNAVAILABLE
+        domain_shield_sync, "get_ssl_expiry_days", lambda _domain: CERTIFICATE_UNAVAILABLE
     )
 
-    await integrations._sync_domain_shield_dns(
+    await domain_shield_sync.sync_domain_shield_dns(
         provisioner=_StubProvisioner([]),  # type: ignore[arg-type]
         workspace_id="workspace-1",
         zone_name="mail-only.test",
@@ -464,8 +467,8 @@ async def test_the_selected_fixes_write_the_merged_records_and_the_row(
             captured["params"] = params
         return []
 
-    monkeypatch.setattr(integrations, "_async_query", capture)
-    monkeypatch.setattr(integrations, "get_ssl_expiry_days", lambda _domain: 30)
+    monkeypatch.setattr(domain_shield_sync, "execute_runtime_query", capture)
+    monkeypatch.setattr(domain_shield_sync, "get_ssl_expiry_days", lambda _domain: 30)
     provisioner = _StubProvisioner(
         [
             {
@@ -477,7 +480,7 @@ async def test_the_selected_fixes_write_the_merged_records_and_the_row(
         ]
     )
 
-    result = await integrations._sync_domain_shield_dns(
+    result = await domain_shield_sync.sync_domain_shield_dns(
         provisioner=provisioner,  # type: ignore[arg-type]
         workspace_id="workspace-1",
         zone_name="example.test",
