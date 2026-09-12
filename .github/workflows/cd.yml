@@ -256,7 +256,10 @@ jobs:
 
             docker exec nginx-proxy nginx -t
             docker exec nginx-proxy nginx -s reload
-            docker image prune -f
+            # Every deploy pulls SHA-tagged images, which are never dangling, so
+            # "-f" alone let them pile up until the disk filled (12 Sept 2026,
+            # 72 GB of images on a 75 GB disk). Unused images go; running ones stay.
+            docker image prune -a -f
 
   health-check:
     name: Health check
