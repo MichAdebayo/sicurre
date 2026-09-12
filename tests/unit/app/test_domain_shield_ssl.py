@@ -423,3 +423,45 @@ async def test_a_cached_certificate_that_has_run_out_says_so(
         "auto_renew": False,
         "error": "The measured certificate has expired",
     }
+
+
+@pytest.mark.asyncio
+async def test_the_selected_fixes_write_the_merged_records_and_the_row(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Both fixes on: the merged SPF and DMARC are deployed and the row reflects them."""
+    captured: dict[str, Any] = {}
+
+    async def capture(sql: str, params: tuple[Any, ...] = ()) -> list[Any]:
+        if "app_domain_shield_status" in sql:
+            captured["sql"] = sql
+            captured["params"] = params
+        return []
+
+    monkeypatch.setattr(integrations, "_async_query", capture)
+    monkeypatch.setattr(integrations, "get_ssl_expiry_days", lambda _domain: 30)
+    provisioner = _StubProvisioner(
+        [
+            {"type": "TXT", "name": "example.test", "content": "v=spf1 include:_spf.google.com -all"},
+            {"type": "TXT", "name": "_dmarc.example.test", "content": "v=DMARC1; p=none"},
+        ]
+    )
+
+    result = await integrations._sync_domain_shield_dns(
+        provisioner=provisioner,  # type: ignore[arg-type]
+        workspace_id="workspace-1",
+        zone_name="example.test",
+        fix_spf=True,
+        fix_dmarc=True,
+    )
+
+    deployed = {record["name"]: record["content"] for record in provisioner.deployed}
+    assert deployed == {
+        "example.test": "v=spf1 include:_spf.google.com include:_spf.mx.cloudflare.net -all",
+        "_dmarc.example.test": "v=DMARC1; p=quarantine; rua=mailto:dmarc@sicurre.com",
+    }
+    assert result["dmarc_reporting_enabled"] is True
+    written = dict(zip(_column_names(captured["sql"]), captured["params"], strict=True))
+    assert (written["spf_valid"], written["dkim_valid"], written["dmarc_valid"]) == (1, 0, 1)
+    assert written["dmarc_policy"] == "quarantine"
+    assert (written["reputation_score"], written["score_grade"]) == (80, "B")

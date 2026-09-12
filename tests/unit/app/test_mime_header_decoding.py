@@ -7,7 +7,7 @@ import inspect
 import pytest
 
 from core.mime_headers import decode_mime_header
-from data_platform.api.routers import integrations
+from data_platform.api.routers import email_scan
 
 #: The exact header observed in production on 4 September, split across two
 #: encoded-words as mail clients do at the 75-character line limit.
@@ -48,7 +48,7 @@ def test_empty_input_is_safe() -> None:
 
 def test_the_scan_decodes_before_anything_consumes_the_header() -> None:
     """Decoding after the rules or the classifier would leave them on wire format."""
-    source = inspect.getsource(integrations)
+    source = inspect.getsource(email_scan)
     decode_at = source.index("payload.subject = decode_mime_header")
     for consumer in ("sender_lower = payload.sender.lower()", "db_subject = payload.subject"):
         assert decode_at < source.index(consumer), f"{consumer} runs before decoding"
@@ -83,7 +83,7 @@ def test_plain_text_is_passed_through_untouched() -> None:
 
 def test_the_body_is_extracted_before_it_is_truncated() -> None:
     """Truncating first discarded the body: the headers alone exceed 4000 chars."""
-    source = inspect.getsource(integrations)
+    source = inspect.getsource(email_scan)
     assert source.index("payload.text = extract_mime_body") < source.index(
         "anonymize_pii(payload.text)[:4000]"
     )

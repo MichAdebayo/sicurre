@@ -12,19 +12,23 @@ from fastapi import BackgroundTasks, HTTPException
 from starlette.requests import Request
 
 from data_platform.api.auth import AuthUser
-from data_platform.api.routers import integrations
-from data_platform.api.routers.integrations import (
-    CloudflareSetupRequest,
+from data_platform.api.routers import cloudflare_account, email_scan, integrations
+from data_platform.api.routers.cloudflare_account import (
     CloudflareTokenSaveRequest,
-    EmailScanRequest,
-    TeardownRequest,
-    cloudflare_status,
     get_workspace_cloudflare_token,
     save_workspace_cloudflare_token,
+)
+from data_platform.api.routers.email_scan import (
+    EmailScanRequest,
     scan_email,
+    upload_quarantine_content,
+)
+from data_platform.api.routers.integrations import (
+    CloudflareSetupRequest,
+    TeardownRequest,
+    cloudflare_status,
     setup_cloudflare,
     teardown_cloudflare,
-    upload_quarantine_content,
 )
 from data_platform.services.notification_policy import notification_is_allowed
 
@@ -107,8 +111,8 @@ async def test_token_get_is_write_only(monkeypatch) -> None:
             return [{"api_token": "enc:v1:ciphertext"}]
         return [{"api_token": "enc:v1:ciphertext"}]
 
-    monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
-    monkeypatch.setattr(integrations, "_async_query", query)
+    monkeypatch.setattr(cloudflare_account, "ensure_runtime_tables", lambda: None)
+    monkeypatch.setattr(cloudflare_account, "_async_query", query)
 
     response = await get_workspace_cloudflare_token(_user())
     assert response == {"configured": True}
@@ -162,8 +166,8 @@ async def test_token_save_persists_ciphertext(monkeypatch) -> None:
         writes.append((sql, params))
         return []
 
-    monkeypatch.setattr(integrations, "CloudflareProvisioner", Provisioner)
-    monkeypatch.setattr(integrations, "_async_query", query)
+    monkeypatch.setattr(cloudflare_account, "CloudflareProvisioner", Provisioner)
+    monkeypatch.setattr(cloudflare_account, "_async_query", query)
 
     response = await save_workspace_cloudflare_token(
         CloudflareTokenSaveRequest(cf_api_token="cloudflare-secret"),
@@ -219,8 +223,8 @@ async def test_quarantine_mime_upload_is_workspace_scoped_and_idempotent(monkeyp
         },
         receive,
     )
-    monkeypatch.setattr(integrations, "_async_query", query)
-    monkeypatch.setattr(integrations, "build_quarantine_store", lambda _settings: Store())
+    monkeypatch.setattr(email_scan, "_async_query", query)
+    monkeypatch.setattr(email_scan, "build_quarantine_store", lambda _settings: Store())
 
     response = await upload_quarantine_content(
         "item-1",
@@ -269,11 +273,11 @@ async def test_phishing_scan_persists_only_a_redacted_quarantine_preview(monkeyp
             "client": ("127.0.0.1", 4000),
         }
     )
-    monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
-    monkeypatch.setattr(integrations, "_async_query", query)
-    monkeypatch.setattr(integrations, "send_loops_transactional", noop_notification)
+    monkeypatch.setattr(email_scan, "ensure_runtime_tables", lambda: None)
+    monkeypatch.setattr(email_scan, "_async_query", query)
+    monkeypatch.setattr(email_scan, "send_loops_transactional", noop_notification)
     clock = iter((10.0, 10.125))
-    monkeypatch.setattr(integrations, "perf_counter", lambda: next(clock))
+    monkeypatch.setattr(email_scan, "perf_counter", lambda: next(clock))
 
     response = await scan_email(
         request,
@@ -338,9 +342,9 @@ async def test_scan_reports_inference_outage_instead_of_marking_email_safe(monke
             "client": ("127.0.0.1", 4000),
         }
     )
-    monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
-    monkeypatch.setattr(integrations, "_async_query", query)
-    monkeypatch.setattr(integrations.httpx, "AsyncClient", UnavailableClient)
+    monkeypatch.setattr(email_scan, "ensure_runtime_tables", lambda: None)
+    monkeypatch.setattr(email_scan, "_async_query", query)
+    monkeypatch.setattr(email_scan.httpx, "AsyncClient", UnavailableClient)
 
     with pytest.raises(HTTPException) as exc_info:
         await scan_email(

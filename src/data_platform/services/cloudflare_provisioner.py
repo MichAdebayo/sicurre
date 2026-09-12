@@ -26,6 +26,7 @@ from typing import Any
 import httpx
 
 from core.config import get_settings
+from core.secret_cipher import encrypt_secret
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,16 @@ class ProvisioningResult:
 # ---------------------------------------------------------------------------
 def _sha256(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def encrypt_provider_token(token: str) -> str:
+    """Encrypt a Cloudflare token with the configured key before it is stored."""
+    settings = get_settings()
+    return encrypt_secret(
+        token,
+        configured_key=settings.secret_encryption_key,
+        environment=settings.environment,
+    )
 
 
 # ---------------------------------------------------------------------------
