@@ -9,8 +9,10 @@ import httpx
 import pytest
 from fastapi import HTTPException
 
+from data_platform.api import workspace_scope
 from data_platform.api.auth import AuthUser
-from data_platform.api.routers import app_routes
+from data_platform.api.routers import dmarc_reports, threats
+from data_platform.services import runtime_probes
 
 USER = AuthUser(
     id="user-1",
@@ -25,17 +27,17 @@ USER = AuthUser(
 
 def test_component_rollup_uses_worst_status() -> None:
     """The aggregate status preserves the most urgent component condition."""
-    assert app_routes._component_rollup([{"status": "ok"}]) == "ok"
-    assert app_routes._component_rollup([{"status": "unknown"}]) == "unknown"
-    assert app_routes._component_rollup([{"status": "degraded"}]) == "degraded"
-    assert app_routes._component_rollup([{"status": "degraded"}, {"status": "down"}]) == "down"
+    assert runtime_probes.component_rollup([{"status": "ok"}]) == "ok"
+    assert runtime_probes.component_rollup([{"status": "unknown"}]) == "unknown"
+    assert runtime_probes.component_rollup([{"status": "degraded"}]) == "degraded"
+    assert runtime_probes.component_rollup([{"status": "degraded"}, {"status": "down"}]) == "down"
 
 
 @pytest.mark.asyncio
 async def test_inference_probe_requires_configured_url() -> None:
     """An absent classifier URL is reported as a down dependency."""
     async with httpx.AsyncClient() as client:
-        result = await app_routes._probe_inference_runtime(client, None)
+        result = await runtime_probes.probe_inference_runtime(client, None)
 
     assert result == [
         {
@@ -60,7 +62,7 @@ async def test_inference_probe_reports_health_and_readiness() -> None:
         return httpx.Response(status)
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        result = await app_routes._probe_inference_runtime(
+        result = await runtime_probes.probe_inference_runtime(
             client, "https://ml.example/v1/classify", "probe-key"
         )
 
@@ -79,7 +81,7 @@ async def test_inference_probe_reports_network_failure() -> None:
         raise httpx.ConnectError("offline", request=request)
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        result = await app_routes._probe_inference_runtime(
+        result = await runtime_probes.probe_inference_runtime(
             client, "https://ml.example/v1/classify", "probe-key"
         )
 
@@ -95,7 +97,9 @@ async def test_public_app_probe_proves_gateway_auth_boundary() -> None:
         return httpx.Response(200 if request.method == "GET" else 401)
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        result, scan_url = await app_routes._probe_public_app_runtime(client, "https://app.example")
+        result, scan_url = await runtime_probes.probe_public_app_runtime(
+            client, "https://app.example"
+        )
 
     assert scan_url == "https://app.example/v1/email/scan"
     assert [(item["component"], item["status"]) for item in result] == [
@@ -114,7 +118,7 @@ async def test_public_app_probe_uses_private_route_without_changing_worker_url()
         return httpx.Response(200 if request.method == "GET" else 401)
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        result, scan_url = await app_routes._probe_public_app_runtime(
+        result, scan_url = await runtime_probes.probe_public_app_runtime(
             client,
             "https://sicurre.example",
             "http://sicurre-app:5173",
@@ -132,7 +136,7 @@ async def test_public_app_probe_uses_private_route_without_changing_worker_url()
 async def test_public_app_probe_rejects_missing_and_unreachable_runtime() -> None:
     """Missing configuration and connection failures cannot appear healthy."""
     async with httpx.AsyncClient() as client:
-        missing, scan_url = await app_routes._probe_public_app_runtime(client, None)
+        missing, scan_url = await runtime_probes.probe_public_app_runtime(client, None)
     assert missing[0]["status"] == "down"
     assert scan_url is None
 
@@ -140,7 +144,9 @@ async def test_public_app_probe_rejects_missing_and_unreachable_runtime() -> Non
         raise httpx.ConnectError("offline", request=request)
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        unreachable, _ = await app_routes._probe_public_app_runtime(client, "https://app.example")
+        unreachable, _ = await runtime_probes.probe_public_app_runtime(
+            client, "https://app.example"
+        )
     assert [item["status"] for item in unreachable] == ["down", "down"]
 
 
@@ -153,9 +159,9 @@ async def test_cloudflare_probe_handles_absent_and_incomplete_integration(
     async def no_rows(*_: object, **__: object) -> list[dict]:
         return []
 
-    monkeypatch.setattr(app_routes, "_admin_rows", no_rows)
+    monkeypatch.setattr(runtime_probes, "quiet_rows", no_rows)
     async with httpx.AsyncClient() as client:
-        absent = await app_routes._probe_cloudflare_runtime(
+        absent = await runtime_probes.probe_cloudflare_runtime(
             client, expected_scan_url="https://app.example/v1/email/scan"
         )
     assert absent[0]["status"] == "unknown"
@@ -163,9 +169,9 @@ async def test_cloudflare_probe_handles_absent_and_incomplete_integration(
     async def incomplete(*_: object, **__: object) -> list[dict]:
         return [{"zone_name": "example.test", "status": "active"}]
 
-    monkeypatch.setattr(app_routes, "_admin_rows", incomplete)
+    monkeypatch.setattr(runtime_probes, "quiet_rows", incomplete)
     async with httpx.AsyncClient() as client:
-        result = await app_routes._probe_cloudflare_runtime(
+        result = await runtime_probes.probe_cloudflare_runtime(
             client, expected_scan_url="https://app.example/v1/email/scan"
         )
     assert result[0]["status"] == "down"
@@ -212,15 +218,15 @@ async def test_cloudflare_probe_validates_all_runtime_resources(
             json={"result": [{"email": "owner@example.test", "verified": "2026-07-18"}]},
         )
 
-    monkeypatch.setattr(app_routes, "_admin_rows", integration)
+    monkeypatch.setattr(runtime_probes, "quiet_rows", integration)
     monkeypatch.setattr(
-        app_routes,
+        runtime_probes,
         "get_settings",
         lambda: SimpleNamespace(secret_encryption_key="key", environment="production"),
     )
-    monkeypatch.setattr(app_routes, "decrypt_secret", lambda *_, **__: "token")
+    monkeypatch.setattr(runtime_probes, "decrypt_secret", lambda *_, **__: "token")
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        result = await app_routes._probe_cloudflare_runtime(
+        result = await runtime_probes.probe_cloudflare_runtime(
             client, expected_scan_url=expected_scan_url
         )
 
@@ -238,7 +244,7 @@ def test_dmarc_report_rejects_another_domain() -> None:
     </feedback>"""
 
     with pytest.raises(HTTPException) as exc_info:
-        app_routes._parse_dmarc_report(payload, "example.test")
+        dmarc_reports._parse_dmarc_report(payload, "example.test")
 
     assert exc_info.value.status_code == 400
     assert "does not match" in str(exc_info.value.detail)
@@ -266,14 +272,17 @@ async def test_kpis_aggregate_each_class_for_current_workspace(
             {"label_verdict": "legitimate", "cnt": 4},
         ]
 
-    monkeypatch.setattr(app_routes, "_workspace_threat_count", threat_count)
-    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+    monkeypatch.setattr(workspace_scope, "workspace_threat_count", threat_count)
+
+    monkeypatch.setattr(threats, "workspace_threat_count", threat_count)
+    monkeypatch.setattr(threats, "execute_runtime_query", query)
+    monkeypatch.setattr(workspace_scope, "execute_runtime_query", query)
 
     async def allow_domain(_domain: str, _workspace_id: str) -> None:
         return None
 
-    monkeypatch.setattr(app_routes, "_require_workspace_domain", allow_domain)
-    result = await app_routes.get_kpis("example.test", object(), USER)  # type: ignore[arg-type]
+    monkeypatch.setattr(workspace_scope, "require_workspace_domain", allow_domain)
+    result = await threats.get_kpis("example.test", object(), USER)  # type: ignore[arg-type]
 
     assert result["raw_records_count"] == 10
     assert result["threats_phishing_count"] == 3
@@ -323,14 +332,16 @@ async def test_threat_list_masks_non_threat_content(
             },
         ]
 
-    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+    monkeypatch.setattr(threats, "execute_runtime_query", query)
+
+    monkeypatch.setattr(workspace_scope, "execute_runtime_query", query)
 
     async def allow_domain(_domain: str, _workspace_id: str) -> None:
         return None
 
-    monkeypatch.setattr(app_routes, "_require_workspace_domain", allow_domain)
+    monkeypatch.setattr(workspace_scope, "require_workspace_domain", allow_domain)
 
-    result = await app_routes.get_threats("example.test", USER)
+    result = await threats.get_threats("example.test", USER)
 
     assert result["items"][0]["subject"] == "[Masqué par Sicurre]"
     assert result["items"][0]["status"] == "active"
@@ -358,19 +369,19 @@ async def test_cloudflare_probe_reports_undecryptable_credential(
             }
         ]
 
-    monkeypatch.setattr(app_routes, "_admin_rows", integration)
+    monkeypatch.setattr(runtime_probes, "quiet_rows", integration)
     monkeypatch.setattr(
-        app_routes,
+        runtime_probes,
         "get_settings",
         lambda: SimpleNamespace(secret_encryption_key="key", environment="production"),
     )
     monkeypatch.setattr(
-        app_routes,
+        runtime_probes,
         "decrypt_secret",
         lambda *_, **__: (_ for _ in ()).throw(ValueError("bad key")),
     )
     async with httpx.AsyncClient() as client:
-        result = await app_routes._probe_cloudflare_runtime(
+        result = await runtime_probes.probe_cloudflare_runtime(
             client, expected_scan_url="https://app.example/v1/email/scan"
         )
 
@@ -424,15 +435,15 @@ async def test_cloudflare_probe_distinguishes_email_sending_failures(
             )
         return httpx.Response(status_code, json=payload)
 
-    monkeypatch.setattr(app_routes, "_admin_rows", integration)
+    monkeypatch.setattr(runtime_probes, "quiet_rows", integration)
     monkeypatch.setattr(
-        app_routes,
+        runtime_probes,
         "get_settings",
         lambda: SimpleNamespace(secret_encryption_key="key", environment="production"),
     )
-    monkeypatch.setattr(app_routes, "decrypt_secret", lambda *_, **__: "token")
+    monkeypatch.setattr(runtime_probes, "decrypt_secret", lambda *_, **__: "token")
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        result = await app_routes._probe_cloudflare_runtime(
+        result = await runtime_probes.probe_cloudflare_runtime(
             client, expected_scan_url=expected_scan_url
         )
 
@@ -475,15 +486,15 @@ async def test_cloudflare_probe_handles_email_sending_probe_exception(
             )
         raise httpx.ConnectError("sending API offline", request=request)
 
-    monkeypatch.setattr(app_routes, "_admin_rows", integration)
+    monkeypatch.setattr(runtime_probes, "quiet_rows", integration)
     monkeypatch.setattr(
-        app_routes,
+        runtime_probes,
         "get_settings",
         lambda: SimpleNamespace(secret_encryption_key="key", environment="production"),
     )
-    monkeypatch.setattr(app_routes, "decrypt_secret", lambda *_, **__: "token")
+    monkeypatch.setattr(runtime_probes, "decrypt_secret", lambda *_, **__: "token")
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        result = await app_routes._probe_cloudflare_runtime(
+        result = await runtime_probes.probe_cloudflare_runtime(
             client, expected_scan_url=expected_scan_url
         )
 
@@ -514,16 +525,16 @@ def test_quarantine_storage_runtime_status(
         quarantine_storage_backend=backend,
         quarantine_r2_bucket_name="private-quarantine",
     )
-    monkeypatch.setattr(app_routes, "get_settings", lambda: settings)
+    monkeypatch.setattr(runtime_probes, "get_settings", lambda: settings)
 
     def build(_: object) -> object:
         if factory_error:
             raise factory_error
         return object()
 
-    monkeypatch.setattr(app_routes, "build_quarantine_store", build)
+    monkeypatch.setattr(runtime_probes, "build_quarantine_store", build)
 
-    assert app_routes._quarantine_storage_status()["status"] == expected
+    assert runtime_probes.quarantine_storage_status()["status"] == expected
 
 
 @pytest.mark.asyncio
@@ -536,7 +547,7 @@ async def test_contract_probe_catches_the_incident_06_condition() -> None:
         return httpx.Response(200)
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        result = await app_routes._probe_inference_runtime(
+        result = await runtime_probes.probe_inference_runtime(
             client, "https://ml.example/v1/classify", "wrong-key"
         )
 
@@ -544,7 +555,7 @@ async def test_contract_probe_catches_the_incident_06_condition() -> None:
     assert statuses["inference_health"] == "ok"
     assert statuses["inference_ready"] == "ok"
     assert statuses["inference_contract"] == "down"
-    assert app_routes._component_rollup(result) == "down"
+    assert runtime_probes.component_rollup(result) == "down"
 
 
 @pytest.mark.asyncio
@@ -557,7 +568,7 @@ async def test_contract_probe_reports_a_missing_key_without_calling_out() -> Non
         return httpx.Response(200)
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        result = await app_routes._probe_inference_contract(
+        result = await runtime_probes.probe_inference_contract(
             client, "https://ml.example/v1/classify", None
         )
 
@@ -574,7 +585,7 @@ async def test_contract_probe_rejects_a_verdictless_success() -> None:
         return httpx.Response(200, json={"detail": "accepted"})
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        result = await app_routes._probe_inference_contract(
+        result = await runtime_probes.probe_inference_contract(
             client, "https://ml.example/v1/classify", "probe-key"
         )
 
@@ -592,7 +603,7 @@ async def test_contract_probe_never_sends_client_content_or_leaks_the_key() -> N
         return httpx.Response(200, json={"verdict": "legitimate"})
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        result = await app_routes._probe_inference_contract(
+        result = await runtime_probes.probe_inference_contract(
             client, "https://ml.example/v1/classify", "super-secret-key"
         )
 
@@ -611,7 +622,7 @@ async def test_contract_probe_degrades_on_an_unexpected_status() -> None:
         return httpx.Response(500)
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        result = await app_routes._probe_inference_contract(
+        result = await runtime_probes.probe_inference_contract(
             client, "https://ml.example/v1/classify", "probe-key"
         )
 
@@ -627,7 +638,7 @@ async def test_contract_probe_survives_a_non_json_success() -> None:
         return httpx.Response(200, content=b"<html>not json</html>")
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        result = await app_routes._probe_inference_contract(
+        result = await runtime_probes.probe_inference_contract(
             client, "https://ml.example/v1/classify", "probe-key"
         )
 

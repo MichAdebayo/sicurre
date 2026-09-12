@@ -4,8 +4,8 @@ from collections.abc import Callable
 
 import pytest
 
-from data_platform.api.routers import app_routes
-from data_platform.api.routers.app_routes import (
+from data_platform.api.routers import domain_shield
+from data_platform.api.routers.domain_shield import (
     _check_domain_blacklists,
     _classify_blocklist_response,
 )
@@ -81,7 +81,7 @@ async def test_blocklist_check_separates_listings_and_access_errors(
             return ["127.255.255.254"]
         return ["127.0.0.126"]
 
-    monkeypatch.setattr(app_routes.asyncio, "to_thread", direct_call)
+    monkeypatch.setattr(domain_shield.asyncio, "to_thread", direct_call)
     monkeypatch.setattr("dns.resolver.resolve", resolve)
 
     listed, unavailable = await _check_domain_blacklists("vinse.app")
@@ -102,7 +102,7 @@ async def test_blocklist_resolution_failures_are_not_listings(
     def unavailable(_hostname: str, _record_type: str) -> list[str]:
         raise RuntimeError("resolver unavailable")
 
-    monkeypatch.setattr(app_routes.asyncio, "to_thread", direct_call)
+    monkeypatch.setattr(domain_shield.asyncio, "to_thread", direct_call)
     monkeypatch.setattr("dns.resolver.resolve", unavailable)
 
     assert await _check_domain_blacklists("vinse.app") == ([], [])
@@ -128,7 +128,7 @@ async def test_dqs_key_routes_spamhaus_through_authenticated_endpoint(
             raise RuntimeError("NXDOMAIN")
         return []
 
-    monkeypatch.setattr(app_routes.asyncio, "to_thread", direct_call)
+    monkeypatch.setattr(domain_shield.asyncio, "to_thread", direct_call)
     monkeypatch.setattr("dns.resolver.resolve", resolve)
 
     await _check_domain_blacklists("example.com", dqs_key="synthetic-fixture")
@@ -157,12 +157,10 @@ async def test_dqs_result_is_not_hidden_by_optional_surbl_refusal(
             raise RuntimeError("NXDOMAIN")
         return ["127.0.0.1"]
 
-    monkeypatch.setattr(app_routes.asyncio, "to_thread", direct_call)
+    monkeypatch.setattr(domain_shield.asyncio, "to_thread", direct_call)
     monkeypatch.setattr("dns.resolver.resolve", resolve)
 
-    assert await _check_domain_blacklists(
-        "example.com", dqs_key="synthetic-fixture"
-    ) == ([], [])
+    assert await _check_domain_blacklists("example.com", dqs_key="synthetic-fixture") == ([], [])
 
 
 @pytest.mark.asyncio
@@ -180,7 +178,7 @@ async def test_without_dqs_key_uses_free_spamhaus_mirror(
         queried_hosts.append(hostname)
         raise RuntimeError("NXDOMAIN")
 
-    monkeypatch.setattr(app_routes.asyncio, "to_thread", direct_call)
+    monkeypatch.setattr(domain_shield.asyncio, "to_thread", direct_call)
     monkeypatch.setattr("dns.resolver.resolve", resolve)
 
     await _check_domain_blacklists("example.com")

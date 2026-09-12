@@ -5,7 +5,7 @@ from __future__ import annotations
 import inspect
 import re
 
-from data_platform.api.routers import app_routes, email_scan
+from data_platform.api.routers import domain_shield, email_scan
 
 #: Retrieved from GET /api/v1/transactional on 4 September 2026.
 THREAT_QUARANTINED = {
@@ -48,7 +48,7 @@ def test_the_renamed_sender_variable_is_not_reintroduced() -> None:
 
 def test_dns_shield_payload_matches_the_template() -> None:
     keys = _data_variable_keys(
-        inspect.getsource(app_routes), "loops_dns_shield_alert_transaction_id"
+        inspect.getsource(domain_shield), "loops_dns_shield_alert_transaction_id"
     )
     assert keys == DNS_SHIELD_ALERT, (
         f"payload does not match the Loops template. "

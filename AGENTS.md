@@ -81,9 +81,11 @@ last and is the one that catches migration and boot failures; wait for it.
 - Python 3.11+, typed, `async def` for handlers and I/O, `httpx.AsyncClient`,
   Pydantic v2 schemas, settings through `pydantic-settings`, no `os.environ` in
   business logic.
-- Small functions, one responsibility per module, no god-files. `app_routes.py`
-  and the setup route in `integrations.py`, under `src/data_platform/api/routers/`,
-  are the debt, not the model.
+- Small functions, one responsibility per module, no god-files. The routers
+  under `src/data_platform/api/routers/` are split by concern (session, threats,
+  quarantine, alerts, domain shield, DMARC reports, admin, operational
+  exercises, integrations, email scan, cloudflare account); the setup route in
+  `integrations.py` is the remaining debt.
 - **Docstrings state the contract**: what it does, arguments, return, errors.
   Rationale goes to an ADR or the commit message; incident narrative goes to
   `docs/certification/incidents/`; measurements go to a dated report. A

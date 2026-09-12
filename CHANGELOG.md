@@ -21,6 +21,16 @@ version.
   idempotent replies, rule matching, notification opt-out and failure paths,
   the MIME custody refusals, the token check refusals, the record helpers and
   the auto-configuration write path.
+- `routers/app_routes.py` is gone. Its 2,700 lines are now one module per
+  concern: `session`, `threats`, `quarantine`, `alerts`, `domain_shield`,
+  `dmarc_reports`, `admin` and `operational_exercises` under `routers/`, the
+  admin health probes in `services/runtime_probes.py`, and the workspace
+  ownership checks in `api/workspace_scope.py`. The connected-domain list joins
+  `routers/integrations.py` and is now tagged `integrations` in the OpenAPI
+  contract; every other route keeps its path, schema, tag and operation id. Tests were written first for the branches that had none: profile update,
+  threat status and feedback failures, the admin overview and health page,
+  exercise refusals, every quarantine release refusal, the Domain Shield
+  refresh and the DMARC report helpers.
 
 ## [1.33.1] - 2026-09-12
 
