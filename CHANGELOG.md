@@ -10,6 +10,9 @@ the authoritative record. This file summarises the notable changes only.
 Deployed from `main` without a version tag: refactor commits do not bump the
 version.
 
+- The deploy prunes every unused image, not only dangling ones. SHA-tagged
+  images from earlier deploys had filled the 75 GB host disk and blocked a
+  deploy at the config copy step.
 - The Cloudflare router is split by concern. `routers/integrations.py` keeps
   connect, status and disconnect; `routers/email_scan.py` holds the two routes
   the Email Worker calls; `routers/cloudflare_account.py` holds the domain
