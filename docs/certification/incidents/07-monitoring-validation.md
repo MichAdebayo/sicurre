@@ -163,6 +163,25 @@ synthetic rules now fire on their first true evaluation, in their own 30 s
 evaluation group, with a 10 s route wait; the scrape interval stays at 60 s
 (Grafana Cloud free tier accepts one data point per minute per series). The
 expected delay is between 10 s and 1 min 40 s, about one minute typically.
-Real alert rules keep their thresholds. The run recorded after the change
-follows below.
+Real alert rules keep their thresholds.
+
+### Run after the change, 12 September 2026 (UTC)
+
+A full-length (240 s) high-latency exercise, started from `/admin` at
+22:29 UTC and left to expire on its own:
+
+| Observation | Time | Source |
+| --- | --- | --- |
+| Signal first scraped at 1 | 22:29:43 | Prometheus |
+| Rule Normal to Alerting | 22:29:50 | Grafana rule state history |
+| Firing email received | 22:30:04 | Gmail internal timestamp |
+| Signal back to 0 (automatic expiry) | 22:33:43 | Prometheus |
+| Rule Alerting to Normal | 22:33:50 | Grafana rule state history |
+| Resolved email received | 22:34:04 | Gmail internal timestamp |
+
+Click to firing email: under 20 seconds this time (the scrape landed just
+after the click; the envelope is 10 s to 1 min 40 s). Signal drop to resolved
+email: 21 seconds. Subjects `[FIRING] Sicurre high latency (synthetic test)`
+and `[RESOLVED] Sicurre high latency (synthetic test)`, receipt identifiers
+`1a097be06d562e91` and `1a097c1ae93bf50c`. No customer traffic was affected.
 
