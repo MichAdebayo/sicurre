@@ -25,7 +25,6 @@ class Settings(BaseSettings):
     environment: str = "dev"
     database_url: str = _DEFAULT_DB_URL
     data_platform_database_url: str = _DEFAULT_DB_URL
-    app_neon_database_url: str | None = None
     database_echo: bool = False
     database_historical_cron_total_count: int = 0
     database_historical_cron_max_total_count: int = 1000
