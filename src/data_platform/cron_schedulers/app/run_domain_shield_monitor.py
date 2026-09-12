@@ -6,7 +6,7 @@ import asyncio
 import logging
 
 from data_platform.api.auth import AuthUser, async_query
-from data_platform.api.routers.app_routes import check_domain_shield_status
+from data_platform.api.routers.domain_shield import check_domain_shield_status
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)

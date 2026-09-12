@@ -28,13 +28,24 @@ from core.inference_client import close_inference_client
 from core.provider_credentials import encrypt_legacy_provider_credentials
 from core.rate_limit import limiter
 from data_platform.api.routers import router as data_platform_router
-from data_platform.api.routers.app_routes import router as app_routes_router
-from data_platform.api.routers.app_routes import synchronize_operational_exercises
+from data_platform.api.routers.admin import router as admin_router
+from data_platform.api.routers.alerts import router as alerts_router
 from data_platform.api.routers.cloudflare_account import router as cloudflare_account_router
+from data_platform.api.routers.dmarc_reports import router as dmarc_reports_router
+from data_platform.api.routers.domain_shield import router as domain_shield_router
 from data_platform.api.routers.email_scan import router as email_scan_router
 from data_platform.api.routers.integrations import router as integrations_router
 from data_platform.api.routers.internal import router as internal_router
+from data_platform.api.routers.operational_exercises import (
+    router as operational_exercises_router,
+)
+from data_platform.api.routers.operational_exercises import (
+    synchronize_operational_exercises,
+)
+from data_platform.api.routers.quarantine import router as quarantine_router
 from data_platform.api.routers.reported_email import router as reported_email_router
+from data_platform.api.routers.session import router as session_router
+from data_platform.api.routers.threats import router as threats_router
 from data_platform.api.schemas.integration_responses import (
     HealthResponse,
     ReadinessResponse,
@@ -178,7 +189,14 @@ def create_app() -> FastAPI:
 
     app.include_router(data_platform_router)
     app.include_router(internal_router)
-    app.include_router(app_routes_router)
+    app.include_router(session_router)
+    app.include_router(threats_router)
+    app.include_router(quarantine_router)
+    app.include_router(alerts_router)
+    app.include_router(domain_shield_router)
+    app.include_router(dmarc_reports_router)
+    app.include_router(admin_router)
+    app.include_router(operational_exercises_router)
     app.include_router(integrations_router)
     app.include_router(email_scan_router)
     app.include_router(cloudflare_account_router)

@@ -6,8 +6,9 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi import HTTPException
 
+from data_platform.api import workspace_scope
 from data_platform.api.auth import AuthUser
-from data_platform.api.routers import app_routes
+from data_platform.api.routers import alerts, dmarc_reports, quarantine, session, threats
 
 
 def _user(platform_admin: bool) -> AuthUser:
@@ -38,10 +39,12 @@ async def test_admin_and_customer_use_the_same_workspace_onboarding(
     """Admin capability is retained without exempting a new workspace from setup."""
     count = AsyncMock(return_value=threat_count)
     connected = AsyncMock(return_value=has_integration)
-    monkeypatch.setattr(app_routes, "_workspace_threat_count", count)
-    monkeypatch.setattr(app_routes, "_workspace_has_cloudflare_integration", connected)
+    monkeypatch.setattr(workspace_scope, "workspace_threat_count", count)
+    monkeypatch.setattr(session, "workspace_threat_count", count)
+    monkeypatch.setattr(workspace_scope, "workspace_has_cloudflare_integration", connected)
+    monkeypatch.setattr(session, "workspace_has_cloudflare_integration", connected)
 
-    result = await app_routes.get_session(_user(platform_admin))
+    result = await session.get_session(_user(platform_admin))
 
     assert result["onboarding_required"] is onboarding
     assert result["is_platform_admin"] is platform_admin
@@ -56,11 +59,11 @@ async def test_admin_and_customer_use_the_same_workspace_onboarding(
 @pytest.mark.parametrize(
     "endpoint",
     [
-        app_routes.get_threats,
-        app_routes.list_quarantine,
-        app_routes.list_alert_history,
-        app_routes.get_alert_preferences,
-        app_routes.get_dmarc_report_summary,
+        threats.get_threats,
+        quarantine.list_quarantine,
+        alerts.list_alert_history,
+        alerts.get_alert_preferences,
+        dmarc_reports.get_dmarc_report_summary,
     ],
 )
 async def test_customer_routes_reject_foreign_domains_even_for_platform_admins(
@@ -68,7 +71,7 @@ async def test_customer_routes_reject_foreign_domains_even_for_platform_admins(
 ) -> None:
     """The actual domain ownership check applies before accessing any mailbox data."""
     query = AsyncMock(return_value=[])
-    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+    monkeypatch.setattr(workspace_scope, "execute_runtime_query", query)
 
     with pytest.raises(HTTPException) as error:
         await endpoint(domain="foreign.test", current_user=_user(platform_admin))
@@ -91,12 +94,15 @@ async def test_admin_customer_kpis_never_include_global_training_data(
             return [{"found": 1}]
         return [{"label_verdict": "legitimate", "cnt": 2}]
 
-    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+    monkeypatch.setattr(threats, "execute_runtime_query", query)
+
+    monkeypatch.setattr(workspace_scope, "execute_runtime_query", query)
     count = AsyncMock(return_value=2)
-    monkeypatch.setattr(app_routes, "_workspace_threat_count", count)
+    monkeypatch.setattr(workspace_scope, "workspace_threat_count", count)
+    monkeypatch.setattr(threats, "workspace_threat_count", count)
     session = AsyncMock()
 
-    result = await app_routes.get_kpis("own.test", session, _user(True))
+    result = await threats.get_kpis("own.test", session, _user(True))
 
     assert result["threats_legitimate_count"] == 2
     assert result["dataset_items_count"] == 0

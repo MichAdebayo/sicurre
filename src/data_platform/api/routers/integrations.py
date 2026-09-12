@@ -827,3 +827,32 @@ async def teardown_cloudflare(
         "zone_name": row["zone_name"],
         "dmarc_reporting_withdrawn": dmarc_reporting_withdrawn,
     }
+
+
+# --------------------------------------------------------------------------- Connected domains
+
+
+@router.get(
+    "/v1/integrations/cloudflare/list",
+    response_model=list[CloudflareIntegrationResponse],
+)
+async def list_cloudflare_integrations(current_user: AuthUser = Depends(get_current_user)):
+    rows = await _async_query(
+        "SELECT * FROM cloudflare_integration WHERE workspace_id = ? ORDER BY created_at DESC",
+        (current_user.workspace_id,),
+    )
+    return [
+        {
+            "id": r["id"],
+            "user_email": r["user_email"],
+            "zone_name": r["zone_name"],
+            "destination_email": r["destination_email"],
+            "worker_name": r["worker_name"],
+            "status": r["status"],
+            "token_configured": bool(r.get("api_token")),
+            "error_message": r.get("error_message") if r["status"] == "error" else None,
+            "created_at": r["created_at"],
+            "updated_at": r["updated_at"],
+        }
+        for r in rows
+    ]

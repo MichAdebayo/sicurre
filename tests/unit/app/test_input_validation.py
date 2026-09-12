@@ -16,16 +16,21 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 from starlette.requests import Request
 
+from data_platform.api import workspace_scope
 from data_platform.api.auth import AuthUser
-from data_platform.api.routers import app_routes, email_scan
-from data_platform.api.routers.app_routes import (
-    FeedbackCreate,
+from data_platform.api.routers import email_scan, threats
+from data_platform.api.routers.alerts import (
     SecurityRuleCreate,
-    StatusUpdate,
-    SupportRequestCreate,
-    UpdateProfileRequest,
 )
 from data_platform.api.routers.email_scan import EmailScanRequest
+from data_platform.api.routers.session import (
+    UpdateProfileRequest,
+)
+from data_platform.api.routers.threats import (
+    FeedbackCreate,
+    StatusUpdate,
+    SupportRequestCreate,
+)
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -480,7 +485,7 @@ class TestStatusUpdateValidation:
     @pytest.mark.asyncio
     async def test_rejects_invalid_status(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """POST /v1/threats/{id}/status rejects invalid status values at the handler level."""
-        from data_platform.api.routers.app_routes import update_threat_status
+        from data_platform.api.routers.threats import update_threat_status
 
         with pytest.raises(HTTPException) as exc_info:
             await update_threat_status(
@@ -509,19 +514,21 @@ class TestSecurityRuleValidation:
 @pytest.mark.asyncio
 async def test_duplicate_feedback_returns_409(monkeypatch: pytest.MonkeyPatch) -> None:
     """POST /v1/feedback returns 409 on duplicate submission."""
-    from data_platform.api.routers.app_routes import create_feedback
+    from data_platform.api.routers.threats import create_feedback
 
     async def query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
         if "INSERT INTO app_feedback" in sql:
             raise Exception("UNIQUE constraint failed: app_feedback.event_id")
         return []
 
-    monkeypatch.setattr(app_routes, "async_query_auth_db", query)
+    monkeypatch.setattr(threats, "execute_runtime_query", query)
+
+    monkeypatch.setattr(workspace_scope, "execute_runtime_query", query)
 
     async def allow_domain(_domain: str, _workspace_id: str) -> None:
         return None
 
-    monkeypatch.setattr(app_routes, "_require_workspace_domain", allow_domain)
+    monkeypatch.setattr(workspace_scope, "require_workspace_domain", allow_domain)
 
     with pytest.raises(HTTPException) as exc_info:
         await create_feedback(
@@ -577,6 +584,7 @@ async def test_scan_email_runs_independent_lookups_concurrently(
         def __init__(self, *args: Any, **kwargs: Any) -> None: ...
         async def __aenter__(self) -> FailingClient:
             return self
+
         async def __aexit__(self, *args: Any) -> None: ...
         async def post(self, *args: Any, **kwargs: Any) -> Any:
             raise httpx.ConnectError("Connection refused")
@@ -594,6 +602,5 @@ async def test_scan_email_runs_independent_lookups_concurrently(
         )
 
     assert max_in_flight >= 3, (
-        f"expected the three independent lookups to overlap, saw at most "
-        f"{max_in_flight} concurrent"
+        f"expected the three independent lookups to overlap, saw at most {max_in_flight} concurrent"
     )

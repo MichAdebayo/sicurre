@@ -16,8 +16,8 @@ from core.config import Settings, get_settings
 from core.rate_limit import limiter
 from data_platform.api.auth import AuthUser, get_current_user
 from data_platform.api.auth import async_query as auth_query
-from data_platform.api.routers.app_routes import (
-    _extract_dmarc_xml_payload,
+from data_platform.api.routers.dmarc_reports import (
+    extract_dmarc_xml_payload,
     persist_dmarc_report,
 )
 from data_platform.api.schemas.app_responses import DmarcImportResponse
@@ -52,7 +52,7 @@ def _dmarc_attachment(raw_message: bytes) -> tuple[str, bytes]:
         ):
             continue
         try:
-            xml_payload = _extract_dmarc_xml_payload(payload)
+            xml_payload = extract_dmarc_xml_payload(payload)
             root = ET.fromstring(xml_payload)
         except (HTTPException, ET.ParseError, OSError):
             continue

@@ -4715,7 +4715,7 @@ paths:
       - HTTPBearer: []
       summary: List Cloudflare Integrations
       tags:
-      - app-ui-flows
+      - integrations
   /v1/integrations/cloudflare/preview:
     post:
       description: 'Describe a domain from public DNS, before the customer creates a token.
