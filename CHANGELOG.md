@@ -16,6 +16,11 @@ version.
   animation tests; the handlers are now read through a ref.
 - The front files that had no test have one: 105 new Vitest tests, whole-tree
   line coverage from 44% to 64%.
+- A CD dispatch that names an image tag is now a rollback: the build job is
+  skipped, the deploy job verifies the four images exist in GHCR under that tag
+  before touching the host, and the tag and registry owner come from the
+  release job. Before this, a tagged dispatch rebuilt the current source and
+  pushed it under the requested tag.
 - The deploy prunes every unused image, not only dangling ones. SHA-tagged
   images from earlier deploys had filled the 75 GB host disk and blocked a
   deploy at the config copy step.
