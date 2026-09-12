@@ -221,10 +221,10 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
 
       {/* Domain Status Alert Banner for Disconnected or New Workspaces */}
       {!hasActiveDomain && totalScans > 0 && (
-        <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+        <div className="bg-warning-bg border border-warning/25 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
           <div className="flex items-start gap-3.5">
-            <div className="p-2 bg-amber-500/15 rounded-lg shrink-0 mt-0.5">
-              <AlertTriangle className="w-5 h-5 text-amber-600" />
+            <div className="p-2 bg-warning/15 rounded-lg shrink-0 mt-0.5">
+              <AlertTriangle className="w-5 h-5 text-warning" />
             </div>
             <div>
               <h3 className="font-bold text-sm text-on-surface">
@@ -238,7 +238,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
           <Button
             onClick={() => onGoToSettings("domains")}
             size="sm"
-            className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shrink-0 cursor-pointer h-9 px-4 rounded-lg shadow-sm"
+            className="bg-warning hover:brightness-95 text-on-warning font-bold text-xs shrink-0 cursor-pointer h-9 px-4 rounded-lg shadow-sm"
           >
             {t("dashboard.reconnect_domain")}
           </Button>
@@ -472,7 +472,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                 </span>
               ) : (
                 <span className="relative flex h-2.5 w-2.5">
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-warning" />
                 </span>
               )}
               {/* Text size increased to match Live Feed titles */}
@@ -480,7 +480,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                 {t("dashboard.recent_scans")}
               </h3>
             </div>
-            <div className={`inline-flex items-center gap-2 text-[12px] font-bold ${hasActiveDomain ? "text-primary" : "text-amber-600"}`}>
+            <div className={`inline-flex items-center gap-2 text-[12px] font-bold ${hasActiveDomain ? "text-primary" : "text-warning"}`}>
               <Mail className="w-4 h-4" />
               <span>
                 {hasActiveDomain
