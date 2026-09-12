@@ -118,7 +118,7 @@ async def get_operational_exercises(current_user: AuthUser = Depends(get_current
     response_model=OperationalExerciseResponse,
     response_model_exclude_unset=True,
 )
-@limiter.limit("2/hour")
+@limiter.limit("10/hour")
 async def start_operational_exercise(
     request: Request,
     payload: OperationalExerciseCreate,
@@ -184,7 +184,7 @@ async def start_operational_exercise(
     response_model=OperationalExerciseResponse,
     response_model_exclude_unset=True,
 )
-@limiter.limit("6/hour")
+@limiter.limit("12/hour")
 async def recover_operational_exercise(
     request: Request,
     exercise_id: str,

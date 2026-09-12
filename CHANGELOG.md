@@ -16,6 +16,16 @@ version.
   animation tests; the handlers are now read through a ref.
 - The front files that had no test have one: 105 new Vitest tests, whole-tree
   line coverage from 44% to 64%.
+- Starting a synthetic exercise is limited to 10 per hour (was 2), stopping
+  one to 12 per hour (was 6), so a rehearsal plus the defence no longer trips
+  the limit. The admin panel names the limit when it is hit instead of the
+  generic failure sentence, and a failed action no longer stays on screen
+  when the confirmation is opened again.
+- The Application Health dashboard says what its request stat means. "Live
+  Request Rate" is now "Request Rate (last 5 minutes, now)", with three
+  decimals, and a new "Requests in Selected Range" stat counts user requests
+  over the time range picked at the top of the dashboard, the number that
+  belongs next to the seven-day traffic graph.
 - The synthetic operational exercises alert within about a minute of the click
   instead of one and a half to four. The three synthetic rules fire on their
   first true evaluation (no pending period), evaluate in their own 30 s group,

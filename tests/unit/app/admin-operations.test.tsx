@@ -51,8 +51,8 @@ vi.mock("../../../src/app/lib/api", () => ({
     isError: mocks.error,
     refetch: mocks.refetch,
   }),
-  useStartOperationalExercise: () => ({ mutate: mocks.start, isPending: mocks.pending, isError: false, error: null }),
-  useRecoverOperationalExercise: () => ({ mutate: mocks.recover, isPending: false, isError: false, error: null }),
+  useStartOperationalExercise: () => ({ mutate: mocks.start, reset: vi.fn(), isPending: mocks.pending, isError: false, error: null }),
+  useRecoverOperationalExercise: () => ({ mutate: mocks.recover, reset: vi.fn(), isPending: false, isError: false, error: null }),
 }));
 
 afterEach(() => {
