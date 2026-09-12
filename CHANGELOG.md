@@ -16,6 +16,11 @@ version.
   animation tests; the handlers are now read through a ref.
 - The front files that had no test have one: 105 new Vitest tests, whole-tree
   line coverage from 44% to 64%.
+- The Application Health dashboard says what its request stat means. "Live
+  Request Rate" is now "Request Rate (last 5 minutes, now)", with three
+  decimals, and a new "Requests in Selected Range" stat counts user requests
+  over the time range picked at the top of the dashboard, the number that
+  belongs next to the seven-day traffic graph.
 - The synthetic operational exercises alert within about a minute of the click
   instead of one and a half to four. The three synthetic rules fire on their
   first true evaluation (no pending period), evaluate in their own 30 s group,

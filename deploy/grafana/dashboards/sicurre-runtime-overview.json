@@ -84,7 +84,7 @@
       },
       "gridPos": {
         "h": 5,
-        "w": 6,
+        "w": 4,
         "x": 0,
         "y": 4
       },
@@ -142,21 +142,21 @@
     {
       "id": 2,
       "type": "stat",
-      "title": "Live Request Rate",
+      "title": "Request Rate (last 5 minutes, now)",
       "datasource": {
         "type": "prometheus",
         "uid": "${prometheus}"
       },
       "gridPos": {
         "h": 5,
-        "w": 6,
-        "x": 6,
+        "w": 5,
+        "x": 4,
         "y": 4
       },
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
-          "decimals": 2,
+          "decimals": 3,
           "color": {
             "mode": "thresholds"
           }
@@ -179,6 +179,50 @@
           "expr": "sum(rate(sicurre_app_gateway_requests_total{route=~\"app|api|auth\"}[5m]))",
           "refId": "A"
         }
+      ],
+      "description": "Average user requests per second over the five minutes before now. A stat keeps the last value, so this does not follow the time picker; the graph below does."
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "Requests in Selected Range",
+      "description": "User requests (app, API, auth) counted over the time range selected at the top of the dashboard. Health probes, metrics scrapes and static assets are excluded.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${prometheus}"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 5,
+        "x": 9,
+        "y": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(sicurre_app_gateway_requests_total{route=~\"app|api|auth\"}[$__range]))",
+          "refId": "A"
+        }
       ]
     },
     {
@@ -192,8 +236,8 @@
       },
       "gridPos": {
         "h": 5,
-        "w": 6,
-        "x": 12,
+        "w": 5,
+        "x": 14,
         "y": 4
       },
       "fieldConfig": {
@@ -248,8 +292,8 @@
       },
       "gridPos": {
         "h": 5,
-        "w": 6,
-        "x": 18,
+        "w": 5,
+        "x": 19,
         "y": 4
       },
       "fieldConfig": {
