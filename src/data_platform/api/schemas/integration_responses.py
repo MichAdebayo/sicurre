@@ -69,6 +69,26 @@ class CloudflareDnsPlan(ApiResponse):
     dkim_present: bool
 
 
+class CloudflareDomainPreviewResponse(ApiResponse):
+    """What public DNS says about a domain, before any token exists.
+
+    ``plan`` is derived from the same merge the write path uses, read from the
+    public records rather than the zone API, so it is indicative: the token
+    verification that follows reads the zone itself.
+    """
+
+    zone_name: str
+    resolvable: bool
+    on_cloudflare: bool
+    nameservers: list[str] = Field(default_factory=list)
+    mail_provider: Literal["cloudflare", "other", "none"]
+    mx_hosts: list[str] = Field(default_factory=list)
+    plan: CloudflareDnsPlan | None = None
+    dmarc_policy: Literal["reject", "quarantine", "none"] | None = None
+    dmarc_reporting: bool = False
+    source: Literal["public_dns"] = "public_dns"
+
+
 class CloudflareTokenVerificationResponse(ApiResponse):
     """Cloudflare token and zone-access validation result."""
 

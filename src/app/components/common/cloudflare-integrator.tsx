@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
 
 import type { CloudflareDnsPlan } from "../../lib/api";
@@ -22,15 +22,16 @@ import {
   Eye,
   EyeOff,
   Zap,
-  HelpCircle,
 } from "lucide-react";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import {
   useCloudflareStatus,
+  usePreviewCloudflareDomain,
   useVerifyCloudflareToken,
   useSetupCloudflare,
   useTeardownCloudflare,
+  type CloudflareDomainPreview,
   type CloudflareStatus,
 } from "../../lib/api";
 
@@ -123,7 +124,11 @@ function integrationStages(
 export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegratorProps) {
   const { t } = useTranslation();
   const { data: cfStatus, isLoading: statusLoading, refetch } = useCloudflareStatus();
+  const previewMutation = usePreviewCloudflareDomain();
   const verifyMutation = useVerifyCloudflareToken();
+  // Step one reads public DNS with nothing but the domain name.
+  const [preview, setPreview] = useState<CloudflareDomainPreview | null>(null);
+  const [previewError, setPreviewError] = useState("");
   // What connecting would change on their zone, read before anything is
   // written. Held so the customer sees it and can decline a record without
   // declining the integration.
@@ -212,6 +217,26 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
     } catch (err: any) {
       setVerifyError(formatCloudflareError(t, err?.message));
     }
+  };
+
+  /** Step zero: describe the domain from public DNS. Needs no token, writes nothing. */
+  const handlePreview = async () => {
+    const zone = zoneName.trim();
+    if (!zone) return;
+    setPreviewError("");
+    try {
+      setPreview(await previewMutation.mutateAsync({ zone_name: zone }));
+    } catch (err: any) {
+      setPreviewError(formatCloudflareError(t, err?.message));
+    }
+  };
+
+  const resetDomain = () => {
+    setPreview(null);
+    setPreviewError("");
+    setDnsPlan(null);
+    setVerifyError("");
+    setCfToken("");
   };
 
   /** Step two: provision, carrying whatever the customer left ticked. */
@@ -538,102 +563,179 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
   }
 
   // ── WIZARD / INPUT FORM STATE (not_configured) ─────────────────────────────
+  // Domain first, read from public DNS. The token is only asked for once the
+  // domain is on Cloudflare and its mail is not served elsewhere.
+  const canConnect =
+    !!preview && preview.resolvable && preview.on_cloudflare && preview.mail_provider !== "other";
   const isFormValid = cfToken.trim() !== "" && zoneName.trim() !== "";
+  const badge = (tone: "ok" | "warn" | "bad", text: string) => (
+    <span
+      className={
+        tone === "ok"
+          ? "inline-flex items-center gap-1 rounded border border-safe/25 bg-safe-bg px-2 py-0.5 text-[11px] font-bold text-safe"
+          : tone === "warn"
+            ? "inline-flex items-center gap-1 rounded border border-warning/25 bg-warning-bg px-2 py-0.5 text-[11px] font-bold text-warning"
+            : "inline-flex items-center gap-1 rounded border border-error/20 bg-error/[0.04] px-2 py-0.5 text-[11px] font-bold text-error"
+      }
+    >
+      {text}
+    </span>
+  );
 
   return (
     <MotionDiv initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-      <div className="bg-surface-low/30 border border-border-subtle rounded-xl p-5 space-y-4">
-        <div className="flex items-center gap-2 relative">
-          <h4 className="font-display font-semibold text-[15px] text-on-surface">{t("cloudflare.configure")}</h4>
-          <div
-            className="relative inline-block"
-            onMouseEnter={() => setShowHelp(true)}
-            onMouseLeave={() => setShowHelp(false)}
-          >
+      <section aria-labelledby="cf-step-domain" className="bg-surface-low/30 border border-border-subtle rounded-xl p-5 space-y-4">
+        <h4 id="cf-step-domain" className="font-display font-semibold text-[15px] text-on-surface">
+          {t("cloudflare.step_domain_title")}
+        </h4>
+        <ul className="space-y-1 text-xs text-on-surface-variant">
+          <li>{t("cloudflare.step_domain_need")}</li>
+          <li>{t("cloudflare.step_domain_do")}</li>
+        </ul>
+        <Input
+          label={t("cloudflare.domain")}
+          type="text"
+          value={zoneName}
+          disabled={!!preview}
+          onChange={e => { setZoneName(e.target.value.trim().toLowerCase()); setDnsPlan(null); setPreview(null); setPreviewError(""); setVerifyError(""); }}
+          placeholder={t("cloudflare.domain_placeholder")}
+        />
+        {previewError && (
+          <p role="alert" className="text-xs font-semibold text-error">{previewError}</p>
+        )}
+        {!preview ? (
+          <div className="flex justify-end">
+            <Button
+              onClick={handlePreview}
+              disabled={!zoneName.trim() || previewMutation.isPending}
+              className="w-full sm:w-auto text-xs font-bold cursor-pointer"
+            >
+              {previewMutation.isPending ? t("cloudflare.checking") : t("cloudflare.check_domain")}
+            </Button>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-border-subtle bg-surface-low p-3.5 space-y-2.5 text-xs">
+            {!preview.resolvable ? (
+              <p role="alert" className="font-semibold text-error">{t("cloudflare.preview_unresolvable")}</p>
+            ) : (
+              <>
+                <div className="flex items-start justify-between gap-2 font-semibold">
+                  <span className="min-w-0 text-on-surface">
+                    {preview.on_cloudflare ? t("cloudflare.preview_on_cloudflare") : t("cloudflare.preview_not_on_cloudflare")}
+                  </span>
+                  {preview.on_cloudflare
+                    ? badge("ok", t("cloudflare.plan_keep"))
+                    : badge("bad", t("cloudflare.status_error"))}
+                </div>
+                {preview.on_cloudflare && (
+                  <div className="flex items-start justify-between gap-2 font-semibold">
+                    <span className="min-w-0 text-on-surface">
+                      {preview.mail_provider === "cloudflare"
+                        ? t("cloudflare.preview_mail_cloudflare")
+                        : preview.mail_provider === "none"
+                          ? t("cloudflare.preview_mail_none")
+                          : t("cloudflare.preview_mail_other", { hosts: (preview.mx_hosts ?? []).join(", ") })}
+                    </span>
+                    {preview.mail_provider === "other"
+                      ? badge("bad", t("cloudflare.status_error"))
+                      : badge("ok", t("cloudflare.plan_keep"))}
+                  </div>
+                )}
+                {canConnect && preview.plan && (
+                  <>
+                    <p className="pt-1 text-xs font-bold text-on-surface-variant">{t("cloudflare.preview_records_title")}</p>
+                    {(["spf", "dmarc"] as const).map((record) => (
+                      <div key={record} className="flex items-center justify-between gap-2 font-semibold">
+                        <span className="min-w-0 text-on-surface">{t(`cloudflare.plan_${record}`)}</span>
+                        {badge(preview.plan![record] === "keep" ? "ok" : "warn", t(`cloudflare.plan_${preview.plan![record]}`))}
+                      </div>
+                    ))}
+                    <p className="text-on-surface-variant">
+                      {preview.plan.dkim_present ? t("cloudflare.preview_dkim_present") : t("cloudflare.preview_dkim_absent")}
+                    </p>
+                    <p className="text-[10.5px] font-semibold text-on-surface-variant/80 leading-snug">
+                      {t("cloudflare.preview_source")}
+                    </p>
+                  </>
+                )}
+              </>
+            )}
             <button
               type="button"
-              onClick={() => setShowHelp(v => !v)}
-              className="text-on-surface-variant/50 hover:text-primary transition-colors cursor-help p-0.5 rounded-full hover:bg-surface-low/50 flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              aria-label={t("cloudflare.setup_help")}
+              onClick={resetDomain}
+              className="text-xs font-bold text-primary hover:underline cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
             >
-              <HelpCircle className="w-3.5 h-3.5" />
+              {t("cloudflare.change_domain")}
             </button>
-            <AnimatePresence>
-              {showHelp && (
-                <MotionDiv
-                  initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute left-6 -top-2 z-30 w-72 bg-white border border-border-subtle p-4 rounded-xl shadow-lg text-[11px] text-on-surface-variant/80 space-y-1.5 leading-normal"
-                >
-                  <p className="font-bold text-on-surface">{t("cloudflare.token_help_title")}</p>
-                  <p>1. {t("cloudflare.token_help_prefilled")}</p>
-                  {/* Cloudflare pre-ticks these five from the link, so nobody has
-                      to find them in a dropdown. The list stays visible below:
-                      this asks for write access to someone's DNS, and hiding
-                      what is being granted behind a button would be worse than
-                      the dropdown it replaces. */}
-                  <a
-                    href={cloudflareTokenTemplateUrl(zoneName || undefined)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-1 inline-flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/[0.06] px-2.5 py-1.5 font-semibold text-primary transition-colors hover:bg-primary/[0.12]"
-                  >
-                    {t("cloudflare.token_help_open")} <ExternalLink className="w-3 h-3" />
-                  </a>
-                  <p className="pt-1">2. {t("cloudflare.token_help_copy")}</p>
-                  <p className="pt-1 font-semibold text-on-surface">{t("cloudflare.token_help_grants")}</p>
-                  <ul className="list-disc pl-4 space-y-0.5 font-medium text-on-surface">
-                    {SICURRE_TOKEN_PERMISSIONS.map(({ key, scope, label }) => (
-                      <li key={key}>{scope} › {label} › Edit</li>
-                    ))}
-                  </ul>
-                </MotionDiv>
-              )}
-            </AnimatePresence>
           </div>
-        </div>
+        )}
+      </section>
 
-        <div className="grid grid-cols-1 gap-4 pt-2">
-          <div>
-            <Input
-              label={t("cloudflare.api_token")}
-              type={showToken ? "text" : "password"}
-              value={cfToken}
-              onChange={e => { setCfToken(e.target.value); setDnsPlan(null); setVerifyError(""); }}
-              placeholder={t("cloudflare.api_token_placeholder")}
-              suffix={
-                <button
-                  type="button"
-                  onClick={() => setShowToken(v => !v)}
-                  aria-label={showToken ? t("cloudflare.hide_token") : t("cloudflare.show_token")}
-                  aria-pressed={showToken}
-                  className="rounded text-on-surface-variant/60 hover:text-on-surface transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                >
-                  {showToken ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
-                </button>
-              }
-            />
-          </div>
+      {canConnect && (
+        <section aria-labelledby="cf-step-token" className="bg-surface-low/30 border border-border-subtle rounded-xl p-5 space-y-4">
+          <h4 id="cf-step-token" className="font-display font-semibold text-[15px] text-on-surface">
+            {t("cloudflare.step_token_title")}
+          </h4>
+          <ul className="space-y-1 text-xs text-on-surface-variant">
+            <li>{t("cloudflare.step_token_need")}</li>
+            <li>{t("cloudflare.step_token_do")}</li>
+            <li>{t("cloudflare.step_token_not")}</li>
+          </ul>
+          {/* Cloudflare pre-ticks the five permissions from this link, so the
+              customer names the token, creates it and copies it. */}
+          <a
+            href={cloudflareTokenTemplateUrl(zoneName || undefined)}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/[0.06] px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            {t("cloudflare.token_help_open")} <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+          </a>
+          <p className="text-xs text-on-surface-variant">{t("cloudflare.token_help_prefilled")}</p>
+          <p className="text-xs text-on-surface-variant">{t("cloudflare.token_help_copy")}</p>
+          <Input
+            label={t("cloudflare.api_token")}
+            type={showToken ? "text" : "password"}
+            value={cfToken}
+            onChange={e => { setCfToken(e.target.value); setDnsPlan(null); setVerifyError(""); }}
+            placeholder={t("cloudflare.api_token_placeholder")}
+            suffix={
+              <button
+                type="button"
+                onClick={() => setShowToken(v => !v)}
+                aria-label={showToken ? t("cloudflare.hide_token") : t("cloudflare.show_token")}
+                aria-pressed={showToken}
+                className="rounded text-on-surface-variant/60 hover:text-on-surface transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                {showToken ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
+              </button>
+            }
+          />
+          <button
+            type="button"
+            onClick={() => setShowHelp(v => !v)}
+            aria-expanded={showHelp}
+            aria-controls="cf-token-permissions"
+            className="text-xs font-bold text-primary hover:underline cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
+          >
+            {showHelp ? t("cloudflare.token_help_toggle_hide") : t("cloudflare.token_help_toggle")}
+          </button>
+          {showHelp && (
+            <div id="cf-token-permissions" className="rounded-lg border border-border-subtle bg-surface-lowest p-3 text-xs text-on-surface-variant space-y-1.5">
+              <p className="font-semibold text-on-surface">{t("cloudflare.token_help_grants")}</p>
+              <ul className="list-disc pl-4 space-y-0.5 font-medium text-on-surface">
+                {SICURRE_TOKEN_PERMISSIONS.map(({ key, scope, label }) => (
+                  <li key={key}>{scope} › {label} › Edit</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+      )}
 
-          <div>
-            <Input
-              label={t("cloudflare.domain")}
-              type="text"
-              value={zoneName}
-              onChange={e => { setZoneName(e.target.value.trim().toLowerCase()); setDnsPlan(null); setVerifyError(""); }}
-              placeholder={t("cloudflare.domain_placeholder")}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* What connecting will change on their zone, shown before the button
-          rather than discovered after it. The two records Sicurre writes can
-          each be declined without declining the integration; the interception
-          itself - Email Routing, the Worker, the routing rule - is what they
-          came for and is not presented as optional. */}
+      {/* What connecting will change on their zone, read with the token and
+          shown before the button. The two records Sicurre writes can each be
+          declined without declining the integration. */}
       {dnsPlan && (
         <div className="rounded-xl border border-border-subtle bg-surface-low p-3.5 space-y-2.5 text-xs">
           <p className="text-xs font-bold text-on-surface-variant">{t("cloudflare.plan_title")}</p>
@@ -652,7 +754,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
                   onChange={(e) =>
                     record === "spf" ? setApplySpf(e.target.checked) : setApplyDmarc(e.target.checked)
                   }
-                  className="w-4 h-4 text-primary bg-surface-lowest border-border-subtle rounded cursor-pointer focus:ring-0"
+                  className="w-4 h-4 text-primary bg-surface-lowest border-border-subtle rounded cursor-pointer focus-visible:ring-2 focus-visible:ring-primary"
                 />
                 <span className="text-on-surface">{t(`cloudflare.plan_${record}`)}</span>
               </label>
@@ -662,7 +764,7 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
             </div>
           ))}
           <p className="text-[10.5px] font-semibold text-on-surface-variant/80 leading-snug">
-            {t("cloudflare.plan_footnote")}
+            {t("cloudflare.plan_footnote")} {t("cloudflare.plan_source_zone")}
           </p>
         </div>
       )}
@@ -673,21 +775,23 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
         </p>
       )}
 
-      <div className="flex justify-end pt-1">
-        <Button
-          onClick={dnsPlan ? handleIntegrate : handleVerify}
-          disabled={!isFormValid || verifyMutation.isPending || setupMutation.isPending}
-          className="w-full sm:w-auto text-xs font-bold cursor-pointer"
-        >
-          {verifyMutation.isPending
-            ? t("cloudflare.checking")
-            : setupMutation.isPending
-              ? t("cloudflare.integrating")
-              : dnsPlan
-                ? t("cloudflare.integrate")
-                : t("cloudflare.check_domain")}
-        </Button>
-      </div>
+      {canConnect && (
+        <div className="flex justify-end pt-1">
+          <Button
+            onClick={dnsPlan ? handleIntegrate : handleVerify}
+            disabled={!isFormValid || verifyMutation.isPending || setupMutation.isPending}
+            className="w-full sm:w-auto text-xs font-bold cursor-pointer"
+          >
+            {verifyMutation.isPending
+              ? t("cloudflare.checking")
+              : setupMutation.isPending
+                ? t("cloudflare.integrating")
+                : dnsPlan
+                  ? t("cloudflare.integrate")
+                  : t("cloudflare.verify_token")}
+          </Button>
+        </div>
+      )}
     </MotionDiv>
   );
 }

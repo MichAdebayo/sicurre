@@ -237,6 +237,19 @@ export interface CloudflareDnsPlan {
   dkim_present: boolean;
 }
 
+export interface CloudflareDomainPreview {
+  zone_name: string;
+  resolvable: boolean;
+  on_cloudflare: boolean;
+  nameservers?: string[];
+  mail_provider: "cloudflare" | "other" | "none";
+  mx_hosts?: string[];
+  plan?: CloudflareDnsPlan;
+  dmarc_policy?: "reject" | "quarantine" | "none" | null;
+  dmarc_reporting?: boolean;
+  source?: "public_dns";
+}
+
 export interface CloudflareSetupPayload {
   cf_api_token?: string;
   zone_name: string;
@@ -694,6 +707,17 @@ export function useCloudflareStatus() {
   return useQuery<CloudflareStatus>({
     queryKey: ["cf-integration"],
     queryFn: () => fetchJson<CloudflareStatus>(`${CF_BASE}/status`),
+  });
+}
+
+/** What public DNS says about a domain, before any token exists. Reads only. */
+export function usePreviewCloudflareDomain() {
+  return useMutation({
+    mutationFn: (payload: { zone_name: string }) =>
+      fetchJson<CloudflareDomainPreview>(`${CF_BASE}/preview`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
   });
 }
 
