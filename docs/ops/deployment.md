@@ -78,9 +78,15 @@ feature  →  app  →  develop  →  main
 ## Rollback
 
 Every deployment is a set of immutable images tagged by version or commit.
-Rolling back is one manual CD dispatch with the previous `IMAGE_TAG`; nothing
-is rebuilt. The procedure was exercised on 18 July 2026 (v1.4.2 to v1.4.1 and
-back), see `docs/certification/incidents/`.
+Rolling back is one manual CD dispatch (Actions, "CD", "Run workflow") with
+the previous tag in `image_tag`. On a dispatch that names a tag the build job
+is skipped, the deploy job first checks that the four images exist in GHCR
+under that tag and fails before touching the host if one is missing, then
+writes `IMAGE_TAG` on the host, pulls the images and recreates the containers.
+The health check that follows is the same as for any deployment. The
+procedure was exercised on 18 July 2026 (v1.4.2 to v1.4.1 and back), see
+`docs/certification/incidents/`, and the workflow path was proven on
+12 September 2026 with a same-tag dispatch of v1.33.3.
 
 ## After a deployment
 

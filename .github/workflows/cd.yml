@@ -8,7 +8,10 @@ on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: "Docker image tag to deploy. Defaults to the validated commit SHA."
+        description: >-
+          Existing image tag to deploy, for a rollback. The build is skipped and
+          the images must already be in GHCR. Leave empty to build and deploy
+          the validated commit.
         required: false
         default: ""
 
@@ -34,6 +37,7 @@ jobs:
       image_tag: ${{ steps.version.outputs.image_tag }}
       source_sha: ${{ steps.version.outputs.source_sha }}
       release_version: ${{ steps.version.outputs.release_version }}
+      owner: ${{ steps.owner.outputs.owner }}
 
     steps:
       - uses: actions/checkout@v6
@@ -79,27 +83,27 @@ jobs:
             echo "release_version=${release_tag#v}"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Resolve lowercase GHCR owner
+        id: owner
+        run: |
+          owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
+          echo "owner=${owner}" >> "$GITHUB_OUTPUT"
+
   build-push:
     name: Build and push images
     runs-on: ubuntu-latest
     needs: release
+    # A dispatch that names an existing tag is a rollback: nothing is rebuilt,
+    # and the images already in the registry are the ones that get deployed.
+    if: github.event.inputs.image_tag == ''
     permissions:
       contents: read
       packages: write
-    outputs:
-      owner: ${{ steps.image.outputs.owner }}
-      tag: ${{ needs.release.outputs.image_tag }}
 
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ needs.release.outputs.source_sha }}
-
-      - name: Resolve lowercase GHCR owner
-        id: image
-        run: |
-          owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
-          echo "owner=${owner}" >> "$GITHUB_OUTPUT"
 
       - uses: docker/login-action@v4
         with:
@@ -117,8 +121,8 @@ jobs:
           target: web
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ steps.image.outputs.owner }}/sicurre-app:${{ needs.release.outputs.image_tag }}
-            ${{ env.REGISTRY }}/${{ steps.image.outputs.owner }}/sicurre-app:latest
+            ${{ env.REGISTRY }}/${{ needs.release.outputs.owner }}/sicurre-app:${{ needs.release.outputs.image_tag }}
+            ${{ env.REGISTRY }}/${{ needs.release.outputs.owner }}/sicurre-app:latest
           cache-from: type=gha,scope=sicurre-app
           cache-to: type=gha,mode=max,scope=sicurre-app
 
@@ -130,8 +134,8 @@ jobs:
           target: auth
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ steps.image.outputs.owner }}/sicurre-auth:${{ needs.release.outputs.image_tag }}
-            ${{ env.REGISTRY }}/${{ steps.image.outputs.owner }}/sicurre-auth:latest
+            ${{ env.REGISTRY }}/${{ needs.release.outputs.owner }}/sicurre-auth:${{ needs.release.outputs.image_tag }}
+            ${{ env.REGISTRY }}/${{ needs.release.outputs.owner }}/sicurre-auth:latest
           cache-from: type=gha,scope=sicurre-auth
           cache-to: type=gha,mode=max,scope=sicurre-auth
 
@@ -142,8 +146,8 @@ jobs:
           file: Dockerfile.data-platform
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ steps.image.outputs.owner }}/sicurre-api:${{ needs.release.outputs.image_tag }}
-            ${{ env.REGISTRY }}/${{ steps.image.outputs.owner }}/sicurre-api:latest
+            ${{ env.REGISTRY }}/${{ needs.release.outputs.owner }}/sicurre-api:${{ needs.release.outputs.image_tag }}
+            ${{ env.REGISTRY }}/${{ needs.release.outputs.owner }}/sicurre-api:latest
           cache-from: type=gha,scope=sicurre-api
           cache-to: type=gha,mode=max,scope=sicurre-api
 
@@ -155,15 +159,19 @@ jobs:
           target: release
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ steps.image.outputs.owner }}/sicurre-data-release:${{ needs.release.outputs.image_tag }}
-            ${{ env.REGISTRY }}/${{ steps.image.outputs.owner }}/sicurre-data-release:latest
+            ${{ env.REGISTRY }}/${{ needs.release.outputs.owner }}/sicurre-data-release:${{ needs.release.outputs.image_tag }}
+            ${{ env.REGISTRY }}/${{ needs.release.outputs.owner }}/sicurre-data-release:latest
           cache-from: type=gha,scope=sicurre-data-release
           cache-to: type=gha,mode=max,scope=sicurre-data-release
 
   deploy:
     name: Deploy to Hetzner
     runs-on: ubuntu-latest
-    needs: build-push
+    needs: [release, build-push]
+    if: >-
+      !cancelled() &&
+      needs.release.result == 'success' &&
+      (needs.build-push.result == 'success' || needs.build-push.result == 'skipped')
     permissions:
       contents: read
       packages: read
@@ -172,6 +180,25 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify the images to deploy exist in the registry
+        # On a rollback this is the whole guarantee: a tag that was never built
+        # fails here, before anything on the host is touched.
+        env:
+          IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ needs.release.outputs.owner }}
+          IMAGE_TAG: ${{ needs.release.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+          for image in sicurre-app sicurre-api sicurre-auth sicurre-data-release; do
+            docker manifest inspect "${IMAGE_PREFIX}/${image}:${IMAGE_TAG}" >/dev/null
+            echo "${image}:${IMAGE_TAG} present"
+          done
 
       - name: Copy stack config to server
         uses: appleboy/scp-action@v0.1.7
@@ -211,15 +238,15 @@ jobs:
             crontab -l >/dev/null
 
             if grep -q '^IMAGE_TAG=' .env; then
-              sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${{ needs.build-push.outputs.tag }}|" .env
+              sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${{ needs.release.outputs.image_tag }}|" .env
             else
-              echo "IMAGE_TAG=${{ needs.build-push.outputs.tag }}" >> .env
+              echo "IMAGE_TAG=${{ needs.release.outputs.image_tag }}" >> .env
             fi
 
             if grep -q '^GHCR_OWNER=' .env; then
-              sed -i "s|^GHCR_OWNER=.*|GHCR_OWNER=${{ needs.build-push.outputs.owner }}|" .env
+              sed -i "s|^GHCR_OWNER=.*|GHCR_OWNER=${{ needs.release.outputs.owner }}|" .env
             else
-              echo "GHCR_OWNER=${{ needs.build-push.outputs.owner }}" >> .env
+              echo "GHCR_OWNER=${{ needs.release.outputs.owner }}" >> .env
             fi
 
             echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io \
@@ -265,6 +292,8 @@ jobs:
     name: Health check
     runs-on: ubuntu-latest
     needs: deploy
+    # A skipped build upstream must not skip the check: only the deploy counts.
+    if: ${{ !cancelled() && needs.deploy.result == 'success' }}
 
     steps:
       - name: Wait for app gateway and API
@@ -290,7 +319,8 @@ jobs:
   provision-observability:
     name: Provision Grafana dashboard
     runs-on: ubuntu-latest
-    needs: [build-push, health-check]
+    needs: [release, health-check]
+    if: ${{ !cancelled() && needs.release.result == 'success' && needs.health-check.result == 'success' }}
 
     steps:
       - name: Import and verify dashboard from Hetzner
@@ -307,5 +337,5 @@ jobs:
               --env-file deploy/env.alloy \
               -v "${{ secrets.DEPLOY_PATH }}:/repo:ro" \
               -w /repo \
-              "ghcr.io/${{ needs.build-push.outputs.owner }}/sicurre-auth:${{ needs.build-push.outputs.tag }}" \
+              "ghcr.io/${{ needs.release.outputs.owner }}/sicurre-auth:${{ needs.release.outputs.image_tag }}" \
               node scripts/deploy/provision_grafana_dashboard.mjs
