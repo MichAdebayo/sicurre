@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import {
@@ -22,7 +22,7 @@ import {
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { CloudflareIntegrator } from "../components/common/cloudflare-integrator";
-import { DomainFootprint } from "../components/settings/domain-footprint";
+import { DomainFootprintSection } from "../components/settings/domain-footprint";
 import { AppToast } from "../components/common/app-toast";
 import AlertsRoute from "./alerts";
 import cloudflareLogo from "../assets/cloudflare-svgrepo-com.svg";
@@ -84,7 +84,6 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
   const teardownMutation = useTeardownCloudflare();
   const retrySetupMutation = useSetupCloudflare();
   const [showIntegrator, setShowIntegrator] = useState(false);
-  const [openFootprintId, setOpenFootprintId] = useState<string | null>(null);
   const [integrationSuccess, setIntegrationSuccess] = useState("");
   const [integrationError, setIntegrationError] = useState("");
   const [retryingDomainId, setRetryingDomainId] = useState<string | null>(null);
@@ -591,8 +590,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                           </thead>
                           <tbody className="divide-y divide-border-subtle/50 font-sans">
                             {domains.map((dom) => (
-                              <Fragment key={dom.id}>
-                              <tr className="hover:bg-surface-low/20 transition-colors">
+                              <tr key={dom.id} className="hover:bg-surface-low/20 transition-colors">
                                 <td className="px-4 py-3 font-semibold text-on-surface">{dom.zone_name}</td>
                                 <td className="px-4 py-3">
                                   <span className={`rounded px-2 py-0.5 text-[11px] font-semibold ${dom.status === "active"
@@ -611,17 +609,6 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                                 <td className="px-4 py-3 font-semibold text-on-surface-variant">{dom.destination_email}</td>
                                 <td className="px-4 py-3 text-right">
                                   <div className="inline-flex items-center gap-1">
-                                    {dom.status === "active" && (
-                                      <button
-                                        type="button"
-                                        onClick={() => setOpenFootprintId(openFootprintId === dom.id ? null : (dom.id ?? null))}
-                                        aria-expanded={openFootprintId === dom.id}
-                                        aria-controls={`footprint-${dom.id}`}
-                                        className="inline-flex h-10 items-center gap-1 rounded-md px-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
-                                      >
-                                        {openFootprintId === dom.id ? t("settings.footprint_hide") : t("settings.footprint_show")}
-                                      </button>
-                                    )}
                                     {dom.status === "error" && (
                                       <button
                                         onClick={() => void handleRetryDomain(dom)}
@@ -646,14 +633,6 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                                   </div>
                                 </td>
                               </tr>
-                              {openFootprintId === dom.id && (
-                                <tr>
-                                  <td colSpan={4} className="px-4 pb-4">
-                                    <DomainFootprint domain={dom.zone_name ?? ""} id={`footprint-${dom.id ?? ""}`} />
-                                  </td>
-                                </tr>
-                              )}
-                              </Fragment>
                             ))}
                           </tbody>
                         </table>
@@ -662,6 +641,8 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                   </div>
                 )}
               </div>
+
+              <DomainFootprintSection domains={domains ?? []} />
             </div>
           )}
 
