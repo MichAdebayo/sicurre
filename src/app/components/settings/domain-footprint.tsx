@@ -14,7 +14,7 @@ interface Fact {
   tone: Tone;
 }
 
-/** The records Sicurre writes on a zone, and the ones it only reads, from a shield status. */
+/** The records Sicurre can manage on a zone, and the ones it only reads, from a shield status. */
 export function describeDomainFootprint(
   status: DomainShieldStatus,
   t: (key: string, options?: Record<string, unknown>) => string,
@@ -72,23 +72,23 @@ const toneStyles: Record<Tone, string> = {
 
 function FactList({ title, icon, facts }: { title: string; icon: React.ReactNode; facts: Fact[] }) {
   return (
-    <div className="space-y-2">
-      <h4 className="flex items-center gap-1.5 text-xs font-semibold text-on-surface-variant">
-        {icon}
+    <div className="space-y-3">
+      <h4 className="flex items-center gap-2 text-body-sm font-semibold text-on-surface">
+        <span className="grid h-7 w-7 place-items-center rounded-lg bg-surface-low text-primary">{icon}</span>
         {title}
       </h4>
-      <ul className="space-y-1.5">
+      <ul className="divide-y divide-border-subtle/60">
         {facts.map((fact) => (
-          <li key={fact.key} className="flex items-center justify-between gap-3 text-xs">
+          <li key={fact.key} className="flex items-center justify-between gap-4 py-2.5 text-body-sm">
             <span className="min-w-0 text-on-surface">{fact.label}</span>
             <span
               className={clsx(
-                "inline-flex shrink-0 items-center gap-1 rounded border px-2 py-0.5 text-[11px] font-semibold",
+                "inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1 text-body-sm font-semibold",
                 toneStyles[fact.tone],
               )}
             >
-              {fact.tone === "ok" && <Check className="h-3 w-3" aria-hidden="true" />}
-              {fact.tone === "todo" && <CircleDashed className="h-3 w-3" aria-hidden="true" />}
+              {fact.tone === "ok" && <Check className="h-3.5 w-3.5" aria-hidden="true" />}
+              {fact.tone === "todo" && <CircleDashed className="h-3.5 w-3.5" aria-hidden="true" />}
               {fact.status}
             </span>
           </li>
@@ -100,55 +100,81 @@ function FactList({ title, icon, facts }: { title: string; icon: React.ReactNode
 
 interface DomainFootprintProps {
   domain: string;
-  id: string;
 }
 
 /**
- * What Sicurre has written on a connected domain and what it only reads,
- * shown under the domain's row in Settings. Reads the cached shield status;
- * never triggers a refresh.
+ * One connected domain: the records Sicurre can manage and the ones it only
+ * reads, as facts from the cached shield status. Never triggers a refresh.
  */
-export function DomainFootprint({ domain, id }: DomainFootprintProps) {
+export function DomainFootprint({ domain }: DomainFootprintProps) {
   const { t } = useTranslation();
   const { data, isLoading } = useDomainShieldStatus(domain);
 
   return (
-    <div
-      id={id}
-      className="rounded-xl border border-border-subtle bg-surface-lowest p-4 space-y-4"
-      aria-live="polite"
+    <article
+      aria-labelledby={`footprint-${domain}`}
+      className="rounded-xl border border-border-subtle bg-surface-lowest p-6 space-y-5"
     >
-      <p className="text-sm font-semibold text-on-surface">
-        {t("settings.footprint_title", { domain })}
-      </p>
+      <h3 id={`footprint-${domain}`} className="font-display text-title-md font-semibold text-on-surface">
+        {domain}
+      </h3>
       {isLoading && !data ? (
-        <p role="status" className="text-xs text-on-surface-variant">
+        <p role="status" className="text-body-sm text-on-surface-variant">
           {t("settings.footprint_loading")}
         </p>
       ) : !data ? (
-        <p className="text-xs text-on-surface-variant">{t("settings.footprint_unavailable")}</p>
+        <p className="text-body-sm text-on-surface-variant">{t("settings.footprint_unavailable")}</p>
       ) : (
         (() => {
           const { writes, reads } = describeDomainFootprint(data, t);
           return (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
               <FactList
                 title={t("settings.footprint_writes")}
-                icon={<PenLine className="h-3.5 w-3.5" aria-hidden="true" />}
+                icon={<PenLine className="h-4 w-4" aria-hidden="true" />}
                 facts={writes}
               />
               <FactList
                 title={t("settings.footprint_reads")}
-                icon={<Eye className="h-3.5 w-3.5" aria-hidden="true" />}
+                icon={<Eye className="h-4 w-4" aria-hidden="true" />}
                 facts={reads}
               />
             </div>
           );
         })()
       )}
-      <p className="text-[11px] leading-relaxed text-on-surface-variant">
+    </article>
+  );
+}
+
+interface DomainFootprintSectionProps {
+  domains: { id?: string; zone_name?: string; status?: string }[];
+}
+
+/**
+ * The Settings section that lists, for every connected domain, what Sicurre
+ * manages on it and what it only reads. Always shown once a domain exists.
+ */
+export function DomainFootprintSection({ domains }: DomainFootprintSectionProps) {
+  const { t } = useTranslation();
+  const connected = domains.filter((domain) => domain.zone_name);
+  if (connected.length === 0) return null;
+  return (
+    <section aria-labelledby="footprint-section-title" className="space-y-5">
+      <div>
+        <h2 id="footprint-section-title" className="app-h2">
+          {t("settings.footprint_title")}
+        </h2>
+        <p className="app-body-sub mt-1 max-w-prose">{t("settings.footprint_intro")}</p>
+      </div>
+      <div className="space-y-4">
+        {connected.map((domain) => (
+          <DomainFootprint key={domain.id ?? domain.zone_name} domain={domain.zone_name ?? ""} />
+        ))}
+      </div>
+      <p className="text-body-sm leading-relaxed text-on-surface-variant max-w-prose">
         {t("settings.footprint_disconnect_note")}
       </p>
-    </div>
+    </section>
   );
 }
