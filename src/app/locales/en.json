@@ -21,6 +21,7 @@
     "stopping": "Stopping…",
     "load_error": "Test state is unavailable.",
     "action_error": "The action failed. Refresh the state before retrying.",
+    "rate_limited": "Limit reached: {{limit}} tests per hour. Try again later.",
     "evidence": "Grafana measurements",
     "alert_state": "Alert state",
     "history": "Signal history",
