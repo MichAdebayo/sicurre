@@ -224,13 +224,14 @@ def test_shield_status_is_written_per_workspace() -> None:
     import inspect
 
     from data_platform.api.routers import domain_shield, integrations
+    from data_platform.services import domain_shield_sync
 
-    for module in (domain_shield, integrations):
+    for module in (domain_shield, integrations, domain_shield_sync):
         source = inspect.getsource(module)
         assert "ON CONFLICT(domain) DO UPDATE" not in source, (
             f"{module.__name__} still upserts on domain alone"
         )
-        if "app_domain_shield_status" in source:
+        if "INSERT INTO app_domain_shield_status" in source:
             assert "ON CONFLICT(workspace_id, domain)" in source
 
 
@@ -268,9 +269,9 @@ def test_domain_shield_fixes_do_not_require_email_routing() -> None:
     """
     import inspect
 
-    from data_platform.api.routers import integrations
+    from data_platform.services import domain_shield_sync
 
-    source = inspect.getsource(integrations._sync_domain_shield_dns)
+    source = inspect.getsource(domain_shield_sync.sync_domain_shield_dns)
     assert "enable_email_routing" not in source, (
         "the DNS fix path must not enable Email Routing; that would couple a "
         "record repair to taking over the customer's mail"

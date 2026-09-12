@@ -14,6 +14,8 @@ The current implementation is documented and exercised through:
 - `src/data_platform/api/routers/email_scan.py` (the routes the Email Worker calls)
 - `src/data_platform/api/routers/cloudflare_account.py` (domain preview, token check, stored token)
 - `src/data_platform/services/dns_records.py` (SPF, DKIM and DMARC record logic)
+- `src/data_platform/services/domain_shield_sync.py` (apply the consented DNS fixes, refresh the status cache)
+- `src/data_platform/services/cloudflare_onboarding.py` (background provisioning of a connected domain)
 - `src/data_platform/services/cloudflare_provisioner.py`
 - `docs/email-intercept.md`
 

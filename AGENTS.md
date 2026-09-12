@@ -84,8 +84,8 @@ last and is the one that catches migration and boot failures; wait for it.
 - Small functions, one responsibility per module, no god-files. The routers
   under `src/data_platform/api/routers/` are split by concern (session, threats,
   quarantine, alerts, domain shield, DMARC reports, admin, operational
-  exercises, integrations, email scan, cloudflare account); the setup route in
-  `integrations.py` is the remaining debt.
+  exercises, integrations, email scan, cloudflare account). Background
+  provisioning and the Domain Shield DNS sync are services, not route code.
 - **Docstrings state the contract**: what it does, arguments, return, errors.
   Rationale goes to an ADR or the commit message; incident narrative goes to
   `docs/certification/incidents/`; measurements go to a dated report. A

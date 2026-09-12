@@ -4751,8 +4751,12 @@ paths:
       - integrations
   /v1/integrations/cloudflare/setup:
     post:
-      description: 'Full one-shot provisioning: • Find zone → enable Email Routing → deploy Email Worker
-        → create c'
+      description: 'Connect ``zone_name`` to Sicurre, or re-apply the consented fixes if it already is.
+
+
+        Returns 201 with the integration id and the DNS result. Raises 400 without
+
+        a token, 409 while a provisioning is running, 502 when Cloudflare refuses.'
       operationId: setup_cloudflare_v1_integrations_cloudflare_setup_post
       requestBody:
         content:
