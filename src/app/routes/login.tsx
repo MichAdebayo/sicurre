@@ -224,7 +224,7 @@ export default function LoginRoute({
       {/* CSS overrides to style labels matching the Resend login screenshot */}
       <style>{`
         .login-container label {
-          color: #94a3b8 !important;
+          color: var(--color-night-muted) !important;
           text-transform: none !important;
           font-size: 13px !important;
           font-weight: 500 !important;
@@ -277,7 +277,7 @@ export default function LoginRoute({
                 ? "Créer un compte"
                 : "Connexion à Sicurre"}
           </h1>
-          {!resetToken && !verificationEmailSent && <p className="text-[13px] text-slate-400 mt-2.5">
+          {!resetToken && !verificationEmailSent && <p className="text-[13px] text-night-muted mt-2.5">
             {isSignUp ? "Vous avez déjà un compte ? " : "Vous n'avez pas de compte ? "}
             <button
               onClick={() => {
@@ -303,13 +303,13 @@ export default function LoginRoute({
               <Mail className="h-5 w-5" />
             </div>
             <div className="space-y-2">
-              <p className="text-sm leading-6 text-slate-300">
+              <p className="text-sm leading-6 text-night-muted">
                 Nous avons envoyé un lien à <strong className="text-white">{email}</strong>.
                 Cliquez dessus pour activer votre compte Sicurre.
               </p>
             </div>
-            {authError && <p className="text-sm text-red-300" role="alert">{authError}</p>}
-            {authNotice && <p className="text-sm text-emerald-200">{authNotice}</p>}
+            {authError && <p className="text-sm text-night-danger" role="alert">{authError}</p>}
+            {authNotice && <p className="text-sm text-night-safe">{authNotice}</p>}
             <div className="flex flex-col gap-6">
               <Button
                 type="button"
@@ -329,7 +329,7 @@ export default function LoginRoute({
                   setAuthError("");
                   setAuthNotice("");
                 }}
-                className="inline-flex min-h-11 items-center justify-center gap-2 self-center rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-colors cursor-pointer"
+                className="inline-flex min-h-11 items-center justify-center gap-2 self-center rounded-lg px-3 py-2 text-sm font-medium text-night-muted hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-colors cursor-pointer"
               >
                 <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                 Revenir à la connexion
@@ -349,7 +349,7 @@ export default function LoginRoute({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 icon={<User className="w-4 h-4 text-white/40" />}
-                className="!bg-slate-950/60 !border-white/10 !text-white !placeholder:text-white/20 focus:!border-white/25 focus:!ring-white/5"
+                className="!bg-night-surface/60 !border-white/10 !text-white !placeholder:text-white/20 focus:!border-white/25 focus:!ring-white/5"
                 required
               />
             )}
@@ -362,7 +362,7 @@ export default function LoginRoute({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               icon={<Mail className="w-4 h-4 text-white/40" />}
-              className="!bg-slate-950/60 !border-white/10 !text-white !placeholder:text-white/20 focus:!border-white/25 focus:!ring-white/5"
+              className="!bg-night-surface/60 !border-white/10 !text-white !placeholder:text-white/20 focus:!border-white/25 focus:!ring-white/5"
               required
             />}
 
@@ -375,7 +375,7 @@ export default function LoginRoute({
                   <button
                     type="button"
                     onClick={handlePasswordResetRequest}
-                    className="text-[12px] text-slate-400 font-medium hover:text-white transition-colors cursor-pointer"
+                    className="text-[12px] text-night-muted font-medium hover:text-white transition-colors cursor-pointer"
                   >
                     Mot de passe oublié ?
                   </button>
@@ -388,7 +388,7 @@ export default function LoginRoute({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 icon={<Lock className="w-4 h-4 text-white/40" />}
-                className="!bg-slate-950/60 !border-white/10 !text-white !placeholder:text-white/20 focus:!border-white/25 focus:!ring-white/5"
+                className="!bg-night-surface/60 !border-white/10 !text-white !placeholder:text-white/20 focus:!border-white/25 focus:!ring-white/5"
                 suffix={
                   <button
                     type="button"
@@ -419,19 +419,19 @@ export default function LoginRoute({
             )}
 
             {isSignUp && turnstileConfig.status === "error" && (
-              <div className="rounded-lg border border-red-900/40 bg-red-950/30 p-3 text-sm font-medium text-red-300" role="alert">
+              <div className="rounded-lg border border-night-danger/30 bg-night-danger/10 p-3 text-sm font-medium text-night-danger" role="alert">
                 {t("login.errors.bot_verification_unavailable")}
               </div>
             )}
 
             {authError && (
-              <div className="p-3 bg-red-950/20 border border-red-900/30 text-red-400 text-sm rounded-lg font-medium">
+              <div className="p-3 bg-night-danger/10 border border-night-danger/30 text-night-danger text-sm rounded-lg font-medium">
                 {authError}
               </div>
             )}
 
             {authNotice && (
-              <div className="rounded-lg border border-emerald-800/50 bg-emerald-950/35 p-3 text-sm font-medium text-emerald-200" role="status">
+              <div className="rounded-lg border border-night-safe/30 bg-night-safe/10 p-3 text-sm font-medium text-night-safe" role="status">
                 {authNotice}
               </div>
             )}
@@ -458,7 +458,7 @@ export default function LoginRoute({
         )}
 
         {/* Footer */}
-        <p className="text-center text-[11px] text-slate-500 mt-10 leading-relaxed">
+        <p className="text-center text-[11px] text-night-faint mt-10 leading-relaxed">
           En vous connectant, vous acceptez nos{" "}
           <button
             onClick={() => setActiveLegalModal("cgu")}
@@ -486,11 +486,11 @@ export default function LoginRoute({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 16 }}
               transition={{ duration: 0.25, ease: "easeOut" }}
-              className="relative w-full max-w-3xl max-h-[85vh] bg-[#0a0d18] border border-white/15 rounded-2xl p-6 sm:p-8 lg:p-10 overflow-y-auto shadow-2xl text-left font-sans text-white space-y-6"
+              className="relative w-full max-w-3xl max-h-[85vh] bg-night-surface border border-white/15 rounded-2xl p-6 sm:p-8 lg:p-10 overflow-y-auto shadow-2xl text-left font-sans text-white space-y-6"
             >
               {/* Modal Header */}
-              <div className="flex items-center justify-between border-b border-white/10 pb-4 sticky top-0 bg-[#0a0d18] z-20 pt-1">
-                <h2 className="font-display font-medium text-2xl text-slate-100 tracking-tight">
+              <div className="flex items-center justify-between border-b border-white/10 pb-4 sticky top-0 bg-night-surface z-20 pt-1">
+                <h2 className="font-display font-medium text-2xl text-night-text tracking-tight">
                   {activeLegalModal === "cgu" ? "Conditions Générales d'Utilisation" : "Politique de Confidentialité"}
                 </h2>
                 <button
@@ -504,9 +504,9 @@ export default function LoginRoute({
 
               {/* Modal Body */}
               {activeLegalModal === "cgu" ? (
-                <div className="space-y-6 text-slate-400 text-sm leading-relaxed">
+                <div className="space-y-6 text-night-muted text-sm leading-relaxed">
                   <section className="space-y-2">
-                    <h3 className="font-display font-medium text-base text-slate-200">1. Objet des CGU</h3>
+                    <h3 className="font-display font-medium text-base text-night-text">1. Objet des CGU</h3>
                     <p>
                       Les présentes Conditions Générales d'Utilisation (CGU) encadrent l'accès et l'utilisation de la plateforme 
                       <strong className="text-white"> Sicurre</strong>. La plateforme fournit un service automatisé 
@@ -515,7 +515,7 @@ export default function LoginRoute({
                   </section>
 
                   <section className="space-y-2">
-                    <h3 className="font-display font-medium text-base text-slate-200">2. Connexion & Intégration Cloudflare</h3>
+                    <h3 className="font-display font-medium text-base text-night-text">2. Connexion & Intégration Cloudflare</h3>
                     <p>
                       L'activation de la protection Sicurre nécessite l'association d'un jeton d'accès Cloudflare restreint. 
                       En configurant cette intégration, l'utilisateur autorise Sicurre à inspecter les métadonnées des e-mails entrants, 
@@ -524,7 +524,7 @@ export default function LoginRoute({
                   </section>
 
                   <section className="space-y-2">
-                    <h3 className="font-display font-medium text-base text-slate-200">3. Engagements & Responsabilités</h3>
+                    <h3 className="font-display font-medium text-base text-night-text">3. Engagements & Responsabilités</h3>
                     <p>
                       Sicurre met en œuvre des contrôles de sécurité, de supervision et de reprise adaptés à son environnement.
                       Aucun niveau de service contractuel n'est garanti pendant cette phase de validation. L'utilisateur demeure responsable de ses identifiants.
@@ -532,16 +532,16 @@ export default function LoginRoute({
                   </section>
 
                   <section className="space-y-2">
-                    <h3 className="font-display font-medium text-base text-slate-200">4. Droit applicable</h3>
+                    <h3 className="font-display font-medium text-base text-night-text">4. Droit applicable</h3>
                     <p>
                       Les présentes CGU sont soumises au droit français. Tout litige relève des tribunaux compétents de Paris, France.
                     </p>
                   </section>
                 </div>
               ) : (
-                <div className="space-y-6 text-slate-400 text-sm leading-relaxed">
+                <div className="space-y-6 text-night-muted text-sm leading-relaxed">
                   <section className="space-y-2">
-                    <h3 className="font-display font-medium text-base text-slate-200">1. Engagements RGPD et Souveraineté</h3>
+                    <h3 className="font-display font-medium text-base text-night-text">1. Engagements RGPD et Souveraineté</h3>
                     <p>
                       Chez Sicurre, nous traitons la sécurité et la confidentialité de vos e-mails avec la plus grande rigueur. 
                       Les traitements suivent des principes de minimisation et de conservation limitée. Cloudflare et les prestataires
@@ -550,7 +550,7 @@ export default function LoginRoute({
                   </section>
 
                   <section className="space-y-2">
-                    <h3 className="font-display font-medium text-base text-slate-200">2. Politique de Non-Stockage des E-mails</h3>
+                    <h3 className="font-display font-medium text-base text-night-text">2. Politique de Non-Stockage des E-mails</h3>
                     <p>
                       Les messages légitimes ne sont pas conservés en contenu brut. Le MIME original d'un message placé en quarantaine
                       est conservé dans un stockage privé pendant 14 jours au maximum afin de permettre sa restauration, puis supprimé.
@@ -558,7 +558,7 @@ export default function LoginRoute({
                   </section>
 
                   <section className="space-y-2">
-                    <h3 className="font-display font-medium text-base text-slate-200">3. Masquage PII Automatique</h3>
+                    <h3 className="font-display font-medium text-base text-night-text">3. Masquage PII Automatique</h3>
                     <p>
                       Toutes les données à caractère personnel (e-mails secondaires, numéros de téléphone, IBAN) transitant par le système 
                       sont automatiquement transformées en balises anonymisées (<code className="text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">[EMAIL]</code>, <code className="text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">[IBAN]</code>) avant tout archivage.

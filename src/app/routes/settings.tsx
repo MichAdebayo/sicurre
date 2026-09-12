@@ -552,7 +552,7 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                       </span>
                       <button
                         onClick={() => setShowIntegrator(false)}
-                        className="text-xs font-bold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white cursor-pointer transition-colors duration-200"
+                        className="text-xs font-bold text-on-surface-variant hover:text-on-surface cursor-pointer transition-colors duration-200"
                       >
                         {t("common.cancel")}
                       </button>

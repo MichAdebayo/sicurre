@@ -46,31 +46,31 @@ export default function MentionsLegalesRoute({ onBack }: MentionsLegalesProps) {
           className="rounded-2xl p-8 lg:p-10 space-y-7 shadow-2xl text-left"
         >
           <div>
-            <h1 className="font-display font-medium text-3xl text-slate-100 tracking-tight mb-2">
+            <h1 className="font-display font-medium text-3xl text-night-text tracking-tight mb-2">
               Mentions Légales
             </h1>
-            <p className="text-xs text-slate-400 font-medium">Dernière mise à jour : 18 juin 2026</p>
+            <p className="text-xs text-night-muted font-medium">Dernière mise à jour : 18 juin 2026</p>
           </div>
 
           <hr className="border-white/10" />
 
           <section className="space-y-3">
-            <h2 className="font-display font-medium text-lg text-slate-200">1. Éditeur du site</h2>
-            <p className="text-sm text-slate-400 leading-relaxed">
+            <h2 className="font-display font-medium text-lg text-night-text">1. Éditeur du site</h2>
+            <p className="text-sm text-night-muted leading-relaxed">
               Le service expérimental <strong className="text-white">Sicurre</strong> est édité par Michael Adebayo
               dans le cadre d'un projet de certification professionnelle. Il ne constitue pas encore une société commerciale immatriculée.
             </p>
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-night-muted">
               <strong className="text-white">Responsable de la publication :</strong> Michael Adebayo.
             </p>
           </section>
 
           <section className="space-y-3">
-            <h2 className="font-display font-medium text-lg text-slate-200">2. Hébergement</h2>
-            <p className="text-sm text-slate-400 leading-relaxed">
+            <h2 className="font-display font-medium text-lg text-night-text">2. Hébergement</h2>
+            <p className="text-sm text-night-muted leading-relaxed">
               Le site et la plateforme applicative sont hébergés par :
             </p>
-            <ul className="list-disc pl-5 text-sm text-slate-400 space-y-1.5">
+            <ul className="list-disc pl-5 text-sm text-night-muted space-y-1.5">
               <li>
                 <strong className="text-white">Neon Inc.</strong> (Base de données) : 2443 Fillmore St, San Francisco, CA 94115, États-Unis.
               </li>
@@ -80,18 +80,18 @@ export default function MentionsLegalesRoute({ onBack }: MentionsLegalesProps) {
           </section>
 
           <section className="space-y-3">
-            <h2 className="font-display font-medium text-lg text-slate-200">3. Nous contacter</h2>
-            <p className="text-sm text-slate-400 leading-relaxed">
+            <h2 className="font-display font-medium text-lg text-night-text">3. Nous contacter</h2>
+            <p className="text-sm text-night-muted leading-relaxed">
               Pour toute question ou demande de support, vous pouvez contacter nos équipes :
             </p>
-            <ul className="list-disc pl-5 text-sm text-slate-400 space-y-1.5">
+            <ul className="list-disc pl-5 text-sm text-night-muted space-y-1.5">
               <li><strong className="text-white">Par e-mail :</strong> contact@sicurre.com</li>
             </ul>
           </section>
 
           <section className="space-y-3">
-            <h2 className="font-display font-medium text-lg text-slate-200">4. Propriété intellectuelle</h2>
-            <p className="text-sm text-slate-400 leading-relaxed">
+            <h2 className="font-display font-medium text-lg text-night-text">4. Propriété intellectuelle</h2>
+            <p className="text-sm text-night-muted leading-relaxed">
               L'ensemble du contenu présent sur le site (textes, logos, animations 3D, chartes graphiques)
               appartient à son auteur ou à ses concédants respectifs. Toute reproduction, modification ou distribution
               sans accord écrit préalable est strictement interdite.
@@ -100,7 +100,7 @@ export default function MentionsLegalesRoute({ onBack }: MentionsLegalesProps) {
         </MotionDiv>
         </main>
 
-        <footer className="text-center text-xs text-slate-500">
+        <footer className="text-center text-xs text-night-faint">
           © 2026 Sicurre. Tous droits réservés.
         </footer>
       </div>

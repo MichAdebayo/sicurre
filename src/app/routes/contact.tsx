@@ -68,22 +68,22 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
 
               <div className="relative z-10 space-y-6">
                 <div>
-                  <span className="text-[10px] font-extrabold tracking-widest text-[#F59E0B] uppercase">CONTACT SICURRE</span>
-                  <h1 className="font-display font-medium text-2xl text-slate-100 mt-1 leading-tight">
+                  <span className="text-[11px] font-semibold tracking-wide text-night-accent">Contact Sicurre</span>
+                  <h1 className="font-display font-medium text-2xl text-night-text mt-1 leading-tight">
                     Discutons ensemble
                   </h1>
                 </div>
-                <p className="text-xs text-slate-400 leading-relaxed">
+                <p className="text-xs text-night-muted leading-relaxed">
                   Préparez votre message ici, puis envoyez-le depuis votre messagerie habituelle.
                 </p>
 
                 <div className="space-y-4 pt-2">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-white/10 rounded-lg text-[#F59E0B]">
+                    <div className="p-2 bg-white/10 rounded-lg text-night-accent">
                       <Clock className="w-4 h-4" />
                     </div>
                     <div>
-                      <p className="text-[10px] text-slate-400 font-semibold uppercase leading-none">Canal</p>
+                      <p className="text-[11px] text-night-muted font-semibold leading-none">Canal</p>
                       <p className="text-sm font-bold mt-1 text-white">E-mail</p>
                     </div>
                   </div>
@@ -93,18 +93,18 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
                       <Mail className="w-4 h-4" />
                     </div>
                     <div>
-                      <p className="text-[10px] text-slate-400 font-semibold uppercase leading-none">E-mail direct</p>
+                      <p className="text-[11px] text-night-muted font-semibold leading-none">E-mail direct</p>
                       <p className="text-sm font-mono mt-1 text-white text-[12px]">contact@sicurre.com</p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-white/10 rounded-lg text-slate-400">
+                    <div className="p-2 bg-white/10 rounded-lg text-night-muted">
                       <MapPin className="w-4 h-4" />
                     </div>
                     <div>
-                      <p className="text-[10px] text-slate-400 font-semibold uppercase leading-none">Siège social</p>
-                      <p className="text-xs text-slate-300 mt-1">Roubaix, France</p>
+                      <p className="text-[11px] text-night-muted font-semibold leading-none">Siège social</p>
+                      <p className="text-xs text-night-muted mt-1">Roubaix, France</p>
                     </div>
                   </div>
                 </div>
@@ -119,11 +119,11 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
               }}
               className="rounded-2xl p-5 space-y-3 text-left"
             >
-              <h2 className="font-display font-medium text-sm text-slate-200 flex items-center gap-2">
+              <h2 className="font-display font-medium text-sm text-night-text flex items-center gap-2">
                 <MessageSquare className="w-4.5 h-4.5 text-primary" />
                 Sécurité & Chiffrement
               </h2>
-              <p className="text-xs text-slate-400 leading-relaxed">
+              <p className="text-xs text-night-muted leading-relaxed">
                 Cette page n’enregistre pas votre message. Votre application de messagerie prend en charge l’envoi.
               </p>
             </div>
@@ -147,10 +147,10 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
                     className="space-y-6 text-left"
                   >
                     <div>
-                      <h2 className="font-display font-medium text-xl text-slate-100 tracking-tight">
+                      <h2 className="font-display font-medium text-xl text-night-text tracking-tight">
                         Envoyer un message
                       </h2>
-                      <p className="text-xs text-slate-400 mt-1">
+                      <p className="text-xs text-night-muted mt-1">
                         Remplissez le formulaire ci-dessous pour joindre notre équipe.
                       </p>
                     </div>
@@ -158,7 +158,7 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
                     <form onSubmit={handleSubmit} className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
-                          <label className="text-xs font-medium text-slate-300">Votre nom complet</label>
+                          <label className="text-xs font-medium text-night-muted">Votre nom complet</label>
                           <input
                             type="text"
                             required
@@ -169,7 +169,7 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
                           />
                         </div>
                         <div className="space-y-1.5">
-                          <label className="text-xs font-medium text-slate-300">Adresse e-mail professionnelle</label>
+                          <label className="text-xs font-medium text-night-muted">Adresse e-mail professionnelle</label>
                           <input
                             type="email"
                             required
@@ -182,12 +182,12 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
                       </div>
 
                       <div className="space-y-1.5">
-                        <label htmlFor="contact-subject" className="text-xs font-medium text-slate-300">Sujet de votre demande</label>
+                        <label htmlFor="contact-subject" className="text-xs font-medium text-night-muted">Sujet de votre demande</label>
                         <select
                           id="contact-subject"
                           value={formData.subject}
                           onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                          className="w-full px-4 py-2.5 rounded-xl border border-white/10 bg-[#121624] text-white text-sm focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary transition-all"
+                          className="w-full px-4 py-2.5 rounded-xl border border-white/10 bg-night-surface text-white text-sm focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary transition-all"
                         >
                           <option value="support">Support Technique / Fausse classification</option>
                           <option value="sales">Demande Commerciale / Tarifs</option>
@@ -197,7 +197,7 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-slate-300">Votre message</label>
+                        <label className="text-xs font-medium text-night-muted">Votre message</label>
                         <textarea
                           required
                           rows={4}
@@ -223,7 +223,7 @@ export default function ContactRoute({ onBack }: ContactRouteProps) {
 
         </main>
 
-        <footer className="text-center text-xs text-slate-500">
+        <footer className="text-center text-xs text-night-faint">
           © 2026 Sicurre. Tous droits réservés.
         </footer>
       </div>

@@ -95,7 +95,7 @@ export function Turnstile({
       id={containerId}
       role="group"
       aria-label="Vérification anti-robot"
-      className="min-h-[65px] w-full overflow-hidden rounded-lg bg-slate-950/60"
+      className="min-h-[65px] w-full overflow-hidden rounded-lg bg-night-surface/60"
     />
   );
 }
