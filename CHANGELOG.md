@@ -10,6 +10,12 @@ the authoritative record. This file summarises the notable changes only.
 Deployed from `main` without a version tag: refactor commits do not bump the
 version.
 
+- The landing-page animation delivers every email once. The envelope's timers
+  restarted on each parent render, so the arrival stage never ran: messages
+  piled up, bins never bounced and the scanner stayed lit. Found by the new
+  animation tests; the handlers are now read through a ref.
+- The front files that had no test have one: 105 new Vitest tests, whole-tree
+  line coverage from 44% to 64%.
 - The deploy prunes every unused image, not only dangling ones. SHA-tagged
   images from earlier deploys had filled the 75 GB host disk and blocked a
   deploy at the config copy step.
