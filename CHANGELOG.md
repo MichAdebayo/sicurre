@@ -5,6 +5,13 @@ notes are generated from Conventional Commits by semantic-release and published
 to [GitHub Releases](https://github.com/MichAdebayo/sicurre/releases), which is
 the authoritative record. This file summarises the notable changes only.
 
+## [1.37.8] - 2026-09-14
+
+- The quarantine page lists held messages newest first on its own, whatever
+  order the API returns, and the API test pins its newest-first ordering.
+- Deleting a quarantined email asks one short question ("Supprimer cet
+  e-mail ?") and confirms with "E-mail supprimé.".
+
 ## [1.37.7] - 2026-09-13
 
 - Mail that is not the customer's is delivered untouched, with nothing stored
