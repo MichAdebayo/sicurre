@@ -5,6 +5,30 @@ notes are generated from Conventional Commits by semantic-release and published
 to [GitHub Releases](https://github.com/MichAdebayo/sicurre/releases), which is
 the authoritative record. This file summarises the notable changes only.
 
+## [1.37.6] - 2026-09-13
+
+- A domain disconnect or account erasure never deletes a Cloudflare Worker that
+  another integration uses or that is on the protected list
+  (`SICURRE_PROTECTED_WORKER_NAMES`, default `sicurre-gw-9e622bde`). Read on
+  Cloudflare: vinse.app and sicurre.com share one account, both vinse.app
+  integrations use that Worker, and the sicurre.com catch-all routes the
+  platform's own mail to it, which the vinse.app catch-all cannot reveal.
+- The dashboard's security score shows a placeholder while it loads and
+  "Note indisponible" in normal-size text only when no grade comes back; it
+  used to print that text in the 48 px grade font after every sign-in. The
+  shield status queries its two blocklists at the same time.
+- No text is forced into capitals any more: the quarantine count badge, the
+  KPI and security score labels, the connection status badge, the alert rule
+  type badge, the landing page label and the `app-label-tiny` style.
+- The admin console names the `revoked`, `pending_verification` and
+  `provisioning` statuses in the interface language, and its delete actions
+  keep their red on hover.
+- nginx: a default HTTPS server refuses, during the TLS handshake, any
+  connection whose host name matches no vhost, such as a scan of the server's
+  IP. CD installs it with `sicurre.com.conf`, restores the previous files if
+  `nginx -t` rejects them, and checks that sicurre.com still answers and that
+  an unknown name is refused.
+
 ## [1.37.5] - 2026-09-13
 
 - Authenticated API requests do less before their own work. Every request

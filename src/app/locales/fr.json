@@ -277,7 +277,10 @@
       "feedback": "retour utilisateur",
       "other": "autre",
       "open": "ouvert",
-      "closed": "fermé"
+      "closed": "fermé",
+      "revoked": "révoqué",
+      "pending_verification": "vérification en attente",
+      "provisioning": "configuration en cours"
     }
   },
   "threats": {

@@ -206,7 +206,7 @@ jobs:
           host: ${{ secrets.HETZNER_HOST }}
           username: ${{ secrets.HETZNER_USER }}
           key: ${{ secrets.HETZNER_SSH_KEY }}
-          source: "docker-compose.prod.yml,deploy/alloy/config.alloy,deploy/nginx/conf.d/sicurre.com.conf,deploy/hetzner/sicurre-crontab.example,deploy/env.compose.example,deploy/env.api.example,deploy/env.auth.example,deploy/env.alloy.example,deploy/grafana/dashboards/sicurre-runtime-overview.json,deploy/grafana/dashboards/sicurre-infrastructure.json,deploy/grafana/dashboards/sicurre-telemetry-pipeline.json,deploy/grafana/dashboards/sicurre-controlled-exercise.json,deploy/grafana/alerts/sicurre-alerts.json,scripts/deploy/provision_grafana_dashboard.mjs,scripts/deploy/retry.mjs,scripts/deploy/notification-policy.mjs"
+          source: "docker-compose.prod.yml,deploy/alloy/config.alloy,deploy/nginx/conf.d/sicurre.com.conf,deploy/nginx/conf.d/00-default-https.conf,deploy/hetzner/sicurre-crontab.example,deploy/env.compose.example,deploy/env.api.example,deploy/env.auth.example,deploy/env.alloy.example,deploy/grafana/dashboards/sicurre-runtime-overview.json,deploy/grafana/dashboards/sicurre-infrastructure.json,deploy/grafana/dashboards/sicurre-telemetry-pipeline.json,deploy/grafana/dashboards/sicurre-controlled-exercise.json,deploy/grafana/alerts/sicurre-alerts.json,scripts/deploy/provision_grafana_dashboard.mjs,scripts/deploy/retry.mjs,scripts/deploy/notification-policy.mjs"
           target: ${{ secrets.DEPLOY_PATH }}
 
       - name: Pull images and restart app stack
@@ -276,13 +276,38 @@ jobs:
             # Bind-mounted Alloy configuration changes do not alter Compose's service hash.
             docker compose -f docker-compose.prod.yml up -d --force-recreate alloy
 
+            # Install this stack's files into the shared nginx-proxy. The previous
+            # copies are kept until nginx accepts the new ones and restored if it
+            # does not, so a rejected file never outlives this step.
+            NGINX_FILES="sicurre.com.conf 00-default-https.conf"
             docker run --rm \
               -v /opt/nginx-proxy/conf.d:/target \
-              -v "${{ secrets.DEPLOY_PATH }}/deploy/nginx/conf.d/sicurre.com.conf:/src/sicurre.com.conf:ro" \
-              alpine cp /src/sicurre.com.conf /target/sicurre.com.conf
-
-            docker exec nginx-proxy nginx -t
-            docker exec nginx-proxy nginx -s reload
+              -v "${{ secrets.DEPLOY_PATH }}/deploy/nginx/conf.d:/src:ro" \
+              -e NGINX_FILES="$NGINX_FILES" \
+              alpine sh -c 'set -e; for f in $NGINX_FILES; do if [ -f "/target/$f" ]; then cp -p "/target/$f" "/target/.$f.previous"; else rm -f "/target/.$f.previous"; fi; cp "/src/$f" "/target/$f"; done'
+            if docker exec nginx-proxy nginx -t; then
+              docker exec nginx-proxy nginx -s reload
+              docker run --rm -v /opt/nginx-proxy/conf.d:/target -e NGINX_FILES="$NGINX_FILES" \
+                alpine sh -c 'for f in $NGINX_FILES; do rm -f "/target/.$f.previous"; done'
+            else
+              docker run --rm -v /opt/nginx-proxy/conf.d:/target -e NGINX_FILES="$NGINX_FILES" \
+                alpine sh -c 'for f in $NGINX_FILES; do if [ -f "/target/.$f.previous" ]; then mv "/target/.$f.previous" "/target/$f"; else rm -f "/target/$f"; fi; done'
+              docker exec nginx-proxy nginx -t
+              echo "nginx rejected the new files; the previous ones were restored" >&2
+              exit 1
+            fi
+            # A named host still answers, and a connection for an unknown name,
+            # such as the server's IP, is refused during the TLS handshake.
+            sleep 2
+            site_status=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 10 --resolve sicurre.com:443:127.0.0.1 https://sicurre.com/ || true)
+            if [ "$site_status" != "200" ]; then
+              echo "sicurre.com answered ${site_status} through nginx after the reload" >&2
+              exit 1
+            fi
+            if curl -sk -o /dev/null --max-time 5 https://127.0.0.1/; then
+              echo "nginx still completes a TLS handshake for an unknown host name" >&2
+              exit 1
+            fi
             # Every deploy pulls SHA-tagged images, which are never dangling, so
             # "-f" alone let them pile up until the disk filled (12 Sept 2026,
             # 72 GB of images on a 75 GB disk). Unused images go; running ones stay.

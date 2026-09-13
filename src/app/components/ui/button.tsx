@@ -1,7 +1,7 @@
 import { type ButtonHTMLAttributes, forwardRef } from "react";
 import { clsx } from "clsx";
 
-type ButtonVariant = "primary" | "warning" | "ghost" | "outline" | "danger";
+type ButtonVariant = "primary" | "warning" | "ghost" | "outline" | "danger" | "danger-ghost" | "danger-outline";
 type ButtonSize = "sm" | "md" | "lg";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -21,6 +21,11 @@ const variantStyles: Record<ButtonVariant, string> = {
     "bg-transparent text-on-surface hover:bg-surface-container",
   outline:
     "bg-surface-lowest border border-border-subtle text-on-surface hover:bg-surface-container",
+  // Destructive actions keep their red on hover instead of turning grey.
+  "danger-ghost":
+    "bg-transparent text-error hover:bg-error/10",
+  "danger-outline":
+    "bg-surface-lowest border border-error/40 text-error hover:bg-error/10",
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
