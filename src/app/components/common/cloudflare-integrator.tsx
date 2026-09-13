@@ -85,7 +85,7 @@ function StatusBadge({ status }: { status: string }) {
   };
   const cfg = map[status] ?? map.not_configured;
   return (
-    <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.1em] px-2.5 py-1 rounded-full border ${cfg.className}`}>
+    <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full border ${cfg.className}`}>
       {cfg.icon}
       {cfg.label}
     </span>

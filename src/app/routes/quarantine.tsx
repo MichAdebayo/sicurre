@@ -155,7 +155,7 @@ export default function QuarantineRoute() {
         <h1 className="app-h1 flex items-center gap-3">
           {t("quarantine.title")}
           {phishingItems.length > 0 && (
-            <span className="inline-flex items-center bg-error/10 text-error text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
+            <span className="inline-flex items-center bg-error/10 text-error text-xs font-bold px-2.5 py-1 rounded-full">
               {t("quarantine.header_count", { count: phishingItems.length })}
             </span>
           )}

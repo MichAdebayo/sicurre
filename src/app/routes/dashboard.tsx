@@ -59,7 +59,7 @@ function KPIBlock({
 
   return (
     <div aria-busy={loading || undefined} className={`rounded-xl border p-5 shadow-sm transition-all duration-300 ${styles[variant]}`}>
-      <p className="text-[11px] font-bold text-on-surface-variant uppercase tracking-[0.12em] mb-2">
+      <p className="text-[11px] font-bold text-on-surface-variant mb-2">
         {label}
       </p>
       <p className={`font-display font-bold text-[32px] tracking-tight leading-none ${textStyles[variant]}`}>
@@ -90,7 +90,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
   const hasActiveDomain = !!activeDomain;
   const showOnboarding = session.onboarding_required || (domainsList ? domainsList.length === 0 : !activeDomain);
 
-  const { data: shieldStatus } = useDomainShieldStatus(
+  const { data: shieldStatus, isLoading: shieldLoading } = useDomainShieldStatus(
     activeDomain || "",
     !!activeDomain
   );
@@ -286,7 +286,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
         {/* Security Grade Hero (Reduced circle, overflow-visible for z-index tooltip popup) */}
         <div className="md:col-span-4 bg-white rounded-xl border border-border-subtle p-6 flex flex-col items-center justify-center text-center shadow-sm relative overflow-visible">
           <div className="absolute top-0 left-6 right-6 h-[3px] bg-primary rounded-b-md" />
-          <div className="text-[12px] font-extrabold uppercase tracking-wider text-on-surface-variant mb-5 flex items-center justify-center gap-1.5 w-full">
+          <div className="text-[12px] font-extrabold text-on-surface-variant mb-5 flex items-center justify-center gap-1.5 w-full">
             <Award className="w-4 h-4 text-primary" />
             <span>{t("dashboard.security_score")}</span>
 
@@ -298,8 +298,18 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
               </div>
             </div>
           </div>
-          <div className="w-28 h-28 rounded-full bg-primary/[0.04] border border-primary/10 flex items-center justify-center font-display font-extrabold text-5xl text-primary shadow-inner">
-            {grade}
+          <div aria-busy={shieldLoading || undefined} className="w-28 h-28 rounded-full bg-primary/[0.04] border border-primary/10 flex items-center justify-center text-primary shadow-inner">
+            {shieldLoading ? (
+              <>
+                <span aria-hidden="true" className="inline-block h-10 w-10 rounded bg-surface-container" />
+                <span className="sr-only">{t("common.loading")}</span>
+              </>
+            ) : shieldStatus ? (
+              <span className="font-display font-extrabold text-5xl">{grade}</span>
+            ) : (
+              // Only a grade gets the display size; an absent one is a plain sentence.
+              <span className="px-3 text-sm font-semibold leading-tight text-on-surface-variant">{grade}</span>
+            )}
           </div>
         </div>
 

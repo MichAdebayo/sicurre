@@ -194,3 +194,16 @@ describe("refresh button", () => {
     expect(mocks.refetch).toHaveBeenCalledOnce();
   });
 });
+
+describe("destructive actions", () => {
+  it("keep their red on hover instead of the neutral grey", () => {
+    renderPage(<AdminIntegrationsRoute />);
+    const rowDelete = screen.getByRole("button", { name: "Supprimer le compte owner@example.test" });
+    const formDelete = screen.getByRole("button", { name: "Supprimer" });
+
+    for (const button of [rowDelete, formDelete]) {
+      expect(button).toHaveClass("text-error", "hover:bg-error/10");
+      expect(button).not.toHaveClass("hover:bg-surface-container");
+    }
+  });
+});

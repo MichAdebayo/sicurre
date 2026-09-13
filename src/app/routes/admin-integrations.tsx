@@ -129,7 +129,7 @@ export default function AdminIntegrationsRoute({ currentEmail = "" }: AdminInteg
         }
         const email = row.user_email;
         return (
-          <Button variant="ghost" size="sm" className="gap-1.5 text-error cursor-pointer" onClick={() => askErase([email])}
+          <Button variant="danger-ghost" size="sm" className="gap-1.5 cursor-pointer" onClick={() => askErase([email])}
             aria-label={t("admin.erase_row_label", { email })}>
             <Trash2 className="h-4 w-4" aria-hidden="true" />{t("admin.erase_account")}
           </Button>
@@ -186,7 +186,7 @@ export default function AdminIntegrationsRoute({ currentEmail = "" }: AdminInteg
             <Input label={t("admin.erase_by_email_label")} type="email" autoComplete="off" value={eraseEmailInput}
               onChange={(event) => setEraseEmailInput(event.target.value)} />
           </div>
-          <Button type="submit" variant="outline" className="gap-2 shrink-0 cursor-pointer text-error" disabled={!eraseEmailInput.trim()}>
+          <Button type="submit" variant="danger-outline" className="gap-2 shrink-0 cursor-pointer" disabled={!eraseEmailInput.trim()}>
             <Trash2 className="h-4 w-4" aria-hidden="true" />{t("admin.erase_account")}
           </Button>
         </form>

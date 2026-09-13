@@ -519,6 +519,17 @@ async def teardown_cloudflare(
             )
         )
 
+        # A Worker named after a zone id can outlive its first integration, and
+        # the platform's own catch-all may route to it from another zone, which
+        # this zone's catch-all cannot reveal. Keep it in either case.
+        shared_worker = await _async_query(
+            "SELECT id FROM cloudflare_integration WHERE worker_name = ? AND id <> ? LIMIT 1",
+            (row["worker_name"], row["id"]),
+        )
+        keep_worker = bool(shared_worker) or (
+            str(row["worker_name"]) in settings.protected_worker_name_set
+        )
+
         try:
             provisioner = CloudflareProvisioner(api_token=api_token)
             await provisioner.teardown(
@@ -526,6 +537,7 @@ async def teardown_cloudflare(
                 account_id=row["account_id"],
                 worker_name=row["worker_name"],
                 rule_id=row.get("rule_id") or "unknown",
+                keep_worker=keep_worker,
             )
         except CloudflareAPIError as exc:
             logger.warning("Cloudflare teardown had errors: %s", exc)

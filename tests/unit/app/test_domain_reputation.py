@@ -1,7 +1,9 @@
 """Domain reputation response classification tests."""
 
+import asyncio
 from collections.abc import Callable
 
+import dns.resolver
 import pytest
 
 from data_platform.api.routers import domain_shield
@@ -186,3 +188,26 @@ async def test_without_dqs_key_uses_free_spamhaus_mirror(
     spamhaus_queries = [h for h in queried_hosts if "spamhaus" in h]
     assert len(spamhaus_queries) == 1
     assert spamhaus_queries[0] == "example.com.dbl.spamhaus.org"
+
+
+@pytest.mark.asyncio
+async def test_both_blocklists_are_queried_at_the_same_time(monkeypatch) -> None:
+    """A slow resolver for one list must not delay the other."""
+    started: list[str] = []
+    release = asyncio.Event()
+
+    async def concurrent_thread(function, *args):
+        started.append(args[0])
+        if len(started) == 2:
+            release.set()
+        await asyncio.wait_for(release.wait(), timeout=1)
+        return function(*args)
+
+    def not_listed(query_host: str, record_type: str):
+        raise dns.resolver.NXDOMAIN
+
+    monkeypatch.setattr(domain_shield.asyncio, "to_thread", concurrent_thread)
+    monkeypatch.setattr("dns.resolver.resolve", not_listed)
+
+    assert await _check_domain_blacklists("vinse.app") == ([], [])
+    assert started == ["vinse.app.dbl.spamhaus.org", "vinse.app.multi.surbl.org"]

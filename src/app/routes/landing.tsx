@@ -413,7 +413,7 @@ export default function LandingRoute({
                         <div className="font-display font-semibold text-[24px] text-white tracking-[-0.02em] leading-tight">
                           {feat.stat}
                         </div>
-                        <div className="text-[11px] uppercase tracking-[0.12em] font-bold text-primary">
+                        <div className="text-[11px] font-bold text-primary">
                           {feat.label}
                         </div>
                         <h3 className="font-display font-medium text-[20px] text-night-text tracking-tight leading-snug">

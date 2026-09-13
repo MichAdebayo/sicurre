@@ -636,8 +636,12 @@ class CloudflareProvisioner:
         account_id: str,
         worker_name: str,
         rule_id: str,
+        keep_worker: bool = False,
     ) -> None:
         """Remove the routing rule and Worker for a previously provisioned zone.
+
+        ``keep_worker`` keeps a Worker the caller knows is shared, with another
+        integration or with the platform, whatever the zone's own catch-all says.
 
         The Worker the zone's catch-all sends mail to is never deleted: on the
         platform's own zone it receives Sicurre's DMARC reports and the emails
@@ -649,6 +653,10 @@ class CloudflareProvisioner:
                 await self.delete_email_rule(zone_id, rule_id)
             except CloudflareAPIError as exc:
                 logger.warning("Could not delete routing rule %s: %s", rule_id, exc)
+
+        if keep_worker:
+            logger.warning("Kept Worker '%s': it is shared beyond zone %s", worker_name, zone_id)
+            return
 
         try:
             protected = await self.catch_all_worker(zone_id)

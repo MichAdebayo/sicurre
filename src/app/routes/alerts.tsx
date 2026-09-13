@@ -385,7 +385,7 @@ export default function AlertsRoute({ mode = "history" }: AlertsRouteProps) {
                   >
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${rule.rule_type === "whitelist" ? "bg-safe/10 text-safe" : "bg-error/10 text-error"
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${rule.rule_type === "whitelist" ? "bg-safe/10 text-safe" : "bg-error/10 text-error"
                           }`}>
                           {rule.rule_type === "whitelist"
                             ? t("alerts.allow")
