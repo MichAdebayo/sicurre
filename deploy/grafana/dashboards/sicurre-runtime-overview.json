@@ -159,6 +159,23 @@
           "decimals": 3,
           "color": {
             "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 5
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
           }
         },
         "overrides": []
@@ -180,13 +197,13 @@
           "refId": "A"
         }
       ],
-      "description": "Average user requests per second over the five minutes before now. A stat keeps the last value, so this does not follow the time picker; the graph below does."
+      "description": "Average user requests per second over the five minutes before now. A stat keeps the last value, so this does not follow the time picker; the graph below does. Yellow from 5 req/s, red from 10 req/s: the scan route refuses more than 600 requests per minute per client, so 10 req/s is the rate at which the API itself starts saying no."
     },
     {
       "id": 10,
       "type": "stat",
       "title": "Requests in Selected Range",
-      "description": "User requests (app, API, auth) counted over the time range selected at the top of the dashboard. Health probes, metrics scrapes and static assets are excluded.",
+      "description": "User requests (app, API, auth) counted over the time range selected at the top of the dashboard. Health probes, metrics scrapes and static assets are excluded. A count has no good or bad value, so it carries no colour.",
       "datasource": {
         "type": "prometheus",
         "uid": "${prometheus}"
@@ -202,7 +219,8 @@
           "unit": "short",
           "decimals": 0,
           "color": {
-            "mode": "thresholds"
+            "mode": "fixed",
+            "fixedColor": "text"
           }
         },
         "overrides": []
