@@ -12,6 +12,11 @@ the authoritative record. This file summarises the notable changes only.
   the current build; any other render failure shows a short message with a
   reload button. The app server answers a missing build file with a 404
   instead of the application shell.
+- The e-mail verification link no longer loops on a Cloudflare security check.
+  The app server followed the auth service's redirect to /login itself, from
+  the Hetzner host; Cloudflare Bot Fight Mode challenged that datacenter
+  request and the challenge reached the visitor. Redirects now go back to the
+  browser.
 
 ## [1.37.10] - 2026-09-14
 

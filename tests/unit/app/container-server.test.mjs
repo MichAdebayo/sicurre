@@ -30,6 +30,12 @@ beforeAll(async () => {
       request.socket.destroy();
       return;
     }
+    if (request.url.startsWith("/api/auth/verify-email")) {
+      // Port 1 refuses connections: a gateway that followed this would answer 502.
+      response.writeHead(302, { Location: "http://127.0.0.1:1/login?verified=1", "Set-Cookie": "probe=1; Path=/" });
+      response.end();
+      return;
+    }
     const chunks = [];
     request.on("data", (chunk) => chunks.push(chunk));
     request.on("end", () => {
@@ -154,6 +160,16 @@ describe("app gateway routing and metrics", () => {
     expect(postBody.body).toBe('{"ok":true}');
 
     expect((await fetch(`${gatewayBase}/v1/items`, { method: "HEAD" })).status).toBe(201);
+  });
+
+  it("hands upstream redirects back to the browser instead of following them", async () => {
+    const redirect = await fetch(`${gatewayBase}/api/auth/verify-email?token=t&callbackURL=%2Flogin%3Fverified%3D1`, {
+      redirect: "manual",
+    });
+
+    expect(redirect.status).toBe(302);
+    expect(redirect.headers.get("location")).toBe("http://127.0.0.1:1/login?verified=1");
+    expect(redirect.headers.get("set-cookie")).toContain("probe=1");
   });
 
   it("returns a stable 502 when an upstream connection fails", async () => {
