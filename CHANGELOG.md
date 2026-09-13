@@ -5,7 +5,16 @@ notes are generated from Conventional Commits by semantic-release and published
 to [GitHub Releases](https://github.com/MichAdebayo/sicurre/releases), which is
 the authoritative record. This file summarises the notable changes only.
 
-## [1.34.0] - 2026-09-13
+## [1.37.1] - 2026-09-13
+
+- Erasing an account no longer tears down the platform's own zone on
+  Cloudflare. `sicurre.com` is both the platform's mail zone and the zone the
+  demonstration account connects, and both share one Worker: the erasure now
+  deletes that zone's rows, keeps its Worker and routing rule, and logs a
+  warning. The zone is read from the report mailbox setting. Every other zone
+  is still torn down first.
+
+## [1.37.0] - 2026-09-13
 
 - A member can erase their account from Settings, Profile, by typing their
   address again: connected domains are torn down on Cloudflare, every
