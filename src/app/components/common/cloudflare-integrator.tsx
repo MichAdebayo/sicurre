@@ -170,23 +170,32 @@ export function CloudflareIntegrator({ userEmail, onSuccess }: CloudflareIntegra
   }, [cfStatus?.status, isIntegrating, t]);
 
   // React to status completion updates during routing step
+  const routingStatus = stages.find((s) => s.id === "routing")?.status;
   useEffect(() => {
-    let timerId: NodeJS.Timeout | undefined;
-    if (isIntegrating && stages.find(s => s.id === "routing")?.status === "loading") {
-      if (cfStatus?.status === "pending_verification" || cfStatus?.status === "active") {
-        setStages(prev => prev.map(s => s.id === "routing" ? { ...s, status: "success" } : s));
-        timerId = setTimeout(() => {
-          setIsIntegrating(false);
-          onSuccess?.();
-        }, 1500);
-      } else if (cfStatus?.status === "error") {
-        setStages(prev => prev.map(s => s.id === "routing" ? { ...s, status: "error", errorMsg: formatCloudflareError(t, cfStatus.error_message || t("cloudflare.final_setup_failed")) } : s));
-      }
+    if (!isIntegrating || routingStatus !== "loading") return;
+    if (cfStatus?.status === "pending_verification" || cfStatus?.status === "active") {
+      setStages(prev => prev.map(s => s.id === "routing" ? { ...s, status: "success" } : s));
+    } else if (cfStatus?.status === "error") {
+      setStages(prev => prev.map(s => s.id === "routing" ? { ...s, status: "error", errorMsg: formatCloudflareError(t, cfStatus.error_message || t("cloudflare.final_setup_failed")) } : s));
     }
-    return () => {
-      if (timerId) clearTimeout(timerId);
-    };
-  }, [cfStatus?.status, isIntegrating, stages, onSuccess, t]);
+  }, [cfStatus?.status, cfStatus?.error_message, isIntegrating, routingStatus, t]);
+
+  // Once the routing step is done, leave the checklist up for 1.5 s and hand
+  // over to the parent. Keyed on the stage status alone, and reading the parent
+  // callback through a ref, so neither a stage update nor a parent render
+  // restarts the timer: that is what kept the checklist on screen for good.
+  const onSuccessRef = useRef(onSuccess);
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+  });
+  useEffect(() => {
+    if (!isIntegrating || routingStatus !== "success") return;
+    const timerId = setTimeout(() => {
+      setIsIntegrating(false);
+      onSuccessRef.current?.();
+    }, 1500);
+    return () => clearTimeout(timerId);
+  }, [isIntegrating, routingStatus]);
 
   // Poll status ONLY when integrating or provisioning in the background
   useEffect(() => {

@@ -18,9 +18,15 @@ version.
   line coverage from 44% to 64%.
 - The Vitest coverage gate measures the whole front. It used to gate seven
   hand-picked files at 90%; it now counts every file under `src/app` plus the
-  auth sidecar and the container server, tested or not, with floors just under
-  the measured figures (lines 60%, statements 60%, branches 60%, functions
-  50%; measured 66%, 63%, 67%, 58% on 13 September 2026).
+  auth sidecar and the container server, tested or not. With 300 more tests on
+  the API client, the routes, the login, the top bar, the Turnstile widget and
+  the Cloudflare integrator, the front measures 96% lines, 95% statements,
+  91% branches and 94% functions (13 September 2026); the floors are 90, 90,
+  85 and 90.
+- The Cloudflare connection checklist dismisses itself once provisioning
+  completes and tells the settings page. Its completion timer was cleared by
+  its own effect re-running, so the checklist stayed on screen and the page
+  never refreshed. Found by the new integrator tests.
 - Starting a synthetic exercise is limited to 10 per hour (was 2), stopping
   one to 12 per hour (was 6), so a rehearsal plus the defence no longer trips
   the limit. The admin panel names the limit when it is hit instead of the
