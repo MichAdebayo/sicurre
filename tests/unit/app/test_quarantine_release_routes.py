@@ -189,6 +189,7 @@ async def test_list_quarantine_returns_only_the_held_items_of_the_owned_domain(m
         }
     ]
     assert "status = 'held'" in db.queries[0][0]
+    assert db.queries[0][0].rstrip().endswith("ORDER BY created_at DESC")
     assert db.queries[0][1] == ("workspace-1", "example.test")
 
 

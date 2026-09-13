@@ -115,10 +115,11 @@ export default function QuarantineRoute() {
     return escaped.replace(/\n/g, "<br />");
   };
 
-  // Only phishing emails should be inside the quarantine page list
-  const phishingItems = items
-    ? items.filter((item) => item.safety_verdict === "phishing")
-    : [];
+  // Only phishing emails belong in this list, newest first whatever order the server sends.
+  const receivedAt = (value: string) => Date.parse(value) || 0;
+  const phishingItems = (items ?? [])
+    .filter((item) => item.safety_verdict === "phishing")
+    .sort((a, b) => receivedAt(b.created_at) - receivedAt(a.created_at));
 
   // Paginated columns items
   const totalItems = phishingItems.length;
@@ -412,7 +413,6 @@ export default function QuarantineRoute() {
             {t("quarantine.confirm_delete")}
           </span>
         }
-        description={t("quarantine.confirm_delete_desc")}
         footer={
           <div className="flex justify-end gap-2.5">
             <Button

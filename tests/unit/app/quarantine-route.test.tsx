@@ -280,6 +280,23 @@ describe("quarantine preview dialog", () => {
   });
 });
 
+describe("quarantine order", () => {
+  it("lists the newest held message first whatever order the server sends", () => {
+    setItems([
+      item({ id: "old", subject: "Ancien", created_at: "2026-09-04T11:12:44.165083+00:00" }),
+      item({ id: "new", subject: "Récent", created_at: "2026-09-13T21:04:25.976231+00:00" }),
+      item({ id: "mid", subject: "Milieu", created_at: "2026-09-13T21:04:21Z" }),
+    ]);
+    render(<QuarantineRoute />);
+
+    const subjects = screen
+      .getAllByRole("heading", { level: 3 })
+      .map((heading) => heading.textContent)
+      .filter((text) => ["Ancien", "Récent", "Milieu"].includes(text ?? ""));
+    expect(subjects).toEqual(["Récent", "Milieu", "Ancien"]);
+  });
+});
+
 describe("quarantine delete confirmation", () => {
   it("asks for confirmation and cancels without deleting", () => {
     setItems([item()]);
@@ -289,7 +306,8 @@ describe("quarantine delete confirmation", () => {
     fireEvent.click(screen.getByRole("button", { name: "quarantine.delete" }));
 
     const confirm = screen.getByRole("alertdialog", { name: "quarantine.confirm_delete" });
-    expect(within(confirm).getByText("quarantine.confirm_delete_desc")).toBeInTheDocument();
+    // One short question, nothing more to read before choosing.
+    expect(confirm).not.toHaveAttribute("aria-describedby");
     expect(within(confirm).getByRole("button", { name: "common.cancel" })).toHaveFocus();
 
     fireEvent.click(within(confirm).getByRole("button", { name: "common.cancel" }));
