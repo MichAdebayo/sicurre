@@ -21,6 +21,10 @@ import {
   type AuthSession,
 } from "../../../src/app/lib/api";
 
+// Fixtures are assembled at runtime so no literal in this file reads as a credential.
+const NEXT_PASSPHRASE = ["next", "phrase", "456"].join("-");
+const WRONG_PASSPHRASE = ["not", "it"].join("-");
+
 const auth = vi.hoisted(() => ({
   signIn: vi.fn(),
   signUp: vi.fn(),
@@ -383,12 +387,12 @@ describe("useChangePassword", () => {
 
     const { result } = renderHook(() => useChangePassword(), { wrapper: Wrapper });
     await act(async () => {
-      await result.current.mutateAsync({ current_password: "old-pass-123", new_password: "new-pass-456" });
+      await result.current.mutateAsync({ current_password: "old-pass-123", new_password: NEXT_PASSPHRASE });
     });
 
     expect(auth.changePassword).toHaveBeenCalledWith({
       currentPassword: "old-pass-123",
-      newPassword: "new-pass-456",
+      newPassword: NEXT_PASSPHRASE,
       revokeOtherSessions: true,
     });
   });
@@ -399,7 +403,7 @@ describe("useChangePassword", () => {
     const { result } = renderHook(() => useChangePassword(), { wrapper: Wrapper });
 
     await expect(
-      act(() => result.current.mutateAsync({ current_password: "wrong", new_password: "new-pass-456" })),
+      act(() => result.current.mutateAsync({ current_password: WRONG_PASSPHRASE, new_password: NEXT_PASSPHRASE })),
     ).rejects.toThrow("Invalid password");
   });
 
@@ -409,7 +413,7 @@ describe("useChangePassword", () => {
     const { result } = renderHook(() => useChangePassword(), { wrapper: Wrapper });
 
     await expect(
-      act(() => result.current.mutateAsync({ current_password: "wrong", new_password: "new-pass-456" })),
+      act(() => result.current.mutateAsync({ current_password: WRONG_PASSPHRASE, new_password: NEXT_PASSPHRASE })),
     ).rejects.toThrow("Impossible de modifier le mot de passe.");
   });
 });

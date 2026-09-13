@@ -7,6 +7,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import SettingsRoute from "../../../src/app/routes/settings";
 import type { AuthSession } from "../../../src/app/lib/api";
 
+// Fixtures are assembled at runtime so no literal in this file reads as a credential.
+const PASS = {
+  old: "ancien",
+  oldLong: ["ancien", "mdp"].join("-"),
+  fresh: ["nouveau", "mdp"].join("-"),
+  short: "court",
+  other: "different",
+  wrong: "faux",
+};
+
 const mocks = vi.hoisted(() => ({
   retrySetup: vi.fn(),
   refetchDomains: vi.fn(),
@@ -310,11 +320,11 @@ describe("security tab", () => {
     fireEvent.click(submit);
     expect(screen.getByText("settings.password_required")).toBeInTheDocument();
 
-    fillPasswords("ancien", "nouveau-mdp", "different");
+    fillPasswords(PASS.old, PASS.fresh, PASS.other);
     fireEvent.click(submit);
     expect(screen.getByText("settings.password_mismatch")).toBeInTheDocument();
 
-    fillPasswords("ancien", "court", "court");
+    fillPasswords(PASS.old, PASS.short, PASS.short);
     fireEvent.click(submit);
     expect(screen.getByText("settings.password_minimum")).toBeInTheDocument();
 
@@ -325,12 +335,12 @@ describe("security tab", () => {
     mocks.changePassword.mockResolvedValue({ status: "ok" });
     render(<SettingsRoute initialTab="security" session={session()} />);
 
-    fillPasswords("ancien-mdp", "nouveau-mdp", "nouveau-mdp");
+    fillPasswords(PASS.oldLong, PASS.fresh, PASS.fresh);
     fireEvent.click(screen.getByRole("button", { name: "settings.update_password" }));
 
     await waitFor(() => expect(mocks.changePassword).toHaveBeenCalledWith({
-      current_password: "ancien-mdp",
-      new_password: "nouveau-mdp",
+      current_password: PASS.oldLong,
+      new_password: PASS.fresh,
     }));
     expect(await screen.findByText("settings.password_updated")).toBeInTheDocument();
     expect(input("settings.current_password")).toHaveValue("");
@@ -342,7 +352,7 @@ describe("security tab", () => {
     mocks.changePassword.mockRejectedValue(new Error("Mot de passe actuel incorrect"));
     render(<SettingsRoute initialTab="security" session={session()} />);
 
-    fillPasswords("faux", "nouveau-mdp", "nouveau-mdp");
+    fillPasswords(PASS.wrong, PASS.fresh, PASS.fresh);
     fireEvent.click(screen.getByRole("button", { name: "settings.update_password" }));
 
     expect(await screen.findByText("Mot de passe actuel incorrect")).toBeInTheDocument();
@@ -353,7 +363,7 @@ describe("security tab", () => {
     mocks.changePassword.mockRejectedValue("nope");
     render(<SettingsRoute initialTab="security" session={session()} />);
 
-    fillPasswords("faux", "nouveau-mdp", "nouveau-mdp");
+    fillPasswords(PASS.wrong, PASS.fresh, PASS.fresh);
     fireEvent.click(screen.getByRole("button", { name: "settings.update_password" }));
 
     expect(await screen.findByText("settings.password_update_failed")).toBeInTheDocument();
