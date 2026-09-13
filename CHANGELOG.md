@@ -5,6 +5,14 @@ notes are generated from Conventional Commits by semantic-release and published
 to [GitHub Releases](https://github.com/MichAdebayo/sicurre/releases), which is
 the authoritative record. This file summarises the notable changes only.
 
+## [1.37.4] - 2026-09-13
+
+- The operational test panel no longer shows a status pill. "Prêt" repeated
+  the enabled "Tester l’alerte" button, and "Actif" repeated the running block
+  with its countdown and stop button. When tests are turned off on the server,
+  "Désactivé par configuration" now sits beside the greyed-out button, the one
+  place the reason was otherwise missing.
+
 ## [1.37.3] - 2026-09-13
 
 - The dashboard's four KPI cards show a quiet placeholder bar while their

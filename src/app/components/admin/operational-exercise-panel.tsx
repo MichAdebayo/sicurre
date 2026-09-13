@@ -67,13 +67,6 @@ export function OperationalExercisePanel() {
           </h2>
           <p className="mt-2 text-sm text-on-surface-variant">{t("operational_test.subtitle")}</p>
         </div>
-        {query.data && !stale && (
-          <span className={`rounded-full border px-3 py-1 text-sm font-semibold ${active
-            ? "border-warning/40 bg-warning-bg text-warning"
-            : "border-border-subtle bg-surface-low text-on-surface"}`}>
-            {t(active ? "operational_test.active" : query.data.enabled ? "operational_test.ready" : "operational_test.disabled")}
-          </span>
-        )}
       </div>
 
       <label className="block max-w-md space-y-2 text-sm font-semibold text-on-surface">
@@ -123,9 +116,15 @@ export function OperationalExercisePanel() {
           </div>
         </div>
       ) : query.data ? (
-        <Button disabled={!canStart || stale || busy} onClick={() => openConfirmation(true)}>
-          <Play className="h-4 w-4" aria-hidden="true" />{t("operational_test.start")}
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button disabled={!canStart || stale || busy} onClick={() => openConfirmation(true)}>
+            <Play className="h-4 w-4" aria-hidden="true" />{t("operational_test.start")}
+          </Button>
+          {/* The button already shows whether a test can start; only a server-side switch-off needs saying. */}
+          {!query.data.enabled && !stale && (
+            <p className="text-sm text-on-surface-variant">{t("operational_test.disabled")}</p>
+          )}
+        </div>
       ) : null}
 
       {actionError && (
