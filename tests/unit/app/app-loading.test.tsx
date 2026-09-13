@@ -59,7 +59,11 @@ vi.mock("../../../src/app/routes/dashboard", () => ({ default: DomainContent }))
 vi.mock("../../../src/app/routes/threats", () => ({ default: DomainContent }));
 vi.mock("../../../src/app/routes/quarantine", () => ({ default: DomainContent }));
 vi.mock("../../../src/app/routes/alerts", () => ({ default: DomainContent }));
-vi.mock("../../../src/app/routes/settings", () => ({ default: () => <h1>Settings page</h1> }));
+vi.mock("../../../src/app/routes/settings", () => ({
+  default: ({ onAccountDeleted }: { onAccountDeleted?: () => void }) => (
+    <><h1>Settings page</h1><button onClick={onAccountDeleted}>Delete account</button></>
+  ),
+}));
 vi.mock("../../../src/app/routes/support", () => ({ default: () => <h1>Support page</h1> }));
 vi.mock("../../../src/app/routes/logs", () => ({ default: () => <h1>Admin console</h1> }));
 vi.mock("../../../src/app/routes/admin-operations", () => ({ default: () => <h1>Admin operations</h1> }));
@@ -304,5 +308,22 @@ describe("ending a session discards the workspace's cached data", () => {
     await screen.findByText("Public page");
 
     expect(state.discardCache).not.toHaveBeenCalled();
+  });
+});
+
+describe("account deletion", () => {
+  it("signs the member out to the landing page and confirms the deletion there", async () => {
+    finishSession();
+    state.domains = { ...state.domains, isLoading: false, data: [
+      { id: "1", zone_name: "vinse.app", status: "active" },
+    ] };
+    window.history.replaceState({}, "", "/app/settings");
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Delete account" }));
+
+    expect(await screen.findByText("Public page")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("settings.account_deleted");
+    expect(screen.queryByText("Settings page")).not.toBeInTheDocument();
   });
 });

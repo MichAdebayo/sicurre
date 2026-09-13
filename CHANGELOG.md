@@ -5,6 +5,22 @@ notes are generated from Conventional Commits by semantic-release and published
 to [GitHub Releases](https://github.com/MichAdebayo/sicurre/releases), which is
 the authoritative record. This file summarises the notable changes only.
 
+## [1.37.3] - 2026-09-13
+
+- The dashboard's four KPI cards show a quiet placeholder bar while their
+  figures load. Since 12 September they printed "Chargement" in the 32 px
+  figure font after every sign-in, because signing out also clears the cached
+  figures; the loading label is kept for screen readers.
+- Deleting one's own account is one button in Settings, Profile. The address
+  is typed in a short dialog, the button shows the deletion in progress, and
+  the landing page confirms "Compte supprimé." once the session is closed. The
+  session used to be discarded the moment the API answered, which dropped the
+  member on the landing page with no message.
+- The console asks once, in a short dialog with no checkbox, and confirms the
+  deletion with a notification. The signed-in admin's own row has no delete
+  action, and the API's refusals read in French.
+- "Supprimer définitivement" is now "Supprimer".
+
 ## [1.37.2] - 2026-09-13
 
 - A disconnect never deletes the Worker a zone's catch-all sends mail to, and

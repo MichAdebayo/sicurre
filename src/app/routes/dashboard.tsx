@@ -32,11 +32,15 @@ function KPIBlock({
   label,
   value,
   variant = "default",
+  loading = false,
 }: {
   label: string;
   value: string;
   variant?: "default" | "phishing" | "spam" | "legitimate" | "primary";
+  /** While the figures load, a quiet bar stands in for the number; the loading label is for screen readers. */
+  loading?: boolean;
 }) {
+  const { t } = useTranslation();
   const styles = {
     default: "border-border-subtle bg-white text-on-surface",
     primary: "border-primary/30 bg-primary/[0.02] text-primary shadow-sm",
@@ -54,12 +58,19 @@ function KPIBlock({
   };
 
   return (
-    <div className={`rounded-xl border p-5 shadow-sm transition-all duration-300 ${styles[variant]}`}>
+    <div aria-busy={loading || undefined} className={`rounded-xl border p-5 shadow-sm transition-all duration-300 ${styles[variant]}`}>
       <p className="text-[11px] font-bold text-on-surface-variant uppercase tracking-[0.12em] mb-2">
         {label}
       </p>
       <p className={`font-display font-bold text-[32px] tracking-tight leading-none ${textStyles[variant]}`}>
-        {value}
+        {loading ? (
+          <>
+            <span aria-hidden="true" className="inline-block h-8 w-20 max-w-full rounded bg-surface-container align-middle" />
+            <span className="sr-only">{t("common.loading")}</span>
+          </>
+        ) : (
+          value
+        )}
       </p>
     </div>
   );
@@ -294,10 +305,10 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
 
         {/* General KPI blocks */}
         <div className="md:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <KPIBlock label={t("dashboard.kpi_raw")} value={kpisLoading ? t("common.loading") : totalScans.toLocaleString()} variant="primary" />
-          <KPIBlock label={t("threats.badge_phishing")} value={kpisLoading ? t("common.loading") : phishingCount.toLocaleString()} variant="phishing" />
-          <KPIBlock label={t("threats.badge_spam")} value={kpisLoading ? t("common.loading") : spamCount.toLocaleString()} variant="spam" />
-          <KPIBlock label={t("threats.badge_legitimate")} value={kpisLoading ? t("common.loading") : legitimateCount.toLocaleString()} variant="legitimate" />
+          <KPIBlock label={t("dashboard.kpi_raw")} value={totalScans.toLocaleString()} loading={kpisLoading} variant="primary" />
+          <KPIBlock label={t("threats.badge_phishing")} value={phishingCount.toLocaleString()} loading={kpisLoading} variant="phishing" />
+          <KPIBlock label={t("threats.badge_spam")} value={spamCount.toLocaleString()} loading={kpisLoading} variant="spam" />
+          <KPIBlock label={t("threats.badge_legitimate")} value={legitimateCount.toLocaleString()} loading={kpisLoading} variant="legitimate" />
         </div>
       </div>
 

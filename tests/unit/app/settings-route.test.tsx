@@ -302,14 +302,18 @@ describe("profile tab", () => {
 });
 
 describe("account erasure", () => {
+  const openDialog = () => fireEvent.click(screen.getByRole("button", { name: "settings.delete_account_open" }));
+  const dialog = () => screen.getByRole("alertdialog");
   const confirmWith = (value: string) =>
-    fireEvent.change(input("settings.delete_account_confirm_label"), { target: { value } });
-  const deleteButton = () => screen.getByRole("button", { name: "settings.delete_account_button" });
+    fireEvent.change(within(dialog()).getByLabelText("settings.delete_account_confirm_label"), { target: { value } });
+  const deleteButton = () => within(dialog()).getByRole("button", { name: "settings.delete_account_button" });
 
-  it("keeps the button disabled until the typed address matches the account", () => {
+  it("shows one button on the page and keeps the confirmation inside the dialog", () => {
     render(<SettingsRoute session={session()} />);
 
-    expect(screen.getByText("settings.delete_account_title")).toBeInTheDocument();
+    expect(screen.queryByLabelText("settings.delete_account_confirm_label")).not.toBeInTheDocument();
+    openDialog();
+    expect(within(dialog()).getByText("settings.delete_account_desc")).toBeInTheDocument();
     expect(deleteButton()).toBeDisabled();
     confirmWith("michael@vinse.ap");
     expect(deleteButton()).toBeDisabled();
@@ -317,47 +321,52 @@ describe("account erasure", () => {
     expect(deleteButton()).toBeEnabled();
   });
 
-  it("deletes the account with the typed address and hands the session back to the shell", async () => {
+  it("deletes the account, closes the dialog and hands the session back to the shell", async () => {
     mocks.deleteAccount.mockResolvedValue({ status: "deleted" });
     const onAccountDeleted = vi.fn();
     render(<SettingsRoute session={session()} onAccountDeleted={onAccountDeleted} />);
 
+    openDialog();
     confirmWith("michael@vinse.app");
     fireEvent.click(deleteButton());
 
     await waitFor(() => expect(onAccountDeleted).toHaveBeenCalledTimes(1));
     expect(mocks.deleteAccount).toHaveBeenCalledWith("michael@vinse.app");
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
   });
 
-  it("surfaces the server message when the erasure is refused and keeps the session", async () => {
+  it("keeps the dialog open with the French failure message when the deletion is refused", async () => {
     mocks.deleteAccount.mockRejectedValue(new Error("Cloudflare could not remove the routing resources"));
     const onAccountDeleted = vi.fn();
     render(<SettingsRoute session={session()} onAccountDeleted={onAccountDeleted} />);
 
+    openDialog();
     confirmWith("michael@vinse.app");
     fireEvent.click(deleteButton());
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Cloudflare could not remove the routing resources");
+    expect(await within(dialog()).findByRole("alert")).toHaveTextContent("settings.delete_account_failed");
     expect(onAccountDeleted).not.toHaveBeenCalled();
   });
 
-  it("falls back to the generic failure copy when the rejection is not an Error", async () => {
-    mocks.deleteAccount.mockRejectedValue("offline");
-    render(<SettingsRoute session={session()} />);
-
-    confirmWith("michael@vinse.app");
-    fireEvent.click(deleteButton());
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("settings.delete_account_failed");
-  });
-
-  it("disables the button while the erasure is pending", () => {
+  it("shows the deletion in progress and cannot be dismissed while it runs", () => {
     mocks.state.deletePending = true;
     render(<SettingsRoute session={session()} />);
 
-    confirmWith("michael@vinse.app");
-    expect(deleteButton()).toBeDisabled();
+    openDialog();
+    expect(within(dialog()).getByRole("button", { name: "settings.delete_account_pending" })).toBeDisabled();
+    expect(within(dialog()).getByRole("button", { name: "common.cancel" })).toBeDisabled();
+    fireEvent.keyDown(dialog(), { key: "Escape" });
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+  });
+
+  it("cancels without calling the API", async () => {
+    render(<SettingsRoute session={session()} />);
+
+    openDialog();
+    fireEvent.click(within(dialog()).getByRole("button", { name: "common.cancel" }));
+
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(mocks.deleteAccount).not.toHaveBeenCalled();
   });
 });
 
