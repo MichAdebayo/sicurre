@@ -135,6 +135,8 @@ describe("admin operational exercises", () => {
   });
   it("requires an explicit confirmation before starting a bounded exercise", () => {
     renderOperations();
+    // The enabled button says the test can start; no "Prêt" pill repeats it.
+    expect(screen.queryByText("Prêt")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Tester l’alerte" }));
     expect(mocks.start).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Lancer le test" }));
@@ -151,6 +153,10 @@ describe("admin operational exercises", () => {
 
     expect(screen.getByText("Désactivé par configuration")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Tester l’alerte" })).toBeDisabled();
+    // The reason sits beside the greyed-out button it explains.
+    expect(screen.getByText("Désactivé par configuration").parentElement).toContainElement(
+      screen.getByRole("button", { name: "Tester l’alerte" }),
+    );
   });
 
   it("offers early recovery for the active exercise", () => {
@@ -162,6 +168,8 @@ describe("admin operational exercises", () => {
       expires_at: "2026-08-06T10:04:00Z",
     };
     renderOperations();
+    // The running block carries the state; no "Actif" pill repeats it.
+    expect(screen.queryByText("Actif", { selector: ".rounded-full" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Arrêter le signal" }));
     expect(mocks.recover).toHaveBeenCalledWith("exercise-1234");
   });

@@ -8,7 +8,6 @@
       "elevated_5xx": "Elevated server errors"
     },
     "subtitle": "Synthetic signal. Customer emails are unaffected.",
-    "ready": "Ready",
     "disabled": "Disabled by configuration",
     "active": "Active",
     "signal_active": "Synthetic signal active",
