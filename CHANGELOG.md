@@ -32,6 +32,11 @@ version.
   the limit. The admin panel names the limit when it is hit instead of the
   generic failure sentence, and a failed action no longer stays on screen
   when the confirmation is opened again.
+- The request stats carry meaning in their colour. The live rate turns yellow
+  at 5 req/s and red at 10 req/s, the rate at which the scan route refuses
+  more than 600 requests per minute per client; the count over the selected
+  range carries no colour, since a count has no wrong value. Both had been
+  painted by Grafana's default scale, which turned a seven-day count red.
 - The Application Health dashboard says what its request stat means. "Live
   Request Rate" is now "Request Rate (last 5 minutes, now)", with three
   decimals, and a new "Requests in Selected Range" stat counts user requests
