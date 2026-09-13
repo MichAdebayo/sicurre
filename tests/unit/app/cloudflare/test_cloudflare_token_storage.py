@@ -11,6 +11,7 @@ import pytest
 from fastapi import BackgroundTasks, HTTPException
 from starlette.requests import Request
 
+from core.config import Settings
 from data_platform.api.auth import AuthUser
 from data_platform.api.routers import cloudflare_account, email_scan, integrations
 from data_platform.api.routers.cloudflare_account import (
@@ -697,7 +698,93 @@ async def test_teardown_of_the_platform_zone_keeps_sicurre_dmarc_reporting(monke
             "account_id": "account-platform",
             "worker_name": "sicurre-gw-client",
             "rule_id": "rule-client",
+            "keep_worker": False,
         }
     ]
     assert deployed == [], "Sicurre's own DMARC record was rewritten"
     assert any("DELETE FROM cloudflare_integration" in sql for sql, _ in statements)
+
+
+def _teardown_fixture(monkeypatch, worker_name: str, shared_rows: list[dict[str, Any]]):
+    """Wire the disconnect route for one integration; return the recorded teardown calls."""
+
+    async def query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        if "WHERE id = ? AND workspace_id = ?" in sql:
+            return [
+                {
+                    "id": "integration-1",
+                    "status": "active",
+                    "api_token": "enc:v1:value",
+                    "zone_id": "zone-1",
+                    "account_id": "account-1",
+                    "worker_name": worker_name,
+                    "rule_id": "rule-1",
+                    "zone_name": "one.example",
+                }
+            ]
+        if "WHERE worker_name = ? AND id <> ?" in sql:
+            assert params == (worker_name, "integration-1")
+            return shared_rows
+        return []
+
+    calls: list[dict[str, Any]] = []
+
+    class Provisioner:
+        def __init__(self, api_token: str) -> None:
+            pass
+
+        async def teardown(self, **kwargs: Any) -> None:
+            calls.append(kwargs)
+
+        async def get_dns_records(self, zone_id: str) -> list[dict[str, str]]:
+            return []
+
+        async def deploy_dns_record(self, **kwargs: Any) -> None:
+            raise AssertionError("no DMARC rewrite expected")
+
+    monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
+    monkeypatch.setattr(integrations, "_async_query", query)
+    monkeypatch.setattr(integrations, "decrypt_secret", lambda *_args, **_kwargs: "stored-secret")
+    monkeypatch.setattr(integrations, "CloudflareProvisioner", Provisioner)
+    return calls
+
+
+@pytest.mark.asyncio
+async def test_teardown_keeps_a_worker_another_integration_uses(monkeypatch) -> None:
+    """vinse.app's July and July-22 integrations share one Worker named after the zone."""
+    calls = _teardown_fixture(monkeypatch, "sicurre-gw-shared", [{"id": "integration-2"}])
+
+    await teardown_cloudflare(TeardownRequest(integration_id="integration-1"), _user())
+
+    assert calls[0]["keep_worker"] is True
+
+
+@pytest.mark.asyncio
+async def test_teardown_keeps_a_protected_platform_worker(monkeypatch) -> None:
+    """The platform catch-all routes to this Worker from another zone."""
+    monkeypatch.setattr(
+        integrations,
+        "get_settings",
+        lambda: Settings(_env_file=None, protected_worker_names=" sicurre-gw-platform , other "),
+    )
+    calls = _teardown_fixture(monkeypatch, "sicurre-gw-platform", [])
+
+    await teardown_cloudflare(TeardownRequest(integration_id="integration-1"), _user())
+
+    assert calls[0]["keep_worker"] is True
+
+
+@pytest.mark.asyncio
+async def test_teardown_deletes_a_worker_nothing_else_uses(monkeypatch) -> None:
+    monkeypatch.setattr(
+        integrations, "get_settings", lambda: Settings(_env_file=None, protected_worker_names="")
+    )
+    calls = _teardown_fixture(monkeypatch, "sicurre-gw-alone", [])
+
+    await teardown_cloudflare(TeardownRequest(integration_id="integration-1"), _user())
+
+    assert calls[0]["keep_worker"] is False
+
+
+def test_the_platform_worker_is_protected_by_default() -> None:
+    assert "sicurre-gw-9e622bde" in Settings(_env_file=None).protected_worker_name_set

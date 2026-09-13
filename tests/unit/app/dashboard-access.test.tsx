@@ -60,3 +60,37 @@ describe("KPI figures while the statistics load", () => {
     expect(container.querySelectorAll('[aria-busy="true"] span[aria-hidden="true"]')).toHaveLength(4);
   });
 });
+
+describe("security score circle", () => {
+  const session = {
+    workspace_id: "own-workspace", display_name: "Michael", role: "owner",
+    is_platform_admin: false, onboarding_required: false,
+  } as AuthSession;
+  const circle = (container: HTMLElement) => container.querySelector(".rounded-full.w-28") as HTMLElement;
+
+  it("shows a quiet placeholder while the shield status loads", () => {
+    queries.shield.mockReturnValue({ data: undefined, isLoading: true } as never);
+    const { container } = render(<DashboardRoute session={session} onGoToSettings={vi.fn()} />);
+
+    expect(circle(container)).toHaveAttribute("aria-busy", "true");
+    expect(circle(container)).not.toHaveTextContent("dashboard.grade_unavailable");
+    expect(circle(container).querySelector(".sr-only")).toHaveTextContent("common.loading");
+  });
+
+  it("shows the grade in the display size once it arrives", () => {
+    queries.shield.mockReturnValue({ data: { score_grade: "A" }, isLoading: false } as never);
+    const { container } = render(<DashboardRoute session={session} onGoToSettings={vi.fn()} />);
+
+    expect(circle(container)).not.toHaveAttribute("aria-busy");
+    expect(circle(container).querySelector(".text-5xl")).toHaveTextContent("A");
+  });
+
+  it("says the grade is unavailable in normal-size text when none comes back", () => {
+    queries.shield.mockReturnValue({ data: undefined, isLoading: false } as never);
+    const { container } = render(<DashboardRoute session={session} onGoToSettings={vi.fn()} />);
+
+    const text = circle(container).querySelector(".text-sm");
+    expect(text).toHaveTextContent("dashboard.grade_unavailable");
+    expect(circle(container).querySelector(".text-5xl")).toBeNull();
+  });
+});

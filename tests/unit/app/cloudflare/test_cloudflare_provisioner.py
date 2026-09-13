@@ -952,3 +952,20 @@ def test_encrypt_provider_token_uses_the_configured_key(monkeypatch) -> None:
     assert stored.startswith("enc:v1:")
     assert "cf-secret" not in stored
     assert decrypt_secret(stored, configured_key=key, environment="test") == "cf-secret"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_teardown_keeps_a_worker_the_caller_marks_as_shared() -> None:
+    provisioner = CloudflareProvisioner(api_token="token")
+    del_rule = respx.delete(_RULE).mock(return_value=httpx.Response(200, json={"success": True}))
+    catch_all = respx.get(_CATCH_ALL).mock(return_value=_catch_all_to_worker("platform-worker"))
+    del_worker = respx.delete(_WORKER).mock(
+        return_value=httpx.Response(200, json={"success": True})
+    )
+
+    await provisioner.teardown("zone-123", "account-456", "my-worker", "rule-123", keep_worker=True)
+
+    assert del_rule.called, "the connected address's own rule still goes"
+    assert not catch_all.called
+    assert not del_worker.called

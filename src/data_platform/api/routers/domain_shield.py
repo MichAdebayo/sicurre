@@ -57,19 +57,25 @@ async def _check_domain_blacklists(
         spamhaus_zone = "dbl.spamhaus.org"
 
     blacklists = {spamhaus_zone: "Spamhaus DBL", "multi.surbl.org": "SURBL List"}
+
+    async def lookup(rbl: str, name: str) -> tuple[str, bool, str | None]:
+        try:
+            answers = await asyncio.to_thread(dns.resolver.resolve, f"{domain}.{rbl}", "A")
+            listed, error = _classify_blocklist_response(name, [str(answer) for answer in answers])
+            return name, listed, error
+        except Exception:
+            return name, False, None
+
+    # Both lists are queried at once, so a slow resolver for one no longer
+    # delays the other; results keep the order of the lists.
+    results = await asyncio.gather(*(lookup(rbl, name) for rbl, name in blacklists.items()))
     listed_on: list[str] = []
     unavailable: list[str] = []
-    for rbl, name in blacklists.items():
-        try:
-            query_host = f"{domain}.{rbl}"
-            answers = await asyncio.to_thread(dns.resolver.resolve, query_host, "A")
-            listed, error = _classify_blocklist_response(name, [str(answer) for answer in answers])
-            if listed:
-                listed_on.append(name)
-            elif error and not (dqs_key and name == "SURBL List"):
-                unavailable.append(error)
-        except Exception:
-            pass
+    for name, listed, error in results:
+        if listed:
+            listed_on.append(name)
+        elif error and not (dqs_key and name == "SURBL List"):
+            unavailable.append(error)
     return listed_on, unavailable
 
 

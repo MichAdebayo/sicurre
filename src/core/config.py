@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     better_auth_cookie_name: str = "better-auth.session_token"
     better_auth_schema: str = "auth"
     platform_admin_emails: str = ""
+    # Cloudflare Workers a domain disconnect or an account erasure never deletes.
+    # sicurre-gw-9e622bde serves vinse.app and, through the sicurre.com
+    # catch-all, the platform's own mail, until the platform has its own Worker.
+    protected_worker_names: str = "sicurre-gw-9e622bde"
     secret_encryption_key: str | None = Field(
         default=None,
         validation_alias=AliasChoices(
@@ -391,6 +395,13 @@ class Settings(BaseSettings):
             email.strip().lower()
             for email in self.platform_admin_emails.split(",")
             if email.strip()
+        )
+
+    @property
+    def protected_worker_name_set(self) -> frozenset[str]:
+        """Return the Cloudflare Worker names a teardown must keep."""
+        return frozenset(
+            name.strip() for name in self.protected_worker_names.split(",") if name.strip()
         )
 
 

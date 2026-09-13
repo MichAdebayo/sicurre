@@ -134,3 +134,32 @@ zone redeploys the Worker with a new secret and replaces the routing rule.
 Erase that account only after the last deploy before it is needed again, or
 comment the three `SICURRE_ADMIN_*` lines out first. Admin rights come from
 `SICURRE_PLATFORM_ADMIN_EMAILS` and return as soon as the address signs up.
+
+## Runbook: Cloudflare Workers shared across zones
+
+vinse.app and sicurre.com sit in one Cloudflare account. The Worker
+`sicurre-gw-9e622bde`, named after the vinse.app zone id, serves both vinse.app
+integrations and, through the sicurre.com catch-all, the platform's own mail
+(`dmarc@sicurre.com`, the report addresses). A teardown only sees the zone it
+removes, so it cannot tell that another zone routes to the Worker.
+
+Every teardown therefore keeps a Worker that another `cloudflare_integration`
+row names, or that is listed in `SICURRE_PROTECTED_WORKER_NAMES` (default
+`sicurre-gw-9e622bde`). The connected address's own routing rule is still
+removed. Remove the name from the list only once the platform catch-all points
+to a Worker of its own.
+
+## Runbook: Scanner traffic on the origin
+
+Automated scanners probe the server's IP for `/.env`, `/.aws/credentials` and
+similar paths, bypassing Cloudflare. `00-default-https.conf` refuses any TLS
+connection whose host name matches no vhost, so these requests stop at nginx
+and never reach an application's logs. The sicurre CD installs it with
+`sicurre.com.conf` into `/opt/nginx-proxy/conf.d`; the sicurre-ml CD installs
+`api.sicurre.com.conf`, which forwards only `/v1/classify`, the health paths and
+`/v1/ready`. Both restore the previous file if `nginx -t` rejects the new one.
+To inspect the live configuration as a deploy user, without sudo:
+
+```bash
+docker exec nginx-proxy nginx -T | grep -n -E "configuration file|listen|server_name"
+```
