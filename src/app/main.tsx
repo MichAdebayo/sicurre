@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import App from "./App.tsx";
+import { installStaleBuildReload } from "./lib/stale-build";
 import "./index.css";
 
 import frTranslation from "./locales/fr.json";
@@ -28,6 +29,9 @@ const syncDocumentLanguage = (language: string) => {
 
 syncDocumentLanguage(i18n.language);
 i18n.on("languageChanged", syncDocumentLanguage);
+
+// A tab left open across a deploy reloads once instead of showing a white screen.
+installStaleBuildReload();
 
 const queryClient = new QueryClient({
   defaultOptions: {

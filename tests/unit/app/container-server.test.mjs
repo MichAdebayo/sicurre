@@ -126,6 +126,12 @@ describe("app gateway routing and metrics", () => {
     const fallback = await fetch(`${gatewayBase}/missing/route`);
     expect(fallback.headers.get("cache-control")).toBe("no-store");
     expect(await fallback.text()).toContain("sicurre shell");
+
+    // A build file the current deploy does not have is a 404, not the shell.
+    const staleChunk = await fetch(`${gatewayBase}/assets/settings-OLDHASH0.js`);
+    expect(staleChunk.status).toBe(404);
+    expect(staleChunk.headers.get("cache-control")).toBe("no-store");
+    expect(await staleChunk.text()).not.toContain("sicurre shell");
   });
 
   it("proxies GET, POST, and HEAD requests without leaking gateway headers", async () => {

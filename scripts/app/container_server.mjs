@@ -201,6 +201,14 @@ async function serveStatic(request, response, pathname) {
     }
     await access(filePath);
   } catch {
+    // A missing build file is a 404, never the application shell. A page left
+    // open across a deploy asks for files the new build no longer has, and an
+    // HTML answer with HTTP 200 only turned that into a confusing MIME error.
+    if (pathname.startsWith("/assets/")) {
+      response.writeHead(404, { "Cache-Control": "no-store", "Content-Type": "text/plain; charset=utf-8" });
+      response.end("Not found");
+      return;
+    }
     filePath = indexFile;
   }
 
