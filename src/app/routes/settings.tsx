@@ -31,6 +31,7 @@ import {
   AuthSession,
   getStoredAuthProvider,
   useChangePassword,
+  useDeleteAccount,
   useUpdateProfile,
   useCloudflareList,
   useSetupCloudflare,
@@ -45,9 +46,11 @@ const MotionDiv = motion.div as any;
 interface SettingsRouteProps {
   session: AuthSession;
   initialTab?: string;
+  /** Called once the account is gone, so the shell can close the session. */
+  onAccountDeleted?: () => void;
 }
 
-export default function SettingsRoute({ session, initialTab }: SettingsRouteProps) {
+export default function SettingsRoute({ session, initialTab, onAccountDeleted }: SettingsRouteProps) {
   const { t, i18n } = useTranslation();
   const [activeTab, setActiveTab] = useState<"profile" | "security" | "preferences" | "notifications" | "domains" | "integrations">(
     (initialTab as any) || (session.onboarding_required ? "domains" : "profile")
@@ -110,6 +113,10 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
 
   const updateProfileMutation = useUpdateProfile();
   const changePasswordMutation = useChangePassword();
+  const deleteAccountMutation = useDeleteAccount();
+  const [deleteEmail, setDeleteEmail] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+  const deleteConfirmed = deleteEmail.trim().toLowerCase() === session.email.trim().toLowerCase();
   const authProvider = getStoredAuthProvider();
 
   useEffect(() => {
@@ -161,6 +168,18 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
       setConfirmPassword("");
     } catch (error) {
       setPasswordError(error instanceof Error ? error.message : t("settings.password_update_failed"));
+    }
+  };
+
+  const handleDeleteAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deleteConfirmed) return;
+    setDeleteError("");
+    try {
+      await deleteAccountMutation.mutateAsync(deleteEmail.trim());
+      onAccountDeleted?.();
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : t("settings.delete_account_failed"));
     }
   };
 
@@ -388,6 +407,35 @@ export default function SettingsRoute({ session, initialTab }: SettingsRouteProp
                   </div>
                 </div>
               </form>
+
+              <div className="mt-8 pt-6 border-t border-border-subtle">
+                <h3 className="text-sm font-bold text-error">{t("settings.delete_account_title")}</h3>
+                <p className="app-body-sub mt-1">{t("settings.delete_account_desc")}</p>
+                <form onSubmit={handleDeleteAccount} className="mt-4 flex flex-col sm:flex-row sm:items-end gap-3">
+                  <div className="flex-1">
+                    <Input
+                      label={t("settings.delete_account_confirm_label")}
+                      type="email"
+                      autoComplete="off"
+                      value={deleteEmail}
+                      onChange={(e) => setDeleteEmail(e.target.value)}
+                      placeholder={session.email}
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    variant="danger"
+                    className="gap-2 shrink-0 cursor-pointer"
+                    disabled={!deleteConfirmed || deleteAccountMutation.isPending}
+                  >
+                    <Trash2 className="w-4 h-4" aria-hidden="true" />
+                    {t("settings.delete_account_button")}
+                  </Button>
+                </form>
+                {deleteError && (
+                  <p role="alert" className="mt-3 text-xs text-error font-semibold">{deleteError}</p>
+                )}
+              </div>
             </section>
           )}
 

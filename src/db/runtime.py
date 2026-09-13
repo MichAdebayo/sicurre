@@ -15,6 +15,8 @@ from core.database import Base
 from db.models import app_runtime  # noqa: F401
 
 _runtime_table_lock = Lock()
+# Better Auth owns these tables; in production they live in their own schema.
+_BETTER_AUTH_TABLES = ("user", "session", "account", "verification")
 _initialized_runtime_urls: set[str] = set()
 
 
@@ -37,7 +39,9 @@ def _qualify_auth_tables(sql: str) -> str:
     if settings.environment.strip().lower() != "production":
         return sql
     schema = settings.better_auth_schema
-    return sql.replace('"user"', f'{schema}."user"')
+    for table in _BETTER_AUTH_TABLES:
+        sql = sql.replace(f'"{table}"', f'{schema}."{table}"')
+    return sql
 
 
 @lru_cache(maxsize=1)

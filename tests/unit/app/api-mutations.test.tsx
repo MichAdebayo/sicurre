@@ -10,10 +10,12 @@ import {
   useCreateFeedback,
   useCreateSecurityRule,
   useCreateSupportRequest,
+  useDeleteAccount,
   useDeleteQuarantine,
   useDeleteSecurityRule,
   useDeleteWorkspaceCloudflareToken,
   useDismissAlert,
+  useEraseAdminAccount,
   useImportDmarcReport,
   useMarkAlertRead,
   useMarkDomainAlertsRead,
@@ -300,6 +302,53 @@ describe("cloudflare mutations", () => {
       body: undefined,
     }));
     expect(invalidatedKeys()).toEqual([["cf-workspace-token"], ["cf-integration"], ["auth-session"], ["cloudflare-list"], ["domain-shield"]]);
+  });
+});
+
+describe("account erasure", () => {
+  it("sends the typed address, then forgets the stored session and every cached query", async () => {
+    respondWith({ status: "deleted" });
+    localStorage.setItem("sicurre_user_email", "owner@example.test");
+    const clear = vi.spyOn(client, "clear");
+
+    const outcome = await runMutation(useDeleteAccount, "owner@example.test");
+
+    expect(outcome).toEqual({ status: "deleted" });
+    expect(request()).toEqual(expect.objectContaining({
+      url: "/v1/auth/account",
+      method: "DELETE",
+      body: JSON.stringify({ email: "owner@example.test" }),
+      credentials: "include",
+      contentType: "application/json",
+    }));
+    expect(localStorage.getItem("sicurre_user_email")).toBeNull();
+    expect(clear).toHaveBeenCalled();
+  });
+
+  it("keeps the session when the API refuses the erasure", async () => {
+    respondWith({ detail: "Confirmation email does not match the account" }, 400);
+    localStorage.setItem("sicurre_user_email", "owner@example.test");
+    const { result } = renderHook(useDeleteAccount, { wrapper: Wrapper });
+
+    await expect(
+      act(() => result.current.mutateAsync("someone@else.test")),
+    ).rejects.toThrow("Confirmation email does not match the account");
+    expect(localStorage.getItem("sicurre_user_email")).toBe("owner@example.test");
+  });
+});
+
+describe("admin account erasure", () => {
+  it("erases the customer by email and refreshes the admin inventory", async () => {
+    respondWith({ status: "deleted" });
+
+    await runMutation(useEraseAdminAccount, "owner@example.test");
+
+    expect(request()).toEqual(expect.objectContaining({
+      url: "/v1/admin/accounts",
+      method: "DELETE",
+      body: JSON.stringify({ email: "owner@example.test" }),
+    }));
+    expect(invalidatedKeys()).toEqual([["admin-domains"], ["admin-overview"]]);
   });
 });
 

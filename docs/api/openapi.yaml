@@ -60,6 +60,18 @@ components:
           title: Zone Name
       title: AdminDomainResponse
       type: object
+    AdminEraseAccountRequest:
+      properties:
+        email:
+          description: Email of the account to erase
+          maxLength: 320
+          minLength: 3
+          title: Email
+          type: string
+      required:
+      - email
+      title: AdminEraseAccountRequest
+      type: object
     AdminFeedbackResponse:
       additionalProperties: false
       description: Recent feedback audit row.
@@ -1233,6 +1245,18 @@ components:
       - item_count
       - status
       title: DatasetSummaryResponse
+      type: object
+    DeleteAccountRequest:
+      properties:
+        email:
+          description: The account email, typed again by the member as confirmation
+          maxLength: 320
+          minLength: 3
+          title: Email
+          type: string
+      required:
+      - email
+      title: DeleteAccountRequest
       type: object
     DmarcImportResponse:
       additionalProperties: false
@@ -3302,6 +3326,39 @@ paths:
       summary: Get Phishtank Snapshot
       tags:
       - internal
+  /v1/admin/accounts:
+    delete:
+      description: 'Erase a customer account on their behalf: same cascade as the member''s own erasure
+        (Cloudflare teardown, workspace rows, identity).
+
+
+        Platform admins only. An admin cannot erase their own account here; that goes through their settings
+        so the session is closed cleanly.'
+      operationId: erase_customer_account_v1_admin_accounts_delete
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminEraseAccountRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Erase Customer Account
+      tags:
+      - app-ui-flows
   /v1/admin/domains:
     get:
       description: Return a bounded, searchable Cloudflare integration inventory.
@@ -3733,6 +3790,40 @@ paths:
       security:
       - HTTPBearer: []
       summary: Delete Security Rule
+      tags:
+      - app-ui-flows
+  /v1/auth/account:
+    delete:
+      description: 'Erase the member''s own account: connected domains are torn down on Cloudflare first,
+        then every workspace row and the identity are deleted in one pass.
+
+
+        Refused when the typed email does not match the account, and while a domain is still provisioning.
+        A Cloudflare refusal stops the erasure before any row is deleted, so the member keeps a working
+        account and can retry.'
+      operationId: delete_account_v1_auth_account_delete
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteAccountRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Delete Account
       tags:
       - app-ui-flows
   /v1/auth/profile:

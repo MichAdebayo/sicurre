@@ -16,7 +16,9 @@ from data_platform.api import workspace_scope
 from data_platform.api.auth import AuthUser
 from data_platform.api.routers import session, threats
 from data_platform.api.routers.session import (
+    DeleteAccountRequest,
     UpdateProfileRequest,
+    delete_account,
     patch_profile,
 )
 from data_platform.api.routers.threats import (
@@ -477,3 +479,43 @@ async def test_a_feedback_without_an_event_skips_the_override_update(
     assert [sql.split()[0] for sql, _params in captured] == ["INSERT"]
     assert result["event_id"] is None
     assert result["original_verdict"] is None
+
+
+# ── Account erasure ──────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_erasure_is_refused_when_the_typed_email_does_not_match(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A typo in the confirmation must stop everything before the cascade starts."""
+    erased: list[AuthUser] = []
+
+    async def erase(user: AuthUser) -> None:
+        erased.append(user)
+
+    monkeypatch.setattr(session, "erase_account", erase)
+
+    with pytest.raises(HTTPException) as excinfo:
+        await delete_account(DeleteAccountRequest(email="someone@else.test"), _USER)
+
+    assert excinfo.value.status_code == 400
+    assert erased == []
+
+
+@pytest.mark.asyncio
+async def test_erasure_runs_the_cascade_for_the_signed_in_member(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Case and surrounding spaces in the typed address do not matter."""
+    erased: list[AuthUser] = []
+
+    async def erase(user: AuthUser) -> None:
+        erased.append(user)
+
+    monkeypatch.setattr(session, "erase_account", erase)
+
+    result = await delete_account(DeleteAccountRequest(email=" Owner@Example.test "), _USER)
+
+    assert result == {"status": "deleted"}
+    assert erased == [_USER]
