@@ -2,7 +2,7 @@ import React from "react";
 import { clsx } from "clsx";
 
 export interface Column<T> {
-  header: string;
+  header: React.ReactNode;
   render: (row: T, index: number) => React.ReactNode;
   className?: string;
 }

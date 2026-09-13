@@ -40,6 +40,17 @@ classifying the message it came from.
 
 **Rights.** Deletion of a quarantined item is immediate and irreversible.
 Release returns the message to its recipient and records the correction.
+Erasure of the account is self-service, from Settings, Profile: the member
+types their address again, every connected domain is torn down on Cloudflare
+(Worker, routing rule, Sicurre's DMARC reporting address), then every
+workspace row (threat journal, quarantine references, alerts and preferences,
+shield status, DMARC summaries, feedback, reported emails, support requests,
+stored token) and the Better Auth identity, sessions and accounts are deleted
+in one pass (`DELETE /v1/auth/account`). A platform admin can run the same
+cascade for a customer who asks by email (`DELETE /v1/admin/accounts`, from
+the console's Cloudflare domains page). What outlives the account: the
+operational exercise log keeps the initiating admin's address as an operations
+record, and Grafana metrics carry no per-member label.
 
 ## Data-platform processing
 

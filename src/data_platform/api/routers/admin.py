@@ -1,4 +1,4 @@
-"""Platform admin routes: overview, domain inventory, runtime health, pipeline."""
+"""Platform admin routes: overview, domain inventory, account erasure, runtime health, pipeline."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,7 +22,9 @@ from data_platform.api.schemas.app_responses import (
     AdminRuntimeHealthResponse,
     DatasetSummaryResponse,
     PipelineRunResponse,
+    StatusResponse,
 )
+from data_platform.services.account_erasure import erase_account
 from data_platform.services.runtime_probes import (
     component_rollup,
     probe_cloudflare_runtime,
@@ -31,6 +34,7 @@ from data_platform.services.runtime_probes import (
     quiet_count,
     quiet_rows,
 )
+from db.runtime import execute_runtime_query
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["app-ui-flows"])
@@ -209,6 +213,57 @@ async def get_admin_domains(
         "total": total,
         "pages": max(1, (total + page_size - 1) // page_size),
     }
+
+
+class AdminEraseAccountRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=320, description="Email of the account to erase")
+
+
+@router.delete("/v1/admin/accounts", response_model=StatusResponse)
+async def erase_customer_account(
+    payload: AdminEraseAccountRequest,
+    current_user: AuthUser = Depends(get_current_user),
+) -> dict:
+    """Erase a customer account on their behalf: same cascade as the member's own erasure (Cloudflare teardown, workspace rows, identity).
+
+    Platform admins only. An admin cannot erase their own account here; that goes through their settings so the session is closed cleanly.
+    """
+    if not current_user.is_platform_admin:
+        raise HTTPException(status_code=403, detail="Platform admin access required")
+    email = payload.email.strip().lower()
+    if email == current_user.email.strip().lower():
+        raise HTTPException(
+            status_code=400, detail="Erase your own account from your settings, not from here"
+        )
+    users = await execute_runtime_query(
+        'SELECT id, email, name FROM "user" WHERE LOWER(email) = ? LIMIT 1', (email,)
+    )
+    if not users:
+        raise HTTPException(status_code=404, detail="No account with this email")
+    auth_user_id = str(users[0]["id"])
+    memberships = await execute_runtime_query(
+        """
+        SELECT m.workspace_id, m.role, w.name AS workspace_name
+        FROM app_workspace_membership m
+        JOIN app_workspace w ON w.id = m.workspace_id
+        WHERE m.auth_user_id = ?
+        LIMIT 1
+        """,
+        (auth_user_id,),
+    )
+    membership = memberships[0] if memberships else {}
+    target = AuthUser(
+        id=auth_user_id,
+        email=email,
+        display_name=str(users[0].get("name") or email),
+        role=str(membership.get("role") or "owner"),
+        workspace_id=str(membership.get("workspace_id") or ""),
+        workspace_name=str(membership.get("workspace_name") or ""),
+        is_platform_admin=False,
+    )
+    await erase_account(target)
+    logger.info("Platform admin %s erased the account %s", current_user.email, email)
+    return {"status": "deleted"}
 
 
 @router.get("/v1/datasets", response_model=list[DatasetSummaryResponse])

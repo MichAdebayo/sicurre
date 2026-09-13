@@ -72,3 +72,62 @@ integration, so an unrecognised report is discarded rather than stored.
 **On teardown.** Disconnecting a client withdraws `dmarc@sicurre.com` from their
 DMARC record automatically, so they stop reporting to us. Nothing needs removing
 on our side - the wildcard is not client-specific.
+
+## Runbook: A member asks for their account to be erased
+
+**Self-service path.** Settings, Profile, "Supprimer mon compte": the member
+types their address, the API tears every connected domain down on Cloudflare,
+deletes every workspace row and the Better Auth identity, and the shell signs
+out. If Cloudflare refuses (revoked token, zone gone), the erasure stops
+before any row is deleted and the member sees the reason; fix the domain
+(disconnect it with a fresh token, or delete the stored token) and retry.
+
+**On their behalf.** Console, Cloudflare domains: "Supprimer le compte" on the
+domain row, "Supprimer la sélection" after ticking rows, or the form at the
+bottom for an account with no connected domain. Every path opens the same
+dialog, which lists the accounts and requires the irreversibility box to be
+ticked; then `DELETE /v1/admin/accounts` runs once per account and each
+refusal is shown with its reason. Refused for the admin's own address.
+
+**The platform's own zone.** `sicurre.com` is both the platform zone (its
+catch-all routes to the Sicurre Worker for DMARC and user reports) and the
+zone the demonstration account connects. The Worker name derives from the
+zone id, so both share one Worker: neither path above may be used for an
+account that connected `sicurre.com`, because the teardown would remove the
+Worker and stop every inbound mail to the domain. Remove the rows only, in
+one transaction, dependants first:
+
+```sql
+-- workspace rows, in this order, then the workspace
+DELETE FROM app_alert_read WHERE workspace_id = :w;
+DELETE FROM app_alert_history WHERE workspace_id = :w;
+DELETE FROM app_alert_preference WHERE workspace_id = :w;
+DELETE FROM app_security_rule WHERE workspace_id = :w;
+DELETE FROM app_quarantine_item WHERE workspace_id = :w;
+DELETE FROM app_domain_shield_history WHERE workspace_id = :w;
+DELETE FROM app_domain_shield_status WHERE workspace_id = :w;
+DELETE FROM app_dmarc_report_summary WHERE workspace_id = :w;
+DELETE FROM app_feedback WHERE workspace_id = :w;
+DELETE FROM app_reported_email WHERE workspace_id = :w;
+DELETE FROM app_support_request WHERE workspace_id = :w;
+DELETE FROM app_inference_event WHERE workspace_id = :w;
+DELETE FROM app_cloudflare_config WHERE workspace_id = :w;
+DELETE FROM cloudflare_integration WHERE workspace_id = :w;
+DELETE FROM app_workspace_membership WHERE workspace_id = :w;
+DELETE FROM app_workspace WHERE id = :w;
+-- identity
+DELETE FROM auth."session" WHERE "userId" = :u;
+DELETE FROM auth."account" WHERE "userId" = :u;
+DELETE FROM auth."verification" WHERE identifier = :email;
+DELETE FROM auth."user" WHERE id = :u;
+```
+
+The Worker keeps forwarding mail while its integration row is gone (it fails
+open when the API refuses the shared secret), and the next onboarding of the
+zone redeploys the Worker with a new secret and replaces the routing rule.
+
+**The seeded admin.** The auth sidecar recreates the account named by
+`SICURRE_ADMIN_EMAIL` in `deploy/env.auth` on every start when it is missing.
+Erase that account only after the last deploy before it is needed again, or
+comment the three `SICURRE_ADMIN_*` lines out first. Admin rights come from
+`SICURRE_PLATFORM_ADMIN_EMAILS` and return as soon as the address signs up.

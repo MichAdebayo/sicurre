@@ -460,6 +460,22 @@ export function useLogout() {
   });
 }
 
+/** Erase the account: the API tears the domains down, deletes the workspace and the identity. */
+export function useDeleteAccount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (email: string) =>
+      fetchJson<{ status: string }>("/auth/account", {
+        method: "DELETE",
+        body: JSON.stringify({ email }),
+      }),
+    onSuccess: () => {
+      clearStoredSession();
+      discardSessionCache(queryClient);
+    },
+  });
+}
+
 export function useUpdateProfile() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -535,6 +551,22 @@ export function useAdminDomains(page: number, search: string, enabled = true) {
     queryFn: () => fetchJson<AdminDomainPage>(`/admin/domains?${params.toString()}`),
     enabled,
     placeholderData: (previous) => previous,
+  });
+}
+
+/** Platform admin: erase a customer account by email (same cascade as the member's own erasure). */
+export function useEraseAdminAccount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (email: string) =>
+      fetchJson<{ status: string }>("/admin/accounts", {
+        method: "DELETE",
+        body: JSON.stringify({ email }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-domains"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-overview"] });
+    },
   });
 }
 
