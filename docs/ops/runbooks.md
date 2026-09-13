@@ -89,15 +89,16 @@ dialog, which lists the accounts and requires the irreversibility box to be
 ticked; then `DELETE /v1/admin/accounts` runs once per account and each
 refusal is shown with its reason. Refused for the admin's own address.
 
-**The platform's own zone.** `sicurre.com` is both the platform zone (its
-catch-all routes to the Sicurre Worker for DMARC and user reports) and the
-zone the demonstration account connects. The Worker name derives from the
-zone id, so both share one Worker. Both paths above therefore skip the
-Cloudflare teardown for the domain of `SICURRE_REPORTED_EMAIL_ADDRESS`: its
-rows are deleted, its Worker and routing rule stay, and the API logs a
-warning. The domain disconnect in Settings, Domains has no such guard and
-must not be used on that zone. To remove the rows by hand, in one
-transaction, dependants first:
+**The platform's own zone.** `sicurre.com` is both the platform zone and the
+zone the demonstration account connects, with two Workers. The catch-all
+sends DMARC reports and reported emails to the platform Worker; onboarding
+creates a second Worker, named after the zone id, and a rule for the
+connected address only. Every teardown (Settings, Domains, "Dissocier", and
+both erasure paths above) reads the zone's catch-all first and never deletes
+the Worker it points to, keeping it too when the catch-all cannot be read.
+It also leaves `dmarc@sicurre.com` in sicurre.com's own DMARC record. The
+connected address then falls back to the catch-all. To remove the rows by
+hand, in one transaction, dependants first:
 
 ```sql
 -- workspace rows, in this order, then the workspace

@@ -629,3 +629,75 @@ async def test_live_teardown_reports_missing_provider_token(monkeypatch) -> None
 
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "Cloudflare API token is not configured"
+
+
+@pytest.mark.asyncio
+async def test_teardown_of_the_platform_zone_keeps_sicurre_dmarc_reporting(monkeypatch) -> None:
+    """sicurre.com hosts the DMARC mailbox itself: withdrawing it would stop the platform's reports."""
+    statements: list[tuple[str, tuple[Any, ...]]] = []
+
+    async def query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        statements.append((sql, params))
+        if "WHERE id = ? AND workspace_id = ?" in sql:
+            return [
+                {
+                    "id": "integration-platform",
+                    "status": "active",
+                    "api_token": "enc:v1:value",
+                    "zone_id": "zone-platform",
+                    "account_id": "account-platform",
+                    "worker_name": "sicurre-gw-client",
+                    "rule_id": "rule-client",
+                    "zone_name": "Sicurre.com.",
+                }
+            ]
+        return []
+
+    torn_down: list[dict[str, Any]] = []
+    deployed: list[dict[str, Any]] = []
+
+    class Provisioner:
+        def __init__(self, api_token: str) -> None:
+            assert api_token == "stored-secret"
+
+        async def teardown(self, **kwargs: Any) -> None:
+            torn_down.append(kwargs)
+
+        async def get_dns_records(self, zone_id: str) -> list[dict[str, str]]:
+            return [
+                {
+                    "type": "TXT",
+                    "name": "_dmarc.sicurre.com",
+                    "content": "v=DMARC1; p=reject; rua=mailto:dmarc@sicurre.com",
+                }
+            ]
+
+        async def deploy_dns_record(self, **kwargs: Any) -> None:
+            deployed.append(kwargs)
+
+    monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
+    monkeypatch.setattr(integrations, "_async_query", query)
+    monkeypatch.setattr(integrations, "decrypt_secret", lambda *_args, **_kwargs: "stored-secret")
+    monkeypatch.setattr(integrations, "CloudflareProvisioner", Provisioner)
+
+    response = await teardown_cloudflare(
+        TeardownRequest(integration_id="integration-platform"), _user()
+    )
+
+    assert response == {
+        "status": "removed",
+        "zone_name": "Sicurre.com.",
+        "dmarc_reporting_withdrawn": True,
+    }
+    # The client connection's own rule and Worker still go through the provisioner,
+    # which keeps whatever Worker the catch-all uses.
+    assert torn_down == [
+        {
+            "zone_id": "zone-platform",
+            "account_id": "account-platform",
+            "worker_name": "sicurre-gw-client",
+            "rule_id": "rule-client",
+        }
+    ]
+    assert deployed == [], "Sicurre's own DMARC record was rewritten"
+    assert any("DELETE FROM cloudflare_integration" in sql for sql, _ in statements)

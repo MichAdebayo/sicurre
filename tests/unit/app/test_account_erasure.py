@@ -6,7 +6,6 @@ pins the order of the cascade or the point where it must stop.
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -48,21 +47,12 @@ def _erasure_fixture(
     monkeypatch: pytest.MonkeyPatch,
     integrations: list[dict[str, Any]],
     teardown_error: Exception | None = None,
-    report_address: str = "report@sicurre.com",
 ) -> tuple[list[tuple[str, tuple[Any, ...]]], list[str]]:
-    """Wire the erasure: the integration list answers one SELECT, teardown is recorded.
-
-    The report mailbox names the platform's own zone, which the cascade must not tear down.
-    """
+    """Wire the erasure route: the integration list answers one SELECT, teardown is recorded."""
     captured, query = _fragment_query(
-        {"SELECT id, status, zone_name FROM cloudflare_integration": integrations}
+        {"SELECT id, status FROM cloudflare_integration": integrations}
     )
     monkeypatch.setattr(account_erasure, "execute_runtime_query", query)
-    monkeypatch.setattr(
-        account_erasure,
-        "get_settings",
-        lambda: SimpleNamespace(reported_email_address=report_address),
-    )
     torn_down: list[str] = []
 
     async def teardown(payload: Any, current_user: AuthUser) -> dict[str, Any]:
@@ -104,10 +94,7 @@ async def test_erasure_tears_every_domain_down_then_deletes_the_workspace_and_th
     """Cloudflare first, then every workspace table, then the Better Auth rows."""
     captured, torn_down = _erasure_fixture(
         monkeypatch,
-        [
-            {"id": "integration-2", "status": "active", "zone_name": "vinse.app"},
-            {"id": "integration-1", "status": "error", "zone_name": None},
-        ],
+        [{"id": "integration-2", "status": "active"}, {"id": "integration-1", "status": "error"}],
     )
 
     await erase_account(_USER)
@@ -179,41 +166,3 @@ async def test_a_member_without_a_workspace_loses_only_the_identity(
         'DELETE FROM "verification" WHERE identifier = ?',
         'DELETE FROM "user" WHERE id = ?',
     ]
-
-
-def test_the_platform_zone_is_the_domain_of_the_report_mailbox(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(
-        account_erasure,
-        "get_settings",
-        lambda: SimpleNamespace(reported_email_address=" Report@Mail.Example.TEST "),
-    )
-
-    assert account_erasure.platform_zone() == "mail.example.test"
-
-
-@pytest.mark.asyncio
-async def test_the_platform_zone_keeps_its_worker_and_loses_only_its_rows(
-    monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """sicurre.com shares its Worker with the platform catch-all; tearing it down stops its mail."""
-    captured, torn_down = _erasure_fixture(
-        monkeypatch,
-        [
-            {"id": "integration-platform", "status": "active", "zone_name": " Sicurre.COM "},
-            {"id": "integration-customer", "status": "active", "zone_name": "vinse.app"},
-        ],
-        report_address="Report@SICURRE.com",
-    )
-
-    with caplog.at_level("WARNING", logger=account_erasure.__name__):
-        await erase_account(_USER)
-
-    assert torn_down == ["integration-customer"]
-    assert "Kept the Cloudflare resources of sicurre.com" in caplog.text
-    deletes = [sql for sql, _ in captured if sql.startswith("DELETE")]
-    assert "DELETE FROM cloudflare_integration WHERE workspace_id = ?" in deletes
-    assert "DELETE FROM app_workspace WHERE id = ?" in deletes
-    assert deletes[-1] == 'DELETE FROM "user" WHERE id = ?'
