@@ -8,7 +8,6 @@
       "elevated_5xx": "Erreurs serveur élevées"
     },
     "subtitle": "Signal synthétique. Aucun impact sur les e-mails clients.",
-    "ready": "Prêt",
     "disabled": "Désactivé par configuration",
     "active": "Actif",
     "signal_active": "Signal synthétique actif",
