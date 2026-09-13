@@ -41,3 +41,22 @@ describe("customer dashboard for platform administrators", () => {
     expect(queries.shield).toHaveBeenCalledWith("own.test", true);
   });
 });
+
+describe("KPI figures while the statistics load", () => {
+  it("shows a quiet placeholder in each card, with the loading label only for screen readers", () => {
+    queries.kpis.mockReturnValue({ data: undefined, isLoading: true });
+    const session = {
+      workspace_id: "own-workspace", display_name: "Michael", role: "owner",
+      is_platform_admin: false, onboarding_required: false,
+    } as AuthSession;
+    const { container } = render(<DashboardRoute session={session} onGoToSettings={vi.fn()} />);
+
+    const labels = screen.getAllByText("common.loading");
+    expect(labels).toHaveLength(4);
+    for (const label of labels) {
+      expect(label).toHaveClass("sr-only");
+      expect(label.closest("[aria-busy]")).toHaveAttribute("aria-busy", "true");
+    }
+    expect(container.querySelectorAll('[aria-busy="true"] span[aria-hidden="true"]')).toHaveLength(4);
+  });
+});
