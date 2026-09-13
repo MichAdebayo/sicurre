@@ -5,6 +5,28 @@ notes are generated from Conventional Commits by semantic-release and published
 to [GitHub Releases](https://github.com/MichAdebayo/sicurre/releases), which is
 the authoritative record. This file summarises the notable changes only.
 
+## [1.37.5] - 2026-09-13
+
+- Authenticated API requests do less before their own work. Every request
+  wrote the workspace membership and ran two backfill updates; the membership
+  is now written only when the name or address changed, and the backfill runs
+  once, when the workspace is created. Measured on a local copy with the same
+  requests: the dashboard's four calls go from 25 SQL statements to 14 and the
+  admin console's two from 26 to 11. On the production database each
+  statement is its own transaction and connection check.
+- The admin overview reads its ten counts in one statement and runs its six
+  lists concurrently.
+- The session reply names the domain the dashboard opens on, so after
+  sign-in the dashboard loads its figures without waiting for the domain
+  list. The other domain pages still wait for the list.
+- Data fetched in the last minute is reused when an admin page is revisited
+  (30 seconds for the dashboard figures and recent threats), the admin Refresh
+  button spins only when clicked, and opening the console loads every admin
+  tab's code at once, each page imported once.
+- Sessions are still revalidated with Better Auth on every request, as the
+  non-functional requirements state; no session cache was added.
+- `make test-backend` and `make test-frontend` run each suite on its own.
+
 ## [1.37.4] - 2026-09-13
 
 - The operational test panel no longer shows a status pill. "Prêt" repeated

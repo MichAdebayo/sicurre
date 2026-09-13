@@ -1,20 +1,30 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { RefreshCw } from "lucide-react";
 import { Button } from "../ui/button";
 
-export function AdminPage({ view, children, onRefresh, refreshing = false }: {
+export function AdminPage({ view, children, onRefresh }: {
   view: "overview" | "operations" | "incidents" | "integrations" | "reviews";
   children: ReactNode;
-  onRefresh?: () => void;
-  refreshing?: boolean;
+  onRefresh?: () => Promise<unknown> | void;
 }) {
   const { t } = useTranslation();
+  // The button spins only for a refresh the admin asked for; background polling stays silent.
+  const [refreshing, setRefreshing] = useState(false);
+  const refresh = async () => {
+    if (!onRefresh || refreshing) return;
+    setRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setRefreshing(false);
+    }
+  };
   return (
     <div className="min-w-0 space-y-8">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="app-h1">{t(`admin.views.${view}`)}</h1>
-        {onRefresh && <Button variant="outline" disabled={refreshing} onClick={onRefresh}>
+        {onRefresh && <Button variant="outline" disabled={refreshing} onClick={refresh}>
           <RefreshCw className={`h-4 w-4 ${refreshing ? "motion-safe:animate-spin" : ""}`} aria-hidden="true" />
           {t("admin.refresh")}
         </Button>}

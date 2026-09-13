@@ -24,6 +24,10 @@ class AuthSessionResponse(ApiResponse):
     workspace_name: str
     is_platform_admin: bool
     has_cloudflare_integration: bool
+    default_domain: str | None = Field(
+        default=None,
+        description="Domain the dashboard opens on, so it can load before the domain list",
+    )
     threat_count: int = Field(ge=0)
     onboarding_required: bool
     sla_latency_ms: int = Field(ge=0)

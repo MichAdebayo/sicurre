@@ -43,6 +43,8 @@ async def test_admin_and_customer_use_the_same_workspace_onboarding(
     monkeypatch.setattr(session, "workspace_threat_count", count)
     monkeypatch.setattr(workspace_scope, "workspace_has_cloudflare_integration", connected)
     monkeypatch.setattr(session, "workspace_has_cloudflare_integration", connected)
+    default = AsyncMock(return_value="own.test" if has_integration else None)
+    monkeypatch.setattr(session, "workspace_default_domain", default)
 
     result = await session.get_session(_user(platform_admin))
 
@@ -52,6 +54,8 @@ async def test_admin_and_customer_use_the_same_workspace_onboarding(
     assert result["workspace_id"] == "own-workspace"
     count.assert_awaited_once_with("own-workspace")
     connected.assert_awaited_once_with("own-workspace")
+    default.assert_awaited_once_with("own-workspace")
+    assert result["default_domain"] == ("own.test" if has_integration else None)
 
 
 @pytest.mark.asyncio

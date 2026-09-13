@@ -28,6 +28,7 @@ from data_platform.api.routers.threats import (
     update_threat_status,
 )
 from data_platform.api.workspace_scope import (
+    workspace_default_domain,
     workspace_has_cloudflare_integration,
     workspace_threat_count,
 )
@@ -153,6 +154,35 @@ async def test_a_workspace_without_integration_reports_none(
     assert await workspace_has_cloudflare_integration("workspace-1") is False
 
 
+@pytest.mark.asyncio
+async def test_the_default_domain_prefers_the_newest_active_integration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Same choice as the front end: active first, then the most recent."""
+    captured, query = _fragment_query(
+        {"FROM cloudflare_integration": [{"zone_name": " Vinse.App "}]}
+    )
+    monkeypatch.setattr(workspace_scope, "execute_runtime_query", query)
+
+    assert await workspace_default_domain("workspace-1") == "vinse.app"
+    sql, params = captured[0]
+    assert "ORDER BY CASE WHEN status = 'active' THEN 0 ELSE 1 END, created_at DESC LIMIT 1" in sql
+    assert params == ("workspace-1",)
+
+
+@pytest.mark.asyncio
+async def test_a_workspace_without_domains_has_no_default_domain(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _captured, query = _fragment_query({"FROM cloudflare_integration": [{"zone_name": None}]})
+    monkeypatch.setattr(workspace_scope, "execute_runtime_query", query)
+    assert await workspace_default_domain("workspace-1") is None
+
+    _captured, empty = _fragment_query({})
+    monkeypatch.setattr(workspace_scope, "execute_runtime_query", empty)
+    assert await workspace_default_domain("workspace-1") is None
+
+
 # ── Profile patch ────────────────────────────────────────────────────────────
 
 
@@ -179,6 +209,12 @@ async def test_patching_the_profile_updates_both_tables_and_returns_the_new_name
     monkeypatch.setattr(workspace_scope, "workspace_has_cloudflare_integration", has_integration)
     monkeypatch.setattr(session, "workspace_has_cloudflare_integration", has_integration)
 
+    async def no_default_domain(workspace_id: str) -> None:
+        assert workspace_id == "workspace-1"
+        return None
+
+    monkeypatch.setattr(session, "workspace_default_domain", no_default_domain)
+
     result = await patch_profile(
         payload=UpdateProfileRequest(display_name="  New Owner  "),
         current_user=_USER,
@@ -201,6 +237,7 @@ async def test_patching_the_profile_updates_both_tables_and_returns_the_new_name
     assert result["has_cloudflare_integration"] is False
     assert result["threat_count"] == 0
     assert result["onboarding_required"] is True
+    assert result["default_domain"] is None
     assert isinstance(result["sla_latency_ms"], int)
 
 

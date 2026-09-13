@@ -3,11 +3,18 @@ import { useTranslation } from "react-i18next";
 import { useActiveDomain } from "../../contexts/active-domain";
 import { PageLoading } from "./page-loading";
 
-export function DomainPageBoundary({ children }: { children: ReactNode }) {
+export function DomainPageBoundary({
+  children,
+  renderWhileLoading = false,
+}: {
+  children: ReactNode;
+  /** Render as soon as a domain is known, before the domain list has loaded. */
+  renderWhileLoading?: boolean;
+}) {
   const { t } = useTranslation();
-  const { isLoading, isError, retry } = useActiveDomain();
+  const { activeDomain, isLoading, isError, retry } = useActiveDomain();
 
-  if (isLoading) return <PageLoading />;
+  if (isLoading && !(renderWhileLoading && activeDomain)) return <PageLoading />;
   if (isError) {
     return (
       <div role="alert" className="flex min-h-48 flex-col items-center justify-center gap-4 text-on-surface">

@@ -52,6 +52,8 @@ export interface AuthSession {
   workspace_name: string;
   is_platform_admin: boolean;
   has_cloudflare_integration: boolean;
+  /** Domain the dashboard opens on, handed over so it can load before the domain list. */
+  default_domain?: string | null;
   threat_count: number;
   onboarding_required: boolean;
   sla_latency_ms: number;
@@ -526,6 +528,9 @@ export function useKPIStats(workspaceId: string, domain: string) {
       return data;
     },
     initialData: () => readCachedKpis(workspaceId, domain),
+    // Cached figures show at once but still count as old, so they are refreshed on arrival.
+    initialDataUpdatedAt: 0,
+    staleTime: 30_000,
     enabled: !!domain,
     refetchInterval: 60000,
     refetchIntervalInBackground: false,
@@ -536,6 +541,8 @@ export function useAdminOverview() {
   return useQuery<AdminOverview>({
     queryKey: ["admin-overview"],
     queryFn: () => fetchJson<AdminOverview>("/admin/overview"),
+    // Revisiting the console within a minute shows the last figures without a new request.
+    staleTime: 60_000,
     retry: false,
     refetchInterval: (query) => query.state.status === "error" ? false : 60000,
     refetchIntervalInBackground: false,
@@ -547,6 +554,7 @@ export function useAdminDomains(page: number, search: string, enabled = true) {
   return useQuery<AdminDomainPage>({
     queryKey: ["admin-domains", page, search],
     queryFn: () => fetchJson<AdminDomainPage>(`/admin/domains?${params.toString()}`),
+    staleTime: 60_000,
     enabled,
     placeholderData: (previous) => previous,
   });
@@ -572,6 +580,7 @@ export function useAdminRuntimeHealth(enabled = true) {
   return useQuery<AdminRuntimeHealth>({
     queryKey: ["admin-runtime-health"],
     queryFn: () => fetchJson<AdminRuntimeHealth>("/admin/runtime-health"),
+    staleTime: 60_000,
     enabled,
     retry: false,
     refetchInterval: (query) => query.state.status === "error" ? false : 60000,
@@ -637,6 +646,7 @@ export function useThreatLogs(domain: string) {
   return useQuery<ThreatLog[]>({
     queryKey: ["threats", domain, "recent"],
     queryFn: async () => (await fetchJson<ThreatPage>(`/threats?page=1&page_size=100&date_range=all&domain=${encodeURIComponent(domain)}`)).items,
+    staleTime: 30_000,
     enabled: !!domain,
     placeholderData: (previous) => previous,
     refetchInterval: 30000,
@@ -1066,6 +1076,7 @@ export function useCloudflareList() {
   return useQuery<CloudflareStatus[]>({
     queryKey: ["cloudflare-list"],
     queryFn: () => fetchJson<CloudflareStatus[]>("/integrations/cloudflare/list"),
+    staleTime: 60_000,
   });
 }
 

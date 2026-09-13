@@ -459,6 +459,8 @@ async def _ensure_workspace_membership(
         SELECT
             m.workspace_id,
             m.role AS membership_role,
+            m.email AS member_email,
+            m.display_name AS member_display_name,
             w.name AS workspace_name
         FROM app_workspace_membership m
         JOIN app_workspace w ON w.id = m.workspace_id
@@ -505,16 +507,25 @@ async def _ensure_workspace_membership(
             ),
         )
         membership_role = WORKSPACE_OWNER_ROLE
+        # Rows recorded for this address before the workspace existed are
+        # adopted once, when the workspace is created.
+        await _backfill_workspace_owned_rows(workspace_id, auth_user_id, email)
     else:
-        workspace_id = str(membership_rows[0]["workspace_id"])
-        workspace_name = str(membership_rows[0]["workspace_name"])
-        membership_role = str(membership_rows[0]["membership_role"])
-        await async_query(
-            "UPDATE app_workspace_membership SET email = ?, display_name = ?, updated_at = ? WHERE auth_user_id = ?",
-            (email, display_name, now, auth_user_id),
+        membership = membership_rows[0]
+        workspace_id = str(membership["workspace_id"])
+        workspace_name = str(membership["workspace_name"])
+        membership_role = str(membership["membership_role"])
+        # Every authenticated request passes through here, so the membership is
+        # written only when the identity provider reports a new address or name.
+        identity_changed = (
+            membership.get("member_email") != email
+            or membership.get("member_display_name") != display_name
         )
-
-    await _backfill_workspace_owned_rows(workspace_id, auth_user_id, email)
+        if identity_changed:
+            await async_query(
+                "UPDATE app_workspace_membership SET email = ?, display_name = ?, updated_at = ? WHERE auth_user_id = ?",
+                (email, display_name, now, auth_user_id),
+            )
 
     settings = get_settings()
     return AuthUser(
