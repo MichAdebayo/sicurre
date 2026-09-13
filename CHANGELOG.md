@@ -16,6 +16,11 @@ version.
   animation tests; the handlers are now read through a ref.
 - The front files that had no test have one: 105 new Vitest tests, whole-tree
   line coverage from 44% to 64%.
+- The Vitest coverage gate measures the whole front. It used to gate seven
+  hand-picked files at 90%; it now counts every file under `src/app` plus the
+  auth sidecar and the container server, tested or not, with floors just under
+  the measured figures (lines 60%, statements 60%, branches 60%, functions
+  50%; measured 66%, 63%, 67%, 58% on 13 September 2026).
 - Starting a synthetic exercise is limited to 10 per hour (was 2), stopping
   one to 12 per hour (was 6), so a rehearsal plus the defence no longer trips
   the limit. The admin panel names the limit when it is hit instead of the
