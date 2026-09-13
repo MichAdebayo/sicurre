@@ -52,6 +52,7 @@ from data_platform.services.cloudflare_provisioner import (
     encrypt_provider_token,
 )
 from data_platform.services.dns_records import (
+    SICURRE_DMARC_MAILBOX,
     read_dns_state,
     withdraw_dmarc_reporting,
 )
@@ -88,6 +89,17 @@ class CloudflareSetupRequest(BaseModel):
     # interception, so the caller must opt in to each.
     fix_spf: bool = False
     fix_dmarc: bool = False
+
+
+def _hosts_sicurre_dmarc_mailbox(zone_name: str | None) -> bool:
+    """True for the zone Sicurre's own DMARC mailbox lives on.
+
+    Withdrawing the mailbox from that zone's record would stop the platform
+    receiving the aggregate reports for its own domain, so a disconnect of the
+    zone leaves it in place.
+    """
+    zone = (zone_name or "").strip().lower().rstrip(".")
+    return zone == SICURRE_DMARC_MAILBOX.rsplit("@", 1)[1]
 
 
 class TeardownRequest(BaseModel):
@@ -528,7 +540,14 @@ async def teardown_cloudflare(
             _, _, existing_dmarc = read_dns_state(
                 await provisioner.get_dns_records(row["zone_id"]), row["zone_name"]
             )
-            withdrawn = withdraw_dmarc_reporting(existing_dmarc)
+            if _hosts_sicurre_dmarc_mailbox(row["zone_name"]):
+                withdrawn = None
+                logger.info(
+                    "Kept Sicurre DMARC reporting on %s: the platform receives its own reports there",
+                    row["zone_name"],
+                )
+            else:
+                withdrawn = withdraw_dmarc_reporting(existing_dmarc)
             if withdrawn is not None:
                 await provisioner.deploy_dns_record(
                     zone_id=row["zone_id"],

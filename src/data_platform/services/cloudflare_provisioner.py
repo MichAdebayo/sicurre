@@ -619,6 +619,17 @@ class CloudflareProvisioner:
                 )
             self._unwrap(r, context=f"POST /zones/{zone_id}/dns_records")
 
+    async def catch_all_worker(self, zone_id: str) -> str | None:
+        """Return the Worker the zone's catch-all rule sends mail to, or None."""
+        data = await self._get(f"/zones/{zone_id}/email/routing/rules/catch_all")
+        result = data.get("result")
+        actions = result.get("actions", []) if isinstance(result, dict) else []
+        for action in actions:
+            value = action.get("value") or []
+            if action.get("type") == "worker" and value:
+                return str(value[0])
+        return None
+
     async def teardown(
         self,
         zone_id: str,
@@ -626,12 +637,34 @@ class CloudflareProvisioner:
         worker_name: str,
         rule_id: str,
     ) -> None:
-        """Remove the routing rule and Worker for a previously provisioned zone."""
+        """Remove the routing rule and Worker for a previously provisioned zone.
+
+        The Worker the zone's catch-all sends mail to is never deleted: on the
+        platform's own zone it receives Sicurre's DMARC reports and the emails
+        users report. When the catch-all cannot be read the Worker is kept as
+        well, since nothing then proves it is not that one.
+        """
         if rule_id and rule_id != "unknown":
             try:
                 await self.delete_email_rule(zone_id, rule_id)
             except CloudflareAPIError as exc:
                 logger.warning("Could not delete routing rule %s: %s", rule_id, exc)
+
+        try:
+            protected = await self.catch_all_worker(zone_id)
+        except (CloudflareAPIError, httpx.HTTPError) as exc:
+            logger.warning(
+                "Kept Worker '%s': the catch-all of zone %s could not be read: %s",
+                worker_name,
+                zone_id,
+                exc,
+            )
+            return
+        if protected == worker_name:
+            logger.warning(
+                "Kept Worker '%s': the catch-all of zone %s sends mail to it", worker_name, zone_id
+            )
+            return
 
         await self.delete_worker(account_id, worker_name)
         logger.info("Teardown complete for zone %s", zone_id)
