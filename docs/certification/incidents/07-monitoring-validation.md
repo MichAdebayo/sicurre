@@ -185,3 +185,18 @@ email: 21 seconds. Subjects `[FIRING] Sicurre high latency (synthetic test)`
 and `[RESOLVED] Sicurre high latency (synthetic test)`, receipt identifiers
 `1a097be06d562e91` and `1a097c1ae93bf50c`. No customer traffic was affected.
 
+The two other scenarios were run the same night, one stopped by hand and one
+left to expire, with the same sources:
+
+| Scenario | Signal at 1 | Rule Alerting | Firing email | Signal at 0 | Rule Normal | Resolved email |
+| --- | --- | --- | --- | --- | --- | --- |
+| Server errors (stopped by hand) | 22:35:48 | 22:35:50 | 22:36:08 | 22:36:48 | 22:36:50 | 22:37:08 |
+| API unavailable (expired) | 23:54:06 | 23:54:50 | 23:55:02 | 23:58:06 | 23:58:50 | 23:59:02 |
+
+Receipt identifiers: server errors `1a097c38eda4af3d` and `1a097c476bf4e694`;
+API unavailable `1a0980bcc80e755c` and `1a0980f79c2d4521`. Across the three
+scenarios the firing email arrived between 20 s and 1 min after the signal was
+first scraped, and the resolved email between 20 s and 1 min after it dropped.
+The variation is the scrape minute and the 30 s evaluation cadence, not the
+scenario.
+
