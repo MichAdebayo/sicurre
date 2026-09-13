@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import {
@@ -24,6 +24,7 @@ import { Input } from "../components/ui/input";
 import { CloudflareIntegrator } from "../components/common/cloudflare-integrator";
 import { DomainFootprintSection } from "../components/settings/domain-footprint";
 import { AppToast } from "../components/common/app-toast";
+import { Dialog } from "../components/ui/dialog";
 import AlertsRoute from "./alerts";
 import cloudflareLogo from "../assets/cloudflare-svgrepo-com.svg";
 import { useTheme } from "../lib/theme";
@@ -114,6 +115,8 @@ export default function SettingsRoute({ session, initialTab, onAccountDeleted }:
   const updateProfileMutation = useUpdateProfile();
   const changePasswordMutation = useChangePassword();
   const deleteAccountMutation = useDeleteAccount();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const deleteInputRef = useRef<HTMLInputElement>(null);
   const [deleteEmail, setDeleteEmail] = useState("");
   const [deleteError, setDeleteError] = useState("");
   const deleteConfirmed = deleteEmail.trim().toLowerCase() === session.email.trim().toLowerCase();
@@ -171,15 +174,26 @@ export default function SettingsRoute({ session, initialTab, onAccountDeleted }:
     }
   };
 
+  const openDeleteAccount = () => {
+    setDeleteEmail("");
+    setDeleteError("");
+    setDeleteOpen(true);
+  };
+
+  const closeDeleteAccount = () => {
+    if (!deleteAccountMutation.isPending) setDeleteOpen(false);
+  };
+
   const handleDeleteAccount = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!deleteConfirmed) return;
+    if (!deleteConfirmed || deleteAccountMutation.isPending) return;
     setDeleteError("");
     try {
       await deleteAccountMutation.mutateAsync(deleteEmail.trim());
+      setDeleteOpen(false);
       onAccountDeleted?.();
-    } catch (error) {
-      setDeleteError(error instanceof Error ? error.message : t("settings.delete_account_failed"));
+    } catch {
+      setDeleteError(t("settings.delete_account_failed"));
     }
   };
 
@@ -408,33 +422,12 @@ export default function SettingsRoute({ session, initialTab, onAccountDeleted }:
                 </div>
               </form>
 
-              <div className="mt-8 pt-6 border-t border-border-subtle">
-                <h3 className="text-sm font-bold text-error">{t("settings.delete_account_title")}</h3>
-                <p className="app-body-sub mt-1">{t("settings.delete_account_desc")}</p>
-                <form onSubmit={handleDeleteAccount} className="mt-4 flex flex-col sm:flex-row sm:items-end gap-3">
-                  <div className="flex-1">
-                    <Input
-                      label={t("settings.delete_account_confirm_label")}
-                      type="email"
-                      autoComplete="off"
-                      value={deleteEmail}
-                      onChange={(e) => setDeleteEmail(e.target.value)}
-                      placeholder={session.email}
-                    />
-                  </div>
-                  <Button
-                    type="submit"
-                    variant="danger"
-                    className="gap-2 shrink-0 cursor-pointer"
-                    disabled={!deleteConfirmed || deleteAccountMutation.isPending}
-                  >
-                    <Trash2 className="w-4 h-4" aria-hidden="true" />
-                    {t("settings.delete_account_button")}
-                  </Button>
-                </form>
-                {deleteError && (
-                  <p role="alert" className="mt-3 text-xs text-error font-semibold">{deleteError}</p>
-                )}
+              <div className="mt-8 pt-6 border-t border-border-subtle flex flex-wrap items-center justify-between gap-4">
+                <h3 className="text-sm font-bold text-on-surface">{t("settings.delete_account_title")}</h3>
+                <Button type="button" variant="danger" size="sm" className="gap-2 cursor-pointer" onClick={openDeleteAccount}>
+                  <Trash2 className="w-4 h-4" aria-hidden="true" />
+                  {t("settings.delete_account_open")}
+                </Button>
               </div>
             </section>
           )}
@@ -915,6 +908,40 @@ export default function SettingsRoute({ session, initialTab, onAccountDeleted }:
           </div>
         </div>
       )}
+      <Dialog
+        isOpen={deleteOpen}
+        onClose={closeDeleteAccount}
+        role="alertdialog"
+        size="sm"
+        initialFocusRef={deleteInputRef}
+        title={t("settings.delete_account_title")}
+        description={t("settings.delete_account_desc")}
+      >
+        <form onSubmit={handleDeleteAccount} className="space-y-4">
+          <Input
+            ref={deleteInputRef}
+            label={t("settings.delete_account_confirm_label")}
+            type="email"
+            autoComplete="off"
+            value={deleteEmail}
+            onChange={(e) => setDeleteEmail(e.target.value)}
+            placeholder={session.email}
+            disabled={deleteAccountMutation.isPending}
+          />
+          {deleteError && <p role="alert" className="text-xs text-error font-semibold">{deleteError}</p>}
+          <div className="flex justify-end gap-2.5">
+            <Button type="button" variant="outline" size="sm" className="font-bold text-xs" onClick={closeDeleteAccount} disabled={deleteAccountMutation.isPending}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" variant="danger" size="sm" className="gap-2 font-bold text-xs" disabled={!deleteConfirmed || deleteAccountMutation.isPending}>
+              {deleteAccountMutation.isPending
+                ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                : <Trash2 className="w-4 h-4" aria-hidden="true" />}
+              {deleteAccountMutation.isPending ? t("settings.delete_account_pending") : t("settings.delete_account_button")}
+            </Button>
+          </div>
+        </form>
+      </Dialog>
       <AppToast
         tone={toastError ? "error" : "success"}
         message={toastError || toastSuccess}

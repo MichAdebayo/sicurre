@@ -15,6 +15,7 @@ import {
   sidebarPagePaths,
 } from "./lib/navigation";
 import { useTranslation } from "react-i18next";
+import { AppToast } from "./components/common/app-toast";
 import { parseVerificationCallback } from "./lib/email-verification";
 import { applyTheme, getStoredTheme } from "./lib/theme";
 import { ActiveDomainProvider } from "./contexts/active-domain";
@@ -166,6 +167,8 @@ function AppContent() {
     () => getSidebarPageFromPath(window.location.pathname) ?? "dashboard",
   );
   const [settingsTab, setSettingsTab] = useState<string | undefined>();
+  // Shown on the landing page once a deleted account has been signed out.
+  const [signedOutNotice, setSignedOutNotice] = useState("");
   const requestedAfterLogin = useRef(getSidebarPageFromPath(window.location.pathname));
   const isVerificationEntry = viewState === "verify-email";
   const sessionQuery = useCurrentSession(sessionLookupEnabled && !isVerificationEntry);
@@ -287,6 +290,11 @@ function AppContent() {
     }
   };
 
+  const handleAccountDeleted = async () => {
+    setSignedOutNotice(t("settings.account_deleted"));
+    await handleLogout();
+  };
+
   if (isVerificationEntry) {
     return <VerifyEmailRoute onNavigateToLogin={() => setViewState("login")} />;
   }
@@ -299,6 +307,7 @@ function AppContent() {
   if (!hasStoredSession || !session) {
     if (viewState === "landing") {
       return (
+        <>
         <LandingRoute
           onNavigateToLogin={() => setViewState("login")}
           onNavigateToSignUp={() => setViewState("signup")}
@@ -306,6 +315,8 @@ function AppContent() {
           onNavigateToConfidentialite={() => setViewState("confidentialite")}
           onNavigateToContact={() => setViewState("contact")}
         />
+        <AppToast tone="success" message={signedOutNotice} visible={Boolean(signedOutNotice)} onClose={() => setSignedOutNotice("")} />
+        </>
       );
     }
     if (viewState === "cgu") {
@@ -376,9 +387,9 @@ function AppContent() {
             {activePage === "logs" && session.is_platform_admin && <LogsRoute />}
             {activePage === "admin-operations" && session.is_platform_admin && <AdminOperationsRoute />}
             {activePage === "admin-incidents" && session.is_platform_admin && <AdminIncidentsRoute />}
-            {activePage === "admin-integrations" && session.is_platform_admin && <AdminIntegrationsRoute />}
+            {activePage === "admin-integrations" && session.is_platform_admin && <AdminIntegrationsRoute currentEmail={session.email} />}
             {activePage === "admin-reviews" && session.is_platform_admin && <AdminReviewsRoute />}
-            {activePage === "settings" && <SettingsRoute session={session} initialTab={settingsTab} onAccountDeleted={handleLogout} />}
+            {activePage === "settings" && <SettingsRoute session={session} initialTab={settingsTab} onAccountDeleted={handleAccountDeleted} />}
             {activePage === "support" && <SupportRoute session={session} />}
           </>
         )}

@@ -76,18 +76,18 @@ on our side - the wildcard is not client-specific.
 ## Runbook: A member asks for their account to be erased
 
 **Self-service path.** Settings, Profile, "Supprimer mon compte": the member
-types their address, the API tears every connected domain down on Cloudflare,
-deletes every workspace row and the Better Auth identity, and the shell signs
-out. If Cloudflare refuses (revoked token, zone gone), the erasure stops
+types their address in the confirmation dialog, the API tears every connected
+domain down on Cloudflare, deletes every workspace row and the Better Auth
+identity, and the shell signs out and confirms the deletion. If Cloudflare refuses (revoked token, zone gone), the erasure stops
 before any row is deleted and the member sees the reason; fix the domain
 (disconnect it with a fresh token, or delete the stored token) and retry.
 
-**On their behalf.** Console, Cloudflare domains: "Supprimer le compte" on the
-domain row, "Supprimer la sélection" after ticking rows, or the form at the
-bottom for an account with no connected domain. Every path opens the same
-dialog, which lists the accounts and requires the irreversibility box to be
-ticked; then `DELETE /v1/admin/accounts` runs once per account and each
-refusal is shown with its reason. Refused for the admin's own address.
+**On their behalf.** Console, Cloudflare domains: "Supprimer" on the domain
+row, "Supprimer (n)" after ticking rows, or the form below the table for an
+account that is not in the list. Every path opens the same short dialog; on
+confirmation `DELETE /v1/admin/accounts` runs once per account and each
+refusal is shown with its reason. The signed-in admin's own row has no delete
+action; their own account is deleted from their settings.
 
 **The platform's own zone.** `sicurre.com` is both the platform zone and the
 zone the demonstration account connects, with two Workers. The catch-all

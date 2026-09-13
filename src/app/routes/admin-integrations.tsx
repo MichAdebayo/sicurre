@@ -1,18 +1,30 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertTriangle, ChevronLeft, ChevronRight, Search, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Search, Trash2 } from "lucide-react";
 import { useAdminDomains, useEraseAdminAccount, type AdminDomainPage } from "../lib/api";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Dialog } from "../components/ui/dialog";
 import { DataTable, type Column } from "../components/ui/data-table";
+import { AppToast } from "../components/common/app-toast";
 import { AdminPage, AdminQueryNotice, useAdminFormatting } from "../components/admin/admin-page";
 
 type AdminDomainRow = AdminDomainPage["items"][number];
 
 const normalizeEmail = (value: string) => value.trim().toLowerCase();
 
-export default function AdminIntegrationsRoute() {
+// The API refuses in English; the two refusals an admin can expect read in the interface language.
+const REFUSAL_KEYS: Record<string, string> = {
+  "Erase your own account from your settings, not from here": "admin.erase_own_refused",
+  "No account with this email": "admin.erase_not_found",
+};
+
+interface AdminIntegrationsRouteProps {
+  /** The signed-in admin. Their own account is deleted from their settings, never from this page. */
+  currentEmail?: string;
+}
+
+export default function AdminIntegrationsRoute({ currentEmail = "" }: AdminIntegrationsRouteProps) {
   const { t } = useTranslation();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -20,21 +32,28 @@ export default function AdminIntegrationsRoute() {
   const query = useAdminDomains(page, deferredSearch);
   const format = useAdminFormatting();
   const { data } = query;
+  const ownEmail = normalizeEmail(currentEmail);
 
   // Accounts are selected by owner address: one owner can hold several domains,
-  // and erasing an account removes every domain it holds in one cascade.
+  // and deleting the account removes every domain it holds.
   const [selected, setSelected] = useState<string[]>([]);
   const [eraseEmailInput, setEraseEmailInput] = useState("");
   const [pendingEmails, setPendingEmails] = useState<string[]>([]);
-  const [acknowledged, setAcknowledged] = useState(false);
+  const [running, setRunning] = useState(false);
   const [eraseDone, setEraseDone] = useState<string[]>([]);
   const [eraseFailures, setEraseFailures] = useState<{ email: string; reason: string }[]>([]);
   const eraseMutation = useEraseAdminAccount();
+  const busy = running || eraseMutation.isPending;
 
-  const pageOwners = useMemo(
-    () => Array.from(new Set((data?.items ?? []).map((row) => row.user_email).filter(Boolean).map((email) => normalizeEmail(email as string)))),
-    [data],
-  );
+  const isOwn = (email: string) => ownEmail !== "" && normalizeEmail(email) === ownEmail;
+  const pageOwners = useMemo(() => {
+    const owners = (data?.items ?? [])
+      .map((row) => row.user_email)
+      .filter((email): email is string => Boolean(email))
+      .map(normalizeEmail)
+      .filter((email) => email !== ownEmail);
+    return Array.from(new Set(owners));
+  }, [data, ownEmail]);
   const allSelected = pageOwners.length > 0 && pageOwners.every((email) => selected.includes(email));
 
   const toggleOwner = (email: string) =>
@@ -44,37 +63,39 @@ export default function AdminIntegrationsRoute() {
 
   const askErase = (emails: string[]) => {
     const unique = Array.from(new Set(emails.map(normalizeEmail).filter(Boolean)));
-    if (unique.length === 0) return;
-    setPendingEmails(unique);
-    setAcknowledged(false);
     setEraseDone([]);
     setEraseFailures([]);
+    if (unique.some(isOwn)) {
+      setEraseFailures([{ email: ownEmail, reason: t("admin.erase_own_refused") }]);
+      return;
+    }
+    if (unique.length > 0) setPendingEmails(unique);
   };
   const closeDialog = () => {
-    if (eraseMutation.isPending) return;
-    setPendingEmails([]);
-    setAcknowledged(false);
+    if (!busy) setPendingEmails([]);
   };
   const runErase = async () => {
-    if (!acknowledged || pendingEmails.length === 0) return;
+    if (busy || pendingEmails.length === 0) return;
+    setRunning(true);
     const done: string[] = [];
     const failures: { email: string; reason: string }[] = [];
-    // One account at a time: each cascade talks to Cloudflare, and a refusal
+    // One account at a time: each deletion talks to Cloudflare, and a refusal
     // on one account must not stop the others nor hide which one it was.
     for (const email of pendingEmails) {
       try {
         await eraseMutation.mutateAsync(email);
         done.push(email);
       } catch (error) {
-        failures.push({ email, reason: error instanceof Error ? error.message : t("admin.erase_failed") });
+        const key = error instanceof Error ? REFUSAL_KEYS[error.message] : undefined;
+        failures.push({ email, reason: t(key ?? "admin.erase_failed") });
       }
     }
+    setRunning(false);
     setEraseDone(done);
     setEraseFailures(failures);
     setSelected((current) => current.filter((email) => !done.includes(email)));
     setEraseEmailInput("");
     setPendingEmails([]);
-    setAcknowledged(false);
   };
 
   const columns: Column<AdminDomainRow>[] = [
@@ -84,7 +105,7 @@ export default function AdminIntegrationsRoute() {
           onChange={toggleAll} className="h-4 w-4 cursor-pointer accent-primary" />
       ),
       className: "w-12",
-      render: (row) => row.user_email ? (
+      render: (row) => row.user_email && !isOwn(row.user_email) ? (
         <input type="checkbox" aria-label={t("admin.select_row", { email: row.user_email })} checked={selected.includes(normalizeEmail(row.user_email))}
           onChange={() => toggleOwner(normalizeEmail(row.user_email as string))} className="h-4 w-4 cursor-pointer accent-primary" />
       ) : null,
@@ -101,12 +122,19 @@ export default function AdminIntegrationsRoute() {
     {
       header: t("admin.col_actions"),
       className: "text-right",
-      render: (row) => row.user_email ? (
-        <Button variant="ghost" size="sm" className="gap-1.5 text-error cursor-pointer" onClick={() => askErase([row.user_email as string])}
-          aria-label={`${t("admin.erase_account")} ${row.user_email}`}>
-          <Trash2 className="h-4 w-4" aria-hidden="true" />{t("admin.erase_account")}
-        </Button>
-      ) : null,
+      render: (row) => {
+        if (!row.user_email) return null;
+        if (isOwn(row.user_email)) {
+          return <span className="text-xs font-semibold text-on-surface-variant">{t("admin.own_account")}</span>;
+        }
+        const email = row.user_email;
+        return (
+          <Button variant="ghost" size="sm" className="gap-1.5 text-error cursor-pointer" onClick={() => askErase([email])}
+            aria-label={t("admin.erase_row_label", { email })}>
+            <Trash2 className="h-4 w-4" aria-hidden="true" />{t("admin.erase_account")}
+          </Button>
+        );
+      },
     },
   ];
 
@@ -145,9 +173,6 @@ export default function AdminIntegrationsRoute() {
         </div>
       </nav>}
 
-      {eraseDone.length > 0 && (
-        <p role="status" className="text-xs font-semibold text-safe">{t("admin.erase_done", { emails: eraseDone.join(", ") })}</p>
-      )}
       {eraseFailures.length > 0 && (
         <ul role="alert" className="space-y-1 text-xs font-semibold text-error">
           {eraseFailures.map((failure) => <li key={failure.email}>{failure.email} : {failure.reason}</li>)}
@@ -156,8 +181,7 @@ export default function AdminIntegrationsRoute() {
 
       <section className="rounded-xl border border-border-subtle p-5">
         <h3 className="text-sm font-bold text-on-surface">{t("admin.erase_by_email_title")}</h3>
-        <p className="app-body-sub mt-1">{t("admin.erase_by_email_desc")}</p>
-        <form onSubmit={(event) => { event.preventDefault(); askErase([eraseEmailInput]); }} className="mt-4 flex flex-col sm:flex-row sm:items-end gap-3">
+        <form onSubmit={(event) => { event.preventDefault(); askErase([eraseEmailInput]); }} className="mt-3 flex flex-col sm:flex-row sm:items-end gap-3">
           <div className="flex-1">
             <Input label={t("admin.erase_by_email_label")} type="email" autoComplete="off" value={eraseEmailInput}
               onChange={(event) => setEraseEmailInput(event.target.value)} />
@@ -172,31 +196,32 @@ export default function AdminIntegrationsRoute() {
         isOpen={pendingEmails.length > 0}
         onClose={closeDialog}
         role="alertdialog"
-        title={t("admin.erase_dialog_title")}
+        size="sm"
+        title={t("admin.erase_dialog_title", { count: pendingEmails.length })}
         description={t("admin.erase_dialog_desc")}
         footer={
-          <div className="flex flex-wrap justify-end gap-3">
-            <Button type="button" variant="outline" className="cursor-pointer" onClick={closeDialog} disabled={eraseMutation.isPending}>
+          <div className="flex justify-end gap-2.5">
+            <Button type="button" variant="outline" size="sm" className="font-bold text-xs cursor-pointer" onClick={closeDialog} disabled={busy}>
               {t("common.cancel")}
             </Button>
-            <Button type="button" variant="danger" className="gap-2 cursor-pointer" onClick={runErase} disabled={!acknowledged || eraseMutation.isPending}>
-              <Trash2 className="h-4 w-4" aria-hidden="true" />{t("admin.erase_confirm")}
+            <Button type="button" variant="danger" size="sm" className="gap-2 font-bold text-xs cursor-pointer" onClick={runErase} disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Trash2 className="h-4 w-4" aria-hidden="true" />}
+              {busy ? t("admin.erase_pending") : t("admin.erase_confirm")}
             </Button>
           </div>
         }
       >
-        <ul className="space-y-1 rounded-lg border border-border-subtle bg-surface-low/50 p-3 text-sm font-semibold text-on-surface">
+        <ul className="space-y-1 text-sm font-semibold text-on-surface">
           {pendingEmails.map((email) => <li key={email} className="break-all">{email}</li>)}
         </ul>
-        <p className="mt-3 flex items-start gap-2 text-sm text-error">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>{t("admin.erase_dialog_warning")}</span>
-        </p>
-        <label className="mt-4 flex cursor-pointer items-start gap-2 text-sm text-on-surface">
-          <input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} className="mt-0.5 h-4 w-4 cursor-pointer accent-primary" />
-          <span>{t("admin.erase_acknowledge")}</span>
-        </label>
       </Dialog>
+
+      <AppToast
+        tone="success"
+        message={t("admin.erase_done", { count: eraseDone.length, emails: eraseDone.join(", ") })}
+        visible={eraseDone.length > 0}
+        onClose={() => setEraseDone([])}
+      />
     </AdminPage>
   );
 }

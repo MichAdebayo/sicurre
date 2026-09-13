@@ -460,19 +460,17 @@ export function useLogout() {
   });
 }
 
-/** Erase the account: the API tears the domains down, deletes the workspace and the identity. */
+/**
+ * Erase the account: the API tears the domains down, deletes the workspace and the identity.
+ * The shell closes the session afterwards, so the member sees the outcome first.
+ */
 export function useDeleteAccount() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (email: string) =>
       fetchJson<{ status: string }>("/auth/account", {
         method: "DELETE",
         body: JSON.stringify({ email }),
       }),
-    onSuccess: () => {
-      clearStoredSession();
-      discardSessionCache(queryClient);
-    },
   });
 }
 

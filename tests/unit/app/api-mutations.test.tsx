@@ -306,7 +306,7 @@ describe("cloudflare mutations", () => {
 });
 
 describe("account erasure", () => {
-  it("sends the typed address, then forgets the stored session and every cached query", async () => {
+  it("sends the typed address and leaves closing the session to the shell", async () => {
     respondWith({ status: "deleted" });
     localStorage.setItem("sicurre_user_email", "owner@example.test");
     const clear = vi.spyOn(client, "clear");
@@ -321,8 +321,9 @@ describe("account erasure", () => {
       credentials: "include",
       contentType: "application/json",
     }));
-    expect(localStorage.getItem("sicurre_user_email")).toBeNull();
-    expect(clear).toHaveBeenCalled();
+    // The shell signs out after showing the outcome; the hook must not drop the session first.
+    expect(localStorage.getItem("sicurre_user_email")).toBe("owner@example.test");
+    expect(clear).not.toHaveBeenCalled();
   });
 
   it("keeps the session when the API refuses the erasure", async () => {

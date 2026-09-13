@@ -78,9 +78,9 @@ describe("dedicated admin pages", () => {
 });
 
 describe("account erasure from the console", () => {
-  const dialog = () => screen.getByRole("alertdialog", { name: "Confirmer la suppression" });
-  const acknowledge = () => fireEvent.click(within(dialog()).getByRole("checkbox", { name: "Je comprends que cette action est irréversible." }));
-  const confirmButton = () => within(dialog()).getByRole("button", { name: "Supprimer définitivement" });
+  const dialog = () => screen.getByRole("alertdialog");
+  const confirmButton = () => within(dialog()).getByRole("button", { name: "Supprimer" });
+  const rowDelete = () => screen.getByRole("button", { name: "Supprimer le compte owner@example.test" });
 
   it("lists the domains in a table with the owner, status and update date", () => {
     renderPage(<AdminIntegrationsRoute />);
@@ -91,75 +91,89 @@ describe("account erasure from the console", () => {
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 
-  it("opens the confirmation from the row action and erases once the admin acknowledges", async () => {
+  it("asks once in a short dialog from the row action, then confirms with a notification", async () => {
     mocks.erase.mockResolvedValue({ status: "deleted" });
     renderPage(<AdminIntegrationsRoute />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Supprimer le compte owner@example.test" }));
+    fireEvent.click(rowDelete());
+    expect(within(dialog()).getByText("Supprimer le compte")).toBeInTheDocument();
+    expect(within(dialog()).getByText("Cette action est irréversible.")).toBeInTheDocument();
     expect(within(dialog()).getByText("owner@example.test")).toBeInTheDocument();
-    expect(within(dialog()).getByText("Cette action est immédiate et irréversible.")).toBeInTheDocument();
-    expect(confirmButton()).toBeDisabled();
-    acknowledge();
-    expect(confirmButton()).toBeEnabled();
+    expect(within(dialog()).queryByRole("checkbox")).not.toBeInTheDocument();
 
     fireEvent.click(confirmButton());
-    expect(await screen.findByRole("status")).toHaveTextContent("Suppression effectuée : owner@example.test");
+    expect(await screen.findByText("Compte supprimé : owner@example.test")).toBeInTheDocument();
     expect(mocks.erase).toHaveBeenCalledWith("owner@example.test");
     await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
   });
 
-  it("selects accounts with the checkboxes and erases the selection in one confirmation", async () => {
+  it("deletes the ticked accounts from the selection button", async () => {
     mocks.erase.mockResolvedValue({ status: "deleted" });
     renderPage(<AdminIntegrationsRoute />);
 
-    expect(screen.queryByRole("button", { name: /Supprimer la sélection/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Supprimer \(/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("checkbox", { name: "Sélectionner tous les comptes de la page" }));
     expect(screen.getByRole("checkbox", { name: "Sélectionner le compte owner@example.test" })).toBeChecked();
-    fireEvent.click(screen.getByRole("button", { name: "Supprimer la sélection (1)" }));
-    acknowledge();
+    fireEvent.click(screen.getByRole("button", { name: "Supprimer (1)" }));
     fireEvent.click(confirmButton());
 
     await waitFor(() => expect(mocks.erase).toHaveBeenCalledWith("owner@example.test"));
-    await waitFor(() => expect(screen.queryByRole("button", { name: /Supprimer la sélection/ })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("button", { name: /Supprimer \(/ })).not.toBeInTheDocument());
   });
 
-  it("erases an account with no domain from the free form and cancels cleanly", async () => {
+  it("offers no delete action on the signed-in admin's own row", () => {
+    renderPage(<AdminIntegrationsRoute currentEmail="Owner@Example.test" />);
+
+    expect(screen.getByText("Votre compte")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Supprimer le compte owner@example.test" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Sélectionner le compte owner@example.test" })).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Sélectionner tous les comptes de la page" })).toBeDisabled();
+  });
+
+  it("refuses the admin's own address in the form without opening the dialog", () => {
+    renderPage(<AdminIntegrationsRoute currentEmail="admin@example.test" />);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Adresse e-mail du compte" }), { target: { value: " Admin@Example.test " } });
+    fireEvent.click(screen.getByRole("button", { name: "Supprimer" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Supprimez votre propre compte depuis vos paramètres.");
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(mocks.erase).not.toHaveBeenCalled();
+  });
+
+  it("opens the same dialog for an address typed in the form and cancels cleanly", async () => {
     renderPage(<AdminIntegrationsRoute />);
-    const emailInput = screen.getByRole("textbox", { name: "Adresse e-mail du compte" });
-    const openButton = screen.getByRole("button", { name: "Supprimer le compte" });
+    const openButton = screen.getByRole("button", { name: "Supprimer" });
 
     expect(openButton).toBeDisabled();
-    fireEvent.change(emailInput, { target: { value: " New@Example.test " } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Adresse e-mail du compte" }), { target: { value: " New@Example.test " } });
     fireEvent.click(openButton);
     expect(within(dialog()).getByText("new@example.test")).toBeInTheDocument();
 
     fireEvent.click(within(dialog()).getByRole("button", { name: "Annuler" }));
-    // The panel animates out before it unmounts.
     await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     expect(mocks.erase).not.toHaveBeenCalled();
   });
 
-  it("reports each refused account with its reason and keeps the others going", async () => {
-    mocks.erase.mockRejectedValueOnce(new Error("No account with this email")).mockRejectedValueOnce("offline");
+  it("shows each refusal in French with the account it concerns", async () => {
+    mocks.erase.mockRejectedValueOnce(new Error("No account with this email"));
     renderPage(<AdminIntegrationsRoute />);
-    fireEvent.click(screen.getByRole("checkbox", { name: "Sélectionner le compte owner@example.test" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "Adresse e-mail du compte" }), { target: { value: "other@example.test" } });
-    fireEvent.click(screen.getByRole("button", { name: "Supprimer le compte" }));
-    acknowledge();
+    fireEvent.click(rowDelete());
     fireEvent.click(confirmButton());
+    expect(await screen.findByRole("alert")).toHaveTextContent("owner@example.test : Aucun compte avec cette adresse.");
 
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("other@example.test : No account with this email");
-    expect(mocks.erase).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("checkbox", { name: "Sélectionner le compte owner@example.test" })).toBeChecked();
+    mocks.erase.mockRejectedValueOnce("offline");
+    fireEvent.click(rowDelete());
+    fireEvent.click(confirmButton());
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("La suppression n’a pas abouti."));
   });
 
-  it("keeps the dialog closed to Escape and the buttons disabled while an erasure is pending", () => {
+  it("shows the deletion in progress and cannot be dismissed while it runs", () => {
     mocks.erasePending = true;
     renderPage(<AdminIntegrationsRoute />);
-    fireEvent.click(screen.getByRole("button", { name: "Supprimer le compte owner@example.test" }));
-    acknowledge();
-    expect(confirmButton()).toBeDisabled();
+    fireEvent.click(rowDelete());
+
+    expect(within(dialog()).getByRole("button", { name: "Suppression…" })).toBeDisabled();
     fireEvent.keyDown(dialog(), { key: "Escape" });
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
   });
