@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import HTTPException, status
 
+from core.config import get_settings
 from data_platform.api.auth import AuthUser
 from data_platform.api.routers.integrations import TeardownRequest, teardown_cloudflare
 from db.runtime import execute_runtime_query
+
+logger = logging.getLogger(__name__)
 
 # Every table holding rows for one workspace, dependants before the tables they
 # reference. The membership row carries the only foreign key, to app_workspace.
@@ -29,17 +34,29 @@ WORKSPACE_TABLES = (
 )
 
 
+def platform_zone() -> str:
+    """Return the zone Sicurre receives its own mail on: the domain of the report mailbox.
+
+    The platform's catch-all and a customer connection of that zone share one
+    Worker, whose name derives from the zone id. Tearing the zone down for a
+    customer would stop every inbound mail to the platform.
+    """
+    return get_settings().reported_email_address.strip().lower().rsplit("@", 1)[-1]
+
+
 async def erase_account(user: AuthUser) -> None:
     """Tear every connected domain down, delete the workspace rows, then the Better Auth rows.
 
     Refused (409) while a domain is still provisioning. A Cloudflare refusal
     propagates before any row is deleted, so the member keeps a working
-    account and can retry. A user without a workspace loses only the identity.
+    account and can retry. The platform's own zone is never torn down: its
+    rows go, its Worker and routing rule keep serving the platform. A user
+    without a workspace loses only the identity.
     """
     email = user.email.strip().lower()
     if user.workspace_id:
         integrations = await execute_runtime_query(
-            "SELECT id, status FROM cloudflare_integration WHERE workspace_id = ? "
+            "SELECT id, status, zone_name FROM cloudflare_integration WHERE workspace_id = ? "
             "ORDER BY created_at DESC",
             (user.workspace_id,),
         )
@@ -49,7 +66,16 @@ async def erase_account(user: AuthUser) -> None:
                 detail="A domain is still being connected; wait for it to complete "
                 "before deleting the account",
             )
+        shared_zone = platform_zone()
         for row in integrations:
+            if str(row.get("zone_name") or "").strip().lower() == shared_zone:
+                logger.warning(
+                    "Kept the Cloudflare resources of %s while erasing %s: "
+                    "the platform receives its own mail through them",
+                    shared_zone,
+                    email,
+                )
+                continue
             await teardown_cloudflare(TeardownRequest(integration_id=str(row["id"])), user)
         for table in WORKSPACE_TABLES:
             await execute_runtime_query(
