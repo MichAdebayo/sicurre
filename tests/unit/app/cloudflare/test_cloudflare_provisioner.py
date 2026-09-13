@@ -507,6 +507,8 @@ async def test_teardown_flow() -> None:
     del_rule = respx.delete(
         "https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/rules/rule-123"
     ).mock(return_value=httpx.Response(200, json={"success": True}))
+    # The catch-all sends mail to another Worker, so this one may go.
+    respx.get(_CATCH_ALL).mock(return_value=_catch_all_to_worker("platform-worker"))
     # Mock delete worker
     del_worker = respx.delete(
         "https://api.cloudflare.com/client/v4/accounts/account-456/workers/scripts/my-worker"
@@ -514,6 +516,99 @@ async def test_teardown_flow() -> None:
     await provisioner.teardown("zone-123", "account-456", "my-worker", "rule-123")
     assert del_rule.called
     assert del_worker.called
+
+
+# --------------------------------------------------------------------------- ──
+# On sicurre.com the catch-all sends DMARC reports and reported emails to the
+# platform Worker. A teardown must never delete the Worker a catch-all uses,
+# and must keep it when the catch-all cannot be read.
+# --------------------------------------------------------------------------- ──
+
+_CATCH_ALL = "https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/rules/catch_all"
+_RULE = "https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/rules/rule-123"
+_WORKER = "https://api.cloudflare.com/client/v4/accounts/account-456/workers/scripts/my-worker"
+
+
+def _catch_all_to_worker(name: str) -> httpx.Response:
+    return httpx.Response(
+        200,
+        json={
+            "success": True,
+            "result": {"enabled": True, "actions": [{"type": "worker", "value": [name]}]},
+        },
+    )
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_teardown_keeps_the_worker_the_catch_all_sends_mail_to() -> None:
+    provisioner = CloudflareProvisioner(api_token="token")
+    del_rule = respx.delete(_RULE).mock(return_value=httpx.Response(200, json={"success": True}))
+    respx.get(_CATCH_ALL).mock(return_value=_catch_all_to_worker("my-worker"))
+    del_worker = respx.delete(_WORKER).mock(
+        return_value=httpx.Response(200, json={"success": True})
+    )
+
+    await provisioner.teardown("zone-123", "account-456", "my-worker", "rule-123")
+
+    assert del_rule.called, "the connected address's own rule still goes"
+    assert not del_worker.called
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_teardown_keeps_the_worker_when_the_catch_all_is_refused() -> None:
+    provisioner = CloudflareProvisioner(api_token="token")
+    respx.delete(_RULE).mock(return_value=httpx.Response(200, json={"success": True}))
+    respx.get(_CATCH_ALL).mock(
+        return_value=httpx.Response(
+            403, json={"success": False, "errors": [{"code": 10000, "message": "Forbidden"}]}
+        )
+    )
+    del_worker = respx.delete(_WORKER).mock(
+        return_value=httpx.Response(200, json={"success": True})
+    )
+
+    await provisioner.teardown("zone-123", "account-456", "my-worker", "rule-123")
+
+    assert not del_worker.called
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_teardown_keeps_the_worker_when_the_catch_all_is_unreachable() -> None:
+    provisioner = CloudflareProvisioner(api_token="token")
+    respx.delete(_RULE).mock(return_value=httpx.Response(200, json={"success": True}))
+    respx.get(_CATCH_ALL).mock(side_effect=httpx.ConnectTimeout("timed out"))
+    del_worker = respx.delete(_WORKER).mock(
+        return_value=httpx.Response(200, json={"success": True})
+    )
+
+    await provisioner.teardown("zone-123", "account-456", "my-worker", "rule-123")
+
+    assert not del_worker.called
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_a_catch_all_that_forwards_or_drops_names_no_worker() -> None:
+    provisioner = CloudflareProvisioner(api_token="token")
+    route = respx.get(_CATCH_ALL)
+    route.side_effect = [
+        httpx.Response(
+            200,
+            json={
+                "success": True,
+                "result": {"actions": [{"type": "forward", "value": ["owner@example.test"]}]},
+            },
+        ),
+        httpx.Response(200, json={"success": True, "result": {"actions": [{"type": "drop"}]}}),
+        httpx.Response(200, json={"success": True, "result": None}),
+    ]
+
+    assert await provisioner.catch_all_worker("zone-123") is None
+    assert await provisioner.catch_all_worker("zone-123") is None
+    assert await provisioner.catch_all_worker("zone-123") is None
 
 
 # --------------------------------------------------------------------------- ──

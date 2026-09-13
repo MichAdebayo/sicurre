@@ -5,6 +5,18 @@ notes are generated from Conventional Commits by semantic-release and published
 to [GitHub Releases](https://github.com/MichAdebayo/sicurre/releases), which is
 the authoritative record. This file summarises the notable changes only.
 
+## [1.37.2] - 2026-09-13
+
+- A disconnect never deletes the Worker a zone's catch-all sends mail to, and
+  keeps it when the catch-all cannot be read. On sicurre.com that Worker
+  receives Sicurre's DMARC reports and the emails users report.
+- A disconnect of sicurre.com keeps `dmarc@sicurre.com` in the domain's own
+  DMARC record, so the platform keeps receiving its aggregate reports.
+- The 1.37.1 erasure guard is withdrawn. It assumed the platform and the
+  demonstration client shared one Worker on sicurre.com; Cloudflare shows two.
+  Erasing an account tears every domain down again, through the same guarded
+  disconnect, so the client Worker and rule no longer stay behind.
+
 ## [1.37.1] - 2026-09-13
 
 - Erasing an account no longer tears down the platform's own zone on
