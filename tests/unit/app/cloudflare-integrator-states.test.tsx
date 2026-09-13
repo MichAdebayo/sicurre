@@ -313,6 +313,8 @@ describe("Cloudflare provisioning progress", () => {
     expect(replacement).toHaveBeenCalledTimes(1);
     expect(onSuccess).not.toHaveBeenCalled();
     expect(screen.queryByText("cloudflare.progress_title")).not.toBeInTheDocument();
+    // The checklist gives way to the connected state.
+    expect(screen.getByText("cloudflare.status_active")).toBeInTheDocument();
 
     act(() => { vi.advanceTimersByTime(5000); });
     expect(replacement).toHaveBeenCalledTimes(1);
