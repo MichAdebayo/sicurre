@@ -5,6 +5,14 @@ notes are generated from Conventional Commits by semantic-release and published
 to [GitHub Releases](https://github.com/MichAdebayo/sicurre/releases), which is
 the authoritative record. This file summarises the notable changes only.
 
+## [1.37.9] - 2026-09-14
+
+- Dialogs no longer flicker. The backdrop is a plain dim that fades in, with
+  no blur: Chromium drew the blur only once the fade ended, so the page
+  snapped from sharp to blurred on open and back on close. The panel no longer
+  fades or scales, which kept the quarantine email preview from showing
+  through ahead of it, and closing unmounts at once.
+
 ## [1.37.8] - 2026-09-14
 
 - The quarantine page lists held messages newest first on its own, whatever
