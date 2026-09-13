@@ -135,6 +135,17 @@ Erase that account only after the last deploy before it is needed again, or
 comment the three `SICURRE_ADMIN_*` lines out first. Admin rights come from
 `SICURRE_PLATFORM_ADMIN_EMAILS` and return as soon as the address signs up.
 
+## Runbook: Platform gateway Worker
+
+Since 13 September 2026 sicurre.com's catch-all runs on `sicurre-platform-gateway`,
+deployed with `SICURRE_SCAN_DISABLED=true`: it ingests `dmarc@sicurre.com` and
+`report+<token>@sicurre.com` and forwards every other message to the platform
+inbox without scanning. michael@sicurre.com has its own forward rule, which the
+onboarding of sicurre.com as a client replaces with Sicurre's intercept rule.
+The scan API also refuses to file mail whose recipient is outside the
+integration's zone, so a catch-all routing to a customer's Worker can no longer
+put another domain's mail in that customer's journal.
+
 ## Runbook: Cloudflare Workers shared across zones
 
 vinse.app and sicurre.com sit in one Cloudflare account. The Worker

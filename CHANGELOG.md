@@ -5,6 +5,28 @@ notes are generated from Conventional Commits by semantic-release and published
 to [GitHub Releases](https://github.com/MichAdebayo/sicurre/releases), which is
 the authoritative record. This file summarises the notable changes only.
 
+## [1.37.7] - 2026-09-13
+
+- Mail that is not the customer's is delivered untouched, with nothing stored
+  or alerted under their workspace: a message whose envelope recipient is
+  outside the integration's zone and its subdomains, and Sicurre's own
+  notifications, trusted only when Cloudflare's first Authentication-Results
+  header records a DKIM pass for mail.sicurre.com. A Loops login link sent to
+  michael@sicurre.com had been scanned, quarantined and alerted under vinse.app
+  through their shared Worker, and Sicurre's alerts were quarantined as
+  phishing.
+- Quarantine previews are decoded from the raw MIME when the Worker uploads
+  it, instead of keeping the Worker's projection with raw headers and encoded
+  bodies. CD rebuilds the previews of held items on each deploy.
+- The quarantine cards no longer lift on hover, which flickered under the
+  preview dialog's backdrop.
+- The API's application logs, scan outcomes and quarantine failures among
+  them, reach Loki at INFO.
+- The gateway Worker has a platform mode (`SICURRE_SCAN_DISABLED`): it ingests
+  DMARC and user reports and forwards everything else unscanned. sicurre.com's
+  catch-all runs on its own `sicurre-platform-gateway`, so vinse.app no longer
+  shares a Worker with the platform; both names are protected from teardown.
+
 ## [1.37.6] - 2026-09-13
 
 - A domain disconnect or account erasure never deletes a Cloudflare Worker that

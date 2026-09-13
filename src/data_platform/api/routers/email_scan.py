@@ -13,6 +13,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 from time import perf_counter
 from typing import Any, Literal
@@ -83,6 +84,42 @@ class EmailScanRequest(BaseModel):
     use_virustotal: bool = False
 
 
+def _recipient_outside_zone(recipient: str, zone: str) -> bool:
+    """True when the envelope recipient's domain is neither the zone nor one of its subdomains.
+
+    An absent recipient, which older Workers omit, or an unknown zone is never
+    treated as outside.
+    """
+    address = (recipient or "").strip().lower().strip("<>")
+    if "@" not in address or not zone:
+        return False
+    domain = address.rsplit("@", 1)[1].rstrip(".")
+    return not (domain == zone or domain.endswith(f".{zone}"))
+
+
+_SICURRE_DKIM_PASS = re.compile(
+    r"\bdkim=pass\b[^;]*\bheader\.d=mail\.sicurre\.com(?=[\s;]|$)", re.IGNORECASE
+)
+
+
+def _is_sicurre_notification(raw_text: str) -> bool:
+    """True when Cloudflare's own authentication results record a DKIM pass for mail.sicurre.com.
+
+    Only the first Authentication-Results header written by mx.cloudflare.net is
+    read: headers further down the message could have been supplied by the sender.
+    """
+    header_block = (raw_text or "").replace("\r\n", "\n").split("\n\n", 1)[0]
+    unfolded = re.sub(r"\n[ \t]+", " ", header_block)
+    for line in unfolded.split("\n"):
+        name, _, value = line.partition(":")
+        if name.strip().lower() != "authentication-results":
+            continue
+        if not value.strip().lower().startswith("mx.cloudflare.net"):
+            continue
+        return bool(_SICURRE_DKIM_PASS.search(value))
+    return False
+
+
 class EmailScanResponse(BaseModel):
     event_id: str
     verdict: Literal["safe", "phishing", "quarantine"]
@@ -124,6 +161,29 @@ async def scan_email(
 
     integration = rows[0]
     settings = get_settings()
+
+    # Mail that is not this customer's is delivered untouched, and nothing is
+    # stored or alerted under their workspace: a message for another zone that
+    # reached this Worker through a catch-all, and Sicurre's own notifications.
+    zone = str(integration.get("zone_name") or "").strip().lower()
+    if _recipient_outside_zone(payload.recipient, zone):
+        logger.info("Delivered mail for a domain outside zone %s without scanning", zone)
+        return EmailScanResponse(
+            event_id=str(uuid4()),
+            verdict="safe",
+            label="legitimate",
+            score=0.0,
+            explanation="Recipient outside the connected domain; delivered without scanning.",
+        )
+    if _is_sicurre_notification(payload.text):
+        logger.info("Delivered a Sicurre notification to zone %s without scanning", zone)
+        return EmailScanResponse(
+            event_id=str(uuid4()),
+            verdict="safe",
+            label="legitimate",
+            score=0.0,
+            explanation="Sicurre notification signed by mail.sicurre.com; delivered without scanning.",
+        )
     workspace_id = integration.get("workspace_id")
     now = datetime.now(timezone.utc).isoformat()
     message_id = payload.message_id.strip() if payload.message_id else ""
@@ -544,4 +604,14 @@ async def upload_quarantine_content(
             domain,
         ),
     )
+    # The scan payload is the Worker's rough projection of the message, with
+    # headers left in and bodies still encoded. The raw MIME is where the
+    # readable body can be decoded, so the preview is rebuilt from it.
+    readable = extract_mime_body(payload.decode("utf-8", errors="replace"))
+    if readable.strip():
+        await _async_query(
+            "UPDATE app_quarantine_item SET body_text = ? WHERE id = ? AND workspace_id = ? "
+            "AND lower(domain) = lower(?)",
+            (anonymize_pii(readable)[:4000], item_id, workspace_id, domain),
+        )
     return {"status": "stored", "idempotent": False}

@@ -20,7 +20,9 @@
  * to the classifier, which would turn a machine report into a false threat.
  *
  * Bindings: SICURRE_SCAN_URL, SICURRE_SHARED_SECRET, FORWARD_TO,
- *           SICURRE_REPORTED_EMAIL_INGEST_KEY (optional; enables ingestion).
+ *           SICURRE_REPORTED_EMAIL_INGEST_KEY (optional; enables ingestion),
+ *           SICURRE_SCAN_DISABLED (optional; "true" makes a platform gateway that
+ *           only ingests reports and forwards everything else unscanned).
  */
 
 const REPORT_ADDRESS = /^report\+([a-z0-9_-]{22}\.[a-z0-9_-]{22})@sicurre\.com$/i;
@@ -101,6 +103,13 @@ export default {
         return;
       }
       // "not-a-report" falls through to classification like ordinary mail.
+    }
+
+    // A platform gateway only ingests reports. Everything else is the platform's
+    // own mail: delivered untouched, never scanned or filed under a customer.
+    if (env.SICURRE_SCAN_DISABLED === 'true') {
+      await message.forward(env.FORWARD_TO);
+      return;
     }
 
     const headerMessageId = message.headers.get('message-id') || message.headers.get('Message-ID') || '';

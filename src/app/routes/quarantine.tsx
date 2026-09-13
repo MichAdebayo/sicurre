@@ -188,7 +188,7 @@ export default function QuarantineRoute() {
             {paginatedItems.map((item) => (
               <div
                 key={item.id}
-                className="bg-white border border-border-subtle rounded-2xl p-5 hover:-translate-y-1 hover:shadow-md hover:border-primary/20 transition-all duration-200 flex flex-col justify-between h-44 cursor-default group relative shadow-sm"
+                className="bg-white border border-border-subtle rounded-2xl p-5 hover:border-primary/30 transition-colors duration-150 flex flex-col justify-between h-44 cursor-default group relative shadow-sm"
               >
                 <div>
                   <div className="flex items-center justify-between gap-2">
