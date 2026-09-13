@@ -58,7 +58,7 @@ def test_ingest_separates_a_lost_report_from_ordinary_mail() -> None:
     assert "response.status === 400" in script
     assert "response.status === 404" in script
     # The lost-report path forwards; the not-a-report path must not return early.
-    branch = script.split("const outcome = await ingest")[1].split("headerMessageId")[0]
+    branch = script.split("const outcome = await ingest")[1].split("SICURRE_SCAN_DISABLED")[0]
     assert "message.forward" in branch
     assert branch.count("return;") == 2, (
         "expected exactly two early returns: stored, and a lost report that is "
@@ -119,3 +119,61 @@ def test_the_script_sends_the_recipient_for_alert_attribution() -> None:
     announced a DMARC report for mail.sicurre.com as "votre domaine vinse.app".
     """
     assert "recipient," in provisioner._WORKER_JS
+
+
+def test_a_platform_gateway_ingests_reports_then_forwards_everything_else_unscanned() -> None:
+    """The sicurre.com catch-all must not scan platform mail as a customer's."""
+    script = provisioner._WORKER_JS
+    ingest_call = script.index("const outcome = await ingest")
+    platform_branch = script.index("env.SICURRE_SCAN_DISABLED === 'true'")
+    scan_call = script.index("fetch(env.SICURRE_SCAN_URL")
+    assert ingest_call < platform_branch < scan_call
+    branch = script[platform_branch:scan_call].split("headerMessageId")[0]
+    assert "await message.forward(env.FORWARD_TO);" in branch
+    assert "return;" in branch
+
+
+def _deployed_bindings(monkeypatch, **kwargs) -> dict[str, str]:
+    import asyncio
+    import json
+
+    captured: dict = {}
+
+    class _Response:
+        status_code = 200
+        is_success = True
+        text = ""
+
+        @staticmethod
+        def json() -> dict:
+            return {"success": True, "result": {}}
+
+    class _Client:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_exc) -> None:
+            return None
+
+        async def put(self, _url, headers=None, files=None):
+            captured["metadata"] = json.loads(files["metadata"][1])
+            return _Response()
+
+    monkeypatch.setattr(provisioner.httpx, "AsyncClient", lambda **_kw: _Client())
+    asyncio.run(
+        provisioner.CloudflareProvisioner(api_token="t").deploy_email_worker(
+            account_id="acct",
+            worker_name="w",
+            scan_url="https://example.test/v1/email/scan",
+            shared_secret="s",
+            forward_to="to@example.test",
+            reported_email_ingest_key="ingest-key",
+            **kwargs,
+        )
+    )
+    return {b["name"]: b.get("text", "") for b in captured["metadata"]["bindings"]}
+
+
+def test_deploy_marks_only_a_platform_gateway_as_scan_disabled(monkeypatch) -> None:
+    assert "SICURRE_SCAN_DISABLED" not in _deployed_bindings(monkeypatch)
+    assert _deployed_bindings(monkeypatch, scan_disabled=True)["SICURRE_SCAN_DISABLED"] == "true"

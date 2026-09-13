@@ -155,6 +155,11 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    # Application loggers (scan outcomes, quarantine failures) write at INFO to
+    # stderr, so Docker keeps them and Alloy ships them to Loki. uvicorn keeps
+    # its own handlers; httpx stays at WARNING so each outbound call is not a line.
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     settings = get_settings()
     local_docs = settings.environment.strip().lower() in {"dev", "development", "local"}
 

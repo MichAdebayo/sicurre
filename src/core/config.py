@@ -43,10 +43,10 @@ class Settings(BaseSettings):
     better_auth_cookie_name: str = "better-auth.session_token"
     better_auth_schema: str = "auth"
     platform_admin_emails: str = ""
-    # Cloudflare Workers a domain disconnect or an account erasure never deletes.
-    # sicurre-gw-9e622bde serves vinse.app and, through the sicurre.com
-    # catch-all, the platform's own mail, until the platform has its own Worker.
-    protected_worker_names: str = "sicurre-gw-9e622bde"
+    # Cloudflare Workers a domain disconnect or an account erasure never deletes:
+    # the platform's own gateway, and sicurre-gw-9e622bde, which served the
+    # sicurre.com catch-all as well as vinse.app until 13 September 2026.
+    protected_worker_names: str = "sicurre-platform-gateway,sicurre-gw-9e622bde"
     secret_encryption_key: str | None = Field(
         default=None,
         validation_alias=AliasChoices(

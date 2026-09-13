@@ -267,8 +267,12 @@ class CloudflareProvisioner:
         shared_secret: str,
         forward_to: str,
         reported_email_ingest_key: str | None = None,
+        scan_disabled: bool = False,
     ) -> None:
         """Deploy the Sicurre Email Worker script to Cloudflare Workers.
+
+        ``scan_disabled`` deploys a platform gateway: it ingests reports and
+        forwards all other mail without calling the scan API.
 
         The script handles the email event, calls the scan API, and either
         forwards clean mail or rejects phishing. Cloudflare replaces the whole
@@ -284,6 +288,8 @@ class CloudflareProvisioner:
             },
             {"type": "plain_text", "name": "FORWARD_TO", "text": forward_to},
         ]
+        if scan_disabled:
+            bindings.append({"type": "plain_text", "name": "SICURRE_SCAN_DISABLED", "text": "true"})
         if reported_email_ingest_key is None:
             # Default rather than require it: both call sites would otherwise
             # have to remember, and forgetting deletes the binding silently.
