@@ -73,6 +73,25 @@ describe("Dialog", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("dims the page without blurring it and keeps the panel still", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByText("open"));
+    const backdrop = document.querySelector<HTMLElement>('div[aria-hidden="true"].absolute.inset-0');
+    expect(backdrop).not.toBeNull();
+    // Chromium draws a backdrop blur only once its fade ends, so it flickered.
+    expect(backdrop!.className).not.toMatch(/backdrop-blur/);
+    // No fade or scale on the panel: an embedded frame showed through ahead of it.
+    expect(screen.getByRole("dialog")).not.toHaveAttribute("style");
+  });
+
+  it("closes at once, without an exit animation holding it on screen", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByText("open"));
+    fireEvent.click(screen.getByRole("button", { name: "common.close" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(document.querySelector('div[aria-hidden="true"].absolute.inset-0')).toBeNull();
+  });
+
   it("keeps Tab inside the panel", async () => {
     render(<Harness />);
     fireEvent.click(screen.getByText("open"));

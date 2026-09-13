@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode, type RefObject } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { clsx } from "clsx";
@@ -96,15 +96,20 @@ function DialogPanel({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* A plain dim, no backdrop blur: Chromium draws the blur only once the
+          fade ends, so the page snapped from sharp to blurred on open and back
+          on close. The panel itself does not fade or scale: an embedded frame,
+          such as the quarantine preview, did not follow the fade and showed
+          through ahead of the panel. */}
       <MotionDiv
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        transition={{ duration: 0.15, ease: "easeOut" }}
         onClick={onClose}
         aria-hidden="true"
-        className="absolute inset-0 bg-on-background/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-on-background/60"
       />
-      <MotionDiv
+      <div
         ref={panelRef}
         role={role}
         aria-modal="true"
@@ -112,10 +117,6 @@ function DialogPanel({
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
         onKeyDown={handleKeyDown}
-        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 10 }}
-        transition={{ duration: 0.2, ease: "easeOut" }}
         className={clsx(
           "relative z-10 flex max-h-[90vh] w-full flex-col overflow-y-auto rounded-2xl border border-border-subtle bg-surface-lowest p-6 shadow-2xl outline-none",
           sizeStyles[size],
@@ -144,11 +145,12 @@ function DialogPanel({
         </div>
         {children && <div className="pt-4 text-body-md text-on-surface-variant">{children}</div>}
         {footer && <div className="mt-5 border-t border-border-subtle pt-5">{footer}</div>}
-      </MotionDiv>
+      </div>
     </div>
   );
 }
 
 export function Dialog({ isOpen, ...panelProps }: DialogProps) {
-  return <AnimatePresence>{isOpen && <DialogPanel {...panelProps} />}</AnimatePresence>;
+  // Closing unmounts at once: no exit animation to hold the panel on screen.
+  return isOpen ? <DialogPanel {...panelProps} /> : null;
 }
