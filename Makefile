@@ -90,6 +90,8 @@ help:
 	@echo "  Setup"
 	@echo "  make install                   - Install local python dependencies"
 	@echo "  make test                      - Run backend test suite (unit + integration)"
+	@echo "  make test-backend              - Run the Python unit and integration tests"
+	@echo "  make test-frontend             - Run the Vitest suite (app, auth sidecar, container server)"
 	@echo "  make openapi                   - Regenerate docs/api/openapi.yaml from FastAPI"
 	@echo "  make openapi-check             - Fail when the generated OpenAPI contract is stale"
 	@echo "  make ci-data-quality           - Run critical Python lint, typing, docs, and coverage gates"
@@ -160,6 +162,12 @@ test-unit:
 
 test-integration:
 	uv run pytest tests/integration
+
+# Backend and frontend suites on their own, for a quick local run.
+test-backend: test-unit test-integration
+
+test-frontend:
+	npm test
 
 openapi:
 	uv run --no-sync python scripts/data_platform/generate_openapi.py

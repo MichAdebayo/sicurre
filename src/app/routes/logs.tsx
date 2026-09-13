@@ -16,7 +16,7 @@ export default function LogsRoute() {
   ] as const : [];
 
   return (
-    <AdminPage view="overview" onRefresh={() => query.refetch()} refreshing={query.isFetching}>
+    <AdminPage view="overview" onRefresh={() => query.refetch()}>
       <AdminQueryNotice loading={query.isLoading} error={query.isError} hasData={!!data} />
       {data && <>
         <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">

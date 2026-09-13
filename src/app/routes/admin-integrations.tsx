@@ -139,7 +139,7 @@ export default function AdminIntegrationsRoute({ currentEmail = "" }: AdminInteg
   ];
 
   return (
-    <AdminPage view="integrations" onRefresh={() => query.refetch()} refreshing={query.isFetching}>
+    <AdminPage view="integrations" onRefresh={() => query.refetch()}>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h2 className="app-h2">{t("admin.domains_title")}{data && <span className="ml-2 text-sm font-normal text-on-surface-variant">({data.total})</span>}</h2>
         <div className="flex flex-wrap items-center gap-3">

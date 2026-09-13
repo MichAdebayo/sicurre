@@ -242,34 +242,31 @@ async def test_cloudflare_probe_reports_binding_and_rule_read_failures(
 async def test_admin_overview_assembles_counts_and_recent_sections(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The overview maps each count query to its summary key and each list to its section."""
-    counts = {
-        "FROM app_workspace_membership": 12,
-        "FROM app_workspace": 3,
-        "FROM app_inference_event": 250,
-        "feedback_type = 'false_negative'": 2,
-        "FROM app_feedback": 9,
-        "FROM app_reported_email": 4,
-        "FROM app_quarantine_item": 5,
-        "cloudflare_integration WHERE status = 'active'": 1,
-        "FROM cloudflare_integration": 2,
-        "FROM app_support_request": 6,
+    """The ten counts come from one statement; each list query maps to its section."""
+    summary = {
+        "workspaces_count": 3,
+        "members_count": 12,
+        "threat_events_count": 250,
+        "feedback_count": 9,
+        "false_negative_count": 2,
+        "reported_email_count": 4,
+        "quarantine_held_count": 5,
+        "cloudflare_integrations_count": 2,
+        "cloudflare_active_count": 1,
+        "support_open_count": 6,
     }
-
-    async def fake_count(sql: str, params: tuple = ()) -> int:
-        for fragment, value in counts.items():
-            if fragment in sql:
-                return value
-        raise AssertionError(f"unexpected count query: {sql}")
-
     verdicts = [{"verdict": "phishing", "count": 40}, {"verdict": "legitimate", "count": 210}]
     feedback_by_type = [{"feedback_type": "false_negative", "count": 2}]
     domains = [{"zone_name": "example.test", "status": "active"}]
     recent_feedback = [{"id": "fb-1", "feedback_type": "false_negative"}]
     recent_quarantine = [{"id": "q-1", "status": "held"}]
     recent_support = [{"id": "s-1", "status": "open"}]
+    summary_statements: list[str] = []
 
     async def fake_rows(sql: str, params: tuple = ()) -> list[dict]:
+        if sql == admin.OVERVIEW_SUMMARY_SQL:
+            summary_statements.append(sql)
+            return [summary]
         if "GROUP BY 1" in sql:
             return verdicts
         if "GROUP BY feedback_type" in sql:
@@ -284,29 +281,54 @@ async def test_admin_overview_assembles_counts_and_recent_sections(
             return recent_support
         raise AssertionError(f"unexpected row query: {sql}")
 
-    monkeypatch.setattr(admin, "quiet_count", fake_count)
+    async def no_single_counts(sql: str, params: tuple = ()) -> int:
+        raise AssertionError(f"the overview must not issue counts one by one: {sql}")
+
+    monkeypatch.setattr(admin, "quiet_count", no_single_counts)
     monkeypatch.setattr(admin, "quiet_rows", fake_rows)
 
     result = await admin.get_admin_overview(current_user=ADMIN)
 
-    assert result["summary"] == {
-        "workspaces_count": 3,
-        "members_count": 12,
-        "threat_events_count": 250,
-        "feedback_count": 9,
-        "false_negative_count": 2,
-        "reported_email_count": 4,
-        "quarantine_held_count": 5,
-        "cloudflare_integrations_count": 2,
-        "cloudflare_active_count": 1,
-        "support_open_count": 6,
-    }
+    assert summary_statements == [admin.OVERVIEW_SUMMARY_SQL]
+    assert result["summary"] == summary
     assert result["verdicts"] == verdicts
     assert result["feedback_by_type"] == feedback_by_type
     assert result["cloudflare_domains"] == domains
     assert result["recent_feedback"] == recent_feedback
     assert result["recent_quarantine"] == recent_quarantine
     assert result["recent_support"] == recent_support
+
+
+def test_the_overview_summary_statement_carries_every_count_as_a_subquery() -> None:
+    for key in (
+        "workspaces_count",
+        "members_count",
+        "threat_events_count",
+        "feedback_count",
+        "false_negative_count",
+        "reported_email_count",
+        "quarantine_held_count",
+        "cloudflare_integrations_count",
+        "cloudflare_active_count",
+        "support_open_count",
+    ):
+        assert f") AS {key}" in admin.OVERVIEW_SUMMARY_SQL
+    assert admin.OVERVIEW_SUMMARY_SQL.count("(SELECT COUNT(*) FROM") == 10
+
+
+@pytest.mark.asyncio
+async def test_a_failed_overview_summary_reads_as_zero_counts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def failing_rows(sql: str, params: tuple = ()) -> list[dict]:
+        return []
+
+    monkeypatch.setattr(admin, "quiet_rows", failing_rows)
+
+    result = await admin.get_admin_overview(current_user=ADMIN)
+
+    assert set(result["summary"].values()) == {0}
+    assert len(result["summary"]) == 10
 
 
 @pytest.mark.asyncio

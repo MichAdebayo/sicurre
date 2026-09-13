@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import subprocess
 from datetime import datetime, timezone
@@ -38,6 +39,30 @@ from db.runtime import execute_runtime_query
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["app-ui-flows"])
+
+# The ten headline counts of the admin overview, read in one statement: issued
+# one at a time they cost ten round trips to the database on every visit.
+_OVERVIEW_COUNTS = {
+    "workspaces_count": "SELECT COUNT(*) FROM app_workspace",
+    "members_count": "SELECT COUNT(*) FROM app_workspace_membership",
+    "threat_events_count": (
+        "SELECT COUNT(*) FROM app_inference_event WHERE (is_deleted IS NULL OR is_deleted = 0)"
+    ),
+    "feedback_count": "SELECT COUNT(*) FROM app_feedback",
+    "false_negative_count": (
+        "SELECT COUNT(*) FROM app_feedback WHERE feedback_type = 'false_negative'"
+    ),
+    "reported_email_count": "SELECT COUNT(*) FROM app_reported_email",
+    "quarantine_held_count": "SELECT COUNT(*) FROM app_quarantine_item WHERE status = 'held'",
+    "cloudflare_integrations_count": "SELECT COUNT(*) FROM cloudflare_integration",
+    "cloudflare_active_count": (
+        "SELECT COUNT(*) FROM cloudflare_integration WHERE status = 'active'"
+    ),
+    "support_open_count": "SELECT COUNT(*) FROM app_support_request WHERE status = 'open'",
+}
+OVERVIEW_SUMMARY_SQL = "SELECT " + ", ".join(
+    f"({sql}) AS {key}" for key, sql in _OVERVIEW_COUNTS.items()
+)
 
 
 @router.get("/v1/admin/runtime-health", response_model=AdminRuntimeHealthResponse)
@@ -82,36 +107,11 @@ async def get_admin_overview(current_user: AuthUser = Depends(get_current_user))
     if not current_user.is_platform_admin:
         raise HTTPException(status_code=403, detail="Platform admin access required")
 
-    overview = {
-        "workspaces_count": await quiet_count("SELECT COUNT(*) AS count FROM app_workspace"),
-        "members_count": await quiet_count(
-            "SELECT COUNT(*) AS count FROM app_workspace_membership"
-        ),
-        "threat_events_count": await quiet_count(
-            "SELECT COUNT(*) AS count FROM app_inference_event WHERE (is_deleted IS NULL OR is_deleted = 0)"
-        ),
-        "feedback_count": await quiet_count("SELECT COUNT(*) AS count FROM app_feedback"),
-        "false_negative_count": await quiet_count(
-            "SELECT COUNT(*) AS count FROM app_feedback WHERE feedback_type = 'false_negative'"
-        ),
-        "reported_email_count": await quiet_count(
-            "SELECT COUNT(*) AS count FROM app_reported_email"
-        ),
-        "quarantine_held_count": await quiet_count(
-            "SELECT COUNT(*) AS count FROM app_quarantine_item WHERE status = 'held'"
-        ),
-        "cloudflare_integrations_count": await quiet_count(
-            "SELECT COUNT(*) AS count FROM cloudflare_integration"
-        ),
-        "cloudflare_active_count": await quiet_count(
-            "SELECT COUNT(*) AS count FROM cloudflare_integration WHERE status = 'active'"
-        ),
-        "support_open_count": await quiet_count(
-            "SELECT COUNT(*) AS count FROM app_support_request WHERE status = 'open'"
-        ),
-    }
+    summary_rows = await quiet_rows(OVERVIEW_SUMMARY_SQL)
+    summary = summary_rows[0] if summary_rows else {}
+    overview = {key: int(summary.get(key) or 0) for key in _OVERVIEW_COUNTS}
 
-    verdict_rows = await quiet_rows(
+    verdict_rows_query = quiet_rows(
         """
         SELECT
             COALESCE(label_verdict, CASE WHEN safety_verdict = 'safe' THEN 'legitimate' ELSE safety_verdict END) AS verdict,
@@ -121,14 +121,14 @@ async def get_admin_overview(current_user: AuthUser = Depends(get_current_user))
         GROUP BY 1
         """
     )
-    feedback_rows = await quiet_rows(
+    feedback_rows_query = quiet_rows(
         """
         SELECT feedback_type, COUNT(*) AS count
         FROM app_feedback
         GROUP BY feedback_type
         """
     )
-    domain_rows = await quiet_rows(
+    domain_rows_query = quiet_rows(
         """
         SELECT zone_name, status, user_email, updated_at
         FROM cloudflare_integration
@@ -137,7 +137,7 @@ async def get_admin_overview(current_user: AuthUser = Depends(get_current_user))
         """
     )
 
-    recent_feedback = await quiet_rows(
+    recent_feedback_query = quiet_rows(
         """
         SELECT
             f.id,
@@ -153,7 +153,7 @@ async def get_admin_overview(current_user: AuthUser = Depends(get_current_user))
         LIMIT 8
         """
     )
-    recent_quarantine = await quiet_rows(
+    recent_quarantine_query = quiet_rows(
         """
         SELECT id, workspace_id, safety_verdict, composite_score, status, created_at, expires_at
         FROM app_quarantine_item
@@ -161,9 +161,25 @@ async def get_admin_overview(current_user: AuthUser = Depends(get_current_user))
         LIMIT 8
         """
     )
-    recent_support = await quiet_rows(
+    recent_support_query = quiet_rows(
         "SELECT id, workspace_id, requester_email, category, status, created_at "
         "FROM app_support_request ORDER BY created_at DESC LIMIT 8"
+    )
+
+    (
+        verdict_rows,
+        feedback_rows,
+        domain_rows,
+        recent_feedback,
+        recent_quarantine,
+        recent_support,
+    ) = await asyncio.gather(
+        verdict_rows_query,
+        feedback_rows_query,
+        domain_rows_query,
+        recent_feedback_query,
+        recent_quarantine_query,
+        recent_support_query,
     )
 
     return {
