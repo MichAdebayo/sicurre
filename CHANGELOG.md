@@ -5,6 +5,19 @@ notes are generated from Conventional Commits by semantic-release and published
 to [GitHub Releases](https://github.com/MichAdebayo/sicurre/releases), which is
 the authoritative record. This file summarises the notable changes only.
 
+## [1.37.11] - 2026-09-14
+
+- A tab left open across a deploy no longer lands on a white screen. When a
+  page file from the earlier build is gone, the app reloads once to pick up
+  the current build; any other render failure shows a short message with a
+  reload button. The app server answers a missing build file with a 404
+  instead of the application shell.
+- The e-mail verification link no longer loops on a Cloudflare security check.
+  The app server followed the auth service's redirect to /login itself, from
+  the Hetzner host; Cloudflare Bot Fight Mode challenged that datacenter
+  request and the challenge reached the visitor. Redirects now go back to the
+  browser.
+
 ## [1.37.10] - 2026-09-14
 
 - The production API writes one log line per request again, so Loki shows

@@ -46,6 +46,8 @@
     "domain_shield": "Domain Shield",
     "load_error": "These data could not be loaded.",
     "retry": "Try again",
+    "page_load_error": "The page could not load.",
+    "reload": "Reload the page",
     "domains_load_error": "Unable to load your domains.",
     "previous": "Previous",
     "next": "Next",

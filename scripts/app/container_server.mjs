@@ -159,7 +159,12 @@ async function proxyRequest(request, response, targetBase) {
 
   const method = request.method || "GET";
   const body = method === "GET" || method === "HEAD" ? undefined : await readRequestBody(request);
-  const upstream = await fetch(target, { method, headers, body });
+  // Redirects go back to the browser. Following them here made the gateway
+  // fetch the public site from the Hetzner host with the visitor's user agent:
+  // Cloudflare Bot Fight Mode challenged that datacenter request, and the
+  // challenge page reached the visitor, who could never pass it. The e-mail
+  // verification link, which ends in a redirect to /login, looped on it.
+  const upstream = await fetch(target, { method, headers, body, redirect: "manual" });
   const responseHeaders = {};
   upstream.headers.forEach((value, key) => {
     if (!["connection", "content-encoding", "content-length", "transfer-encoding"].includes(key)) {
@@ -201,6 +206,14 @@ async function serveStatic(request, response, pathname) {
     }
     await access(filePath);
   } catch {
+    // A missing build file is a 404, never the application shell. A page left
+    // open across a deploy asks for files the new build no longer has, and an
+    // HTML answer with HTTP 200 only turned that into a confusing MIME error.
+    if (pathname.startsWith("/assets/")) {
+      response.writeHead(404, { "Cache-Control": "no-store", "Content-Type": "text/plain; charset=utf-8" });
+      response.end("Not found");
+      return;
+    }
     filePath = indexFile;
   }
 
