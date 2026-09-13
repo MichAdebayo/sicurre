@@ -5,6 +5,13 @@ notes are generated from Conventional Commits by semantic-release and published
 to [GitHub Releases](https://github.com/MichAdebayo/sicurre/releases), which is
 the authoritative record. This file summarises the notable changes only.
 
+## [1.37.10] - 2026-09-14
+
+- The production API writes one log line per request again, so Loki shows
+  endpoint activity instead of startup lines only. The start command no longer
+  switches uvicorn's access log off; Alloy still drops health and metrics
+  probes before they reach Loki.
+
 ## [1.37.9] - 2026-09-14
 
 - Dialogs no longer flicker. The backdrop is a plain dim that fades in, with
