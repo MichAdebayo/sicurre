@@ -378,7 +378,7 @@ function AppContent() {
             {activePage === "admin-incidents" && session.is_platform_admin && <AdminIncidentsRoute />}
             {activePage === "admin-integrations" && session.is_platform_admin && <AdminIntegrationsRoute />}
             {activePage === "admin-reviews" && session.is_platform_admin && <AdminReviewsRoute />}
-            {activePage === "settings" && <SettingsRoute session={session} initialTab={settingsTab} />}
+            {activePage === "settings" && <SettingsRoute session={session} initialTab={settingsTab} onAccountDeleted={handleLogout} />}
             {activePage === "support" && <SupportRoute session={session} />}
           </>
         )}

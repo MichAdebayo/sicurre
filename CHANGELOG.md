@@ -5,6 +5,23 @@ notes are generated from Conventional Commits by semantic-release and published
 to [GitHub Releases](https://github.com/MichAdebayo/sicurre/releases), which is
 the authoritative record. This file summarises the notable changes only.
 
+## [1.34.0] - 2026-09-13
+
+- A member can erase their account from Settings, Profile, by typing their
+  address again: connected domains are torn down on Cloudflare, every
+  workspace row and the Better Auth identity are deleted in one pass, and the
+  session closes. A Cloudflare refusal stops the erasure before any row goes.
+- The console's Cloudflare domains page is a table: domain, owner, status,
+  update date, a checkbox per row and a delete action. A platform admin can
+  erase one account from its row, several from the selection, or one with no
+  domain by address; every path opens the same alert dialog, which lists the
+  accounts, states that the action is irreversible and needs an explicit
+  acknowledgement before the cascade runs. Refusals are reported per account.
+  The admin's own account is refused there and goes through their settings.
+- The RGPD register records the right to erasure with what outlives an
+  account, and the runbooks gain the erasure procedure, including the one
+  account that shares the platform's own zone and must be removed by rows only.
+
 ## [Unreleased] - 2026-09-12
 
 Deployed from `main` without a version tag: refactor commits do not bump the

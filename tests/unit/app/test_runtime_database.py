@@ -41,6 +41,17 @@ def test_auth_table_qualification_is_environment_specific(monkeypatch) -> None:
         ),
     )
     assert _qualify_auth_tables('SELECT * FROM "user"') == 'SELECT * FROM identity."user"'
+    # Every Better Auth table is qualified; the camel-case "userId" column is not touched.
+    assert (
+        _qualify_auth_tables('DELETE FROM "session" WHERE "userId" = ?')
+        == 'DELETE FROM identity."session" WHERE "userId" = ?'
+    )
+    assert _qualify_auth_tables('DELETE FROM "account" WHERE "userId" = ?').startswith(
+        'DELETE FROM identity."account"'
+    )
+    assert _qualify_auth_tables('DELETE FROM "verification" WHERE identifier = ?').startswith(
+        'DELETE FROM identity."verification"'
+    )
 
     monkeypatch.setattr(
         "db.runtime.get_settings", lambda: Settings(_env_file=None, environment="test")

@@ -1,19 +1,20 @@
-"""The signed-in member: session payload and profile update."""
+"""The signed-in member: session payload, profile update and account erasure."""
 
 from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from core.config import get_settings
 from data_platform.api.auth import AuthUser, get_current_user
-from data_platform.api.schemas.app_responses import AuthSessionResponse
+from data_platform.api.schemas.app_responses import AuthSessionResponse, StatusResponse
 from data_platform.api.workspace_scope import (
     workspace_has_cloudflare_integration,
     workspace_threat_count,
 )
+from data_platform.services.account_erasure import erase_account
 from db.runtime import execute_runtime_query
 
 router = APIRouter(tags=["app-ui-flows"])
@@ -21,6 +22,14 @@ router = APIRouter(tags=["app-ui-flows"])
 
 class UpdateProfileRequest(BaseModel):
     display_name: str = Field(min_length=2, max_length=120)
+
+
+class DeleteAccountRequest(BaseModel):
+    email: str = Field(
+        min_length=3,
+        max_length=320,
+        description="The account email, typed again by the member as confirmation",
+    )
 
 
 async def _session_payload(user: AuthUser) -> dict:
@@ -71,3 +80,21 @@ async def patch_profile(
         is_platform_admin=current_user.is_platform_admin,
     )
     return await _session_payload(refreshed)
+
+
+@router.delete("/v1/auth/account", response_model=StatusResponse)
+async def delete_account(
+    payload: DeleteAccountRequest,
+    current_user: AuthUser = Depends(get_current_user),
+) -> dict:
+    """Erase the member's own account: connected domains are torn down on Cloudflare first, then every workspace row and the identity are deleted in one pass.
+
+    Refused when the typed email does not match the account, and while a domain is still provisioning. A Cloudflare refusal stops the erasure before any row is deleted, so the member keeps a working account and can retry.
+    """
+    if payload.email.strip().lower() != current_user.email.strip().lower():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Confirmation email does not match the account",
+        )
+    await erase_account(current_user)
+    return {"status": "deleted"}

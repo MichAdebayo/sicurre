@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import dataclasses
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
+from fastapi import HTTPException
 
 from data_platform.api.auth import AuthUser
 from data_platform.api.routers import admin
@@ -382,3 +384,122 @@ def test_execute_pipeline_logs_failures_without_raising(
     )
     assert record.exc_info is not None
     assert "make exited with status 2" in str(record.exc_info[1])
+
+
+# ── Account erasure by a platform admin ──────────────────────────────────────
+
+
+def _erasure_admin_fixture(
+    monkeypatch: pytest.MonkeyPatch,
+    users: list[dict[str, object]],
+    memberships: list[dict[str, object]],
+) -> tuple[list[AuthUser], list[tuple[str, tuple[object, ...]]]]:
+    erased: list[AuthUser] = []
+    captured: list[tuple[str, tuple[object, ...]]] = []
+
+    async def query(sql: str, params: tuple[object, ...] = ()) -> list[dict[str, object]]:
+        captured.append((sql, params))
+        if 'FROM "user"' in sql:
+            return users
+        if "FROM app_workspace_membership" in sql:
+            return memberships
+        return []
+
+    async def erase(user: AuthUser) -> None:
+        erased.append(user)
+
+    monkeypatch.setattr(admin, "execute_runtime_query", query)
+    monkeypatch.setattr(admin, "erase_account", erase)
+    return erased, captured
+
+
+@pytest.mark.asyncio
+async def test_erasing_an_account_requires_a_platform_admin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    erased, captured = _erasure_admin_fixture(monkeypatch, [], [])
+    member = dataclasses.replace(ADMIN, is_platform_admin=False)
+
+    with pytest.raises(HTTPException) as excinfo:
+        await admin.erase_customer_account(
+            admin.AdminEraseAccountRequest(email="owner@example.test"), member
+        )
+
+    assert excinfo.value.status_code == 403
+    assert erased == [] and captured == []
+
+
+@pytest.mark.asyncio
+async def test_an_admin_cannot_erase_their_own_account_from_the_console(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Their own erasure goes through settings so the shell closes the session."""
+    erased, captured = _erasure_admin_fixture(monkeypatch, [], [])
+
+    with pytest.raises(HTTPException) as excinfo:
+        await admin.erase_customer_account(
+            admin.AdminEraseAccountRequest(email=" Admin@Example.test "), ADMIN
+        )
+
+    assert excinfo.value.status_code == 400
+    assert erased == [] and captured == []
+
+
+@pytest.mark.asyncio
+async def test_erasing_an_unknown_email_is_a_404(monkeypatch: pytest.MonkeyPatch) -> None:
+    erased, captured = _erasure_admin_fixture(monkeypatch, [], [])
+
+    with pytest.raises(HTTPException) as excinfo:
+        await admin.erase_customer_account(
+            admin.AdminEraseAccountRequest(email="ghost@example.test"), ADMIN
+        )
+
+    assert excinfo.value.status_code == 404
+    assert erased == []
+    assert captured[0][1] == ("ghost@example.test",)
+
+
+@pytest.mark.asyncio
+async def test_the_admin_erases_the_member_with_their_workspace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    erased, _captured = _erasure_admin_fixture(
+        monkeypatch,
+        [{"id": "user-7", "email": "Owner@Example.test", "name": "Owner Seven"}],
+        [{"workspace_id": "workspace-7", "role": "owner", "workspace_name": "Seven"}],
+    )
+
+    result = await admin.erase_customer_account(
+        admin.AdminEraseAccountRequest(email="OWNER@example.test"), ADMIN
+    )
+
+    assert result == {"status": "deleted"}
+    assert erased == [
+        AuthUser(
+            id="user-7",
+            email="owner@example.test",
+            display_name="Owner Seven",
+            role="owner",
+            workspace_id="workspace-7",
+            workspace_name="Seven",
+            is_platform_admin=False,
+        )
+    ]
+
+
+@pytest.mark.asyncio
+async def test_the_admin_erases_a_member_who_never_got_a_workspace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Signed up, never loaded the app: the cascade sees no workspace and drops the identity only."""
+    erased, _captured = _erasure_admin_fixture(
+        monkeypatch, [{"id": "user-8", "email": "new@example.test", "name": None}], []
+    )
+
+    await admin.erase_customer_account(
+        admin.AdminEraseAccountRequest(email="new@example.test"), ADMIN
+    )
+
+    assert erased[0].workspace_id == ""
+    assert erased[0].display_name == "new@example.test"
+    assert erased[0].is_platform_admin is False

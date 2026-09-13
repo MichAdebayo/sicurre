@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   deleteToken: vi.fn(),
   updateProfile: vi.fn(),
   changePassword: vi.fn(),
+  deleteAccount: vi.fn(),
   changeLanguage: vi.fn(),
   state: {
     authProvider: "password" as string,
@@ -34,6 +35,7 @@ const mocks = vi.hoisted(() => ({
     setupPending: false,
     savePending: false,
     passwordPending: false,
+    deletePending: false,
     tokenConfigured: true,
   },
 }));
@@ -62,6 +64,7 @@ vi.mock("../../../src/app/lib/api", () => ({
   getStoredAuthProvider: () => mocks.state.authProvider,
   useChangePassword: () => ({ mutateAsync: mocks.changePassword, isPending: mocks.state.passwordPending, reset: vi.fn() }),
   useUpdateProfile: () => ({ mutateAsync: mocks.updateProfile, isPending: false, reset: vi.fn() }),
+  useDeleteAccount: () => ({ mutateAsync: mocks.deleteAccount, isPending: mocks.state.deletePending, reset: vi.fn() }),
   useCloudflareList: () => ({
     data: mocks.state.domains,
     isLoading: mocks.state.domainsLoading,
@@ -131,6 +134,7 @@ afterEach(() => {
   mocks.state.setupPending = false;
   mocks.state.savePending = false;
   mocks.state.passwordPending = false;
+  mocks.state.deletePending = false;
   mocks.state.tokenConfigured = true;
 });
 
@@ -294,6 +298,66 @@ describe("profile tab", () => {
     expect(toast).toHaveTextContent("settings.profile_save_failed");
     fireEvent.click(within(toast).getByRole("button", { name: "Fermer la notification" }));
     await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+  });
+});
+
+describe("account erasure", () => {
+  const confirmWith = (value: string) =>
+    fireEvent.change(input("settings.delete_account_confirm_label"), { target: { value } });
+  const deleteButton = () => screen.getByRole("button", { name: "settings.delete_account_button" });
+
+  it("keeps the button disabled until the typed address matches the account", () => {
+    render(<SettingsRoute session={session()} />);
+
+    expect(screen.getByText("settings.delete_account_title")).toBeInTheDocument();
+    expect(deleteButton()).toBeDisabled();
+    confirmWith("michael@vinse.ap");
+    expect(deleteButton()).toBeDisabled();
+    confirmWith("  Michael@Vinse.app ");
+    expect(deleteButton()).toBeEnabled();
+  });
+
+  it("deletes the account with the typed address and hands the session back to the shell", async () => {
+    mocks.deleteAccount.mockResolvedValue({ status: "deleted" });
+    const onAccountDeleted = vi.fn();
+    render(<SettingsRoute session={session()} onAccountDeleted={onAccountDeleted} />);
+
+    confirmWith("michael@vinse.app");
+    fireEvent.click(deleteButton());
+
+    await waitFor(() => expect(onAccountDeleted).toHaveBeenCalledTimes(1));
+    expect(mocks.deleteAccount).toHaveBeenCalledWith("michael@vinse.app");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("surfaces the server message when the erasure is refused and keeps the session", async () => {
+    mocks.deleteAccount.mockRejectedValue(new Error("Cloudflare could not remove the routing resources"));
+    const onAccountDeleted = vi.fn();
+    render(<SettingsRoute session={session()} onAccountDeleted={onAccountDeleted} />);
+
+    confirmWith("michael@vinse.app");
+    fireEvent.click(deleteButton());
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Cloudflare could not remove the routing resources");
+    expect(onAccountDeleted).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the generic failure copy when the rejection is not an Error", async () => {
+    mocks.deleteAccount.mockRejectedValue("offline");
+    render(<SettingsRoute session={session()} />);
+
+    confirmWith("michael@vinse.app");
+    fireEvent.click(deleteButton());
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("settings.delete_account_failed");
+  });
+
+  it("disables the button while the erasure is pending", () => {
+    mocks.state.deletePending = true;
+    render(<SettingsRoute session={session()} />);
+
+    confirmWith("michael@vinse.app");
+    expect(deleteButton()).toBeDisabled();
   });
 });
 
