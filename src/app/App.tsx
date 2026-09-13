@@ -22,6 +22,7 @@ import { ActiveDomainProvider } from "./contexts/active-domain";
 import { buildDocumentTitle, type DocumentTitleView } from "./lib/document-title";
 import { PageLoading } from "./components/common/page-loading";
 import { DomainPageBoundary } from "./components/common/domain-page-boundary";
+import { AppErrorBoundary } from "./components/common/app-error-boundary";
 
 const pageLoaders = {
   dashboard: () => import("./routes/dashboard"),
@@ -160,9 +161,11 @@ function RouteFallback() {
 
 export default function App() {
   return (
-    <Suspense fallback={<RouteFallback />}>
-      <AppContent />
-    </Suspense>
+    <AppErrorBoundary>
+      <Suspense fallback={<RouteFallback />}>
+        <AppContent />
+      </Suspense>
+    </AppErrorBoundary>
   );
 }
 

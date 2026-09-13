@@ -76,6 +76,15 @@ describe("application bootstrap", () => {
     );
   });
 
+  it("reloads once when a page file from an earlier deploy fails to load", async () => {
+    const addEventListener = vi.spyOn(window, "addEventListener");
+
+    await bootstrap();
+
+    expect(addEventListener).toHaveBeenCalledWith("vite:preloadError", expect.any(Function));
+    addEventListener.mockRestore();
+  });
+
   it("starts in French by default and keeps the document language in sync with i18next", async () => {
     const { i18n } = await bootstrap();
 

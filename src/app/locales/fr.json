@@ -47,6 +47,8 @@
     "load_error": "Impossible de charger ces données.",
     "domains_load_error": "Impossible de charger vos domaines.",
     "retry": "Réessayer",
+    "page_load_error": "La page n’a pas pu se charger.",
+    "reload": "Recharger la page",
     "previous": "Précédent",
     "next": "Suivant",
     "open_navigation": "Ouvrir la navigation",
