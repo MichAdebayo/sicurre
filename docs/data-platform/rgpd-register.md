@@ -42,7 +42,8 @@ classifying the message it came from.
 Release returns the message to its recipient and records the correction.
 Erasure of the account is self-service, from Settings, Profile: the member
 types their address again, every connected domain is torn down on Cloudflare
-(Worker, routing rule, Sicurre's DMARC reporting address), then every
+(Worker, routing rule, Sicurre's DMARC reporting address; the platform's own
+zone keeps its Worker, which also serves the platform), then every
 workspace row (threat journal, quarantine references, alerts and preferences,
 shield status, DMARC summaries, feedback, reported emails, support requests,
 stored token) and the Better Auth identity, sessions and accounts are deleted
