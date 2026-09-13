@@ -226,6 +226,26 @@ describe("authenticated refresh loading", () => {
     },
   );
 
+  it("opens the dashboard on the session's domain while the domain list is still loading", async () => {
+    window.history.replaceState({}, "", "/app/dashboard");
+    finishSession();
+    state.session.data = { ...state.session.data, default_domain: "vinse.app" };
+    render(<App />);
+
+    expect(await screen.findByText("Protected: vinse.app")).toBeInTheDocument();
+    expect(state.domains.isLoading).toBe(true);
+  });
+
+  it("keeps other domain pages waiting for the list even when the session names a domain", async () => {
+    window.history.replaceState({}, "", "/app/threats");
+    finishSession();
+    state.session.data = { ...state.session.data, default_domain: "vinse.app" };
+    render(<App />);
+
+    expect(await screen.findByRole("status", { name: "common.loading" })).toBeInTheDocument();
+    expect(screen.queryByText(/Protected:/)).not.toBeInTheDocument();
+  });
+
   it("shows the empty state only after a successful empty response", async () => {
     finishSession();
     const { rerender } = render(<App />);

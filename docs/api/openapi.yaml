@@ -535,6 +535,12 @@ components:
       additionalProperties: false
       description: Authenticated workspace and onboarding state.
       properties:
+        default_domain:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Domain the dashboard opens on, so it can load before the domain list
+          title: Default Domain
         display_name:
           title: Display Name
           type: string

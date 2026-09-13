@@ -44,6 +44,21 @@ async def workspace_threat_count(workspace_id: str, domain: str | None = None) -
     return int(rows[0]["count"]) if rows else 0
 
 
+async def workspace_default_domain(workspace_id: str) -> str | None:
+    """The domain the dashboard opens on: the newest active one, else the newest one.
+
+    Mirrors the front end's default so the session can hand it over before the
+    domain list has loaded.
+    """
+    rows = await execute_runtime_query(
+        "SELECT zone_name FROM cloudflare_integration WHERE workspace_id = ? "
+        "ORDER BY CASE WHEN status = 'active' THEN 0 ELSE 1 END, created_at DESC LIMIT 1",
+        (workspace_id,),
+    )
+    zone = str(rows[0].get("zone_name") or "").strip().lower() if rows else ""
+    return zone or None
+
+
 async def workspace_has_cloudflare_integration(workspace_id: str) -> bool:
     rows = await execute_runtime_query(
         "SELECT 1 AS found FROM cloudflare_integration WHERE workspace_id = ? AND status IN ('pending_verification', 'active', 'provisioning') LIMIT 1",

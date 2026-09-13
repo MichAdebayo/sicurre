@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createInstance } from "i18next";
 import { I18nextProvider } from "react-i18next";
@@ -176,5 +176,21 @@ describe("account erasure from the console", () => {
     expect(within(dialog()).getByRole("button", { name: "Suppression…" })).toBeDisabled();
     fireEvent.keyDown(dialog(), { key: "Escape" });
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+  });
+});
+
+describe("refresh button", () => {
+  it("spins only while a refresh the admin asked for is running", async () => {
+    let finish!: () => void;
+    mocks.refetch.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
+    renderPage(<AdminIntegrationsRoute />);
+    const button = screen.getByRole("button", { name: "Actualiser" });
+
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+    await waitFor(() => expect(button).toBeDisabled());
+    await act(async () => { finish(); });
+    await waitFor(() => expect(button).toBeEnabled());
+    expect(mocks.refetch).toHaveBeenCalledOnce();
   });
 });

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -11,6 +12,7 @@ from core.config import get_settings
 from data_platform.api.auth import AuthUser, get_current_user
 from data_platform.api.schemas.app_responses import AuthSessionResponse, StatusResponse
 from data_platform.api.workspace_scope import (
+    workspace_default_domain,
     workspace_has_cloudflare_integration,
     workspace_threat_count,
 )
@@ -33,8 +35,12 @@ class DeleteAccountRequest(BaseModel):
 
 
 async def _session_payload(user: AuthUser) -> dict:
-    threat_count = await workspace_threat_count(user.workspace_id)
-    has_integration = await workspace_has_cloudflare_integration(user.workspace_id)
+    # Independent lookups, issued together rather than one after another.
+    threat_count, has_integration, default_domain = await asyncio.gather(
+        workspace_threat_count(user.workspace_id),
+        workspace_has_cloudflare_integration(user.workspace_id),
+        workspace_default_domain(user.workspace_id),
+    )
     settings = get_settings()
     return {
         "id": user.id,
@@ -45,6 +51,7 @@ async def _session_payload(user: AuthUser) -> dict:
         "workspace_name": user.workspace_name,
         "is_platform_admin": user.is_platform_admin,
         "has_cloudflare_integration": has_integration,
+        "default_domain": default_domain,
         "threat_count": threat_count,
         "onboarding_required": not has_integration and threat_count == 0,
         "sla_latency_ms": settings.sla_latency_ms,

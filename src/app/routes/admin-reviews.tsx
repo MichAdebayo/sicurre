@@ -9,7 +9,7 @@ export default function AdminReviewsRoute() {
   const format = useAdminFormatting();
   const itemClass = "min-w-0 rounded-lg border border-border-subtle bg-surface-lowest p-4 text-sm dark:bg-surface-low";
   return (
-    <AdminPage view="reviews" onRefresh={() => query.refetch()} refreshing={query.isFetching}>
+    <AdminPage view="reviews" onRefresh={() => query.refetch()}>
       <AdminQueryNotice loading={query.isLoading} error={query.isError} hasData={!!data} />
       {data && <>
         <div className="grid gap-8 xl:grid-cols-2">

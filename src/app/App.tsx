@@ -38,21 +38,38 @@ const pageLoaders = {
   "domain-shield": () => import("./routes/domain-shield"),
 };
 
+type PageKey = keyof typeof pageLoaders;
+const pageModules = new Map<PageKey, Promise<unknown>>();
+
+/**
+ * One import per page, shared by React.lazy, the prefetch during session
+ * validation and the admin console preload, so a page is never fetched twice.
+ * A failed import is forgotten so the next attempt retries it.
+ */
+function loadPage<K extends PageKey>(page: K): ReturnType<(typeof pageLoaders)[K]> {
+  const cached = pageModules.get(page);
+  if (cached) return cached as ReturnType<(typeof pageLoaders)[K]>;
+  const pending = pageLoaders[page]() as ReturnType<(typeof pageLoaders)[K]>;
+  pageModules.set(page, pending);
+  pending.catch(() => pageModules.delete(page));
+  return pending;
+}
+
 const LandingRoute = lazy(() => import("./routes/landing"));
 const LoginRoute = lazy(() => import("./routes/login"));
 const VerifyEmailRoute = lazy(() => import("./routes/verify-email"));
-const DashboardRoute = lazy(pageLoaders.dashboard);
-const ThreatsRoute = lazy(pageLoaders.threats);
-const LogsRoute = lazy(pageLoaders.logs);
-const AdminOperationsRoute = lazy(pageLoaders["admin-operations"]);
-const AdminIncidentsRoute = lazy(pageLoaders["admin-incidents"]);
-const AdminIntegrationsRoute = lazy(pageLoaders["admin-integrations"]);
-const AdminReviewsRoute = lazy(pageLoaders["admin-reviews"]);
-const SettingsRoute = lazy(pageLoaders.settings);
-const SupportRoute = lazy(pageLoaders.support);
-const QuarantineRoute = lazy(pageLoaders.quarantine);
-const AlertsRoute = lazy(pageLoaders.alerts);
-const DomainShieldRoute = lazy(pageLoaders["domain-shield"]);
+const DashboardRoute = lazy(() => loadPage("dashboard"));
+const ThreatsRoute = lazy(() => loadPage("threats"));
+const LogsRoute = lazy(() => loadPage("logs"));
+const AdminOperationsRoute = lazy(() => loadPage("admin-operations"));
+const AdminIncidentsRoute = lazy(() => loadPage("admin-incidents"));
+const AdminIntegrationsRoute = lazy(() => loadPage("admin-integrations"));
+const AdminReviewsRoute = lazy(() => loadPage("admin-reviews"));
+const SettingsRoute = lazy(() => loadPage("settings"));
+const SupportRoute = lazy(() => loadPage("support"));
+const QuarantineRoute = lazy(() => loadPage("quarantine"));
+const AlertsRoute = lazy(() => loadPage("alerts"));
+const DomainShieldRoute = lazy(() => loadPage("domain-shield"));
 const MentionsLegalesRoute = lazy(() => import("./routes/mentions-legales"));
 const ConfidentialiteRoute = lazy(() => import("./routes/confidentialite"));
 const ContactRoute = lazy(() => import("./routes/contact"));
@@ -178,9 +195,18 @@ function AppContent() {
   const administration = isAdminPage(activePage) && Boolean(session?.is_platform_admin);
 
   useEffect(() => {
+    if (!administration) return;
+    // Opening the console fetches every admin tab's code at once, so switching
+    // tabs never waits for a download.
+    for (const page of ["logs", "admin-operations", "admin-incidents", "admin-integrations", "admin-reviews"] as const) {
+      void loadPage(page).catch(() => undefined);
+    }
+  }, [administration]);
+
+  useEffect(() => {
     if (!sessionQuery.isLoading || !getSidebarPageFromPath(window.location.pathname)) return;
     // Fetch code alongside session validation, without rendering protected content.
-    void pageLoaders[activePage]().catch(() => {
+    void loadPage(activePage).catch(() => {
       // A failed speculative fetch must not interrupt authentication.
     });
   }, [activePage, sessionQuery.isLoading]);
@@ -352,7 +378,7 @@ function AppContent() {
   };
 
   return (
-    <ActiveDomainProvider key={session.workspace_id} workspaceId={session.workspace_id}>
+    <ActiveDomainProvider key={session.workspace_id} workspaceId={session.workspace_id} initialDomain={session.default_domain}>
     <AppShell
       currentPage={activePage}
       onPageChange={(page) => {
@@ -375,7 +401,7 @@ function AppContent() {
     >
       <Suspense fallback={<PageLoading />}>
         {!isAdminPage(activePage) && !["settings", "support"].includes(activePage) ? (
-          <DomainPageBoundary>
+          <DomainPageBoundary renderWhileLoading={activePage === "dashboard"}>
             {activePage === "dashboard" && <DashboardRoute session={session} onGoToSettings={handleGoToSettings} />}
             {activePage === "threats" && <ThreatsRoute />}
             {activePage === "quarantine" && <QuarantineRoute />}

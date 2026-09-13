@@ -15,9 +15,12 @@ const ActiveDomainContext = createContext<ActiveDomainContextValue | null>(null)
 
 export function ActiveDomainProvider({
   workspaceId,
+  initialDomain = "",
   children,
 }: {
   workspaceId: string;
+  /** The session's default domain, used only until the domain list arrives. */
+  initialDomain?: string | null;
   children: React.ReactNode;
 }) {
   const query = useCloudflareList();
@@ -29,17 +32,23 @@ export function ActiveDomainProvider({
     if (domains.some((item) => item.zone_name?.toLowerCase() === selected.toLowerCase())) {
       return selected.toLowerCase();
     }
-    return (
+    const listed = (
       domains.find((item) => item.status === "active")?.zone_name
       ?? domains[0]?.zone_name
       ?? ""
     ).toLowerCase();
-  }, [domains, selected]);
+    if (listed || !query.isLoading || selected) return listed;
+    // While the list loads, and with no stored choice to honour, open on the
+    // domain the session named. The API checks ownership on every request, so
+    // this only saves waiting for the list.
+    return (initialDomain ?? "").trim().toLowerCase();
+  }, [domains, selected, query.isLoading, initialDomain]);
 
   useEffect(() => {
-    if (!activeDomain) return;
+    // Only a domain confirmed by the list is remembered.
+    if (!activeDomain || query.isLoading) return;
     localStorage.setItem(storageKey, activeDomain);
-  }, [activeDomain, storageKey]);
+  }, [activeDomain, query.isLoading, storageKey]);
 
   const setActiveDomain = (domain: string) => {
     const normalized = domain.trim().toLowerCase();
