@@ -80,6 +80,9 @@ describe("Dialog", () => {
     expect(backdrop).not.toBeNull();
     // Chromium draws a backdrop blur only once its fade ends, so it flickered.
     expect(backdrop!.className).not.toMatch(/backdrop-blur/);
+    // A theme token flips to near-white in dark mode and washed the page out.
+    expect(backdrop!.className).toMatch(/\bbg-black\/60\b/);
+    expect(backdrop!.className).not.toMatch(/on-background/);
     // No fade or scale on the panel: an embedded frame showed through ahead of it.
     expect(screen.getByRole("dialog")).not.toHaveAttribute("style");
   });

@@ -788,3 +788,107 @@ async def test_teardown_deletes_a_worker_nothing_else_uses(monkeypatch) -> None:
 
 def test_the_platform_worker_is_protected_by_default() -> None:
     assert "sicurre-gw-9e622bde" in Settings(_env_file=None).protected_worker_name_set
+
+
+def _teardown_row(**overrides: Any) -> dict[str, Any]:
+    row = {
+        "id": "integration-3",
+        "status": "active",
+        "api_token": "enc:v1:value",
+        "zone_id": "zone-3",
+        "account_id": "account-3",
+        "worker_name": "worker-3",
+        "rule_id": "rule-3",
+        "zone_name": "three.example",
+        "user_email": "owner@three.example",
+        "destination_email": "owner.inbox@gmail.test",
+    }
+    row.update(overrides)
+    return row
+
+
+def _teardown_wiring(monkeypatch, row: dict[str, Any], restore_error: Exception | None = None) -> list[tuple[Any, ...]]:
+    restored: list[tuple[Any, ...]] = []
+
+    async def query(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        if "WHERE id = ? AND workspace_id = ?" in sql:
+            return [row]
+        return []
+
+    class Provisioner:
+        def __init__(self, api_token: str) -> None:
+            pass
+
+        async def teardown(self, **_kwargs: Any) -> None:
+            return None
+
+        async def restore_forwarding(self, zone_id: str, address: str, forward_to: str) -> bool:
+            if restore_error is not None:
+                raise restore_error
+            restored.append((zone_id, address, forward_to))
+            return True
+
+        async def get_dns_records(self, _zone_id: str) -> list[dict[str, str]]:
+            return []
+
+        async def deploy_dns_record(self, **_kwargs: Any) -> None:
+            return None
+
+    monkeypatch.setattr(integrations, "_ensure_tables", lambda: None)
+    monkeypatch.setattr(integrations, "_async_query", query)
+    monkeypatch.setattr(integrations, "decrypt_secret", lambda *_args, **_kwargs: "stored-secret")
+    monkeypatch.setattr(integrations, "CloudflareProvisioner", Provisioner)
+    return restored
+
+
+@pytest.mark.asyncio
+async def test_teardown_gives_the_protected_address_its_forward_back(monkeypatch) -> None:
+    """Without it, mail to the address has no route once the Worker rule is gone."""
+    restored = _teardown_wiring(monkeypatch, _teardown_row())
+
+    response = await teardown_cloudflare(TeardownRequest(integration_id="integration-3"), _user())
+
+    assert response["status"] == "removed"
+    assert restored == [("zone-3", "owner@three.example", "owner.inbox@gmail.test")]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"user_email": "owner@elsewhere.example"},
+        {"destination_email": "owner@three.example"},
+        {"destination_email": ""},
+        {"user_email": ""},
+    ],
+)
+async def test_teardown_restores_nothing_it_cannot_route(monkeypatch, overrides: dict[str, Any]) -> None:
+    """An address off the zone, or a forward to itself, is not a rule to create."""
+    restored = _teardown_wiring(monkeypatch, _teardown_row(**overrides))
+
+    await teardown_cloudflare(TeardownRequest(integration_id="integration-3"), _user())
+
+    assert restored == []
+
+
+@pytest.mark.asyncio
+async def test_teardown_restores_a_subdomain_address(monkeypatch) -> None:
+    restored = _teardown_wiring(monkeypatch, _teardown_row(user_email="owner@mail.three.example"))
+
+    await teardown_cloudflare(TeardownRequest(integration_id="integration-3"), _user())
+
+    assert restored == [("zone-3", "owner@mail.three.example", "owner.inbox@gmail.test")]
+
+
+@pytest.mark.asyncio
+async def test_a_failed_forward_restore_does_not_fail_the_teardown(monkeypatch) -> None:
+    """The Worker and rule are already gone: the disconnect still completes."""
+    _teardown_wiring(
+        monkeypatch,
+        _teardown_row(),
+        restore_error=integrations.CloudflareAPIError("destination address not verified"),
+    )
+
+    response = await teardown_cloudflare(TeardownRequest(integration_id="integration-3"), _user())
+
+    assert response["status"] == "removed"

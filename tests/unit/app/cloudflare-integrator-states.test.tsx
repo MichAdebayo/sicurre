@@ -203,7 +203,9 @@ describe("Cloudflare token verification", () => {
     fireEvent.click(screen.getByRole("button", { name: "cloudflare.verify_token" }));
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("cloudflare.errors.invalid_token");
-    expect(alert).toHaveFocus();
+    // Focus moves in an effect that runs after the message renders; a slow runner
+    // reached this line in between.
+    await waitFor(() => expect(alert).toHaveFocus());
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
 
     // Editing the token clears the error.

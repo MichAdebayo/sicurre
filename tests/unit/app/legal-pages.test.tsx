@@ -42,6 +42,7 @@ const pages = [
       "3. Stockage minimal et quarantaine temporaire",
       "4. Masquage automatique des Données Personnelles (PII)",
       "5. Révocation de vos autorisations",
+      "6. Suppression de votre compte",
     ],
   },
   {

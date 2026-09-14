@@ -464,6 +464,10 @@ html.dark {
   --color-navy-dark: #86c3f3;
   --color-secondary-container: #4a3005;
   --color-on-secondary-container: #ffe7bd;
+  /* Red inverts like safe and warning: the light-theme #ba1a1a sat at 2.7:1 on
+     the dark surfaces, so every phishing badge failed WCAG AA. */
+  --color-error: #f87171;
+  --color-on-error: #06111f;
   --color-error-container: #4a1414;
   --color-on-error-container: #ffe1e1;
   --color-safe-bg: #0d2c24;
