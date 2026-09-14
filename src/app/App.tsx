@@ -16,7 +16,7 @@ import {
 } from "./lib/navigation";
 import { useTranslation } from "react-i18next";
 import { AppToast } from "./components/common/app-toast";
-import { parseVerificationCallback } from "./lib/email-verification";
+import { parseVerificationCallback, type VerificationCallback } from "./lib/email-verification";
 import { applyTheme, getStoredTheme } from "./lib/theme";
 import { ActiveDomainProvider } from "./contexts/active-domain";
 import { buildDocumentTitle, type DocumentTitleView } from "./lib/document-title";
@@ -174,6 +174,9 @@ function AppContent() {
   const [hasStoredSession, setHasStoredSession] = useState(getInitialLoginState);
   const [sessionLookupEnabled, setSessionLookupEnabled] = useState(verificationCallback.status === "none");
   const [viewState, setViewStateState] = useState<ViewState>(getInitialViewState);
+  // The activation notice belongs to the visit that followed the e-mail link,
+  // not to every later sign-in form in the same tab.
+  const [verificationNotice, setVerificationNotice] = useState<VerificationCallback>(verificationCallback);
 
   const setViewState = (view: ViewState) => {
     sessionStorage.setItem("sicurre_view_state", view);
@@ -297,6 +300,7 @@ function AppContent() {
   }, [session]);
 
   const handleLoginSuccess = () => {
+    setVerificationNotice({ status: "none" });
     const requested = requestedAfterLogin.current ?? "dashboard";
     window.history.replaceState({}, document.title, sidebarPagePaths[requested]);
     sessionStorage.removeItem("sicurre_view_state");
@@ -306,6 +310,7 @@ function AppContent() {
   };
 
   const handleLogout = async () => {
+    setVerificationNotice({ status: "none" });
     requestedAfterLogin.current = null;
     setSessionLookupEnabled(false);
     setHasStoredSession(false);
@@ -365,9 +370,9 @@ function AppContent() {
         onLoginSuccess={handleLoginSuccess}
         initialMode={viewState === "signup" ? "signup" : "login"}
         onNavigateToLanding={() => setViewState("landing")}
-        emailJustVerified={verificationCallback.status === "verified"}
+        emailJustVerified={verificationNotice.status === "verified"}
         emailVerificationError={
-          verificationCallback.status === "error" ? verificationCallback.reason : undefined
+          verificationNotice.status === "error" ? verificationNotice.reason : undefined
         }
       />
     );

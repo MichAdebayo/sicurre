@@ -38,6 +38,11 @@ vi.mock("../../../src/app/contexts/active-domain", () => ({
   useActiveDomain: () => ({ activeDomain: "vinse.app" }),
 }));
 
+const theme = vi.hoisted(() => ({ value: "light" as "light" | "dark" }));
+vi.mock("../../../src/app/lib/theme", () => ({
+  useTheme: () => [theme.value, vi.fn()],
+}));
+
 vi.mock("../../../src/app/lib/api", () => ({
   useQuarantineItems: () => state.items,
   useReleaseQuarantine: () => state.release,
@@ -277,6 +282,32 @@ describe("quarantine preview dialog", () => {
     fireEvent.click(within(toast).getByRole("button", { name: "Fermer la notification" }));
 
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+});
+
+describe("quarantine preview colours", () => {
+  afterEach(() => {
+    theme.value = "light";
+  });
+
+  it("keeps the preview text readable in dark mode", () => {
+    theme.value = "dark";
+    setItems([item()]);
+    render(<QuarantineRoute />);
+
+    const frame = openPreview().querySelector("iframe");
+    const doc = frame?.getAttribute("srcdoc") ?? "";
+    expect(doc).toContain("color: #cbd5e1");
+    expect(doc).toContain("background: transparent");
+    expect(doc).not.toContain("color: #374151");
+  });
+
+  it("keeps the dark grey text in light mode", () => {
+    setItems([item()]);
+    render(<QuarantineRoute />);
+
+    const doc = openPreview().querySelector("iframe")?.getAttribute("srcdoc") ?? "";
+    expect(doc).toContain("color: #374151");
   });
 });
 

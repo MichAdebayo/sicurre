@@ -312,8 +312,13 @@ describe("account erasure", () => {
     render(<SettingsRoute session={session()} />);
 
     expect(screen.queryByLabelText("settings.delete_account_confirm_label")).not.toBeInTheDocument();
+    expect(screen.getByText("settings.delete_account_card_desc")).toBeInTheDocument();
     openDialog();
     expect(within(dialog()).getByText("settings.delete_account_desc")).toBeInTheDocument();
+    // The member reads what goes, Cloudflare included, before confirming.
+    for (const effect of ["cloudflare", "forwarding", "data", "quarantine"]) {
+      expect(within(dialog()).getByText(`settings.delete_account_effect_${effect}`)).toBeInTheDocument();
+    }
     expect(deleteButton()).toBeDisabled();
     confirmWith("michael@vinse.ap");
     expect(deleteButton()).toBeDisabled();

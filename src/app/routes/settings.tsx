@@ -422,12 +422,17 @@ export default function SettingsRoute({ session, initialTab, onAccountDeleted }:
                 </div>
               </form>
 
-              <div className="mt-8 pt-6 border-t border-border-subtle flex flex-wrap items-center justify-between gap-4">
-                <h3 className="text-sm font-bold text-on-surface">{t("settings.delete_account_title")}</h3>
-                <Button type="button" variant="danger" size="sm" className="gap-2 cursor-pointer" onClick={openDeleteAccount}>
-                  <Trash2 className="w-4 h-4" aria-hidden="true" />
-                  {t("settings.delete_account_open")}
-                </Button>
+              <div className="mt-8 pt-6 border-t border-border-subtle">
+                <div className="flex flex-col gap-4 rounded-xl border border-error/25 bg-error/[0.03] p-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-1">
+                    <h3 className="text-base font-bold text-on-surface">{t("settings.delete_account_title")}</h3>
+                    <p className="app-body-sub">{t("settings.delete_account_card_desc")}</p>
+                  </div>
+                  <Button type="button" variant="danger-outline" className="gap-2 shrink-0 cursor-pointer" onClick={openDeleteAccount}>
+                    <Trash2 className="w-4 h-4" aria-hidden="true" />
+                    {t("settings.delete_account_open")}
+                  </Button>
+                </div>
               </div>
             </section>
           )}
@@ -762,24 +767,27 @@ export default function SettingsRoute({ session, initialTab, onAccountDeleted }:
                     <div className="flex items-center gap-3 pt-2">
                       <Button
                         type="submit"
+                        size="sm"
                         disabled={saveWsTokenMutation.isPending}
-                        className="bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold px-4 py-2 rounded-lg cursor-pointer h-9 transition-all"
+                        className="cursor-pointer"
                       >
                         {saveWsTokenMutation.isPending
                           ? t("settings.verifying")
                           : t("settings.save_integration")}
                       </Button>
 
-                      <button
+                      <Button
+                        variant="outline"
+                        size="sm"
                         type="button"
                         onClick={() => {
                           setIsEditingToken(false);
                           setCfTokenInput("");
                         }}
-                        className="bg-surface-low border border-border-subtle text-on-surface hover:bg-surface-low/80 text-xs font-bold px-4 py-2 rounded-lg cursor-pointer h-9 transition-all"
+                        className="cursor-pointer"
                       >
                         {t("common.cancel")}
-                      </button>
+                      </Button>
                     </div>
                   </form>
                 ) : wsTokenData?.configured ? (
@@ -808,7 +816,7 @@ export default function SettingsRoute({ session, initialTab, onAccountDeleted }:
                             setCfTokenInput("");
                             setIsEditingToken(true);
                           }}
-                          className="font-bold text-xs h-9 cursor-pointer"
+                          className="cursor-pointer"
                         >
                           {t("settings.edit_token")}
                         </Button>
@@ -816,7 +824,7 @@ export default function SettingsRoute({ session, initialTab, onAccountDeleted }:
                           variant="danger"
                           size="sm"
                           onClick={handleDeleteToken}
-                          className="font-bold text-xs h-9 cursor-pointer"
+                          className="cursor-pointer"
                         >
                           {t("settings.revoke_access")}
                         </Button>
@@ -836,88 +844,80 @@ export default function SettingsRoute({ session, initialTab, onAccountDeleted }:
       </div>
 
       {/* UI Confirmation Modal for Token Deletion */}
-      {deleteTokenConfirmVisible && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm select-none animate-in fade-in duration-200">
-          <div className="bg-surface-lowest border border-border-subtle rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-error/10 text-error rounded-xl">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <h4 className="font-display font-bold text-base text-on-surface">
-                {t("settings.revoke_api_title")}
-              </h4>
-            </div>
-            <p className="text-xs font-semibold text-on-surface-variant leading-relaxed">
-              {t("settings.revoke_api_desc")}
-            </p>
-            <div className="flex justify-end gap-2.5">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setDeleteTokenConfirmVisible(false)}
-                className="font-bold text-xs"
-              >
-                {t("common.cancel")}
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={executeDeleteToken}
-                className="font-bold text-xs"
-              >
-                {t("settings.revoke")}
-              </Button>
-            </div>
+      <Dialog
+        isOpen={deleteTokenConfirmVisible}
+        onClose={() => setDeleteTokenConfirmVisible(false)}
+        role="alertdialog"
+        size="md"
+        title={
+          <span className="flex items-center gap-3">
+            <span className="rounded-xl bg-error/10 p-2 text-error">
+              <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+            </span>
+            {t("settings.revoke_api_title")}
+          </span>
+        }
+        description={t("settings.revoke_api_desc")}
+        footer={
+          <div className="flex justify-end gap-2.5">
+            <Button variant="outline" size="sm" onClick={() => setDeleteTokenConfirmVisible(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button variant="danger" size="sm" onClick={executeDeleteToken}>
+              {t("settings.revoke")}
+            </Button>
           </div>
-        </div>
-      )}
+        }
+      />
 
-      {/* UI Confirmation Modal for Domain Deletion */}
-      {removeDomainConfirmId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm select-none animate-in fade-in duration-200">
-          <div className="bg-surface-lowest border border-border-subtle rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-error/10 text-error rounded-xl">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <h4 className="font-display font-bold text-base text-on-surface">
-                {t("settings.disconnect_domain")}
-              </h4>
-            </div>
-            <p className="text-xs font-semibold text-on-surface-variant leading-relaxed">
-              {t("settings.disconnect_domain_desc")}
-            </p>
-            <div className="flex justify-end gap-2.5">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setRemoveDomainConfirmId(null)}
-                className="font-bold text-xs"
-              >
-                {t("common.cancel")}
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() => executeRemoveDomain(removeDomainConfirmId)}
-                className="font-bold text-xs"
-              >
-                {t("settings.remove")}
-              </Button>
-            </div>
+      <Dialog
+        isOpen={removeDomainConfirmId !== null}
+        onClose={() => setRemoveDomainConfirmId(null)}
+        role="alertdialog"
+        size="md"
+        title={
+          <span className="flex items-center gap-3">
+            <span className="rounded-xl bg-error/10 p-2 text-error">
+              <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+            </span>
+            {t("settings.disconnect_domain")}
+          </span>
+        }
+        description={t("settings.disconnect_domain_desc")}
+        footer={
+          <div className="flex justify-end gap-2.5">
+            <Button variant="outline" size="sm" onClick={() => setRemoveDomainConfirmId(null)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => {
+                if (removeDomainConfirmId) void executeRemoveDomain(removeDomainConfirmId);
+              }}
+            >
+              {t("settings.remove")}
+            </Button>
           </div>
-        </div>
-      )}
+        }
+      />
+
       <Dialog
         isOpen={deleteOpen}
         onClose={closeDeleteAccount}
         role="alertdialog"
-        size="sm"
+        size="md"
         initialFocusRef={deleteInputRef}
         title={t("settings.delete_account_title")}
         description={t("settings.delete_account_desc")}
       >
         <form onSubmit={handleDeleteAccount} className="space-y-4">
+          <ul className="list-disc space-y-1.5 pl-5 text-body-sm text-on-surface-variant">
+            <li>{t("settings.delete_account_effect_cloudflare")}</li>
+            <li>{t("settings.delete_account_effect_forwarding")}</li>
+            <li>{t("settings.delete_account_effect_data")}</li>
+            <li>{t("settings.delete_account_effect_quarantine")}</li>
+          </ul>
           <Input
             ref={deleteInputRef}
             label={t("settings.delete_account_confirm_label")}
@@ -930,10 +930,10 @@ export default function SettingsRoute({ session, initialTab, onAccountDeleted }:
           />
           {deleteError && <p role="alert" className="text-xs text-error font-semibold">{deleteError}</p>}
           <div className="flex justify-end gap-2.5">
-            <Button type="button" variant="outline" size="sm" className="font-bold text-xs" onClick={closeDeleteAccount} disabled={deleteAccountMutation.isPending}>
+            <Button type="button" variant="outline" size="sm" onClick={closeDeleteAccount} disabled={deleteAccountMutation.isPending}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" variant="danger" size="sm" className="gap-2 font-bold text-xs" disabled={!deleteConfirmed || deleteAccountMutation.isPending}>
+            <Button type="submit" variant="danger" size="sm" className="gap-2" disabled={!deleteConfirmed || deleteAccountMutation.isPending}>
               {deleteAccountMutation.isPending
                 ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
                 : <Trash2 className="w-4 h-4" aria-hidden="true" />}

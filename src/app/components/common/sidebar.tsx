@@ -179,7 +179,9 @@ export function Sidebar({
     <aside
       className={clsx(
         "h-screen shrink-0 border-r border-border-subtle bg-surface-lowest flex flex-col motion-safe:transition-[width] motion-safe:duration-200 dark:bg-surface-low",
-        collapsed ? "w-[72px]" : "w-[240px]",
+        // 264px keeps "Protégé · N e-mails analysés" on one line up to five digits;
+        // at 240px the status wrapped onto a second row.
+        collapsed ? "w-[72px]" : "w-[264px]",
         className,
       )}
     >

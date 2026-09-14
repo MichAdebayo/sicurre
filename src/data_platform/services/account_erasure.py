@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from fastapi import HTTPException, status
 
+from core.config import get_settings
 from data_platform.api.auth import AuthUser
 from data_platform.api.routers.integrations import TeardownRequest, teardown_cloudflare
+from data_platform.services.quarantine_storage import build_quarantine_store
 from db.runtime import execute_runtime_query
 
 # Every table holding rows for one workspace, dependants before the tables they
@@ -27,6 +29,31 @@ WORKSPACE_TABLES = (
     "cloudflare_integration",
     "app_workspace_membership",
 )
+
+
+async def _drop_stored_quarantine_copies(workspace_id: str) -> None:
+    """Delete every stored raw copy before its row goes, so no message outlives the account.
+
+    Deleting the rows alone left the copies in storage until the 14-day lifecycle
+    expired them. A storage failure stops the erasure before any row is deleted:
+    the rows still point at the copies, and the member can retry.
+    """
+    rows = await execute_runtime_query(
+        "SELECT raw_storage_uri FROM app_quarantine_item WHERE workspace_id = ? "
+        "AND raw_storage_uri IS NOT NULL AND raw_storage_uri <> ''",
+        (workspace_id,),
+    )
+    if not rows:
+        return
+    store = build_quarantine_store(get_settings())
+    try:
+        for row in rows:
+            await store.delete(str(row["raw_storage_uri"]))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Quarantine storage is temporarily unavailable; the account was not deleted",
+        ) from exc
 
 
 async def erase_account(user: AuthUser) -> None:
@@ -51,6 +78,7 @@ async def erase_account(user: AuthUser) -> None:
             )
         for row in integrations:
             await teardown_cloudflare(TeardownRequest(integration_id=str(row["id"])), user)
+        await _drop_stored_quarantine_copies(user.workspace_id)
         for table in WORKSPACE_TABLES:
             await execute_runtime_query(
                 f"DELETE FROM {table} WHERE workspace_id = ?", (user.workspace_id,)

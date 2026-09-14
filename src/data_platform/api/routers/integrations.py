@@ -91,6 +91,24 @@ class CloudflareSetupRequest(BaseModel):
     fix_dmarc: bool = False
 
 
+def _forwarding_to_restore(row: dict[str, Any]) -> tuple[str, str] | None:
+    """The protected address and its verified destination, when a forward can be restored.
+
+    Only an address on the zone itself, or one of its subdomains, with a destination
+    that is not the address, can be routed back: anything else would be a rule
+    Cloudflare refuses or a loop.
+    """
+    address = str(row.get("user_email") or "").strip().lower()
+    forward_to = str(row.get("destination_email") or "").strip().lower()
+    zone = str(row.get("zone_name") or "").strip().lower()
+    if not address or not forward_to or not zone or address == forward_to or "@" not in address:
+        return None
+    domain = address.rsplit("@", 1)[1]
+    if domain != zone and not domain.endswith(f".{zone}"):
+        return None
+    return address, forward_to
+
+
 def _hosts_sicurre_dmarc_mailbox(zone_name: str | None) -> bool:
     """True for the zone Sicurre's own DMARC mailbox lives on.
 
@@ -546,6 +564,21 @@ async def teardown_cloudflare(
                 detail=f"Cloudflare could not remove the routing resources: {exc}",
             ) from exc
 
+        # Connecting replaced the protected address's own forward with the Worker
+        # rule. Give it back so its mail keeps arriving once Sicurre is gone. The
+        # Worker and rule are already removed, so a failure is logged, not raised.
+        restore = _forwarding_to_restore(row)
+        if restore is not None:
+            try:
+                await provisioner.restore_forwarding(row["zone_id"], *restore)
+            except Exception as exc:
+                logger.warning(
+                    "Could not restore forwarding for %s on %s; recreate it in "
+                    "Cloudflare Email Routing: %s",
+                    restore[0],
+                    row["zone_name"],
+                    exc,
+                )
         # Withdraw Sicurre's DMARC reporting address. The Worker and rule are
         # already gone, so a DNS failure here is reported rather than raised.
         try:

@@ -166,3 +166,89 @@ async def test_a_member_without_a_workspace_loses_only_the_identity(
         'DELETE FROM "verification" WHERE identifier = ?',
         'DELETE FROM "user" WHERE id = ?',
     ]
+
+
+def _erasure_with_copies(
+    monkeypatch: pytest.MonkeyPatch,
+    copies: list[str],
+    delete_error: Exception | None = None,
+) -> tuple[list[tuple[str, tuple[Any, ...]]], list[str], list[str]]:
+    """Wire an erasure whose workspace holds stored quarantine copies."""
+    captured, query = _fragment_query(
+        {
+            "SELECT id, status FROM cloudflare_integration": [{"id": "integration-1", "status": "active"}],
+            "SELECT raw_storage_uri FROM app_quarantine_item": [
+                {"raw_storage_uri": uri} for uri in copies
+            ],
+        }
+    )
+    monkeypatch.setattr(account_erasure, "execute_runtime_query", query)
+    events: list[str] = []
+    dropped: list[str] = []
+
+    async def teardown(payload: Any, current_user: AuthUser) -> dict[str, Any]:
+        events.append("teardown")
+        return {"status": "removed"}
+
+    class Store:
+        async def delete(self, storage_uri: str) -> None:
+            # Nothing may be deleted from the database before the copies are gone.
+            assert not any(sql.startswith("DELETE") for sql, _ in captured)
+            if delete_error is not None:
+                raise delete_error
+            events.append("copy")
+            dropped.append(storage_uri)
+
+    monkeypatch.setattr(account_erasure, "teardown_cloudflare", teardown)
+    monkeypatch.setattr(account_erasure, "get_settings", lambda: object())
+    monkeypatch.setattr(account_erasure, "build_quarantine_store", lambda _settings: Store())
+    return captured, events, dropped
+
+
+@pytest.mark.asyncio
+async def test_erasure_deletes_every_stored_quarantine_copy_before_any_row(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Deleting the rows alone left the raw messages in storage for up to 14 days."""
+    captured, events, dropped = _erasure_with_copies(
+        monkeypatch, ["r2://quarantine/workspace-1/a.eml", "r2://quarantine/workspace-1/b.eml"]
+    )
+
+    await erase_account(_USER)
+
+    assert dropped == ["r2://quarantine/workspace-1/a.eml", "r2://quarantine/workspace-1/b.eml"]
+    assert events == ["teardown", "copy", "copy"], "Cloudflare first, then the copies"
+    assert "DELETE FROM app_quarantine_item WHERE workspace_id = ?" in [sql for sql, _ in captured]
+
+
+@pytest.mark.asyncio
+async def test_a_storage_failure_stops_the_erasure_before_any_row_is_deleted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The rows keep pointing at the copies, so a retry can finish the job."""
+    captured, _events, dropped = _erasure_with_copies(
+        monkeypatch, ["r2://quarantine/workspace-1/a.eml"], delete_error=RuntimeError("R2 unreachable")
+    )
+
+    with pytest.raises(HTTPException) as excinfo:
+        await erase_account(_USER)
+
+    assert excinfo.value.status_code == 503
+    assert dropped == []
+    assert [sql for sql, _ in captured if sql.startswith("DELETE")] == []
+
+
+@pytest.mark.asyncio
+async def test_an_erasure_without_stored_copies_never_opens_the_store(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured, events, dropped = _erasure_with_copies(monkeypatch, [])
+    monkeypatch.setattr(
+        account_erasure,
+        "build_quarantine_store",
+        lambda _settings: pytest.fail("the store was opened with nothing to delete"),
+    )
+
+    await erase_account(_USER)
+
+    assert dropped == [] and events == ["teardown"]

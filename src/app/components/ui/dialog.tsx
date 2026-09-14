@@ -100,14 +100,16 @@ function DialogPanel({
           fade ends, so the page snapped from sharp to blurred on open and back
           on close. The panel itself does not fade or scale: an embedded frame,
           such as the quarantine preview, did not follow the fade and showed
-          through ahead of the panel. */}
+          through ahead of the panel. The dim is plain black in both themes: the
+          on-background token is near-white in dark mode, so the page washed out
+          behind the dialog and snapped back to dark on close. */}
       <MotionDiv
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.15, ease: "easeOut" }}
         onClick={onClose}
         aria-hidden="true"
-        className="absolute inset-0 bg-on-background/60"
+        className="absolute inset-0 bg-black/60"
       />
       <div
         ref={panelRef}
