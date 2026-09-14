@@ -62,7 +62,7 @@ def test_operational_panel_token_pairs_pass_aa_in_both_themes() -> None:
 def _mix(foreground: str, background: str, alpha: float) -> str:
     fg = [int(foreground.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4)]
     bg = [int(background.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4)]
-    return "#" + "".join(f"{round(alpha * f + (1 - alpha) * b):02x}" for f, b in zip(fg, bg))
+    return "#" + "".join(f"{round(alpha * f + (1 - alpha) * b):02x}" for f, b in zip(fg, bg, strict=True))
 
 
 def test_error_text_and_its_badge_tint_pass_aa_in_both_themes() -> None:
