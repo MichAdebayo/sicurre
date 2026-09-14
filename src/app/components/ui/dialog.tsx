@@ -1,10 +1,7 @@
 import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode, type RefObject } from "react";
-import { motion } from "framer-motion";
 import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { clsx } from "clsx";
-
-const MotionDiv = motion.div as any;
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), iframe, [tabindex]:not([tabindex="-1"])';
@@ -102,15 +99,9 @@ function DialogPanel({
           such as the quarantine preview, did not follow the fade and showed
           through ahead of the panel. The dim is plain black in both themes: the
           on-background token is near-white in dark mode, so the page washed out
-          behind the dialog and snapped back to dark on close. */}
-      <MotionDiv
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.15, ease: "easeOut" }}
-        onClick={onClose}
-        aria-hidden="true"
-        className="absolute inset-0 bg-black/60"
-      />
+          behind the dialog and snapped back to dark on close. It appears and goes
+          at once: a fading full-screen layer was the last animated surface. */}
+      <div onClick={onClose} aria-hidden="true" className="absolute inset-0 bg-black/60" />
       <div
         ref={panelRef}
         role={role}
