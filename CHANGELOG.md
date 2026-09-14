@@ -5,6 +5,18 @@ notes are generated from Conventional Commits by semantic-release and published
 to [GitHub Releases](https://github.com/MichAdebayo/sicurre/releases), which is
 the authoritative record. This file summarises the notable changes only.
 
+## [1.37.16] - 2026-09-14
+
+- The API no longer pings the database every 30 seconds by default, so Neon
+  can scale the compute to zero when nothing uses it. Setting
+  SICURRE_DB_KEEPALIVE_ENABLED=true turns the ping back on. The first scan
+  after an idle period waits for the compute to wake. The database gauge
+  reports no value until a round trip is observed, so the
+  database-unreachable alert does not fire just because nothing pinged.
+- Scheduled collection is frozen: every job line in the production crontab
+  is commented out, and CD installs that file on each deploy, so deploys
+  keep the jobs stopped.
+
 ## [1.37.15] - 2026-09-14
 
 - The trend chart bars use soft fills in light mode with a slate outline

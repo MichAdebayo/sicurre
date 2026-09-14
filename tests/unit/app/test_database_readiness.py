@@ -158,3 +158,22 @@ def test_the_keepalive_records_what_it_sees(monkeypatch) -> None:
     assert ok_flag is True
     assert detail is None
     assert age is not None and age < 5
+
+
+def test_the_database_gauge_is_unknown_until_a_round_trip_is_observed() -> None:
+    """With the keepalive off nothing pings, and a gauge left at 0 reads as an outage.
+
+    Prometheus exports a never-set gauge as 0, and the database-unreachable alert
+    fires on that after three minutes. Unknown has to be NaN, not 0.
+    """
+    import math
+
+    from prometheus_client import REGISTRY
+
+    assert math.isnan(REGISTRY.get_sample_value("sicurre_database_up"))
+
+    db_health.record_success()
+    assert REGISTRY.get_sample_value("sicurre_database_up") == 1.0
+
+    db_health.record_failure("OperationalError: compute time quota exceeded")
+    assert REGISTRY.get_sample_value("sicurre_database_up") == 0.0
