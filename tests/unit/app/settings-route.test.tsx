@@ -158,9 +158,14 @@ describe("connected domain recovery", () => {
   });
 
   it("shows a spinner on the row being retried while the setup call is pending", async () => {
+    // The test ends the call itself: a 20 ms timer once finished it on a slow CI
+    // runner before the spinner was checked, and the spinner was already gone.
+    let finishSetup: (value: { status: string }) => void = () => {};
     mocks.retrySetup.mockImplementation(() => {
       mocks.state.setupPending = true;
-      return new Promise((resolve) => setTimeout(() => resolve({ status: "provisioning" }), 20));
+      return new Promise((resolve) => {
+        finishSetup = resolve;
+      });
     });
     render(<SettingsRoute initialTab="domains" session={session()} />);
 
@@ -168,8 +173,9 @@ describe("connected domain recovery", () => {
     fireEvent.click(retry);
 
     await waitFor(() => expect(retry).toBeDisabled());
-    expect(retry.querySelector(".animate-spin")).not.toBeNull();
+    await waitFor(() => expect(retry.querySelector(".animate-spin")).not.toBeNull());
     mocks.state.setupPending = false;
+    finishSetup({ status: "provisioning" });
     await screen.findByRole("status");
   });
 

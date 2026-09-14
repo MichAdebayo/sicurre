@@ -126,6 +126,40 @@ def test_prepare_restoration_mime_preserves_original_sender_context() -> None:
     assert "DKIM-Signature" not in restored
 
 
+def test_prepare_restoration_mime_drops_transport_headers_and_renews_the_message_id() -> None:
+    """Cloudflare Email Sending rejected a rebuilt message as email.invalid.
+
+    Diagnosed on 14 September 2026: the same message was accepted once the
+    original hop's Received, Received-SPF and provider X- headers were removed
+    and the Message-ID was renewed on the sender domain.
+    """
+    raw = (
+        b"Received: from mail.example.net by mx.cloudflare.net\r\n"
+        b"Received-SPF: pass\r\n"
+        b"Return-Path: <bounce@outside.test>\r\n"
+        b"Delivered-To: owner@example.test\r\n"
+        b"X-CF-SpamH-Score: 1\r\n"
+        b"X-Google-DKIM-Signature: stale\r\n"
+        b"X-Sicurre-Scan: phishing\r\n"
+        b"Message-ID: <original@mail.outside.test>\r\n"
+        b"From: Attacker <sender@outside.test>\r\n"
+        b"To: victim@example.test\r\n"
+        b"Subject: Invoice\r\n\r\nBody"
+    )
+
+    restored = prepare_restoration_mime(
+        raw, sender="owner@example.test", recipient="destination@example.net"
+    ).decode()
+
+    for stripped in ("Received:", "Received-SPF", "Return-Path", "Delivered-To", "X-CF-SpamH-Score", "X-Google-DKIM-Signature"):
+        assert stripped not in restored, f"{stripped} survived the rebuild"
+    assert "X-Sicurre-Scan: phishing" in restored
+    assert "X-Sicurre-Original-Message-ID: <original@mail.outside.test>" in restored
+    assert "Message-ID: <original@mail.outside.test>" not in restored.replace("X-Sicurre-Original-Message-ID: <original@mail.outside.test>", "")
+    assert "@example.test>" in restored.split("\r\nMessage-ID: ", 1)[1].split("\r\n", 1)[0]
+    assert "Subject: Invoice" in restored and restored.endswith("Body")
+
+
 @pytest.mark.asyncio
 async def test_cloudflare_permission_error_is_actionable() -> None:
     """A missing Email Sending grant is distinguishable from an outage."""

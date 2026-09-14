@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from email import policy
 from email.parser import BytesParser
+from email.utils import make_msgid
 from typing import Any
 
 import httpx
@@ -114,6 +115,22 @@ def prepare_restoration_mime(raw_mime: bytes, *, sender: str, recipient: str) ->
     ):
         while header in message:
             del message[header]
+    # Transport headers belong to the original hop, not to this new message.
+    # Cloudflare Email Sending rejected the rebuilt message as email.invalid
+    # while Received, Received-SPF and the provider's X- headers were present.
+    for header in list(dict.fromkeys(name for name, _ in message.items())):
+        lowered = header.lower()
+        if lowered in {"received", "received-spf", "return-path", "delivered-to"} or (
+            lowered.startswith("x-") and not lowered.startswith("x-sicurre-")
+        ):
+            while header in message:
+                del message[header]
+    original_message_id = str(message.get("Message-ID") or "").strip()
+    while "Message-ID" in message:
+        del message["Message-ID"]
+    message["Message-ID"] = make_msgid(domain=sender.rsplit("@", 1)[-1] or None)
+    if original_message_id:
+        message["X-Sicurre-Original-Message-ID"] = original_message_id
     message["From"] = f"Sicurre Restoration <{sender}>"
     message["To"] = recipient
     if original_from:
