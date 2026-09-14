@@ -5,6 +5,13 @@ notes are generated from Conventional Commits by semantic-release and published
 to [GitHub Releases](https://github.com/MichAdebayo/sicurre/releases), which is
 the authoritative record. This file summarises the notable changes only.
 
+## [1.37.13] - 2026-09-14
+
+- The quarantine preview shows the message as plain text in a scrollable box
+  instead of an embedded frame. Nothing in the message is interpreted either
+  way, and Chrome no longer paints a blank frame for an instant on every open.
+- The dialog backdrop appears and goes at once, without a fade.
+
 ## [1.37.12] - 2026-09-14
 
 - Account deletion erases every stored quarantine copy before its rows,
