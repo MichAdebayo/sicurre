@@ -422,21 +422,21 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
                         {/* Phishing stack (Top) */}
                         {phish > 0 && (
                           <div
-                            className="bg-error w-full transition-all"
+                            className="bg-chart-phishing w-full transition-all"
                             style={{ height: `${phishPct}%` }}
                           />
                         )}
                         {/* Spam stack (Middle) */}
                         {spam > 0 && (
                           <div
-                            className="bg-warning w-full transition-all"
+                            className="bg-chart-spam w-full transition-all"
                             style={{ height: `${spamPct}%` }}
                           />
                         )}
                         {/* Legitimate stack (Bottom) */}
                         {safe > 0 && (
                           <div
-                            className="bg-safe w-full transition-all"
+                            className="bg-chart-safe w-full transition-all"
                             style={{ height: `${safePct}%` }}
                           />
                         )}
@@ -455,21 +455,21 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
               <div className="absolute top-16 right-6 z-35 p-3 bg-white border border-border-subtle text-on-surface rounded-xl text-[13px] shadow-xl flex flex-col gap-1.5 w-48 font-sans select-none pointer-events-none animate-in fade-in duration-100">
                 <div className="flex items-center justify-between gap-2 font-bold text-safe border-b border-border-subtle/40 pb-1.5 mb-0.5">
                   <span className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-safe" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-chart-safe" />
                     {t("threats.badge_legitimate")}
                   </span>
                   <span>{trendData.safeCounts[hoveredBarIndex]}</span>
                 </div>
                 <div className="flex items-center justify-between gap-2 border-b border-border-subtle/40 pb-1.5 mb-0.5 font-bold text-spam-text">
                   <span className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-warning" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-chart-spam" />
                     {t("threats.badge_spam")}
                   </span>
                   <span>{trendData.spamCounts[hoveredBarIndex]}</span>
                 </div>
                 <div className="flex items-center justify-between gap-2 font-bold text-error">
                   <span className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-error" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-chart-phishing" />
                     {t("threats.badge_phishing")}
                   </span>
                   <span>{trendData.phishingCounts[hoveredBarIndex]}</span>
