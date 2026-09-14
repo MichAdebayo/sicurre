@@ -7,73 +7,6 @@
   "links": [],
   "panels": [
     {
-      "id": 9,
-      "type": "stat",
-      "title": "Database Reachable",
-      "description": "Whether the last database round trip succeeded. /health cannot answer this: Docker restarts the container on it, and restarting cannot reach a database that is down. Reported by the keepalive ping, or by /health/ready when no keepalive is running.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${prometheus}"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      },
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "UNREACHABLE",
-                  "color": "red"
-                },
-                "1": {
-                  "text": "REACHABLE",
-                  "color": "green"
-                }
-              }
-            }
-          ],
-          "noValue": "NOT OBSERVED",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        }
-      },
-      "targets": [
-        {
-          "expr": "min(sicurre_database_up{stack=\"sicurre\"})",
-          "refId": "A"
-        }
-      ]
-    },
-    {
       "id": 1,
       "type": "stat",
       "title": "Application Available",
@@ -86,7 +19,7 @@
         "h": 5,
         "w": 4,
         "x": 0,
-        "y": 4
+        "y": 0
       },
       "fieldConfig": {
         "defaults": {
@@ -151,7 +84,7 @@
         "h": 5,
         "w": 5,
         "x": 4,
-        "y": 4
+        "y": 0
       },
       "fieldConfig": {
         "defaults": {
@@ -212,7 +145,7 @@
         "h": 5,
         "w": 5,
         "x": 9,
-        "y": 4
+        "y": 0
       },
       "fieldConfig": {
         "defaults": {
@@ -256,7 +189,7 @@
         "h": 5,
         "w": 5,
         "x": 14,
-        "y": 4
+        "y": 0
       },
       "fieldConfig": {
         "defaults": {
@@ -312,7 +245,7 @@
         "h": 5,
         "w": 5,
         "x": 19,
-        "y": 4
+        "y": 0
       },
       "fieldConfig": {
         "defaults": {
@@ -368,7 +301,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 9
+        "y": 5
       },
       "fieldConfig": {
         "defaults": {
@@ -411,7 +344,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 9
+        "y": 5
       },
       "fieldConfig": {
         "defaults": {
@@ -454,7 +387,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 18
+        "y": 14
       },
       "fieldConfig": {
         "defaults": {
@@ -495,7 +428,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 18
+        "y": 14
       },
       "fieldConfig": {
         "defaults": {

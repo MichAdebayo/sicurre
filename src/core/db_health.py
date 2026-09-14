@@ -26,8 +26,8 @@ _state: dict[str, float | str | None] = {"at": None, "ok": None, "detail": None}
 
 
 def _mark_unknown() -> None:
-    # A never-set gauge exports 0, which the database-unreachable alert reads as
-    # an outage. Without the keepalive nothing may ping for hours, so unknown is NaN.
+    # A never-set gauge exports 0, which reads as an outage. Without the keepalive
+    # nothing may ping for hours, so unknown is NaN.
     database_up.set(float("nan"))
 
 

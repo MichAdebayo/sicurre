@@ -163,8 +163,8 @@ def test_the_keepalive_records_what_it_sees(monkeypatch) -> None:
 def test_the_database_gauge_is_unknown_until_a_round_trip_is_observed() -> None:
     """With the keepalive off nothing pings, and a gauge left at 0 reads as an outage.
 
-    Prometheus exports a never-set gauge as 0, and the database-unreachable alert
-    fires on that after three minutes. Unknown has to be NaN, not 0.
+    Prometheus exports a never-set gauge as 0, which reads as a database that
+    refused. Unknown has to be NaN, not 0.
     """
     import math
 
