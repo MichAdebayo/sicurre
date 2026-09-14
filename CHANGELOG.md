@@ -5,6 +5,17 @@ notes are generated from Conventional Commits by semantic-release and published
 to [GitHub Releases](https://github.com/MichAdebayo/sicurre/releases), which is
 the authoritative record. This file summarises the notable changes only.
 
+## [1.37.15] - 2026-09-14
+
+- The trend chart bars use soft fills in light mode with a slate outline
+  around each bar, which keeps the 3:1 boundary against the card and track;
+  segments stay flush, with no gaps. Dark mode is unchanged.
+- Releasing a quarantined email works: the rebuilt message drops the original
+  transport headers (Received, Received-SPF and the provider's X- headers) and
+  gets a fresh Message-ID, keeping the original one in
+  X-Sicurre-Original-Message-ID. Cloudflare Email Sending rejected the message
+  with email.invalid while those headers were present.
+
 ## [1.37.14] - 2026-09-14
 
 - The dashboard trend chart has its own bar colours: brighter red, orange and

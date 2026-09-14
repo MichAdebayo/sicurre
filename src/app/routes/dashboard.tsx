@@ -416,7 +416,7 @@ export default function DashboardRoute({ session, onGoToSettings }: DashboardRou
 
                       {/* Removed standard HTML browser titles */}
                       <div
-                        className="w-full flex flex-col justify-end rounded-t-md overflow-hidden bg-surface-low border border-border-subtle/50 transition-all duration-300 group-hover:scale-y-105"
+                        className="w-full flex flex-col justify-end rounded-t-md overflow-hidden bg-surface-low border border-chart-outline transition-all duration-300 group-hover:scale-y-105"
                         style={{ height: `${Math.max(6, totalPct * 0.78)}%` }}
                       >
                         {/* Phishing stack (Top) */}

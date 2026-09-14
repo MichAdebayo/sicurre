@@ -92,22 +92,23 @@ _AA_NON_TEXT = 3.0
 
 
 def test_trend_chart_bars_stay_distinguishable_in_both_themes() -> None:
-    """The chart's own colours are lighter than the text colours, never below 3:1.
+    """Every bar keeps a 3:1 boundary against the card and its track.
 
     The bars sit on the card (surface-lowest; bg-white maps to it in dark mode)
-    inside a surface-low track.
+    inside a surface-low track. In light mode the fills are soft and the slate
+    outline carries the boundary; in dark mode the fills carry it themselves.
     """
     css = (Path(__file__).resolve().parents[3] / "src/app/index.css").read_text()
     light_css, dark_css = css.split("html.dark {", maxsplit=1)
     declarations = r"--color-([\w-]+):\s*(#[0-9a-fA-F]{6})\s*;"
     light = dict(re.findall(declarations, light_css))
     dark = {**light, **dict(re.findall(declarations, dark_css.split("}", 1)[0]))}
-    assert light["chart-phishing"] != dark["chart-phishing"], "dark mode keeps its own bar colours"
-    for mode, palette in [("light", light), ("dark", dark)]:
+    for ground in ("surface-lowest", "surface-low"):
+        outline = _contrast(light["chart-outline"], light[ground])
+        assert outline >= _AA_NON_TEXT, f"light: chart-outline on {ground} is {outline:.2f}:1"
         for bar in ("chart-phishing", "chart-spam", "chart-safe"):
-            for ground in ("surface-lowest", "surface-low"):
-                ratio = _contrast(palette[bar], palette[ground])
-                assert ratio >= _AA_NON_TEXT, f"{mode}: {bar} on {ground} is {ratio:.2f}:1"
+            ratio = _contrast(dark[bar], dark[ground])
+            assert ratio >= _AA_NON_TEXT, f"dark: {bar} on {ground} is {ratio:.2f}:1"
 
 
 def test_primary_blue_is_below_aa_on_white() -> None:
