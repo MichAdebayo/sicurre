@@ -5,6 +5,12 @@ notes are generated from Conventional Commits by semantic-release and published
 to [GitHub Releases](https://github.com/MichAdebayo/sicurre/releases), which is
 the authoritative record. This file summarises the notable changes only.
 
+## [1.37.14] - 2026-09-14
+
+- The dashboard trend chart has its own bar colours: brighter red, orange and
+  emerald in light mode instead of the deep text colours, while dark mode keeps
+  its shades. Every bar keeps at least 3:1 against the card and its track.
+
 ## [1.37.13] - 2026-09-14
 
 - The quarantine preview shows the message as plain text in a scrollable box
