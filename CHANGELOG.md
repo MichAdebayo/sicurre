@@ -28,6 +28,9 @@ the authoritative record. This file summarises the notable changes only.
 - The quarantine preview tidies the stored text before display: Windows line
   endings, whitespace-only lines and runs of blank lines no longer turn a short
   message into a long scroll.
+- Dark mode red passes WCAG AA: the theme now defines its own error colour,
+  as it already did for safe and warning. The light-theme red sat at 2.7:1
+  on the dark surfaces, so every phishing badge on the quarantine page failed.
 - The sidebar is 264px wide so the workspace status and the analysed e-mail
   count sit on one line.
 - The latency SLO alert needs at least 20 gateway requests in its window, like

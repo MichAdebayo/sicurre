@@ -50,12 +50,41 @@ def test_operational_panel_token_pairs_pass_aa_in_both_themes() -> None:
         ("on-primary-container", "primary-container"),
         ("warning", "warning-bg"),
         ("on-error-container", "error-container"),
+        ("on-error", "error"),
         ("on-surface-variant", "surface-low"),
     ]
     for mode, palette in [("light", light), ("dark", dark)]:
         for foreground, background in pairs:
             ratio = _contrast(palette[foreground], palette[background])
             assert ratio >= _AA_BODY, f"{mode}: {foreground}/{background} is {ratio:.2f}:1"
+
+
+def _mix(foreground: str, background: str, alpha: float) -> str:
+    fg = [int(foreground.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4)]
+    bg = [int(background.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4)]
+    return "#" + "".join(f"{round(alpha * f + (1 - alpha) * b):02x}" for f, b in zip(fg, bg))
+
+
+def test_error_text_and_its_badge_tint_pass_aa_in_both_themes() -> None:
+    """Phishing badges are `text-error` on a 10-15% `bg-error` tint over a surface.
+
+    The dark theme once kept the light #ba1a1a, which sat at 2.7:1 on the dark
+    surfaces: every badge on the quarantine page failed.
+    """
+    css = (Path(__file__).resolve().parents[3] / "src/app/index.css").read_text()
+    light_css, dark_css = css.split("html.dark {", maxsplit=1)
+    declarations = r"--color-([\w-]+):\s*(#[0-9a-fA-F]{6})\s*;"
+    light = dict(re.findall(declarations, light_css))
+    dark = {**light, **dict(re.findall(declarations, dark_css.split("}", 1)[0]))}
+    for mode, palette in [("light", light), ("dark", dark)]:
+        for surface in ("background", "surface-lowest", "surface-low"):
+            ground = palette[surface]
+            text = _contrast(palette["error"], ground)
+            assert text >= _AA_BODY, f"{mode}: error on {surface} is {text:.2f}:1"
+            for alpha in (0.10, 0.15):
+                tint = _mix(palette["error"], ground, alpha)
+                badge = _contrast(palette["error"], tint)
+                assert badge >= _AA_BODY, f"{mode}: error badge on {surface} at {alpha:.0%} is {badge:.2f}:1"
 
 
 def test_primary_blue_is_below_aa_on_white() -> None:
