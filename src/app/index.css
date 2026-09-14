@@ -34,12 +34,13 @@
   --color-on-tertiary-container: #ffc4af;
 
   /* ── Trend chart bars ──
-     Graphics, not text: they need 3:1 against the card and the bar track, not
-     the 4.5:1 the deep text colours are built for, so the chart gets its own
-     brighter mid-tones in light mode. */
-  --color-chart-phishing: #ef4444;
-  --color-chart-spam: #ea580c;
-  --color-chart-safe: #059669;
+     Soft fills; the slate outline around each bar carries the 3:1 boundary
+     against the card and the track that graphics need, so the fills can stay
+     gentle instead of borrowing the deep text colours. */
+  --color-chart-phishing: #f87171;
+  --color-chart-spam: #fb923c;
+  --color-chart-safe: #34d399;
+  --color-chart-outline: #64748b;
 
   /* ── Error ── */
   --color-error: #ba1a1a;
@@ -481,6 +482,7 @@ html.dark {
   --color-chart-phishing: #f87171;
   --color-chart-spam: #f59e0b;
   --color-chart-safe: #34d399;
+  --color-chart-outline: #33445f;
   --color-safe-bg: #0d2c24;
   --color-safe: #34d399;
   --color-on-safe: #06111f;
