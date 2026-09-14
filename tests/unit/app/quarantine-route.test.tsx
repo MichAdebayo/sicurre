@@ -38,11 +38,6 @@ vi.mock("../../../src/app/contexts/active-domain", () => ({
   useActiveDomain: () => ({ activeDomain: "vinse.app" }),
 }));
 
-const theme = vi.hoisted(() => ({ value: "light" as "light" | "dark" }));
-vi.mock("../../../src/app/lib/theme", () => ({
-  useTheme: () => [theme.value, vi.fn()],
-}));
-
 vi.mock("../../../src/app/lib/api", () => ({
   useQuarantineItems: () => state.items,
   useReleaseQuarantine: () => state.release,
@@ -186,10 +181,11 @@ describe("quarantine preview dialog", () => {
     expect(within(dialog).getByText("quarantine.preview_notice")).toBeInTheDocument();
     expect(within(dialog).getByText("quarantine.action_note")).toBeInTheDocument();
 
-    const frame = within(dialog).getByTitle("quarantine.safe_preview") as HTMLIFrameElement;
-    expect(frame).toHaveAttribute("sandbox", "");
-    expect(frame.getAttribute("srcdoc")).toContain("&lt;a href=&#039;http://x&#039;&gt;ici&lt;/a&gt; &amp; &quot;payez&quot;<br />maintenant");
-    expect(frame.getAttribute("srcdoc")).not.toContain("<a href");
+    const preview = within(dialog).getByRole("region", { name: "quarantine.safe_preview" });
+    // The message is shown as text: markup in it is never interpreted.
+    expect(preview).toHaveTextContent(`Cliquez <a href='http://x'>ici</a> & "payez" maintenant 'svp'`);
+    expect(preview.querySelector("a, iframe, img, script")).toBeNull();
+    expect(dialog.querySelector("iframe")).toBeNull();
   });
 
   it("shows the no-subject label inside the preview when the subject is empty", () => {
@@ -285,29 +281,16 @@ describe("quarantine preview dialog", () => {
   });
 });
 
-describe("quarantine preview colours", () => {
-  afterEach(() => {
-    theme.value = "light";
-  });
-
-  it("keeps the preview text readable in dark mode", () => {
-    theme.value = "dark";
-    setItems([item()]);
+describe("quarantine preview rendering", () => {
+  it("shows the message as tidy plain text without an embedded frame", () => {
+    setItems([item({ body_text: "Bonjour,\r\n \r\n\r\n\r\nVotre colis est bloqué." })]);
     render(<QuarantineRoute />);
 
-    const frame = openPreview().querySelector("iframe");
-    const doc = frame?.getAttribute("srcdoc") ?? "";
-    expect(doc).toContain("color: #cbd5e1");
-    expect(doc).toContain("background: transparent");
-    expect(doc).not.toContain("color: #374151");
-  });
-
-  it("keeps the dark grey text in light mode", () => {
-    setItems([item()]);
-    render(<QuarantineRoute />);
-
-    const doc = openPreview().querySelector("iframe")?.getAttribute("srcdoc") ?? "";
-    expect(doc).toContain("color: #374151");
+    const dialog = openPreview();
+    const preview = within(dialog).getByRole("region", { name: "quarantine.safe_preview" });
+    expect(preview.textContent).toBe("Bonjour,\n\nVotre colis est bloqué.");
+    expect(preview).toHaveClass("whitespace-pre-wrap", "text-on-surface-variant");
+    expect(dialog.querySelector("iframe")).toBeNull();
   });
 });
 

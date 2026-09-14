@@ -22,7 +22,6 @@ import {
   useReportedEmails,
 } from "../lib/api";
 import { useActiveDomain } from "../contexts/active-domain";
-import { useTheme } from "../lib/theme";
 import { tidyPreviewText } from "../lib/quarantine-preview";
 
 const MotionDiv = motion.div as any;
@@ -38,11 +37,6 @@ export default function QuarantineRoute() {
   const { data: reportsData, isLoading: reportsLoading } = useReportedEmails();
   const reportedEmails = reportsData?.items ?? [];
   const { activeDomain } = useActiveDomain();
-  // The preview frame does not inherit the page colours: in dark mode its dark
-  // grey text sat unreadable on the dark panel.
-  const [theme] = useTheme();
-  const previewText = theme === "dark" ? "#cbd5e1" : "#374151";
-  const previewLink = theme === "dark" ? "#93c5fd" : "#2563eb";
 
   // Queries & Mutations
   const { data: items, isLoading, error, refetch } = useQuarantineItems(activeDomain);
@@ -110,16 +104,6 @@ export default function QuarantineRoute() {
     } catch (err) {
       setActionError(t(quarantineActionErrorKey(err)));
     }
-  };
-
-  const renderSafeHtml = (rawText: string) => {
-    const escaped = rawText
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-    return escaped.replace(/\n/g, "<br />");
   };
 
   // Only phishing emails belong in this list, newest first whatever order the server sends.
@@ -393,14 +377,18 @@ export default function QuarantineRoute() {
               </div>
             </div>
 
-            {/* Sandboxed preview frame: scripts, images and links are inert. */}
+            {/* Plain text, never HTML: nothing in the message is interpreted, so
+                scripts, images and links stay inert without an embedded frame,
+                which Chrome painted blank for an instant on every open. */}
             <div className="pt-2">
-              <iframe
-                title={t("quarantine.safe_preview")}
-                srcDoc={`<!DOCTYPE html><html><head><style>html, body { background: transparent; } body { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: ${previewText}; font-size: 13.5px; line-height: 1.6; margin: 10px; word-break: break-word; } a { color: ${previewLink}; pointer-events: none !important; text-decoration: underline; } img { display: none !important; }</style></head><body>${renderSafeHtml(tidyPreviewText(selectedItem.body_text))}</body></html>`}
-                sandbox=""
-                className="w-full h-[240px] bg-surface-low border border-border-subtle rounded-xl"
-              />
+              <div
+                role="region"
+                aria-label={t("quarantine.safe_preview")}
+                tabIndex={0}
+                className="h-[240px] w-full overflow-y-auto whitespace-pre-wrap break-words rounded-xl border border-border-subtle bg-surface-low p-3 text-[13.5px] leading-relaxed text-on-surface-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                {tidyPreviewText(selectedItem.body_text)}
+              </div>
             </div>
           </div>
         )}

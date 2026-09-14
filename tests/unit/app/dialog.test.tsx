@@ -83,6 +83,8 @@ describe("Dialog", () => {
     // A theme token flips to near-white in dark mode and washed the page out.
     expect(backdrop!.className).toMatch(/\bbg-black\/60\b/);
     expect(backdrop!.className).not.toMatch(/on-background/);
+    // No fade either: the dim is there from the first frame.
+    expect(backdrop).not.toHaveAttribute("style");
     // No fade or scale on the panel: an embedded frame showed through ahead of it.
     expect(screen.getByRole("dialog")).not.toHaveAttribute("style");
   });
