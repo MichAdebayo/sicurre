@@ -369,6 +369,34 @@ class CloudflareProvisioner:
         logger.info("Email routing rule created (id=%s) for %s", rule_id, target_email)
         return str(rule_id)
 
+    async def restore_forwarding(self, zone_id: str, address: str, forward_to: str) -> bool:
+        """Give a disconnected address back its forward to the verified destination.
+
+        Connecting replaced the address's own forward rule with the Worker rule, so
+        removing the Worker rule alone left mail to that address with no route on a
+        zone without a catch-all. Returns False, creating nothing, when a rule for
+        the address still exists.
+        """
+        data = await self._get(f"/zones/{zone_id}/email/routing/rules")
+        for rule in data.get("result", []):
+            for matcher in rule.get("matchers", []):
+                if (
+                    matcher.get("type") == "literal"
+                    and str(matcher.get("value", "")).lower() == address.lower()
+                ):
+                    return False
+        await self._post(
+            f"/zones/{zone_id}/email/routing/rules",
+            body={
+                "name": f"Forward {address}",
+                "enabled": True,
+                "matchers": [{"type": "literal", "field": "to", "value": address}],
+                "actions": [{"type": "forward", "value": [forward_to]}],
+            },
+        )
+        logger.info("Restored forwarding for %s to its verified destination", address)
+        return True
+
     async def delete_email_rule(self, zone_id: str, rule_id: str) -> None:
         await self._delete(f"/zones/{zone_id}/email/routing/rules/{rule_id}")
         logger.info("Email routing rule %s deleted", rule_id)

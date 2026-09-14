@@ -969,3 +969,67 @@ async def test_teardown_keeps_a_worker_the_caller_marks_as_shared() -> None:
     assert del_rule.called, "the connected address's own rule still goes"
     assert not catch_all.called
     assert not del_worker.called
+
+
+# --------------------------------------------------------------------------- ──
+# Connecting replaces the protected address's forward rule with the Worker rule.
+# A disconnect gives the forward back, unless a rule for the address remains.
+# --------------------------------------------------------------------------- ──
+
+_RULES = "https://api.cloudflare.com/client/v4/zones/zone-123/email/routing/rules"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_restore_forwarding_recreates_the_forward_rule() -> None:
+    provisioner = CloudflareProvisioner(api_token="token")
+    respx.get(_RULES).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "success": True,
+                "result": [
+                    {
+                        "id": "other",
+                        "matchers": [{"type": "literal", "field": "to", "value": "support@example.test"}],
+                        "actions": [{"type": "forward", "value": ["inbox@gmail.test"]}],
+                    }
+                ],
+            },
+        )
+    )
+    created = respx.post(_RULES).mock(
+        return_value=httpx.Response(200, json={"success": True, "result": {"id": "restored"}})
+    )
+
+    assert await provisioner.restore_forwarding("zone-123", "Owner@example.test", "inbox@gmail.test")
+
+    body = json.loads(created.calls.last.request.content)
+    assert body["matchers"] == [{"type": "literal", "field": "to", "value": "Owner@example.test"}]
+    assert body["actions"] == [{"type": "forward", "value": ["inbox@gmail.test"]}]
+    assert body["enabled"] is True
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_restore_forwarding_leaves_an_existing_rule_for_the_address_alone() -> None:
+    provisioner = CloudflareProvisioner(api_token="token")
+    respx.get(_RULES).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "success": True,
+                "result": [
+                    {
+                        "id": "still-there",
+                        "matchers": [{"type": "literal", "field": "to", "value": "owner@example.test"}],
+                        "actions": [{"type": "worker", "value": ["my-worker"]}],
+                    }
+                ],
+            },
+        )
+    )
+    created = respx.post(_RULES).mock(return_value=httpx.Response(200, json={"success": True}))
+
+    assert not await provisioner.restore_forwarding("zone-123", "OWNER@example.test", "inbox@gmail.test")
+    assert not created.called

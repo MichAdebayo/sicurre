@@ -77,8 +77,10 @@ on our side - the wildcard is not client-specific.
 
 **Self-service path.** Settings, Profile, "Supprimer mon compte": the member
 types their address in the confirmation dialog, the API tears every connected
-domain down on Cloudflare, deletes every workspace row and the Better Auth
-identity, and the shell signs out and confirms the deletion. If Cloudflare refuses (revoked token, zone gone), the erasure stops
+domain down on Cloudflare, deletes every stored quarantine copy, then every
+workspace row and the Better Auth identity, and the shell signs out and
+confirms the deletion. If quarantine storage is unreachable, the erasure stops
+before any row is deleted and can be retried. If Cloudflare refuses (revoked token, zone gone), the erasure stops
 before any row is deleted and the member sees the reason; fix the domain
 (disconnect it with a fresh token, or delete the stored token) and retry.
 
@@ -96,8 +98,9 @@ creates a second Worker, named after the zone id, and a rule for the
 connected address only. Every teardown (Settings, Domains, "Dissocier", and
 both erasure paths above) reads the zone's catch-all first and never deletes
 the Worker it points to, keeping it too when the catch-all cannot be read.
-It also leaves `dmarc@sicurre.com` in sicurre.com's own DMARC record. The
-connected address then falls back to the catch-all. To remove the rows by
+It also leaves `dmarc@sicurre.com` in sicurre.com's own DMARC record. Every
+teardown gives the connected address its forward rule to the verified
+destination back, unless a rule for that address still exists. To remove the rows by
 hand, in one transaction, dependants first:
 
 ```sql

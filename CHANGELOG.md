@@ -5,6 +5,34 @@ notes are generated from Conventional Commits by semantic-release and published
 to [GitHub Releases](https://github.com/MichAdebayo/sicurre/releases), which is
 the authoritative record. This file summarises the notable changes only.
 
+## [1.37.12] - 2026-09-14
+
+- Account deletion erases every stored quarantine copy before its rows,
+  instead of leaving the raw messages in storage until the 14-day lifecycle
+  expired them. A storage failure stops the deletion before any row goes.
+- Disconnecting a domain, alone or through account deletion, gives the
+  protected address its forward to the verified destination back. Connecting
+  had replaced that rule with the Worker rule, so on a zone without a
+  catch-all the address was left with no route.
+- Settings: account deletion is a clear danger zone with a description and a
+  standard-size button; its dialog is wider and lists what the deletion removes.
+  The token revoke and domain disconnect confirmations use the shared dialog,
+  and the Cloudflare token buttons use the shared button sizes.
+- The activation notice on the sign-in form clears once the member signs in or
+  out, instead of returning on every later sign-in in the same tab.
+- The privacy page describes what account deletion removes.
+- Dark mode: the dialog backdrop is a dark dim in both themes instead of the
+  near-white on-background token, which washed the page out behind every
+  dialog, and the quarantine preview text follows the theme so it stays
+  readable on the dark panel.
+- The quarantine preview tidies the stored text before display: Windows line
+  endings, whitespace-only lines and runs of blank lines no longer turn a short
+  message into a long scroll.
+- The sidebar is 264px wide so the workspace status and the analysed e-mail
+  count sit on one line.
+- The latency SLO alert needs at least 20 gateway requests in its window, like
+  the 5xx alert: one slow account deletion on quiet traffic paged it.
+
 ## [1.37.11] - 2026-09-14
 
 - A tab left open across a deploy no longer lands on a white screen. When a

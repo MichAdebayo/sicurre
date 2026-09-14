@@ -53,7 +53,7 @@
     {
       "uid": "sicurre-high-latency",
       "title": "Sicurre latency above SLO",
-      "expression": "histogram_quantile(0.95, sum by (le) (rate(sicurre_app_gateway_request_duration_seconds_bucket{stack=\"sicurre\",route=~\"app|api|auth\"}[5m])))",
+      "expression": "histogram_quantile(0.95, sum by (le) (rate(sicurre_app_gateway_request_duration_seconds_bucket{stack=\"sicurre\",route=~\"app|api|auth\"}[5m]))) and on() (sum(increase(sicurre_app_gateway_request_duration_seconds_count{stack=\"sicurre\",route=~\"app|api|auth\"}[5m])) >= 20)",
       "operator": "gt",
       "threshold": 5,
       "for": "5m",

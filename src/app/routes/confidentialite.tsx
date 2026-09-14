@@ -117,6 +117,19 @@ export default function ConfidentialiteRoute({ onBack }: ConfidentialiteProps) {
               ou depuis Cloudflare en révoquant le jeton API et en désactivant le routage/Worker associé au domaine.
             </p>
           </section>
+
+          <section className="space-y-3">
+            <h2 className="font-display font-medium text-lg text-night-text">6. Suppression de votre compte</h2>
+            <p className="text-sm text-night-muted leading-relaxed">
+              Depuis les paramètres, la suppression du compte est immédiate et ne peut pas être annulée :
+            </p>
+            <ul className="list-disc pl-5 text-sm text-night-muted space-y-1.5">
+              <li>sur chaque domaine connecté, la règle de routage et le Worker Sicurre sont retirés de Cloudflare, ainsi que l’adresse de rapports DMARC de Sicurre ;</li>
+              <li>l’adresse protégée retrouve son transfert vers la boîte de réception vérifiée ;</li>
+              <li>l’espace de travail, les alertes, le journal des menaces, les réglages et le compte sont effacés de la base applicative ;</li>
+              <li>les copies des e-mails en quarantaine sont effacées immédiatement.</li>
+            </ul>
+          </section>
         </MotionDiv>
         </main>
 

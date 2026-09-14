@@ -70,6 +70,18 @@ def test_gateway_error_alert_requires_meaningful_customer_traffic() -> None:
     assert rule["for"] == "10m"
 
 
+def test_latency_alert_requires_meaningful_customer_traffic() -> None:
+    """One slow account deletion on quiet traffic paged the latency SLO."""
+    alerts = json.loads(ALERT_RULES.read_text(encoding="utf-8"))
+    rule = next(rule for rule in alerts["rules"] if rule["uid"] == "sicurre-high-latency")
+
+    assert rule["expression"].startswith("histogram_quantile(0.95,")
+    assert 'route=~"app|api|auth"' in rule["expression"]
+    assert "sicurre_app_gateway_request_duration_seconds_count" in rule["expression"]
+    assert ">= 20" in rule["expression"]
+    assert rule["for"] == "5m"
+
+
 def test_shared_active_series_budget_is_visible_and_alerted() -> None:
     """Keep the shared Grafana free-tier budget observable before exhaustion."""
     dashboard = json.loads(TELEMETRY_DASHBOARD.read_text(encoding="utf-8"))
