@@ -1,15 +1,18 @@
+# Frozen on 14 September 2026: collection is stopped. CD installs this file on
+# every deploy, so the jobs stay commented here. To resume, remove the
+# "# frozen: " prefix from each job line.
 SHELL=/bin/sh
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 COMPOSE="docker compose -f /home/sicurre-prod/sicurre/docker-compose.prod.yml"
 
-45 1 * * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/app/run_quarantine_purge.py >> /home/sicurre-prod/sicurre/cron-quarantine-purge.log 2>&1
-17 */6 * * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/app/run_domain_shield_monitor.py >> /home/sicurre-prod/sicurre/cron-domain-shield.log 2>&1
-15 2 * * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/api/run_phishtank_ingestion.py >> /home/sicurre-prod/sicurre/cron-phishtank.log 2>&1
-35 2 * * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/file/run_csv_ingestion.py >> /home/sicurre-prod/sicurre/cron-file.log 2>&1
-20 3 * * 1 cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/scraping/run_sekoia_ioc.py >> /home/sicurre-prod/sicurre/cron-sekoia.log 2>&1
-45 3 * * 2 cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/scraping/run_certfr_cti.py >> /home/sicurre-prod/sicurre/cron-certfr.log 2>&1
-10 4 1 * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/database/run_sql_ingestion.py >> /home/sicurre-prod/sicurre/cron-database.log 2>&1
-10 5 2 * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py >> /home/sicurre-prod/sicurre/cron-common-crawl.log 2>&1
+# frozen: 45 1 * * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/app/run_quarantine_purge.py >> /home/sicurre-prod/sicurre/cron-quarantine-purge.log 2>&1
+# frozen: 17 */6 * * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/app/run_domain_shield_monitor.py >> /home/sicurre-prod/sicurre/cron-domain-shield.log 2>&1
+# frozen: 15 2 * * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/api/run_phishtank_ingestion.py >> /home/sicurre-prod/sicurre/cron-phishtank.log 2>&1
+# frozen: 35 2 * * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/file/run_csv_ingestion.py >> /home/sicurre-prod/sicurre/cron-file.log 2>&1
+# frozen: 20 3 * * 1 cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/scraping/run_sekoia_ioc.py >> /home/sicurre-prod/sicurre/cron-sekoia.log 2>&1
+# frozen: 45 3 * * 2 cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/scraping/run_certfr_cti.py >> /home/sicurre-prod/sicurre/cron-certfr.log 2>&1
+# frozen: 10 4 1 * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/database/run_sql_ingestion.py >> /home/sicurre-prod/sicurre/cron-database.log 2>&1
+# frozen: 10 5 2 * * cd /home/sicurre-prod/sicurre && $COMPOSE run --rm --no-deps sicurre-api uv run --no-sync python src/data_platform/cron_schedulers/bigdata/run_incremental_cc.py >> /home/sicurre-prod/sicurre/cron-common-crawl.log 2>&1
 
 # Release publishes a dataset and dispatches training. Normally `30 6 3 * *`.
-30 6 13 * * cd /home/sicurre-prod/sicurre && $COMPOSE --profile release run --rm --no-deps sicurre-data-release >> /home/sicurre-prod/sicurre/cron-dataset-release.log 2>&1
+# frozen: 30 6 13 * * cd /home/sicurre-prod/sicurre && $COMPOSE --profile release run --rm --no-deps sicurre-data-release >> /home/sicurre-prod/sicurre/cron-dataset-release.log 2>&1

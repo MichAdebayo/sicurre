@@ -50,6 +50,10 @@ crontab /home/sicurre-prod/sicurre/deploy/hetzner/sicurre-crontab.example
 crontab -l
 ```
 
+The jobs are frozen since 14 September 2026: every job line in
+`sicurre-crontab.example` starts with `# frozen: `, and CD installs the file as
+is on each deploy, so deploys keep them stopped. Remove the prefix to resume.
+
 Source entries start ephemeral tasks from the deployed API image, with the same
 `deploy/env.api` configuration as the API service. The monthly publication uses
 the dedicated `sicurre-data-release` image, which adds Kaggle tooling without

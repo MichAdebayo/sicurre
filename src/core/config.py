@@ -218,10 +218,10 @@ class Settings(BaseSettings):
         description="Private app gateway base URL used only by runtime health probes.",
     )
     scheduler_enabled: bool = False
-    # Holds a pooled connection open so a scan does not pay connection setup to a
-    # suspended serverless database. It also stops Neon suspending compute at all,
-    # which is metered, so it is a switch rather than a constant.
-    db_keepalive_enabled: bool = True
+    # Off by default so Neon can scale the compute to zero when idle. When on, it
+    # pings every 30 seconds so a scan does not pay connection setup or a compute
+    # wake, and it keeps metered compute running around the clock.
+    db_keepalive_enabled: bool = False
     telemetry_traces_enabled: bool = False
     telemetry_otlp_endpoint: str = "http://alloy:4318/v1/traces"
     telemetry_trace_sample_ratio: float = Field(default=1.0, ge=0, le=1)
