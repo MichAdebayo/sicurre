@@ -113,11 +113,11 @@ def test_keepalive_can_be_turned_off_by_an_operator() -> None:
         db_keepalive.get_settings = original  # type: ignore[assignment]
 
 
-def test_the_keepalive_defaults_to_on() -> None:
-    """Turning it off is a deliberate act; the default preserves today's behaviour."""
+def test_the_keepalive_defaults_to_off() -> None:
+    """The ping keeps Neon compute awake around the clock, so running it is opt-in."""
     from core.config import Settings
 
-    assert Settings.model_fields["db_keepalive_enabled"].default is True
+    assert Settings.model_fields["db_keepalive_enabled"].default is False
 
 
 def test_keepalive_survives_a_failing_ping() -> None:

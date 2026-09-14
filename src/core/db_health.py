@@ -14,7 +14,7 @@ from prometheus_client import Gauge
 
 database_up = Gauge(
     "sicurre_database_up",
-    "1 when the database last answered, 0 when it last refused.",
+    "1 when the database last answered, 0 when it last refused, NaN before any round trip.",
 )
 database_last_success = Gauge(
     "sicurre_database_last_success_timestamp_seconds",
@@ -23,6 +23,15 @@ database_last_success = Gauge(
 
 # Nothing has been observed yet: neither reachable nor known-broken.
 _state: dict[str, float | str | None] = {"at": None, "ok": None, "detail": None}
+
+
+def _mark_unknown() -> None:
+    # A never-set gauge exports 0, which reads as an outage. Without the keepalive
+    # nothing may ping for hours, so unknown is NaN.
+    database_up.set(float("nan"))
+
+
+_mark_unknown()
 
 # Older than this and a caller wanting the truth has to go and look.
 STALE_AFTER_SECONDS = 90.0
@@ -57,3 +66,4 @@ def is_stale() -> bool:
 
 def reset_for_tests() -> None:
     _state.update(at=None, ok=None, detail=None)
+    _mark_unknown()
